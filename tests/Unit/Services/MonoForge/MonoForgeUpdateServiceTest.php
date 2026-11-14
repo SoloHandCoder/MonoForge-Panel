@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Unit\Services\MonoForge\MonoForgeUpdateServiceTest;
 
-use Carbon\CarbonImmutable;
 use FilesystemIterator;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
 use Illuminate\Http\Client\Request;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
-use Pterodactyl\Services\MonoForge\MonoForgeBuild;
 use Pterodactyl\Services\MonoForge\MonoForgeRelease;
 use Pterodactyl\Services\MonoForge\MonoForgeUpdateService;
 use Pterodactyl\Tests\TestCase;
@@ -26,6 +25,8 @@ uses(TestCase::class);
 const REPO = 'SoloHandCoder/MonoForge-Panel';
 const LATEST_URL = 'https://api.github.com/repos/SoloHandCoder/MonoForge-Panel/releases/latest';
 const LATEST_SHA = '9e8d7c6b5a4f30291817263544a3b2c1d0e9f8a7';
+const CURRENT_SHA = '3f9c2ab1d4e5f60718293a4b5c6d7e8f90a1b2c3';
+const COMPARE_URL = 'https://api.github.com/repos/SoloHandCoder/MonoForge-Panel/compare/'.CURRENT_SHA.'...'.LATEST_SHA;
 
 /** @return array<string, mixed> */
 function releasePayload(string $tag = 'build-9e8d7c6', bool $withChecksum = true): array
@@ -77,18 +78,44 @@ beforeEach(function (): void {
     config(['monoforge.update.mode' => 'notify', 'monoforge.update.repo' => REPO]);
 });
 
-test('compares builds by commit and build time', function (): void {
-    $current = new MonoForgeBuild('3f9c2ab', '3f9c2ab1d4e5f60718293a4b5c6d7e8f90a1b2c3', CarbonImmutable::parse('2026-11-14T12:00:00Z'));
-    $newer = new MonoForgeBuild('9e8d7c6', LATEST_SHA, CarbonImmutable::parse('2026-11-15T12:00:00Z'));
-    $older = new MonoForgeBuild('1a2b3c4', '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d', CarbonImmutable::parse('2026-11-13T12:00:00Z'));
+test('only offers a build that GitHub says is ahead of the running commit', function (string $comparison, string $expected): void {
+    $base = temporaryDirectory();
+    file_put_contents($base.'/version.json', json_encode(['version' => '3f9c2ab', 'commit' => CURRENT_SHA]));
+    Http::fake([
+        LATEST_URL => Http::response(releasePayload()),
+        COMPARE_URL => $comparison === 'error' ? Http::response('nope', 500) : Http::response(['status' => $comparison]),
+    ]);
 
-    expect(MonoForgeBuild::isNewer(null, $newer))->toBeTrue()
-        ->and(MonoForgeBuild::isNewer($current, $newer))->toBeTrue()
-        ->and(MonoForgeBuild::isNewer($current, $older))->toBeFalse()
-        ->and(MonoForgeBuild::isNewer($current, $current))->toBeFalse()
+    try {
+        $service = updateService($base, $base.'/work');
+
+        expect($service->updateCheck())->toBe($expected)
+            ->and($service->isUpdateAvailable())->toBe($expected === 'available');
+    } finally {
+        deleteDirectory($base);
+    }
+})->with([
+    'ahead' => ['ahead', 'available'],
+    'an older release (re-run or downgrade)' => ['behind', 'current'],
+    'diverged' => ['diverged', 'current'],
+    'the comparison failed' => ['error', 'unknown'],
+]);
+
+test('treats the same commit as current and an unknown running build as outdated without comparing', function (): void {
+    $base = temporaryDirectory();
+    Http::fake([LATEST_URL => Http::response(releasePayload())]);
+
+    try {
+        $service = updateService($base, $base.'/work');
+        expect($service->updateCheck())->toBe('available');
+
         // A short hash and the full hash of one commit are the same build.
-        ->and(MonoForgeBuild::isNewer(new MonoForgeBuild('9e8d7c6', '9e8d7c6'), $newer))->toBeFalse()
-        ->and(MonoForgeBuild::isNewer(new MonoForgeBuild('3f9c2ab', '3f9c2ab'), $newer))->toBeTrue();
+        file_put_contents($base.'/version.json', json_encode(['version' => '9e8d7c6', 'commit' => '9e8d7c6']));
+        expect($service->updateCheck())->toBe('current');
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/compare/'));
+    } finally {
+        deleteDirectory($base);
+    }
 });
 
 test('reads releases only from build tags that carry the tarball and its checksum', function (): void {
@@ -105,8 +132,8 @@ test('reads releases only from build tags that carry the tarball and its checksu
 
 test('reports an update when the running build is older and caches the lookup', function (): void {
     $base = temporaryDirectory();
-    file_put_contents($base.'/version.json', json_encode(['version' => '3f9c2ab', 'commit' => '3f9c2ab1d4e5f60718293a4b5c6d7e8f90a1b2c3', 'built_at' => '2026-11-14T12:00:00Z']));
-    Http::fake([LATEST_URL => Http::response(releasePayload())]);
+    file_put_contents($base.'/version.json', json_encode(['version' => '3f9c2ab', 'commit' => CURRENT_SHA, 'built_at' => '2026-11-14T12:00:00Z']));
+    Http::fake([LATEST_URL => Http::response(releasePayload()), COMPARE_URL => Http::response(['status' => 'ahead'])]);
 
     try {
         $service = updateService($base, $base.'/work');
@@ -114,7 +141,8 @@ test('reports an update when the running build is older and caches the lookup', 
         expect($service->currentVersion())->toBe('3f9c2ab')
             ->and($service->isUpdateAvailable())->toBeTrue()
             ->and($service->latest()?->build->version)->toBe('9e8d7c6');
-        Http::assertSentCount(1);
+        // One release lookup and one comparison, both cached.
+        Http::assertSentCount(2);
 
         config(['monoforge.update.mode' => 'off']);
         expect($service->isUpdateAvailable())->toBeFalse();
@@ -180,6 +208,30 @@ test('the update command reports an available build with --check and installs no
             ->and(Artisan::output())->toContain('MonoForge build 9e8d7c6 is up to date.');
 
         Process::assertNothingRan();
+    } finally {
+        deleteDirectory($base);
+    }
+});
+
+test('a stale unfinished run is recovered by bringing the panel back up', function (): void {
+    $base = temporaryDirectory();
+    $work = $base.'/work';
+    mkdir($work);
+    file_put_contents($work.'/run.json', json_encode(['backup' => null, 'down' => true, 'touched' => false]));
+    file_put_contents($work.'/status.json', json_encode(['state' => 'running', 'step' => 'backing_up']));
+    Process::fake();
+
+    try {
+        $service = updateService($base, $work);
+
+        expect($service->status()['error'])->toContain('p:monoforge:recover');
+
+        $status = $service->recoverIfStale();
+
+        expect($status['message'] ?? null)->toBe('Recovered from an unfinished update.')
+            ->and(is_file($work.'/run.json'))->toBeFalse()
+            ->and($service->recoverIfStale())->toBeNull();
+        Process::assertRan(fn (PendingProcess $process): bool => is_array($process->command) && in_array('up', $process->command, true));
     } finally {
         deleteDirectory($base);
     }

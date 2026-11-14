@@ -8,7 +8,6 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Pterodactyl\Exceptions\Service\MonoForge\UpdateFailedException;
-use Pterodactyl\Services\MonoForge\MonoForgeBuild;
 use Pterodactyl\Services\MonoForge\MonoForgeRelease;
 use Pterodactyl\Services\MonoForge\MonoForgeUpdateService;
 
@@ -16,13 +15,13 @@ use Pterodactyl\Services\MonoForge\MonoForgeUpdateService;
 #[Signature('p:monoforge:update
     {--check : Only report whether a newer build is available.}
     {--force : Install the latest build now, whatever the update mode, even if it is already installed.}
-    {--pending : Install an update that an administrator requested from the panel, if there is one.}')]
+    {--pending : Recover an unfinished update, then install an update requested from the panel, if any.}')]
 class UpdateCommand extends Command
 {
     public function handle(MonoForgeUpdateService $updates): int
     {
         if ($this->option('pending')) {
-            return $updates->hasPendingRequest() ? $this->apply($updates, force: false) : self::SUCCESS;
+            return $this->pending($updates);
         }
 
         $latest = $updates->latest(fresh: true);
@@ -34,23 +33,32 @@ class UpdateCommand extends Command
             return $this->option('force') ? self::FAILURE : self::SUCCESS;
         }
 
-        $available = MonoForgeBuild::isNewer($updates->current(), $latest->build);
-
-        if ($available) {
-            $this->components->info("Update available: MonoForge build {$latest->build->version} (running {$current}). {$latest->pageUrl()}");
-        } else {
-            $this->components->info("MonoForge build {$current} is up to date.");
-        }
+        $check = $updates->updateCheck($latest);
+        match ($check) {
+            'available' => $this->components->info("Update available: MonoForge build {$latest->build->version} (running {$current}). {$latest->pageUrl()}"),
+            'unknown' => $this->components->warn("Could not compare build {$current} with the latest build {$latest->build->version} on GitHub, so nothing is installed automatically."),
+            default => $this->components->info("MonoForge build {$current} is up to date."),
+        };
 
         if ($this->option('check')) {
             return self::SUCCESS;
         }
 
-        if ($this->option('force') || ($available && $updates->mode() === 'auto')) {
+        if ($this->option('force') || ($check === 'available' && $updates->mode() === 'auto')) {
             return $this->apply($updates, force: (bool) $this->option('force'));
         }
 
         return self::SUCCESS;
+    }
+
+    private function pending(MonoForgeUpdateService $updates): int
+    {
+        $recovered = $updates->recoverIfStale();
+        if ($recovered !== null) {
+            $this->components->warn($recovered['error'] ?? 'Recovered from an unfinished update.');
+        }
+
+        return $updates->hasPendingRequest() ? $this->apply($updates, force: false) : self::SUCCESS;
     }
 
     private function apply(MonoForgeUpdateService $updates, bool $force): int

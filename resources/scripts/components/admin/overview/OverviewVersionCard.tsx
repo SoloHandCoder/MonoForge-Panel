@@ -138,14 +138,16 @@ function CurrentAlert({ status }: { status: AdminUpdateStatus }) {
         );
     }
 
-    if (!status.latest) {
+    if (!status.latest || status.check === 'unknown') {
         return (
             <Alert
                 type='info'
                 title={`MonoForge build ${status.current_version} — latest build unknown`}
                 className='mb-6'
             >
-                The latest build could not be fetched from GitHub. It will be checked again shortly.
+                {status.latest
+                    ? `Build ${status.latest.version} is out, but GitHub could not confirm it is newer than this one, so it is not offered. It will be checked again shortly.`
+                    : 'The latest build could not be fetched from GitHub. It will be checked again shortly.'}
                 <LastFailure status={status} />
             </Alert>
         );

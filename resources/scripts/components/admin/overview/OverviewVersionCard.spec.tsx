@@ -41,6 +41,7 @@ const status = (overrides: Partial<AdminUpdateStatus> = {}): AdminUpdateStatus =
         tag: 'build-9e8d7c6',
         url: 'https://github.com/SoloHandCoder/MonoForge-Panel/releases/tag/build-9e8d7c6',
     },
+    check: 'available',
     update_available: true,
     status: { state: 'idle', step: null, message: null, from: null, to: null, error: null, updated_at: null },
     ...overrides,
@@ -54,6 +55,7 @@ describe('OverviewVersionCard', () => {
 
     it('shows the running build as up to date', () => {
         mocks.status = status({
+            check: 'current',
             update_available: false,
             latest: { ...build, tag: 'build-3f9c2ab', url: 'https://github.com/x' },
         });
@@ -106,6 +108,14 @@ describe('OverviewVersionCard', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(
             'The last update failed: The downloaded build does not match'
         );
+    });
+
+    it('does not offer a build GitHub could not confirm is newer', () => {
+        mocks.status = status({ check: 'unknown', update_available: false });
+        render(<OverviewVersionCard version={version} />);
+
+        expect(screen.getByRole('alert')).toHaveTextContent('latest build unknown');
+        expect(screen.queryByRole('button', { name: 'Update now' })).not.toBeInTheDocument();
     });
 
     it('falls back to the version endpoint while the status loads', () => {

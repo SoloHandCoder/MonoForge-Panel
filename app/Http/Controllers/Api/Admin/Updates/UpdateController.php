@@ -42,6 +42,7 @@ class UpdateController extends AdminApiController
             'tag' => 'build-9e8d7c6',
             'url' => 'https://github.com/SoloHandCoder/MonoForge-Panel/releases/tag/build-9e8d7c6',
         ],
+        'check' => 'available',
         'update_available' => true,
         'status' => [
             'state' => 'idle',
@@ -64,6 +65,16 @@ class UpdateController extends AdminApiController
         ],
     ];
 
+    private const array ENVIRONMENT_ONLY_EXAMPLE = [
+        'errors' => [
+            [
+                'code' => 'DisplayException',
+                'status' => '400',
+                'detail' => 'This panel reads its settings from the environment only; set MONOFORGE_UPDATE_MODE in .env instead.',
+            ],
+        ],
+    ];
+
     public function __construct(private readonly MonoForgeUpdateService $updates) {}
 
     /**
@@ -73,6 +84,7 @@ class UpdateController extends AdminApiController
     #[ScribeResponse(self::STATUS_EXAMPLE, description: 'Update status returned.')]
     #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
     #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
+    #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
     #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
     #[ResponseField('status', 'object', 'The last requested or applied update.')]
     #[ResponseField('current', 'object', 'The running build, or null when the panel has no version.json.', nullable: true)]
@@ -105,6 +117,7 @@ class UpdateController extends AdminApiController
     #[ScribeResponse(self::ERROR_EXAMPLE, status: 400, description: 'Updates are off, one is already running or there is nothing newer to install.')]
     #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
     #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
+    #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
     #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
     #[ResponseField('status', 'object', 'The last requested or applied update.')]
     #[ResponseField('current', 'object', 'The running build, or null when the panel has no version.json.', nullable: true)]
@@ -140,10 +153,18 @@ class UpdateController extends AdminApiController
      */
     #[Endpoint('Update update settings', 'Sets the update mode: off, notify (check daily) or auto (check hourly and install new builds).')]
     #[ScribeResponse(status: 204, description: 'Update mode saved.')]
+    #[ScribeResponse(self::ENVIRONMENT_ONLY_EXAMPLE, status: 400, description: 'The panel reads its settings from the environment only.')]
     public function settings(UpdateUpdateSettingsRequest $request): Response
     {
-        Setting::put('settings::monoforge:update:mode', $request->string('mode')->toString());
-        config(['monoforge.update.mode' => $request->string('mode')->toString()]);
+        throw_if(config('pterodactyl.load_environment_only'), DisplayException::class, 'This panel reads its settings from the environment only; set MONOFORGE_UPDATE_MODE in .env instead.');
+
+        $mode = $request->string('mode')->toString();
+        Setting::put('settings::monoforge:update:mode', $mode);
+        config(['monoforge.update.mode' => $mode]);
+
+        if ($mode === 'off') {
+            $this->updates->cancelPending();
+        }
 
         return $this->returnNoContent();
     }
@@ -163,6 +184,7 @@ class UpdateController extends AdminApiController
             'latest' => $latest instanceof MonoForgeRelease
                 ? [...$latest->build->toArray(), 'tag' => $latest->tag, 'url' => $latest->pageUrl()]
                 : null,
+            'check' => $mode === 'off' ? 'off' : $this->updates->updateCheck($latest),
             'update_available' => $this->updates->isUpdateAvailable($latest),
             'status' => $this->updates->status(),
         ];

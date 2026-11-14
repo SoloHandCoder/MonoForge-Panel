@@ -55,27 +55,6 @@ final readonly class MonoForgeBuild
     }
 
     /**
-     * Whether $latest should replace $current: an unknown current build, or a different
-     * commit that was not built before the current one.
-     */
-    public static function isNewer(?self $current, self $latest): bool
-    {
-        if (! $current instanceof self) {
-            return true;
-        }
-
-        if ($current->sameCommitAs($latest)) {
-            return false;
-        }
-
-        if ($current->builtAt instanceof CarbonImmutable && $latest->builtAt instanceof CarbonImmutable) {
-            return $latest->builtAt->greaterThan($current->builtAt);
-        }
-
-        return true;
-    }
-
-    /**
      * Whether both builds come from the same commit. Short and full hashes of one commit match.
      */
     public function sameCommitAs(self $other): bool

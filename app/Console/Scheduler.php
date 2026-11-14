@@ -44,18 +44,19 @@ final class Scheduler
     }
 
     /**
-     * Check for MonoForge builds daily (notify) or check and install them hourly (auto), and
-     * pick up updates requested from the admin area within a minute. These run as the panel
-     * user from cron, so updating never needs root.
+     * Every minute: recover an update that died part way and pick up updates requested
+     * from the admin area. Then check for MonoForge builds daily (notify) or check and
+     * install them hourly (auto). These run as the panel user from cron, so updating never
+     * needs root.
      */
     private function scheduleMonoForgeUpdates(Schedule $schedule): void
     {
+        $schedule->command(UpdateCommand::class, ['--pending'])->everyMinute()->withoutOverlapping(120)->runInBackground();
+
         $mode = config('monoforge.update.mode');
         if ($mode !== 'notify' && $mode !== 'auto') {
             return;
         }
-
-        $schedule->command(UpdateCommand::class, ['--pending'])->everyMinute()->withoutOverlapping(120)->runInBackground();
 
         if ($mode === 'auto') {
             $schedule->command(UpdateCommand::class)->hourly()->withoutOverlapping(120)->runInBackground();

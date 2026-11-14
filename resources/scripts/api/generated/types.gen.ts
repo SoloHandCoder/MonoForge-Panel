@@ -3970,6 +3970,10 @@ export type AdminGetUpdateStatusResponseBody = {
         url: string;
     } | null;
     /**
+     * off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).
+     */
+    check: 'off' | 'available' | 'current' | 'unknown';
+    /**
      * Whether the latest build should replace the running one.
      */
     update_available: boolean;
@@ -4017,6 +4021,10 @@ export type AdminApplyUpdateResponseBody = {
         tag: string;
         url: string;
     } | null;
+    /**
+     * off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).
+     */
+    check: 'off' | 'available' | 'current' | 'unknown';
     /**
      * Whether the latest build should replace the running one.
      */
@@ -10884,6 +10892,10 @@ export type AdminUpdateUpdateSettingsData = {
 };
 
 export type AdminUpdateUpdateSettingsErrors = {
+    /**
+     * The panel reads its settings from the environment only.
+     */
+    400: ErrorEnvelope;
     /**
      * Authentication credentials were missing or invalid.
      */
