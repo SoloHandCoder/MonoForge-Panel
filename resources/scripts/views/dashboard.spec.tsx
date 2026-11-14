@@ -82,6 +82,34 @@ it('gives owners power actions from list data, which carries no per-server meta'
     }
 });
 
+it('gives a subuser the Files shortcut only with the permission to read files', async () => {
+    registerViewLayer('theme', 'theme', {
+        'dashboard.serverCard': ({ model }: ViewProps<'dashboard.serverCard'>) => (
+            <span>files: {String(model.permissions.files)}</span>
+        ),
+    });
+
+    try {
+        await renderInApp(
+            <>
+                <View
+                    name='dashboard.serverCard'
+                    server={createTestServer({ owner: false, permissions: ['control.console'] })}
+                />
+                <View
+                    name='dashboard.serverCard'
+                    server={createTestServer({ owner: false, permissions: ['file.read'] })}
+                />
+            </>
+        );
+
+        expect(await screen.findByText('files: false')).toBeVisible();
+        expect(screen.getByText('files: true')).toBeVisible();
+    } finally {
+        clearThemeLayers();
+    }
+});
+
 it('renders the classic server list from a fixture, with a link and status pill per card', async () => {
     await renderInApp(
         <ViewFixtureProvider fixtures={{ 'dashboard.serverList': 'servers' }}>

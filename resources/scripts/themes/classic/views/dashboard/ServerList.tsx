@@ -19,7 +19,7 @@ import Welcome from './Welcome';
 import { Slot, View, type ServerListItem, type ServerListModel, type ViewProps } from '@/sdk/theme';
 
 const cardClass =
-    'group relative animate-rise rounded-[18px] border border-border bg-card p-5 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#4c3d86] hover:shadow-[0_16px_36px_-16px_rgba(139,92,246,.6)] focus-within:border-[#4c3d86]';
+    'group relative min-w-0 animate-rise rounded-[18px] border border-border bg-card p-5 transition-[translate,transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#4c3d86] hover:shadow-[0_16px_36px_-16px_rgba(139,92,246,.6)] focus-within:border-[#4c3d86]';
 
 function ServerRow({ item, index }: { item: ServerListItem; index: number }) {
     const { server } = item;

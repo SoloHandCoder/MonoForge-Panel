@@ -25,6 +25,8 @@ export interface ServerCardPermissions {
     readonly stop: boolean;
     readonly restart: boolean;
     readonly console: boolean;
+    /** May list the server's files, so the Files page opens. */
+    readonly files: boolean;
 }
 export interface ServerCardModel {
     readonly identifier: string;

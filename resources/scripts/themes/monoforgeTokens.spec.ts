@@ -45,4 +45,12 @@ describe('MonoForge tokens', () => {
         expect(css).toContain('prefers-reduced-motion: reduce');
         expect(css).toContain('@utility animate-rise');
     });
+
+    it('drops the hover lift under reduced motion, which Tailwind 4 draws with translate', () => {
+        const start = css.indexOf('@media (prefers-reduced-motion: reduce)');
+        const block = css.slice(start, css.indexOf('\n}', start));
+
+        expect(block).toContain(String.raw`.hover\:-translate-y-1:hover`);
+        expect(block).toContain('translate: none !important;');
+    });
 });

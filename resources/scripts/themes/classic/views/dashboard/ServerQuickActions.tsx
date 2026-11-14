@@ -29,12 +29,17 @@ export default function ServerQuickActions({ item, className }: { item: ServerLi
                         close();
                     }}
                 >
-                    Restart {item.name}? Players will be disconnected.
+                    Players will be disconnected.
                 </Dialog.ConfirmTrigger>
             )}
-            <PanelLink destination={{ to: '/server/$id/files', params: { id: identifier } }} className={actionClass}>
-                Files
-            </PanelLink>
+            {permissions.files && (
+                <PanelLink
+                    destination={{ to: '/server/$id/files', params: { id: identifier } }}
+                    className={actionClass}
+                >
+                    Files
+                </PanelLink>
+            )}
         </div>
     );
 }

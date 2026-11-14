@@ -108,7 +108,7 @@ function MetricsContent({ state }: { state: ServerCardState }) {
 
 export default function ServerCardMetrics({ model, className }: ViewProps<'dashboard.serverCard.metrics'>) {
     return (
-        <div className={cn('grid gap-3', className)}>
+        <div className={cn('grid grid-cols-1 gap-3', className)}>
             <MetricsContent state={model.state} />
         </div>
     );

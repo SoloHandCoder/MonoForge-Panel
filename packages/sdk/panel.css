@@ -469,6 +469,8 @@ body {
 
     .hover\:-translate-y-0\.5:hover,
     .hover\:-translate-y-1:hover {
+        /* Tailwind 4 draws the lift with the translate property, not transform. */
+        translate: none !important;
         transform: none !important;
     }
 }

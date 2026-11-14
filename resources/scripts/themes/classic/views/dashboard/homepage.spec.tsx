@@ -93,33 +93,126 @@ async function renderInApp(children: ReactNode) {
 
 describe('welcomeStats', () => {
     it('sums the memory of ready servers and counts the running ones', () => {
-        expect(welcomeStats(listModel(threeServers()))).toEqual({
-            online: 2,
-            total: 3,
-            memoryUsed: 3 * GiB,
-            memoryLimit: 12 * GiB,
-        });
+        expect(
+            welcomeStats(
+                listModel([
+                    item({ uuid: 'a', state: ready('running', GiB, 4 * GiB) }),
+                    item({ uuid: 'b', state: ready('offline', 2 * GiB, 8 * GiB) }),
+                ])
+            )
+        ).toEqual({ online: 1, total: 2, memory: { used: 3 * GiB, limit: 12 * GiB } });
     });
 
-    it('is all zeros without servers', () => {
-        expect(welcomeStats(listModel([]))).toEqual({ online: 0, total: 0, memoryUsed: 0, memoryLimit: 0 });
+    it('reports unlimited memory when any ready server has no limit', () => {
+        expect(welcomeStats(listModel(threeServers())).memory).toEqual({ used: 3 * GiB, limit: null });
+    });
+
+    it('leaves memory out without any live stats', () => {
+        expect(welcomeStats(listModel([]))).toEqual({ online: 0, total: 0, memory: null });
+        expect(welcomeStats(listModel([item({ state: { kind: 'loading' } })])).memory).toBeNull();
     });
 });
 
+const loaded = { pagination: { total: 3, count: 3, perPage: 25, currentPage: 1, totalPages: 1 } };
+
 describe('Welcome', () => {
     it('greets the user and shows the tiles', async () => {
-        await renderInApp(<Welcome model={listModel(threeServers())} />);
+        await renderInApp(<Welcome model={listModel(threeServers(), loaded)} />);
 
-        expect(screen.getByRole('heading').textContent).toContain('Hey solohandcoder');
+        expect(screen.getByText(/Hey/).textContent).toContain('Hey solohandcoder');
         expect(screen.getByText('2 / 3')).toBeVisible();
         expect(screen.getByText('servers online')).toBeVisible();
         expect(screen.getByText('memory in use')).toBeVisible();
+        expect(screen.getByText(/ \/ ∞$/)).toBeVisible();
     });
 
-    it('hides the tiles when listing other users servers', async () => {
-        await renderInApp(<Welcome model={listModel(threeServers(), { scope: 'others' })} />);
+    it('is not a page heading, so the page keeps one h1', async () => {
+        await renderInApp(<Welcome model={listModel(threeServers(), loaded)} />);
+
+        expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    });
+
+    it.each([
+        ['every server is online', [ready('running', 0, 1), ready('running', 0, 1)], ', your worlds are running.'],
+        [
+            'some servers are online',
+            [ready('running', 0, 1), ready('offline', 0, 1)],
+            ', 1 of your 2 servers are online.',
+        ],
+        ['no server is online', [ready('offline', 0, 1)], ', welcome back.'],
+        ['there are no servers', [], ', welcome back.'],
+    ])('says what is true when %s', async (_case, states, greeting) => {
+        const servers = states.map((state, index) => item({ uuid: String(index), state }));
+
+        await renderInApp(<Welcome model={listModel(servers, loaded)} />);
+
+        expect(screen.getByText(/Hey/).textContent).toBe(`Hey solohandcoder${greeting}`);
+        expect(screen.getByText('solohandcoder').tagName).toBe('SPAN');
+    });
+
+    it('does not claim the servers are running before they have loaded', async () => {
+        await renderInApp(<Welcome model={listModel(threeServers(), { loading: true, pagination: null })} />);
+
+        expect(screen.getByText(/Hey/).textContent).toBe('Hey solohandcoder, welcome back.');
+        expect(screen.queryByText('servers online')).not.toBeInTheDocument();
+        expect(screen.queryByText('memory in use')).not.toBeInTheDocument();
+    });
+
+    it('hides the tiles while the list reloads', async () => {
+        await renderInApp(<Welcome model={listModel(threeServers(), { ...loaded, loading: true })} />);
 
         expect(screen.queryByText('servers online')).not.toBeInTheDocument();
+    });
+
+    it('leaves the memory tile out without live stats', async () => {
+        await renderInApp(<Welcome model={listModel([item({ state: { kind: 'loading' } })], loaded)} />);
+
+        expect(screen.getByText('servers online')).toBeVisible();
+        expect(screen.queryByText('memory in use')).not.toBeInTheDocument();
+    });
+
+    it('hides the tiles and speaks neutrally when listing other users servers', async () => {
+        await renderInApp(<Welcome model={listModel(threeServers(), { ...loaded, scope: 'others' })} />);
+
+        expect(screen.queryByText('servers online')).not.toBeInTheDocument();
+        const text = screen.getByText(/Hey/).textContent ?? '';
+
+        expect(text).toBe("Hey solohandcoder, here are other users' servers.");
+        expect(text).not.toMatch(/\byour\b/);
+    });
+});
+
+describe('server card layout', () => {
+    it('keeps every grid to one fixed column so a long description cannot widen the page', async () => {
+        await renderInApp(
+            <ServerList
+                Default={() => null}
+                model={listModel(
+                    [item({ uuid: 'a', description: 'x'.repeat(400), state: ready('running', GiB, 4 * GiB) })],
+                    loaded
+                )}
+            />
+        );
+
+        const card = document.querySelector<HTMLElement>('[data-part="server-card"]')!;
+
+        expect(card.className).toContain('min-w-0');
+        const grids = [...card.querySelectorAll<HTMLElement>('.grid')];
+
+        expect(grids.length).toBeGreaterThan(1);
+        for (const grid of grids) {
+            expect(grid.className).toMatch(/\bgrid-cols-/);
+        }
+    });
+
+    it('lifts on hover with the translate property it also transitions', async () => {
+        await renderInApp(
+            <ServerList Default={() => null} model={listModel([item({ state: ready('running', 0, 1) })], loaded)} />
+        );
+
+        const card = document.querySelector<HTMLElement>('[data-part="server-card"]')!;
+
+        expect(card.className).toMatch(/transition-\[[^\]]*\btranslate\b/);
     });
 });
 
@@ -127,7 +220,7 @@ describe('ServerQuickActions', () => {
     it('hides Restart without the permission', async () => {
         await renderInApp(
             <ServerQuickActions
-                item={item({ permissions: { start: true, stop: true, restart: false, console: true } })}
+                item={item({ permissions: { start: true, stop: true, restart: false, console: true, files: true } })}
             />
         );
 
@@ -139,11 +232,22 @@ describe('ServerQuickActions', () => {
     it('hides Console without the permission', async () => {
         await renderInApp(
             <ServerQuickActions
-                item={item({ permissions: { start: true, stop: true, restart: true, console: false } })}
+                item={item({ permissions: { start: true, stop: true, restart: true, console: false, files: true } })}
             />
         );
 
         expect(screen.queryByRole('link', { name: 'Console' })).not.toBeInTheDocument();
+    });
+
+    it('hides Files without the permission to read files', async () => {
+        await renderInApp(
+            <ServerQuickActions
+                item={item({ permissions: { start: true, stop: true, restart: true, console: true, files: false } })}
+            />
+        );
+
+        expect(screen.queryByRole('link', { name: 'Files' })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Console' })).toBeVisible();
     });
 
     it('restarts only after the dialog is confirmed', async () => {
@@ -157,7 +261,8 @@ describe('ServerQuickActions', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Restart' }));
 
-        expect(screen.getByText('Restart Survival? Players will be disconnected.')).toBeVisible();
+        expect(screen.getByText('Players will be disconnected.')).toBeVisible();
+        expect(screen.queryByText(/Restart Survival\? Players/)).not.toBeInTheDocument();
         expect(restart).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getAllByRole('button', { name: 'Restart' }).at(-1)!);

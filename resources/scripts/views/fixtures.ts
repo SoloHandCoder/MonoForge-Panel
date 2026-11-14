@@ -65,7 +65,7 @@ export function createTestServerCard(options: Partial<ServerCardModel> = {}): Se
             memory: statMetric(256 * 1024 * 1024, 1024 * 1024 * 1024),
             disk: statMetric(512 * 1024 * 1024, 2048 * 1024 * 1024),
         },
-        permissions: { start: true, stop: true, restart: true, console: true },
+        permissions: { start: true, stop: true, restart: true, console: true, files: true },
         actions: { start: noop, stop: noop, restart: noop },
         sending: false,
         ...options,
