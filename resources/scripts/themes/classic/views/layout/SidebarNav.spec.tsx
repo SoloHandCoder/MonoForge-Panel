@@ -78,6 +78,13 @@ describe('SidebarNav on the dashboard', () => {
         expect(screen.getByTestId('server-count')).toHaveTextContent('7');
     });
 
+    it('tells screen readers how many servers there are', async () => {
+        await renderNav({ ...fixture('user'), serverCount: 7 });
+
+        expect(screen.getByTestId('server-count')).toHaveAttribute('aria-hidden');
+        expect(screen.getByRole('link', { name: /7 servers/ })).toHaveAttribute('href', '/');
+    });
+
     it('shows the brand, the search and the user', async () => {
         await renderNav({ ...fixture('admin'), brand: { name: 'MonoForge', logoUrl: null } });
 
@@ -118,10 +125,30 @@ describe('SidebarNav in an area', () => {
         const nav = screen.getByRole('navigation', { name: 'Server' });
 
         expect(nav).toHaveTextContent('Survival');
-        expect(nav).toHaveTextContent('running');
+        expect(nav).toHaveTextContent('Online');
+        expect(nav).not.toHaveTextContent('running');
         expect(within(nav).getByRole('link', { name: 'Console' })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: 'Files' })).toHaveAttribute('data-status', 'active');
         expect(screen.queryByRole('link', { name: 'API keys' })).not.toBeInTheDocument();
+    });
+
+    it.each([
+        ['running', 'Online'],
+        ['starting', 'Starting'],
+        ['stopping', 'Stopping'],
+        ['offline', 'Offline'],
+        [null, 'Unknown'],
+    ] as const)('labels the %s state as %s, like the server cards', async (state, label) => {
+        const model = fixture('serverArea');
+
+        await renderNav(
+            model.area.kind === 'server' ? { ...model, area: { ...model.area, state } } : model,
+            '/server/a1b2c3d4'
+        );
+
+        const badge = within(screen.getByRole('navigation', { name: 'Server' })).getByText(label);
+
+        expect(badge.textContent).toBe(label);
     });
 
     it('adds the server admin link for root admins', async () => {

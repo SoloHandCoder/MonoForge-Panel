@@ -204,9 +204,14 @@ function PanelNav({ model, area }: { model: AppLayoutModel; area: AccountArea | 
             {dashboard && (
                 <AppLink link={dashboard} label='Servers'>
                     {model.serverCount !== null && (
-                        <Badge size='sm' variant='soft' data-testid='server-count' aria-hidden>
-                            {model.serverCount}
-                        </Badge>
+                        <>
+                            <Badge size='sm' variant='soft' data-testid='server-count' aria-hidden>
+                                {model.serverCount}
+                            </Badge>
+                            <span className='sr-only'>
+                                , {model.serverCount} {model.serverCount === 1 ? 'server' : 'servers'}
+                            </span>
+                        </>
                     )}
                 </AppLink>
             )}
@@ -225,6 +230,8 @@ function PanelNav({ model, area }: { model: AppLayoutModel; area: AccountArea | 
 }
 
 const stateTone = { running: 'success', starting: 'warning', stopping: 'warning', offline: 'neutral' } as const;
+// The same words as the server cards' status pills.
+const stateLabel = { running: 'Online', starting: 'Starting', stopping: 'Stopping', offline: 'Offline' } as const;
 
 function ServerNav({ area }: { area: ServerArea }) {
     const items = area.adminLink ? [...area.nav.items, area.adminLink] : area.nav.items;
@@ -240,7 +247,7 @@ function ServerNav({ area }: { area: ServerArea }) {
                 <p className='flex items-center gap-2 px-3 pt-2 pb-1 text-sm font-semibold text-foreground'>
                     <span className='min-w-0 flex-1 truncate'>{area.name}</span>
                     <Badge size='sm' variant='soft' tone={area.state ? stateTone[area.state] : 'neutral'}>
-                        {area.state ?? 'unknown'}
+                        {area.state ? stateLabel[area.state] : 'Unknown'}
                     </Badge>
                 </p>
                 <AreaSlot area={area} at='before' />
