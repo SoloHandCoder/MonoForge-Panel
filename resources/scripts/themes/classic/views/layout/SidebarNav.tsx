@@ -15,6 +15,7 @@ import {
     LayoutDashboard,
     LogOut,
     MapPin,
+    MessageCircle,
     Network,
     Palette,
     Rocket,
@@ -43,6 +44,7 @@ import {
     type ServerArea,
 } from '@/sdk/theme';
 import MonoForgeMark from '../brand/MonoForgeMark';
+import { discordLinkProps } from '../brand/links';
 
 // The panel's own items render these directly, so they never wait for the icon catalog.
 const icons = new Map<string, LucideIcon>([
@@ -316,6 +318,12 @@ export default function SidebarNav({ model }: { model: AppLayoutModel }) {
             <View name='app.search' className={sidebarItemClass} />
             <div className='flex flex-col gap-2'>
                 <AreaNav model={model} />
+            </div>
+            <div className='flex flex-col gap-0.5'>
+                <a {...discordLinkProps} className={sidebarItemClass}>
+                    <Icon icon={MessageCircle} className='size-4 shrink-0' aria-hidden />
+                    <span className='min-w-0 flex-1 truncate'>Join our Discord</span>
+                </a>
             </div>
             <div className='mt-auto flex items-center gap-3 border-t border-sidebar-border px-1 pt-4'>
                 <Avatar name={user.uuid} size={32} />

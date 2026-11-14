@@ -68,6 +68,17 @@ describe('SidebarNav on the dashboard', () => {
         expect(screen.getByRole('link', { name: 'Account' })).not.toHaveAttribute('data-status', 'active');
     });
 
+    it('links to the Discord invite in a new tab', async () => {
+        await renderNav(fixture('user'));
+
+        expect(screen.getByRole('link', { name: 'Join our Discord' })).toHaveAttribute(
+            'href',
+            'https://discord.gg/B3fd45pgvC'
+        );
+        expect(screen.getByRole('link', { name: 'Join our Discord' })).toHaveAttribute('target', '_blank');
+        expect(screen.getByRole('link', { name: 'Join our Discord' })).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
     it('shows the server count once it has loaded', async () => {
         await renderNav(fixture('user'));
         expect(screen.queryByTestId('server-count')).not.toBeInTheDocument();

@@ -126,6 +126,16 @@ describe('Welcome', () => {
         expect(screen.getByText(/ \/ ∞$/)).toBeVisible();
     });
 
+    it('offers the Discord invite in a new tab', async () => {
+        await renderInApp(<Welcome model={listModel(threeServers(), loaded)} />);
+
+        const discord = screen.getByRole('link', { name: 'Join the Discord' });
+
+        expect(discord).toHaveAttribute('href', 'https://discord.gg/B3fd45pgvC');
+        expect(discord).toHaveAttribute('target', '_blank');
+        expect(discord).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
     it('is not a page heading, so the page keeps one h1', async () => {
         await renderInApp(<Welcome model={listModel(threeServers(), loaded)} />);
 

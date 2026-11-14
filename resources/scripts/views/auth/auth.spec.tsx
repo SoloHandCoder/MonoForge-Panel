@@ -130,6 +130,16 @@ describe('sign-in look', () => {
         expect(screen.getByRole('heading', { name: 'Login to Continue' })).toBeInTheDocument();
         unmount();
     });
+
+    it('links to the Discord invite in a new tab from the card footer', () => {
+        const { unmount } = renderView('page.auth.login');
+        const discord = screen.getByRole('link', { name: 'Join our Discord' });
+
+        expect(discord).toHaveAttribute('href', 'https://discord.gg/B3fd45pgvC');
+        expect(discord).toHaveAttribute('target', '_blank');
+        expect(discord).toHaveAttribute('rel', 'noopener noreferrer');
+        unmount();
+    });
 });
 
 describe('page.auth.login', () => {
