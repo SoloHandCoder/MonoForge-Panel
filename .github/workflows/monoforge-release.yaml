@@ -1,15 +1,18 @@
 name: MonoForge Release
 
-# Builds a ready-to-run panel tarball for every push to main and publishes it as a
-# GitHub release tagged build-<short sha>. Installed panels check the latest of these
-# releases and update themselves from its assets (see MonoForgeUpdateService).
+# Builds a ready-to-run panel tarball for every commit on main that passed the Tests
+# workflow (ci.yaml) and publishes it as a GitHub release tagged build-<short sha>.
+# Installed panels check the latest of these releases and update themselves from its
+# assets (see MonoForgeUpdateService).
 #
 # Releases are created with the workflow GITHUB_TOKEN, so they do not trigger other
 # workflows (docker.yaml listens for published releases).
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [main]
+  # Manual runs build the commit they are started on.
   workflow_dispatch:
 
 concurrency:
@@ -21,10 +24,21 @@ jobs:
     name: Build and publish
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Only commits whose Tests run passed, and only pushes to main (not pull requests).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     permissions:
       contents: write
+    env:
+      # The exact commit the Tests run passed for, not whatever main points at now.
+      BUILD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # gh runs outside the checkout (in the dist folder), so it is told the repository.
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.BUILD_SHA }}
 
       # The live panel runs PHP 8.3, so the production dependencies are resolved on it.
       - uses: shivammathur/setup-php@v2
@@ -50,9 +64,9 @@ jobs:
       - name: Write version.json
         id: version
         run: |
-          short="${GITHUB_SHA::7}"
+          short="${BUILD_SHA::7}"
           built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          jq -n --arg version "$short" --arg commit "$GITHUB_SHA" --arg built_at "$built_at" \
+          jq -n --arg version "$short" --arg commit "$BUILD_SHA" --arg built_at "$built_at" \
             '{version: $version, commit: $commit, built_at: $built_at}' > version.json
           cat version.json
           echo "short=$short" >> "$GITHUB_OUTPUT"
@@ -88,13 +102,13 @@ jobs:
           TAG: build-${{ steps.version.outputs.short }}
         run: |
           cd "$RUNNER_TEMP/dist"
-          notes="MonoForge Panel build of ${GITHUB_SHA} on main. Installed panels pick this up through their update check."
+          notes="MonoForge Panel build of ${BUILD_SHA} on main. Installed panels pick this up through their update check."
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" monoforge-panel.tar.gz monoforge-panel.tar.gz.sha256 version.json --clobber
             gh release edit "$TAG" --latest
           else
             gh release create "$TAG" monoforge-panel.tar.gz monoforge-panel.tar.gz.sha256 version.json \
-              --target "$GITHUB_SHA" \
+              --target "$BUILD_SHA" \
               --title "MonoForge build ${{ steps.version.outputs.short }}" \
               --notes "$notes" \
               --latest
