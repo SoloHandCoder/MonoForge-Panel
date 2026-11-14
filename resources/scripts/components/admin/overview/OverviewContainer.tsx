@@ -5,6 +5,7 @@ import { useAdminVersion } from '@/api/admin/version/queries';
 import type { AdminVersion } from '@/api/admin/version/queries';
 import AdminContentBlock from '@/components/admin/AdminContentBlock';
 import OverviewVersionCard from '@/components/admin/overview/OverviewVersionCard';
+import { REPOSITORY_URL } from '@/components/admin/overview/repository';
 import Spinner from '@/components/elements/Spinner';
 import { httpErrorToHuman } from '@/api/http';
 import { ServerError } from '@/components/elements/ScreenBlock';
@@ -26,8 +27,8 @@ const sections: { to: LinkProps['to']; label: string; description: string }[] = 
 
 const externalLinks = (version: AdminVersion) => [
     { href: version.discord, label: 'Get Help', icon: LifeBuoy },
-    { href: 'https://pterodactyl.io', label: 'Documentation', icon: BookOpen },
-    { href: 'https://github.com/pterodactyl/panel', label: 'GitHub', icon: Code2 },
+    { href: `${REPOSITORY_URL}#readme`, label: 'Documentation', icon: BookOpen },
+    { href: REPOSITORY_URL, label: 'GitHub', icon: Code2 },
     { href: version.donations, label: 'Support Project', icon: HeartHandshake },
 ];
 

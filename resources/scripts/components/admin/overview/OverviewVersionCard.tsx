@@ -1,5 +1,6 @@
 import type { AdminVersion } from '@/api/admin/version/queries';
 import { Alert } from '@/components/elements/alert';
+import { REPOSITORY_URL } from './repository';
 
 export default function OverviewVersionCard({ version }: { version: AdminVersion }) {
     return (
@@ -17,23 +18,23 @@ export default function OverviewVersionCard({ version }: { version: AdminVersion
                     You are running version <code className='font-mono'>{version.current}</code>; the latest available
                     is{' '}
                     <a
-                        href={`https://github.com/pterodactyl/panel/releases/v${version.latest}`}
+                        href={`${REPOSITORY_URL}/releases`}
                         target='_blank'
                         rel='noreferrer'
                         className='font-mono underline transition-colors hover:text-accent'
                     >
                         {version.latest}
                     </a>
-                    . Follow the{' '}
+                    . See the{' '}
                     <a
-                        href='https://pterodactyl.io/docs/v2/panel/updating'
+                        href={`${REPOSITORY_URL}/commits`}
                         target='_blank'
                         rel='noreferrer'
                         className='underline transition-colors hover:text-accent'
                     >
-                        update guide
+                        recent changes
                     </a>{' '}
-                    to upgrade.
+                    before you upgrade.
                 </>
             )}
         </Alert>

@@ -30,11 +30,14 @@ describe('OverviewVersionCard', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('A panel update is available.');
         expect(screen.getByRole('link', { name: '1.12.0' })).toHaveAttribute(
             'href',
-            'https://github.com/pterodactyl/panel/releases/v1.12.0'
+            'https://github.com/SoloHandCoder/MonoForge-Panel/releases'
         );
-        expect(screen.getByRole('link', { name: 'update guide' })).toHaveAttribute(
+        expect(screen.getByRole('link', { name: 'recent changes' })).toHaveAttribute(
             'href',
-            'https://pterodactyl.io/docs/v2/panel/updating'
+            'https://github.com/SoloHandCoder/MonoForge-Panel/commits'
         );
+        for (const link of screen.getAllByRole('link')) {
+            expect(link.getAttribute('href')).not.toMatch(/pterodactyl/i);
+        }
     });
 });
