@@ -137,6 +137,14 @@ class Node extends Model implements Identifiable
                 'sftp' => [
                     'bind_port' => $this->daemonSFTP,
                 ],
+                // Calagopus Wings (wings-rs) streams S3 backups by default through a
+                // remote endpoint this panel does not have, retrying for ~15 seconds
+                // before falling back. Pterodactyl Wings ignores this key.
+                'backups' => [
+                    's3' => [
+                        'streaming' => false,
+                    ],
+                ],
             ],
             'allowed_mounts' => $allowedMounts,
             'remote' => mb_rtrim($remote, '/'),

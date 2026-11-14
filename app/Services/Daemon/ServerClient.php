@@ -94,9 +94,19 @@ final readonly class ServerClient
      */
     public function logs(int $lines = 100): array
     {
+        // Pterodactyl Wings reads `size` and answers with {"data": [...]}. Calagopus
+        // Wings (wings-rs) reads `lines` and streams the log as plain text. Send
+        // both parameters and accept either response so either daemon works.
         $response = $this->connection->request('GET', "/api/servers/{$this->uuid}/logs", [
-            'query' => ['size' => $lines],
+            'query' => ['size' => $lines, 'lines' => $lines],
         ]);
+
+        if (str_starts_with(strtolower((string) $response->header('Content-Type')), 'text/plain')) {
+            $body = rtrim(str_replace("\r\n", "\n", $response->body()), "\n");
+
+            return $body === '' ? [] : array_slice(explode("\n", $body), -$lines);
+        }
+
         $data = $this->connection->decode($response, [
             'data.data' => ['present', 'nullable', 'array', 'list'],
             'data.data.*' => ['string'],
