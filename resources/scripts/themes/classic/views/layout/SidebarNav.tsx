@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+    Activity,
     Archive,
     ArrowLeft,
     Blocks,
@@ -9,6 +10,7 @@ import {
     ExternalLink,
     Folder,
     FolderTree,
+    HardDrive,
     History,
     KeyRound,
     Layers,
@@ -58,6 +60,8 @@ const icons = new Map<string, LucideIcon>([
     ['users', Users],
     ['archive', Archive],
     ['network', Network],
+    ['activity', Activity],
+    ['hard-drive', HardDrive],
     ['rocket', Rocket],
     ['settings', Settings],
     ['external-link', ExternalLink],

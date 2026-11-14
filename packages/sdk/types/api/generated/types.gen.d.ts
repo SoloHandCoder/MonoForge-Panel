@@ -3628,6 +3628,202 @@ export type AdminDisableExtensionResponseBody = {
         errored_at: string | null;
     };
 };
+export type AdminGetLiveUsageResponseBody = {
+    /**
+     * Every node, ordered by name.
+     */
+    nodes: Array<{
+        /**
+         * The node ID.
+         */
+        id: number;
+        /**
+         * The node name.
+         */
+        name: string;
+        /**
+         * Whether Wings answered: online or offline.
+         */
+        status: 'online' | 'offline';
+        /**
+         * CPU in use as a percentage where 100 is one thread.
+         */
+        cpu: {
+            /**
+             * CPU the node's servers use.
+             */
+            used: number;
+            /**
+             * The node's CPU threads times 100, when Wings reports them.
+             */
+            capacity: number | null;
+        };
+        /**
+         * Memory in bytes.
+         */
+        memory: {
+            /**
+             * Memory the node's servers use.
+             */
+            used_bytes: number;
+            /**
+             * Memory allocated to the node's servers.
+             */
+            allocated_bytes: number;
+            /**
+             * The node's configured memory.
+             */
+            capacity_bytes: number;
+        };
+        /**
+         * Disk in bytes.
+         */
+        disk: {
+            /**
+             * Disk the node's servers use, or null while the node is offline.
+             */
+            used_bytes: number | null;
+            /**
+             * Disk allocated to the node's servers.
+             */
+            allocated_bytes: number;
+            /**
+             * The node's configured disk.
+             */
+            capacity_bytes: number;
+        };
+        /**
+         * Servers Wings reports as running.
+         */
+        servers_online: number;
+        /**
+         * Servers on the node.
+         */
+        servers_total: number;
+        /**
+         * The node's servers, ordered by name.
+         */
+        servers: Array<{
+            /**
+             * The server ID.
+             */
+            id: number;
+            /**
+             * The server name.
+             */
+            name: string;
+            /**
+             * The Wings power state; unknown when Wings has no reading and offline when the node is unreachable.
+             */
+            state: string;
+            /**
+             * CPU in use as a percentage where 100 is one thread.
+             */
+            cpu: number;
+            /**
+             * The CPU limit as a percentage, or null when unlimited.
+             */
+            cpu_limit: number | null;
+            /**
+             * Memory in use.
+             */
+            memory_bytes: number;
+            /**
+             * The memory limit, or null when unlimited.
+             */
+            memory_limit_bytes: number | null;
+            /**
+             * Disk in use, or null without a reading.
+             */
+            disk_bytes: number | null;
+            /**
+             * The disk limit, or null when unlimited.
+             */
+            disk_limit_bytes: number | null;
+        }>;
+    }>;
+};
+export type AdminGetStorageUsageResponseBody = {
+    /**
+     * Every node, ordered by name.
+     */
+    nodes: Array<{
+        /**
+         * The node ID.
+         */
+        id: number;
+        /**
+         * The node name.
+         */
+        name: string;
+        /**
+         * Whether Wings answered: online or offline.
+         */
+        status: 'online' | 'offline';
+        /**
+         * Disk the node's servers use, or null while the node is offline.
+         */
+        used_bytes: number | null;
+        /**
+         * Disk allocated to the node's servers.
+         */
+        allocated_bytes: number;
+        /**
+         * The node's configured disk.
+         */
+        capacity_bytes: number;
+        /**
+         * Up to five servers using the most disk.
+         */
+        servers: Array<{
+            /**
+             * The server ID.
+             */
+            id: number;
+            /**
+             * The server name.
+             */
+            name: string;
+            /**
+             * Disk in use, or null without a reading.
+             */
+            used_bytes: number | null;
+            /**
+             * The disk limit, or null when unlimited.
+             */
+            limit_bytes: number | null;
+        }>;
+    }>;
+    /**
+     * Storage the panel itself uses.
+     */
+    website: {
+        /**
+         * The panel database's data and index size, or null when the database does not report it.
+         */
+        database_bytes: number | null;
+        /**
+         * The size of the panel's storage folder, or null when it cannot be read.
+         */
+        storage_bytes: number | null;
+        /**
+         * Successful backups stored on the nodes.
+         */
+        local_backups_bytes: number;
+        /**
+         * How many successful backups are stored on the nodes.
+         */
+        local_backups_count: number;
+        /**
+         * Successful backups stored in S3.
+         */
+        remote_backups_bytes: number;
+        /**
+         * How many successful backups are stored in S3.
+         */
+        remote_backups_count: number;
+    };
+};
 export type AdminListNodeAllocationIpsResponseBody = {
     data?: Array<string>;
 };
@@ -5834,6 +6030,54 @@ export type AdminGetNodeUtilizationResponses = {
     200: AdminNodeUtilizationResponse;
 };
 export type AdminGetNodeUtilizationResponse = AdminGetNodeUtilizationResponses[keyof AdminGetNodeUtilizationResponses];
+export type AdminGetLiveUsageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/insights/usage';
+};
+export type AdminGetLiveUsageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetLiveUsageError = AdminGetLiveUsageErrors[keyof AdminGetLiveUsageErrors];
+export type AdminGetLiveUsageResponses = {
+    /**
+     * Live usage returned.
+     */
+    200: AdminGetLiveUsageResponseBody;
+};
+export type AdminGetLiveUsageResponse = AdminGetLiveUsageResponses[keyof AdminGetLiveUsageResponses];
+export type AdminGetStorageUsageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/insights/storage';
+};
+export type AdminGetStorageUsageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetStorageUsageError = AdminGetStorageUsageErrors[keyof AdminGetStorageUsageErrors];
+export type AdminGetStorageUsageResponses = {
+    /**
+     * Storage usage returned.
+     */
+    200: AdminGetStorageUsageResponseBody;
+};
+export type AdminGetStorageUsageResponse = AdminGetStorageUsageResponses[keyof AdminGetStorageUsageResponses];
 export type AdminListServerMountsData = {
     body?: never;
     path: {

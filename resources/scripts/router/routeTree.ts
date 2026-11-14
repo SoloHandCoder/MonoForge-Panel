@@ -48,6 +48,7 @@ import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
+import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
     adminLocationListQueryParams,
     adminLocationQueryOptions,
@@ -907,6 +908,24 @@ const panelChildren = [
             () => import('@/components/admin/nodes/NodesContainer'),
             ['panel.nodes.before', 'panel.nodes.after']
         ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'usage',
+        staticData: { nav: { label: 'Live usage', icon: 'activity' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...adminLiveUsageQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/admin/insights/LiveUsageContainer')),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'storage',
+        staticData: { nav: { label: 'Storage', icon: 'hard-drive' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...adminStorageUsageQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/admin/insights/StorageContainer')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,
