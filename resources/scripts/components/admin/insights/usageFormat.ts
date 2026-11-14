@@ -25,9 +25,14 @@ export function usageTone(percent: number | null): UiTone {
 
 const percentText = (value: number): string => `${Math.round(value)}%`;
 
-/** CPU where 100% is one thread, such as `250% / 2100%`; the limit is left out when unknown or unlimited. */
-export function cpuText(used: number, capacity: number | null): string {
-    return capacity === null ? percentText(used) : `${percentText(used)} / ${percentText(capacity)}`;
+/**
+ * CPU where 100% is one thread, such as `250% / 2100%`; the limit is left out when unknown or
+ * unlimited, and a missing reading shows as a dash.
+ */
+export function cpuText(used: number | null, capacity: number | null): string {
+    const value = used === null ? '—' : percentText(used);
+
+    return capacity === null ? value : `${value} / ${percentText(capacity)}`;
 }
 
 /** Bytes against a limit, such as `1.5 GiB / 4 GiB`, or `1.5 GiB / ∞` when unlimited. */

@@ -16,6 +16,17 @@ export const liveUsageFixture: AdminLiveUsage = {
             servers_total: 2,
             servers: [
                 {
+                    id: 13,
+                    name: 'Awaiting',
+                    state: 'unknown',
+                    cpu: null,
+                    cpu_limit: null,
+                    memory_bytes: null,
+                    memory_limit_bytes: null,
+                    disk_bytes: null,
+                    disk_limit_bytes: null,
+                },
+                {
                     id: 11,
                     name: 'Idle',
                     state: 'offline',
@@ -89,6 +100,7 @@ export const storageUsageFixture: AdminStorageUsage = {
     website: {
         database_bytes: 50 * 1_048_576,
         storage_bytes: null,
+        storage_approximate: false,
         local_backups_bytes: 2 * GIB,
         local_backups_count: 1,
         remote_backups_bytes: 0,

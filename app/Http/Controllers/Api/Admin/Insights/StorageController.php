@@ -43,6 +43,7 @@ class StorageController extends AdminApiController
         'website' => [
             'database_bytes' => 52_428_800,
             'storage_bytes' => 104_857_600,
+            'storage_approximate' => false,
             'local_backups_bytes' => 10_737_418_240,
             'local_backups_count' => 4,
             'remote_backups_bytes' => 0,
@@ -59,7 +60,7 @@ class StorageController extends AdminApiController
     #[ResponseField('nodes.id', 'integer', 'The node ID.', required: true)]
     #[ResponseField('nodes.name', 'string', 'The node name.', required: true)]
     #[ResponseField('nodes.status', 'string', 'Whether Wings answered: online or offline.', required: true, enum: ['online', 'offline'])]
-    #[ResponseField('nodes.used_bytes', 'integer', "Disk the node's servers use, or null while the node is offline.", nullable: true)]
+    #[ResponseField('nodes.used_bytes', 'integer', "Disk the node's servers use, or null while the node is offline or none of its servers has a reading.", nullable: true)]
     #[ResponseField('nodes.allocated_bytes', 'integer', "Disk allocated to the node's servers.", required: true)]
     #[ResponseField('nodes.capacity_bytes', 'integer', "The node's configured disk.", required: true)]
     #[ResponseField('nodes.servers', 'object[]', 'Up to five servers using the most disk.', required: true)]
@@ -70,6 +71,7 @@ class StorageController extends AdminApiController
     #[ResponseField('website', 'object', 'Storage the panel itself uses.', required: true)]
     #[ResponseField('website.database_bytes', 'integer', "The panel database's data and index size, or null when the database does not report it.", nullable: true)]
     #[ResponseField('website.storage_bytes', 'integer', "The size of the panel's storage folder, or null when it cannot be read.", nullable: true)]
+    #[ResponseField('website.storage_approximate', 'boolean', 'Whether the storage folder walk stopped early, so its size is a lower bound.', required: true)]
     #[ResponseField('website.local_backups_bytes', 'integer', 'Successful backups stored on the nodes.', required: true)]
     #[ResponseField('website.local_backups_count', 'integer', 'How many successful backups are stored on the nodes.', required: true)]
     #[ResponseField('website.remote_backups_bytes', 'integer', 'Successful backups stored in S3.', required: true)]

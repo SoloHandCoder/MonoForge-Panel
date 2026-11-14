@@ -117,8 +117,12 @@ function WebsiteCard({ website }: { website: AdminWebsiteStorage }) {
                 <WebsiteFact
                     icon={FolderOpen}
                     label='Storage folder'
-                    value={orUnknown(website.storage_bytes)}
-                    detail='Logs, caches and uploads'
+                    value={`${website.storage_approximate ? 'At least ' : ''}${orUnknown(website.storage_bytes)}`}
+                    detail={
+                        website.storage_approximate
+                            ? 'Logs, caches and uploads; too many files to count them all'
+                            : 'Logs, caches and uploads'
+                    }
                 />
                 <WebsiteFact
                     icon={Archive}

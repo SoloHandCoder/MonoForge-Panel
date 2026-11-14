@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Insights;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
-use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
-use Pterodactyl\Facades\Daemon;
+use Illuminate\Support\Facades\Http;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Throwable;
 
 /**
  * Live resource use of every node and its servers, read from Wings. Nodes are named by
  * id and name only: connection addresses never leave this service.
  *
- * @phpstan-type ServerUsage array{id: int, name: string, state: string, cpu: float, cpu_limit: int|null, memory_bytes: int, memory_limit_bytes: int|null, disk_bytes: int|null, disk_limit_bytes: int|null}
- * @phpstan-type NodeUsage array{id: int, name: string, status: 'online'|'offline', cpu: array{used: float, capacity: int|null}, memory: array{used_bytes: int, allocated_bytes: int, capacity_bytes: int}, disk: array{used_bytes: int|null, allocated_bytes: int, capacity_bytes: int}, servers_online: int, servers_total: int, servers: list<ServerUsage>}
- * @phpstan-type LiveReading array{online: bool, cpu_count: int|null, servers: array<string, array{state: string, cpu: float, memory_bytes: int, disk_bytes: int}|null>}
+ * Every node is asked for its system information at once, then every reachable node's
+ * servers at once, each round with a short timeout, so one refresh takes at most about
+ * six seconds however many nodes and servers there are. A server Wings did not answer for
+ * in time has no reading; its node stays online.
+ *
+ * @phpstan-type ServerUsage array{id: int, name: string, state: string, cpu: float|null, cpu_limit: int|null, memory_bytes: int|null, memory_limit_bytes: int|null, disk_bytes: int|null, disk_limit_bytes: int|null}
+ * @phpstan-type NodeUsage array{id: int, name: string, status: 'online'|'offline', cpu: array{used: float, capacity: int|null}, memory: array{used_bytes: int|null, allocated_bytes: int, capacity_bytes: int}, disk: array{used_bytes: int|null, allocated_bytes: int, capacity_bytes: int}, servers_online: int, servers_total: int, servers: list<ServerUsage>}
+ * @phpstan-type ServerReading array{state: string, cpu: float|null, memory_bytes: int|null, disk_bytes: int|null}
+ * @phpstan-type LiveReading array{online: bool, cpu_count: int|null, servers: array<string, ServerReading>}
  */
 final readonly class NodeUsageService
 {
@@ -28,10 +38,17 @@ final readonly class NodeUsageService
     /** An unreachable node is retried less often, so its timeouts do not hold up every refresh. */
     private const int OFFLINE_CACHE_SECONDS = 20;
 
-    /** Wings calls made here give up quickly: a slow node shows as offline rather than stalling the page. */
+    /** Each round of Wings calls gives up after this long; two rounds bound a refresh. */
     private const int TIMEOUT_SECONDS = 3;
 
     private const int CONNECT_TIMEOUT_SECONDS = 2;
+
+    /** Only one request refreshes stale readings; the others wait for it, then read its results. */
+    private const string LOCK = 'insights:refresh';
+
+    private const int LOCK_SECONDS = 10;
+
+    private const int LOCK_WAIT_SECONDS = 7;
 
     /** @return list<NodeUsage> */
     public function nodes(): array
@@ -42,19 +59,26 @@ final readonly class NodeUsageService
             ->get(['id', 'uuid', 'name', 'node_id', 'memory', 'disk', 'cpu'])
             ->groupBy('node_id');
 
-        return array_values(Node::query()->orderBy('name')->get()
-            ->map(fn (Node $node): array => $this->node($node, array_values($servers->get($node->id)?->all() ?? [])))
-            ->all());
+        $nodes = array_values(Node::query()->orderBy('name')->get()->all());
+
+        /** @var array<int, list<Server>> $byNode */
+        $byNode = [];
+        foreach ($nodes as $node) {
+            $byNode[$node->id] = array_values($servers->get($node->id)?->all() ?? []);
+        }
+
+        $readings = $this->readings($nodes, $byNode);
+
+        return array_map(fn (Node $node): array => $this->node($node, $byNode[$node->id], $readings[$node->id]), $nodes);
     }
 
     /**
      * @param  list<Server>  $servers
+     * @param  LiveReading  $live
      * @return NodeUsage
      */
-    private function node(Node $node, array $servers): array
+    private function node(Node $node, array $servers, array $live): array
     {
-        $live = $this->reading($node, $servers);
-
         $rows = array_map(function (Server $server) use ($live): array {
             $reading = $live['servers'][$server->uuid] ?? null;
 
@@ -62,32 +86,30 @@ final readonly class NodeUsageService
                 'id' => $server->id,
                 'name' => $server->name,
                 'state' => $reading['state'] ?? ($live['online'] ? 'unknown' : 'offline'),
-                'cpu' => $reading['cpu'] ?? 0.0,
+                'cpu' => $reading['cpu'] ?? null,
                 'cpu_limit' => $server->cpu > 0 ? $server->cpu : null,
-                'memory_bytes' => $reading['memory_bytes'] ?? 0,
+                'memory_bytes' => $reading['memory_bytes'] ?? null,
                 'memory_limit_bytes' => $server->memory > 0 ? $server->memory * self::MEBIBYTE : null,
                 'disk_bytes' => $reading['disk_bytes'] ?? null,
                 'disk_limit_bytes' => $server->disk > 0 ? $server->disk * self::MEBIBYTE : null,
             ];
         }, $servers);
 
-        $diskReadings = array_filter(array_column($rows, 'disk_bytes'), fn (?int $bytes): bool => $bytes !== null);
-
         return [
             'id' => $node->id,
             'name' => $node->name,
             'status' => $live['online'] ? 'online' : 'offline',
             'cpu' => [
-                'used' => round(array_sum(array_column($rows, 'cpu')), 1),
+                'used' => round(array_sum($this->known(array_column($rows, 'cpu'))), 1),
                 'capacity' => $live['cpu_count'] === null ? null : $live['cpu_count'] * 100,
             ],
             'memory' => [
-                'used_bytes' => array_sum(array_column($rows, 'memory_bytes')),
+                'used_bytes' => $this->total($live['online'], $rows === [], array_column($rows, 'memory_bytes')),
                 'allocated_bytes' => array_sum(array_map(fn (Server $server): int => $server->memory, $servers)) * self::MEBIBYTE,
                 'capacity_bytes' => $node->memory * self::MEBIBYTE,
             ],
             'disk' => [
-                'used_bytes' => $live['online'] ? array_sum($diskReadings) : null,
+                'used_bytes' => $this->total($live['online'], $rows === [], array_column($rows, 'disk_bytes')),
                 'allocated_bytes' => array_sum(array_map(fn (Server $server): int => $server->disk, $servers)) * self::MEBIBYTE,
                 'capacity_bytes' => $node->disk * self::MEBIBYTE,
             ],
@@ -98,59 +120,211 @@ final readonly class NodeUsageService
     }
 
     /**
-     * The node's live reading, from cache when one was taken in the last few seconds.
+     * @template T of int|float
      *
-     * @param  list<Server>  $servers
-     * @return LiveReading
+     * @param  array<int, T|null>  $values
+     * @return list<T>
      */
-    private function reading(Node $node, array $servers): array
+    private function known(array $values): array
     {
-        $key = "insights:node:{$node->id}";
-
-        /** @var LiveReading|null $cached */
-        $cached = Cache::get($key);
-        if (is_array($cached)) {
-            return $cached;
-        }
-
-        $reading = $this->withShortTimeouts(fn (): array => $this->read($node, $servers));
-        Cache::put($key, $reading, now()->addSeconds($reading['online'] ? self::ONLINE_CACHE_SECONDS : self::OFFLINE_CACHE_SECONDS));
-
-        return $reading;
+        return array_values(array_filter($values, fn (int|float|null $value): bool => $value !== null));
     }
 
     /**
-     * @param  list<Server>  $servers
-     * @return LiveReading
+     * The sum of the readings there are; null when the node is offline or none of its servers has one.
+     *
+     * @param  array<int, int|null>  $values
      */
-    private function read(Node $node, array $servers): array
+    private function total(bool $online, bool $empty, array $values): ?int
     {
-        try {
-            $system = Daemon::node($node)->systemInformation();
-        } catch (DaemonConnectionException) {
-            return ['online' => false, 'cpu_count' => null, 'servers' => []];
+        $known = $this->known($values);
+        if (! $online || (! $empty && $known === [])) {
+            return null;
         }
 
+        return array_sum($known);
+    }
+
+    /**
+     * Each node's live reading, from cache when it is fresh; stale ones are refreshed in one round.
+     *
+     * @param  list<Node>  $nodes
+     * @param  array<int, list<Server>>  $servers
+     * @return array<int, LiveReading>
+     */
+    private function readings(array $nodes, array $servers): array
+    {
+        $readings = $this->cached($nodes);
+        if (count($readings) === count($nodes)) {
+            return $readings;
+        }
+
+        $refresh = function () use ($nodes, $servers): array {
+            // Another request may have refreshed them while this one waited for the lock.
+            $readings = $this->cached($nodes);
+            $stale = array_values(array_filter($nodes, fn (Node $node): bool => ! isset($readings[$node->id])));
+
+            foreach ($this->read($stale, $servers) as $id => $reading) {
+                Cache::put("insights:node:{$id}", $reading, now()->addSeconds($reading['online'] ? self::ONLINE_CACHE_SECONDS : self::OFFLINE_CACHE_SECONDS));
+                $readings[$id] = $reading;
+            }
+
+            return $readings;
+        };
+
+        $lock = Cache::lock(self::LOCK, self::LOCK_SECONDS);
+
+        try {
+            $lock->block(self::LOCK_WAIT_SECONDS);
+        } catch (LockTimeoutException) {
+            // The refresh holding the lock is taking too long; read for this request rather than wait longer.
+        }
+
+        try {
+            return $refresh();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @param  list<Node>  $nodes
+     * @return array<int, LiveReading>
+     */
+    private function cached(array $nodes): array
+    {
         $readings = [];
-        foreach ($servers as $server) {
+        foreach ($nodes as $node) {
+            /** @var LiveReading|null $reading */
+            $reading = Cache::get("insights:node:{$node->id}");
+            if (is_array($reading)) {
+                $readings[$node->id] = $reading;
+            }
+        }
+
+        return $readings;
+    }
+
+    /**
+     * @param  list<Node>  $nodes
+     * @param  array<int, list<Server>>  $servers
+     * @return array<int, LiveReading>
+     */
+    private function read(array $nodes, array $servers): array
+    {
+        $offline = ['online' => false, 'cpu_count' => null, 'servers' => []];
+
+        /** @var array<int, array{url: string, token: string}> $clients */
+        $clients = [];
+        /** @var array<int, LiveReading> $readings */
+        $readings = [];
+        foreach ($nodes as $node) {
             try {
-                $details = Daemon::server($server, $node)->details();
-            } catch (DaemonConnectionException) {
-                $readings[$server->uuid] = null;
+                $clients[$node->id] = ['url' => $node->getConnectionAddress(), 'token' => $node->getDecryptedKey()];
+            } catch (Throwable) {
+                // An undecryptable token or a malformed address leaves the node unreadable, not the page broken.
+                $readings[$node->id] = $offline;
+            }
+        }
+
+        $systems = $this->pool(array_map(fn (array $client): array => [$client, '/api/system'], $clients));
+
+        $requests = [];
+        foreach ($clients as $id => $client) {
+            if (! is_array($systems[$id] ?? null)) {
+                $readings[$id] = $offline;
 
                 continue;
             }
 
-            $utilization = $details['utilization'] ?? [];
-            $readings[$server->uuid] = [
-                'state' => $details['state'] ?? 'unknown',
-                'cpu' => round((float) ($utilization['cpu_absolute'] ?? 0), 1),
-                'memory_bytes' => $utilization['memory_bytes'] ?? 0,
-                'disk_bytes' => $utilization['disk_bytes'] ?? 0,
-            ];
+            $readings[$id] = ['online' => true, 'cpu_count' => $this->cpuCount($systems[$id]), 'servers' => []];
+            foreach ($servers[$id] ?? [] as $server) {
+                $requests["{$id}:{$server->uuid}"] = [$client, "/api/servers/{$server->uuid}"];
+            }
         }
 
-        return ['online' => true, 'cpu_count' => $this->cpuCount($system), 'servers' => $readings];
+        $answered = [];
+        foreach ($this->pool($requests) as $key => $details) {
+            [$id, $uuid] = explode(':', $key, 2);
+            $reading = is_array($details) ? $this->serverReading($details) : null;
+            if ($reading !== null) {
+                $answered[(int) $id][$uuid] = $reading;
+            }
+        }
+
+        foreach ($answered as $id => $found) {
+            if (isset($readings[$id])) {
+                $readings[$id]['servers'] = $found;
+            }
+        }
+
+        return $readings;
+    }
+
+    /**
+     * Sends every request at once and decodes the JSON objects that came back; failures decode to null.
+     *
+     * @template K of array-key
+     *
+     * @param  array<K, array{array{url: string, token: string}, string}>  $requests
+     * @return array<K, array<mixed>|null>
+     */
+    private function pool(array $requests): array
+    {
+        if ($requests === []) {
+            return [];
+        }
+
+        $results = Http::pool(function (Pool $pool) use ($requests): array {
+            $sent = [];
+            foreach ($requests as $key => [$client, $path]) {
+                $sent[] = $pool->as((string) $key)
+                    ->baseUrl($client['url'])
+                    ->withToken($client['token'])
+                    ->acceptJson()
+                    ->timeout(self::TIMEOUT_SECONDS)
+                    ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+                    ->withOptions(['verify' => App::isProduction()])
+                    ->get($path);
+            }
+
+            return $sent;
+        });
+
+        $decoded = [];
+        foreach (array_keys($requests) as $key) {
+            $response = $results[(string) $key] ?? null;
+            $json = $response instanceof Response && $response->successful() ? $response->json() : null;
+            $decoded[$key] = is_array($json) ? $json : null;
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Wings omits what it has not measured; a missing value stays unknown rather than reading as zero.
+     *
+     * @param  array<mixed>  $details
+     * @return ServerReading|null
+     */
+    private function serverReading(array $details): ?array
+    {
+        $state = $details['state'] ?? null;
+        if (! is_string($state)) {
+            return null;
+        }
+
+        $utilization = is_array($details['utilization'] ?? null) ? $details['utilization'] : [];
+        $cpu = $utilization['cpu_absolute'] ?? null;
+        $memory = $utilization['memory_bytes'] ?? null;
+        $disk = $utilization['disk_bytes'] ?? null;
+
+        return [
+            'state' => $state,
+            'cpu' => is_int($cpu) || is_float($cpu) ? round((float) $cpu, 1) : null,
+            'memory_bytes' => is_int($memory) ? $memory : null,
+            'disk_bytes' => is_int($disk) ? $disk : null,
+        ];
     }
 
     /**
@@ -163,28 +337,5 @@ final readonly class NodeUsageService
         $count = $system['cpu_count'] ?? (is_array($system['system'] ?? null) ? ($system['system']['cpu_threads'] ?? null) : null);
 
         return is_int($count) && $count > 0 ? $count : null;
-    }
-
-    /**
-     * @template T
-     *
-     * @param  callable(): T  $callback
-     * @return T
-     */
-    private function withShortTimeouts(callable $callback): mixed
-    {
-        $timeout = config('pterodactyl.guzzle.timeout');
-        $connectTimeout = config('pterodactyl.guzzle.connect_timeout');
-
-        config([
-            'pterodactyl.guzzle.timeout' => self::TIMEOUT_SECONDS,
-            'pterodactyl.guzzle.connect_timeout' => self::CONNECT_TIMEOUT_SECONDS,
-        ]);
-
-        try {
-            return $callback();
-        } finally {
-            config(['pterodactyl.guzzle.timeout' => $timeout, 'pterodactyl.guzzle.connect_timeout' => $connectTimeout]);
-        }
     }
 }

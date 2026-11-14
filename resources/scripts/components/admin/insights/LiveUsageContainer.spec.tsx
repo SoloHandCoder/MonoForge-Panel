@@ -40,7 +40,7 @@ describe('LiveUsageContainer', () => {
         expect(screen.getByText('Alpha').closest('.opacity-60')).toBeNull();
     });
 
-    it('expands a node into its servers, busiest first', () => {
+    it('expands a node into its servers, busiest first and unknown readings last', () => {
         render(<LiveUsageContainer />);
 
         const toggle = screen.getByRole('button', { name: /1 of 2 running/ });
@@ -53,9 +53,10 @@ describe('LiveUsageContainer', () => {
 
         const rows = within(document.getElementById('node-usage-1-servers')!).getAllByRole('listitem');
 
-        expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Busy', 'Idle']);
+        expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Busy', 'Idle', 'Awaiting']);
         expect(within(rows[0]).getByText('250% / 400%')).toBeInTheDocument();
         expect(within(rows[1]).getByText('0%')).toBeInTheDocument();
+        expect(within(rows[2]).getByText('Unknown')).toBeInTheDocument();
     });
 
     it('never renders a node address', () => {

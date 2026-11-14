@@ -3933,9 +3933,9 @@ export type AdminGetLiveUsageResponseBody = {
          */
         memory: {
             /**
-             * Memory the node's servers use.
+             * Memory the node's servers use, or null while the node is offline or none of its servers has a reading.
              */
-            used_bytes: number;
+            used_bytes: number | null;
             /**
              * Memory allocated to the node's servers.
              */
@@ -3950,7 +3950,7 @@ export type AdminGetLiveUsageResponseBody = {
          */
         disk: {
             /**
-             * Disk the node's servers use, or null while the node is offline.
+             * Disk the node's servers use, or null while the node is offline or none of its servers has a reading.
              */
             used_bytes: number | null;
             /**
@@ -3987,17 +3987,17 @@ export type AdminGetLiveUsageResponseBody = {
              */
             state: string;
             /**
-             * CPU in use as a percentage where 100 is one thread.
+             * CPU in use as a percentage where 100 is one thread, or null without a reading.
              */
-            cpu: number;
+            cpu: number | null;
             /**
              * The CPU limit as a percentage, or null when unlimited.
              */
             cpu_limit: number | null;
             /**
-             * Memory in use.
+             * Memory in use, or null without a reading.
              */
-            memory_bytes: number;
+            memory_bytes: number | null;
             /**
              * The memory limit, or null when unlimited.
              */
@@ -4032,7 +4032,7 @@ export type AdminGetStorageUsageResponseBody = {
          */
         status: 'online' | 'offline';
         /**
-         * Disk the node's servers use, or null while the node is offline.
+         * Disk the node's servers use, or null while the node is offline or none of its servers has a reading.
          */
         used_bytes: number | null;
         /**
@@ -4077,6 +4077,10 @@ export type AdminGetStorageUsageResponseBody = {
          * The size of the panel's storage folder, or null when it cannot be read.
          */
         storage_bytes: number | null;
+        /**
+         * Whether the storage folder walk stopped early, so its size is a lower bound.
+         */
+        storage_approximate: boolean;
         /**
          * Successful backups stored on the nodes.
          */

@@ -913,8 +913,9 @@ const panelChildren = [
         getParentRoute: () => panelRoute,
         path: 'usage',
         staticData: { nav: { label: 'Live usage', icon: 'activity' } },
-        loader: async ({ context }) => {
-            await context.queryClient.ensureQueryData({ ...adminLiveUsageQueryOptions(), revalidateIfStale: true });
+        // Prefetch without waiting: Wings can take seconds to answer, and the page shows its own spinner.
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminLiveUsageQueryOptions());
         },
         component: componentRoute(() => import('@/components/admin/insights/LiveUsageContainer')),
     }),
@@ -922,8 +923,9 @@ const panelChildren = [
         getParentRoute: () => panelRoute,
         path: 'storage',
         staticData: { nav: { label: 'Storage', icon: 'hard-drive' } },
-        loader: async ({ context }) => {
-            await context.queryClient.ensureQueryData({ ...adminStorageUsageQueryOptions(), revalidateIfStale: true });
+        // Prefetch without waiting: Wings can take seconds to answer, and the page shows its own spinner.
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminStorageUsageQueryOptions());
         },
         component: componentRoute(() => import('@/components/admin/insights/StorageContainer')),
     }),

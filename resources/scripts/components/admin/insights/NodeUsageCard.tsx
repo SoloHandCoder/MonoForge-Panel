@@ -9,7 +9,9 @@ import Card from '@/components/elements/Card';
 import { bytesToString } from '@/lib/formatters';
 import { cn } from '@/lib/cn';
 
-const byCpu = (a: AdminServerUsage, b: AdminServerUsage) => b.cpu - a.cpu || a.name.localeCompare(b.name);
+/** Busiest first; servers without a reading go last. */
+const byCpu = (a: AdminServerUsage, b: AdminServerUsage) =>
+    (b.cpu ?? -1) - (a.cpu ?? -1) || a.name.localeCompare(b.name);
 
 function ServerUsageRow({ server }: { server: AdminServerUsage }) {
     const state = stateBadge(server.state);
