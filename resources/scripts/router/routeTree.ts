@@ -48,6 +48,7 @@ import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
+import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
     adminLocationListQueryParams,
     adminLocationQueryOptions,
@@ -907,6 +908,26 @@ const panelChildren = [
             () => import('@/components/admin/nodes/NodesContainer'),
             ['panel.nodes.before', 'panel.nodes.after']
         ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'usage',
+        staticData: { nav: { label: 'Live usage', icon: 'activity' } },
+        // Prefetch without waiting: Wings can take seconds to answer, and the page shows its own spinner.
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminLiveUsageQueryOptions());
+        },
+        component: componentRoute(() => import('@/components/admin/insights/LiveUsageContainer')),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'storage',
+        staticData: { nav: { label: 'Storage', icon: 'hard-drive' } },
+        // Prefetch without waiting: Wings can take seconds to answer, and the page shows its own spinner.
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminStorageUsageQueryOptions());
+        },
+        component: componentRoute(() => import('@/components/admin/insights/StorageContainer')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,

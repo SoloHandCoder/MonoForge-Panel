@@ -405,6 +405,8 @@ const adminNav = (extension = false) =>
         ['users', 'Users', 'users'],
         ['locations', 'Locations', 'map-pin'],
         ['nodes', 'Nodes', 'network'],
+        ['usage', 'Live usage', 'activity'],
+        ['storage', 'Storage', 'hard-drive'],
         ['servers', 'Servers', 'server'],
         ['databases', 'Database Hosts', 'database'],
         ['mounts', 'Mounts', 'folder-tree'],
