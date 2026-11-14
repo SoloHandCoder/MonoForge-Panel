@@ -55,3 +55,6 @@ result
 # Files written by tests and local tooling
 /public/uploads/
 /.superpowers/
+
+# Build identity written into release tarballs by the MonoForge release workflow
+/version.json

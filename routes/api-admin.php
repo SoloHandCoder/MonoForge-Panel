@@ -61,6 +61,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
+use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\DisableTwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\ExternalController as UserExternalController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\UserController;
@@ -512,4 +513,21 @@ Route::prefix('/api-keys')->name('api.admin.api-keys')->group(function (): void 
 */
 Route::prefix('/version')->name('api.admin.version')->group(function (): void {
     Route::get('/', VersionController::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| MonoForge Update Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/updates
+|
+*/
+Route::prefix('/updates')->name('api.admin.updates')->group(function (): void {
+    Route::get('/status', [UpdateController::class, 'status'])->name('.status');
+
+    Route::middleware(RequireSessionAuthentication::class)->group(function (): void {
+        Route::post('/apply', [UpdateController::class, 'apply'])->name('.apply');
+        Route::put('/settings', [UpdateController::class, 'settings'])->name('.settings');
+    });
 });

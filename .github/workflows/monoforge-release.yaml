@@ -1,0 +1,180 @@
+name: MonoForge Release
+
+# Builds a ready-to-run panel tarball for every commit on main that passed the Tests
+# workflow (ci.yaml) and publishes it as a GitHub release tagged build-<short sha>.
+# Installed panels check the latest of these releases and update themselves from its
+# assets (see MonoForgeUpdateService).
+#
+# The build job only has read access; the publish job, which can write releases, never
+# checks out or runs repository code: it only uploads the build job's artifact.
+#
+# Releases are created with the workflow GITHUB_TOKEN, so they do not trigger other
+# workflows (docker.yaml listens for published releases).
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [main]
+  # Manual runs are limited to main and still require a passed Tests run for the commit.
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: monoforge-release
+  cancel-in-progress: false
+
+env:
+  # The exact commit the Tests run passed for, not whatever main points at now.
+  BUILD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Only pushes to main in this repository whose Tests run passed, or a manual run on main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository)
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      short: ${{ steps.version.outputs.short }}
+    steps:
+      - name: Require a passed Tests run for this commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed="$(gh api "repos/$GH_REPO/actions/runs?head_sha=$BUILD_SHA&event=push&per_page=100" \
+            --jq '[.workflow_runs[] | select(.name == "Tests" and .conclusion == "success")] | length')"
+          if [ "$passed" -lt 1 ]; then
+            echo "::error::No successful Tests run for $BUILD_SHA; refusing to build a release."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.BUILD_SHA }}
+          persist-credentials: false
+
+      # The live panel runs PHP 8.3, so the production dependencies are resolved on it.
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: "8.3"
+          extensions: bcmath, cli, curl, gd, intl, mbstring, mysql, openssl, pdo, posix, tokenizer, xml, zip
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install production PHP dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
+
+      - name: Build the frontend
+        run: |
+          npm ci
+          npm run build:production
+
+      - name: Write version.json
+        id: version
+        run: |
+          short="${BUILD_SHA::7}"
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -n --arg version "$short" --arg commit "$BUILD_SHA" --arg built_at "$built_at" \
+            '{version: $version, commit: $commit, built_at: $built_at}' > version.json
+          cat version.json
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      - name: Pack the panel
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          tarball="$RUNNER_TEMP/dist/monoforge-panel.tar"
+          # Everything the panel needs to run, without development files, secrets or runtime data.
+          tar -cf "$tarball" \
+            --exclude=./.git \
+            --exclude=./.github \
+            --exclude=./node_modules \
+            --exclude='./packages/*/node_modules' \
+            --exclude=./tests \
+            --exclude='./.env*' \
+            --exclude=./storage \
+            --exclude='./bootstrap/cache/*.php' \
+            --exclude=./.superpowers \
+            .
+          # storage/ ships as its empty skeleton (the tracked .gitignore files) only.
+          git ls-files storage | sed 's|^|./|' | tar -rf "$tarball" --no-recursion -T -
+          gzip -9 "$tarball"
+          cp version.json "$RUNNER_TEMP/dist/version.json"
+          cd "$RUNNER_TEMP/dist"
+          sha256sum monoforge-panel.tar.gz > monoforge-panel.tar.gz.sha256
+          cat monoforge-panel.tar.gz.sha256
+          ls -lh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: monoforge-release
+          path: ${{ runner.temp }}/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: build-${{ needs.build.outputs.short }}
+    steps:
+      # A re-run or a late Tests run for an older commit must never become the latest build.
+      - name: Check the build is still the tip of main and not yet published
+        id: gate
+        run: |
+          tip="$(gh api "repos/$GH_REPO/commits/main" --jq .sha)"
+          if [ "$tip" != "$BUILD_SHA" ]; then
+            echo "::notice::$BUILD_SHA is no longer the tip of main ($tip); not publishing it."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists; leaving it as it is."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v8
+        if: steps.gate.outputs.publish == 'true'
+        with:
+          name: monoforge-release
+          path: dist
+
+      - name: Publish the release
+        if: steps.gate.outputs.publish == 'true'
+        working-directory: dist
+        run: |
+          gh release create "$TAG" monoforge-panel.tar.gz monoforge-panel.tar.gz.sha256 version.json \
+            --target "$BUILD_SHA" \
+            --title "MonoForge build ${{ needs.build.outputs.short }}" \
+            --notes "MonoForge Panel build of $BUILD_SHA on main. Installed panels pick this up through their update check." \
+            --latest
+
+      - name: Keep the last 10 builds
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          gh release list --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+            while read -r tag; do
+              echo "Deleting old build release $tag"
+              gh release delete "$tag" --yes --cleanup-tag
+            done

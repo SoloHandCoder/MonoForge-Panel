@@ -17,23 +17,23 @@ use Pterodactyl\Services\Helpers\SoftwareVersionService;
 class VersionController extends AdminApiController
 {
     private const array VERSION_EXAMPLE = [
-        'current' => '1.0.0',
-        'latest' => '1.0.0',
+        'current' => '3f9c2ab',
+        'latest' => '3f9c2ab',
         'is_latest' => true,
-        'daemon' => '1.0.0',
-        'discord' => 'https://pterodactyl.io/discord',
-        'donations' => 'https://github.com/sponsors/pterodactyl',
+        'daemon' => '',
+        'discord' => '',
+        'donations' => '',
     ];
 
     /**
-     * Return panel and daemon version information.
+     * Return the running and latest MonoForge builds, and daemon version information.
      */
-    #[Endpoint('Get version information', 'Returns panel, Wings, and project version metadata.')]
+    #[Endpoint('Get version information', 'Returns the running and latest MonoForge builds (short commits), plus Wings and project metadata.')]
     #[ScribeResponse(self::VERSION_EXAMPLE, description: 'Version information returned.')]
     public function __invoke(GetVersionRequest $request, SoftwareVersionService $version): JsonResponse
     {
         return new JsonResponse([
-            'current' => config('app.version'),
+            'current' => $version->getCurrentPanel(),
             'latest' => $version->getPanel(),
             'is_latest' => $version->isLatestPanel(),
             'daemon' => $version->getDaemon(),

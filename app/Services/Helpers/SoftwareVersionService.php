@@ -9,6 +9,7 @@ use Exception;
 use GuzzleHttp\Client;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Pterodactyl\Exceptions\Service\Helper\CdnVersionFetchingException;
+use Pterodactyl\Services\MonoForge\MonoForgeUpdateService;
 
 class SoftwareVersionService
 {
@@ -26,11 +27,22 @@ class SoftwareVersionService
     ) {}
 
     /**
-     * Get the latest version of the panel from the CDN servers.
+     * The MonoForge build that is running: its short commit, or the app version when unknown.
+     */
+    public function getCurrentPanel(): string
+    {
+        return $this->updates()->currentVersion();
+    }
+
+    /**
+     * The latest MonoForge build on GitHub, or the running build when it cannot be determined.
      */
     public function getPanel(): string
     {
-        return $this->versionData()['panel'] ?? config()->string('app.version');
+        $updates = $this->updates();
+        $latest = $updates->mode() === 'off' ? null : $updates->latest();
+
+        return $latest?->build->version ?? $updates->currentVersion();
     }
 
     /**
@@ -58,16 +70,16 @@ class SoftwareVersionService
     }
 
     /**
-     * Determine if the current version of the panel is the latest.
+     * Determine if the running MonoForge build is the latest one.
      */
     public function isLatestPanel(): bool
     {
-        $version = config()->string('app.version');
-        if ($version === 'canary') {
-            return true;
-        }
+        return ! $this->updates()->isUpdateAvailable();
+    }
 
-        return version_compare($version, $this->getPanel()) >= 0;
+    protected function updates(): MonoForgeUpdateService
+    {
+        return resolve(MonoForgeUpdateService::class);
     }
 
     /**

@@ -52,6 +52,11 @@ vi.mock('@/api/admin/activity/queries', () => ({
         }),
     }),
 }));
+vi.mock('@/api/admin/updates/queries', () => ({
+    isUpdateInProgress: () => false,
+    useAdminUpdateStatus: () => ({ data: undefined }),
+    useApplyAdminUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
 vi.mock('@/components/admin/AdminContentBlock', () => ({
     default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
