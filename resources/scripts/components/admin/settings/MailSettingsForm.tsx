@@ -2,6 +2,8 @@ import { useAppForm, Form } from '@/components/form';
 import type { AdminSettings } from '@/api/admin/settings/queries';
 import { type MailSettingsValues } from '@/api/admin/settings/queries';
 import {
+    isMailDriver,
+    mailDrivers,
     testAdminMailInput,
     updateAdminMailSettingsInput,
     useSendTestAdminMail,
@@ -22,6 +24,7 @@ const mailEncryptionValue = (
 ): MailSettingsValues['encryption'] => (encryption === 'tls' || encryption === 'ssl' ? encryption : '');
 
 const mailSettingsFormValues = (settings: AdminSettings): MailSettingsFormValues => ({
+    driver: isMailDriver(settings.mail['mail:default']) ? settings.mail['mail:default'] : 'smtp',
     host: settings.mail['mail:mailers:smtp:host'],
     port: settings.mail['mail:mailers:smtp:port'],
     encryption: mailEncryptionValue(settings.mail['mail:mailers:smtp:encryption']),
@@ -29,11 +32,13 @@ const mailSettingsFormValues = (settings: AdminSettings): MailSettingsFormValues
     password: '',
     fromAddress: settings.mail['mail:from:address'],
     fromName: settings.mail['mail:from:name'] || '',
+    resendApiKey: '',
 });
 
 export default function MailSettingsForm({ settings }: { settings: AdminSettings }) {
-    const disabled = settings.mail['mail:default'] !== 'smtp';
+    const currentDriver = settings.mail['mail:default'];
     const readOnly = settings.meta.load_environment_only;
+    const resendKeySet = settings.mail['services:resend:key_set'];
     const updateMailSettings = useUpdateAdminMailSettings();
     const updateMailSettingsForTest = useUpdateAdminMailSettings({ successNotification: false });
     const sendTestMail = useSendTestAdminMail();
@@ -47,18 +52,19 @@ export default function MailSettingsForm({ settings }: { settings: AdminSettings
             }
 
             const input = updateAdminMailSettingsInput({ ...value, port: submittedNumber(value.port) });
+            const cleared = { ...value, password: '', resendApiKey: '' };
 
             try {
                 if (meta === 'test') {
                     await updateMailSettingsForTest.mutateAsync(input);
-                    form.reset({ ...value, password: '' });
+                    form.reset(cleared);
                     await sendTestMail.mutateAsync(testAdminMailInput());
 
                     return;
                 }
 
                 await updateMailSettings.mutateAsync(input);
-                form.reset({ ...value, password: '' });
+                form.reset(cleared);
             } catch {
                 // Error toast is handled by the mutation.
             }
@@ -67,70 +73,119 @@ export default function MailSettingsForm({ settings }: { settings: AdminSettings
 
     const sendTestEmail = () => void form.handleSubmit('test');
 
-    if (disabled) {
-        return (
-            <TitledGreyBox title='Mail Configuration'>
-                <div className='rounded-sm border border-border bg-popover px-4 py-3 text-sm text-foreground'>
-                    This interface is limited to instances using SMTP as the mail driver. Use{' '}
-                    <code>php artisan p:environment:mail</code> to update mail settings, or set{' '}
-                    <code>MAIL_DRIVER=smtp</code> in the environment file.
-                </div>
-            </TitledGreyBox>
-        );
-    }
-
     return (
         <Form form={form}>
-            <TitledGreyBox title='Mail Configuration'>
-                <div className='grid grid-cols-2 gap-4'>
-                    <form.AppField name='host'>
-                        {(field) => (
-                            <field.TextField type='text' id='mail_host' label='SMTP Host' disabled={readOnly} />
-                        )}
-                    </form.AppField>
-                    <form.AppField
-                        name='port'
-                        validators={{ onChange: requiredNumber('An SMTP port must be provided.') }}
-                    >
-                        {(field) => <field.NumberField id='mail_port' label='SMTP Port' disabled={readOnly} />}
-                    </form.AppField>
-                </div>
-                <div className='mt-6'>
-                    <form.AppField name='encryption'>
-                        {(field) => (
-                            <field.SelectField
-                                id='mail_encryption'
-                                label='Encryption'
-                                options={[
-                                    { value: '', label: 'None' },
-                                    { value: 'tls', label: 'Transport Layer Security (TLS)' },
-                                    { value: 'ssl', label: 'Secure Sockets Layer (SSL)' },
-                                ]}
-                                disabled={readOnly}
-                            />
-                        )}
-                    </form.AppField>
-                </div>
-                <div className='mt-6'>
-                    <form.AppField name='username'>
-                        {(field) => (
-                            <field.TextField type='text' id='mail_username' label='Username' disabled={readOnly} />
-                        )}
-                    </form.AppField>
-                </div>
-                <div className='mt-6'>
-                    <form.AppField name='password'>
-                        {(field) => (
-                            <field.TextField
-                                type='password'
-                                id='mail_password'
-                                label='Password'
-                                description='Leave blank to keep the existing password. Enter !e to clear the password.'
-                                disabled={readOnly}
-                            />
-                        )}
-                    </form.AppField>
-                </div>
+            <TitledGreyBox title='Email'>
+                {!isMailDriver(currentDriver) && (
+                    <div className='mb-6 rounded-sm border border-border bg-popover px-4 py-3 text-sm text-foreground'>
+                        The panel currently sends mail with the <code>{currentDriver}</code> driver from the environment
+                        file. Saving here switches it to the driver selected below.
+                    </div>
+                )}
+                <form.AppField name='driver'>
+                    {(field) => (
+                        <field.SelectField id='mail_driver' label='Driver' options={mailDrivers} disabled={readOnly} />
+                    )}
+                </form.AppField>
+                <form.Subscribe selector={(state) => state.values.driver}>
+                    {(driver) => (
+                        <>
+                            {driver === 'smtp' && (
+                                <>
+                                    <div className='mt-6 grid grid-cols-2 gap-4'>
+                                        <form.AppField name='host'>
+                                            {(field) => (
+                                                <field.TextField
+                                                    type='text'
+                                                    id='mail_host'
+                                                    label='SMTP Host'
+                                                    disabled={readOnly}
+                                                />
+                                            )}
+                                        </form.AppField>
+                                        <form.AppField
+                                            name='port'
+                                            validators={{ onChange: requiredNumber('An SMTP port must be provided.') }}
+                                        >
+                                            {(field) => (
+                                                <field.NumberField
+                                                    id='mail_port'
+                                                    label='SMTP Port'
+                                                    disabled={readOnly}
+                                                />
+                                            )}
+                                        </form.AppField>
+                                    </div>
+                                    <div className='mt-6'>
+                                        <form.AppField name='encryption'>
+                                            {(field) => (
+                                                <field.SelectField
+                                                    id='mail_encryption'
+                                                    label='Encryption'
+                                                    options={[
+                                                        { value: '', label: 'None' },
+                                                        { value: 'tls', label: 'Transport Layer Security (TLS)' },
+                                                        { value: 'ssl', label: 'Secure Sockets Layer (SSL)' },
+                                                    ]}
+                                                    disabled={readOnly}
+                                                />
+                                            )}
+                                        </form.AppField>
+                                    </div>
+                                    <div className='mt-6'>
+                                        <form.AppField name='username'>
+                                            {(field) => (
+                                                <field.TextField
+                                                    type='text'
+                                                    id='mail_username'
+                                                    label='Username'
+                                                    disabled={readOnly}
+                                                />
+                                            )}
+                                        </form.AppField>
+                                    </div>
+                                    <div className='mt-6'>
+                                        <form.AppField name='password'>
+                                            {(field) => (
+                                                <field.TextField
+                                                    type='password'
+                                                    id='mail_password'
+                                                    label='Password'
+                                                    description='Leave blank to keep the existing password. Enter !e to clear the password.'
+                                                    disabled={readOnly}
+                                                />
+                                            )}
+                                        </form.AppField>
+                                    </div>
+                                </>
+                            )}
+                            {driver === 'resend' && (
+                                <div className='mt-6'>
+                                    <form.AppField name='resendApiKey'>
+                                        {(field) => (
+                                            <field.TextField
+                                                type='password'
+                                                id='mail_resend_api_key'
+                                                label='Resend API Key'
+                                                description={
+                                                    resendKeySet
+                                                        ? 'A key is saved. Leave blank to keep it, or enter !e to clear it.'
+                                                        : 'No key is saved yet. Create one at resend.com under API Keys.'
+                                                }
+                                                disabled={readOnly}
+                                            />
+                                        )}
+                                    </form.AppField>
+                                </div>
+                            )}
+                            {driver === 'log' && (
+                                <p className='mt-6 text-sm text-muted-foreground'>
+                                    Emails are written to the panel log instead of being sent.
+                                </p>
+                            )}
+                        </>
+                    )}
+                </form.Subscribe>
                 <div className='mt-6 grid grid-cols-2 gap-4'>
                     <form.AppField name='fromAddress'>
                         {(field) => (

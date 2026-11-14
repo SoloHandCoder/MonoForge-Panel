@@ -31,6 +31,7 @@ class SettingsController extends AdminApiController
             'mail:mailers:smtp:password' => '',
             'mail:from:address' => 'panel@example.com',
             'mail:from:name' => 'Pterodactyl',
+            'services:resend:key_set' => false,
         ],
         'advanced' => [
             'recaptcha:enabled' => false,
@@ -71,6 +72,8 @@ class SettingsController extends AdminApiController
                 'mail:mailers:smtp:password' => '',
                 'mail:from:address' => config('mail.from.address'),
                 'mail:from:name' => config('mail.from.name'),
+                // Never return the Resend API key, only whether one is stored.
+                'services:resend:key_set' => filled(config('services.resend.key')),
             ],
             'advanced' => [
                 'recaptcha:enabled' => config('recaptcha.enabled'),

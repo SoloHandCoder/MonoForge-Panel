@@ -12,7 +12,6 @@ use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
-use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\UpdateMailSettingsRequest;
 use Pterodactyl\Models\Setting;
@@ -22,29 +21,19 @@ use Pterodactyl\Providers\SettingsServiceProvider;
 #[Subgroup('Settings', 'View and update global panel settings.')]
 class MailController extends AdminApiController
 {
-    private const array SMTP_DRIVER_ERROR = [
-        'errors' => [
-            [
-                'code' => 'DisplayException',
-                'status' => '400',
-                'detail' => 'This feature is only available if SMTP is the selected email driver for the Panel.',
-            ],
-        ],
-    ];
-
     /**
      * Update mail settings.
      */
-    #[Endpoint('Update mail settings', 'Updates SMTP mail settings and restarts queued workers so they reload configuration.')]
+    #[Endpoint('Update mail settings', 'Selects the mail driver (SMTP, Resend or log), updates its settings and the sender, and restarts queued workers so they reload configuration. The SMTP password and Resend API key are write-only.')]
     #[ScribeResponse(status: 204, description: 'Mail settings updated.')]
-    #[ScribeResponse(self::SMTP_DRIVER_ERROR, status: 400, description: 'The panel is not configured to use SMTP mail.')]
     public function __invoke(UpdateMailSettingsRequest $request, Kernel $kernel): Response
     {
-        throw_if(config('mail.default') !== 'smtp', DisplayException::class, 'This feature is only available if SMTP is the selected email driver for the Panel.');
-
         $values = $request->normalize();
-        if (Arr::get($values, 'mail:mailers:smtp:password') === '!e') {
-            $values['mail:mailers:smtp:password'] = '';
+        // "!e" clears a stored secret.
+        foreach (['mail:mailers:smtp:password', 'services:resend:key'] as $secret) {
+            if (Arr::get($values, $secret) === '!e') {
+                $values[$secret] = '';
+            }
         }
 
         foreach ($values as $key => $value) {

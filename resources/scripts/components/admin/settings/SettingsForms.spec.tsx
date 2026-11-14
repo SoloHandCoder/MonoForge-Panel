@@ -33,6 +33,7 @@ const settings: AdminSettings = {
         'mail:mailers:smtp:password': '',
         'mail:from:address': 'panel@example.com',
         'mail:from:name': 'Panel',
+        'services:resend:key_set': false,
     },
     advanced: {
         'recaptcha:enabled': false,
@@ -70,9 +71,43 @@ describe('mail settings', () => {
         await user.click(screen.getByRole('button', { name: 'Save Changes' }));
 
         expect(mutations.mail).toHaveBeenCalledWith({
-            body: { smtp: expect.objectContaining({ port: 587, password: 'smtp-secret' }) },
+            body: expect.objectContaining({
+                driver: 'smtp',
+                smtp: expect.objectContaining({ port: 587, password: 'smtp-secret' }),
+                from_address: 'panel@example.com',
+            }),
         });
         expect(password).toHaveValue('');
+    });
+
+    it('sends the Resend key once without SMTP settings', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <MailSettingsForm
+                settings={{
+                    ...settings,
+                    mail: { ...settings.mail, 'mail:default': 'resend' },
+                    meta: { ...settings.meta, load_environment_only: false },
+                }}
+            />
+        );
+
+        expect(screen.queryByLabelText('SMTP Host')).toBeNull();
+        const key = screen.getByLabelText('Resend API Key');
+
+        await user.type(key, 're_secret');
+        await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+        expect(mutations.mail).toHaveBeenCalledWith({
+            body: {
+                driver: 'resend',
+                from_address: 'panel@example.com',
+                from_name: 'Panel',
+                resend: { api_key: 're_secret' },
+            },
+        });
+        expect(key).toHaveValue('');
     });
 });
 

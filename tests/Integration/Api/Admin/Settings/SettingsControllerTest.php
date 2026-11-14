@@ -44,7 +44,7 @@ test('update general', function () {
     expect(Setting::fetch('settings::app:locale'))->toBe('en');
 });
 test('update mail', function () {
-    // Mail settings only update when SMTP is the selected driver, mirroring the legacy MailController guard.
+    // Payloads without a driver mean SMTP (the legacy smtp-only shape).
     config()->set('mail.default', 'smtp');
     $response = $this->putJson(route('api.admin.settings.mail'), validMailPayload());
     $response->assertStatus(Response::HTTP_NO_CONTENT);

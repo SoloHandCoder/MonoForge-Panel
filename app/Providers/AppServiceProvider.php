@@ -8,7 +8,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Request;
+use Illuminate\Mail\MailManager;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Routing\Route as IlluminateRoute;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +27,7 @@ use Illuminate\Validation\Rules\Password;
 use Knuckles\Scribe\Scribe;
 use Pterodactyl\Enum\ResourceLimit;
 use Pterodactyl\Extensions\Illuminate\Auth\Passwords\PasswordBrokerManager;
+use Pterodactyl\Extensions\Mail\ResendTransport;
 use Pterodactyl\Extensions\Scribe\Support\PathParameterNames;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ApiKey;
@@ -126,6 +129,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(EnvironmentService::class);
 
         $this->app->extend('auth.password', fn (): PasswordBrokerManager => new PasswordBrokerManager($this->app));
+
+        // Resend over its HTTP API without the Resend SDK. The key is read when the
+        // transport is built, after SettingsServiceProvider has applied stored settings.
+        $this->callAfterResolving('mail.manager', function (MailManager $manager): void {
+            $manager->extend('resend', function (array $config): ResendTransport {
+                $key = $config['key'] ?? config('services.resend.key');
+
+                return new ResendTransport($this->app->make(HttpFactory::class), is_string($key) ? $key : '');
+            });
+        });
 
         // Only load the settings service provider if the environment
         // is configured to allow it.
