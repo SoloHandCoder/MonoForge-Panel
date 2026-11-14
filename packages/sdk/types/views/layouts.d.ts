@@ -28,6 +28,8 @@ export interface AppLayoutModel {
     readonly links: readonly AppLayoutLink[];
     /** Where the user is, with the model of that area's layout, so the shell can draw its navigation. */
     readonly area: AppArea;
+    /** The user's servers on every page of the dashboard's list, from its first page; null until that loads. */
+    readonly serverCount: number | null;
     readonly user: {
         readonly uuid: string;
         readonly username: string;

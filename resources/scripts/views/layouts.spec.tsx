@@ -1,7 +1,11 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { serverResourceUsageQueryOptions, type ServerPowerState } from '@/api/account/servers/queries';
+import {
+    accountServersQueryOptions,
+    serverResourceUsageQueryOptions,
+    type ServerPowerState,
+} from '@/api/account/servers/queries';
 import type { SdkServerResources } from '@/sdk/server';
 import { publishAreaNav } from '@/router/nav';
 import { createExtensionTestHost, createTestServer, type ExtensionTestHost } from '@/sdk/testing';
@@ -9,7 +13,7 @@ import { Main } from './a11y';
 import { cssUrl } from './brand';
 import { registerClassicTheme } from './classic';
 import { Navigation, NavigationLink } from './navigation';
-import { clearThemeLayers, getViewDefinition, registerViewLayer, type ViewModels, type ViewProps } from './registry';
+import { clearThemeLayers, getViewDefinition, registerViewLayer, type ViewProps } from './registry';
 import { ViewFixtureProvider, View, type ViewFixtureSelection } from './View';
 import type { LayoutViewName } from '@/router/viewRoutes';
 import type { AppLayoutModel } from './layouts';
@@ -18,7 +22,7 @@ import './layouts';
 let host: ExtensionTestHost | undefined;
 
 beforeAll(() => {
-    // The sub-navigation measures its row as it resizes.
+    // Menus measure their trigger as it resizes.
     vi.stubGlobal(
         'ResizeObserver',
         class {
@@ -51,8 +55,18 @@ const contexts = {
     'layout.admin': 'admin',
 } as const satisfies Record<LayoutViewName, string>;
 
-async function renderLayout(name: LayoutViewName, selection: ViewFixtureSelection | null, path = '/') {
+/** The first page of the server list, which the shell counts the servers from. */
+function seedServers(panel: ExtensionTestHost, total: number) {
+    panel.queryClient.setQueryData(accountServersQueryOptions({ page: 1 }).queryKey, {
+        object: 'list',
+        data: [],
+        meta: { pagination: { total, count: 0, per_page: 50, current_page: 1, total_pages: 1 } },
+    } as never);
+}
+
+async function renderLayout(name: LayoutViewName, selection: ViewFixtureSelection | null, path = '/', servers = 0) {
     host = createExtensionTestHost({ path });
+    seedServers(host, servers);
 
     const layout = (
         <View name={name}>
@@ -90,21 +104,28 @@ describe('layout.app', () => {
         await renderLayout('layout.app', { models: { 'layout.app': appModel({ signOut }) } });
 
         expect(await screen.findByRole('link', { name: 'Panel' })).toHaveAttribute('href', '/');
-        expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('data-status', 'active');
-        expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/panel');
-        expect(screen.getByRole('link', { name: 'Account Settings' })).toHaveAttribute('href', '/account');
-        expect(screen.getByRole('button', { name: 'Search' })).toHaveClass('px-3', 'sm:px-6');
+        expect(screen.getByRole('link', { name: 'Servers' })).toHaveAttribute('data-status', 'active');
+        expect(screen.getByRole('link', { name: 'Admin area' })).toHaveAttribute('href', '/panel');
+        expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
+        expect(screen.getByRole('button', { name: 'Search' })).toHaveClass('rounded-md', 'px-3');
         expect(screen.getByRole('main')).toHaveTextContent('Routed page');
+        expect(screen.getByRole('navigation', { name: 'Main' }).closest('aside')).not.toBeNull();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
         expect(signOut).toHaveBeenCalledOnce();
     });
 
     it('leaves the admin link out for other users', async () => {
         await renderLayout('layout.app', { fixtures: { 'layout.app': 'user' } });
 
-        expect(await screen.findByRole('link', { name: 'Dashboard' })).toBeVisible();
-        expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+        expect(await screen.findByRole('link', { name: 'Servers' })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Admin area' })).not.toBeInTheDocument();
+    });
+
+    it('counts the servers from the first page of the server list', async () => {
+        await renderLayout('layout.app', null, '/', 12);
+
+        expect(await screen.findByTestId('server-count')).toHaveTextContent('12');
     });
 
     it('shows the theme logo in place of the panel name', async () => {
@@ -184,6 +205,7 @@ describe('the area layout.app renders', () => {
     async function renderArea(path: string, power: ServerPowerState = 'running') {
         registerViewLayer('aurora', 'theme', { 'layout.app': AreaProbe });
         host = createExtensionTestHost({ path, server });
+        seedServers(host, 1);
         host.queryClient.setQueryData(serverResourceUsageQueryOptions(server.attributes.uuid).queryKey, {
             object: 'stats',
             attributes: { current_state: power },
@@ -245,82 +267,17 @@ describe('the area layout.app renders', () => {
     });
 });
 
-describe('layout.server', () => {
-    it('lists the model navigation and, for root admins, the admin link', async () => {
-        await renderLayout('layout.server', { fixtures: { 'layout.server': 'admin' } }, '/server/a1b2c3d4/files');
-        const navigation = screen.getByRole('link', { name: 'Console' }).parentElement!;
+describe.each([
+    ['layout.server', 'owner', '/server/a1b2c3d4/files'],
+    ['layout.account', 'default', '/account/api'],
+    ['layout.admin', 'default', '/panel/users'],
+] as const)('%s', (name, fixture, path) => {
+    it('leaves its navigation to the shell and places only the page', async () => {
+        await renderLayout(name, { fixtures: { [name]: fixture } }, path);
 
-        expect(within(navigation).getByRole('link', { name: 'Files' })).toHaveAttribute('data-status', 'active');
-        expect(within(navigation).getByRole('link', { name: 'Files' })).toHaveAttribute(
-            'href',
-            '/server/a1b2c3d4/files#/'
-        );
-        expect(within(navigation).getByRole('link', { name: 'Open Admin Area' })).toHaveAttribute(
-            'href',
-            '/panel/servers/1'
-        );
-    });
-
-    it('leaves out what a subuser cannot open', async () => {
-        await renderLayout('layout.server', { fixtures: { 'layout.server': 'subuser' } }, '/server/a1b2c3d4');
-
-        expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Console', 'Files', 'Backups']);
-    });
-});
-
-describe('layout.admin', () => {
-    const settingsModel = (): ViewModels['layout.admin'] => {
-        const model = getViewDefinition('layout.admin')!.fixtures!.default!() as ViewModels['layout.admin'];
-        const settings = model.nav.items.find((item) => item.id === 'settings')!;
-
-        return {
-            ...model,
-            nav: {
-                items: [
-                    ...model.nav.items,
-                    {
-                        ...settings,
-                        id: 'settings/mail',
-                        label: 'Mail',
-                        destination: { to: '/panel/settings/mail' },
-                        icon: null,
-                    },
-                ],
-            },
-        };
-    };
-
-    it('labels the mobile disclosure with the most specific active item', async () => {
-        await renderLayout('layout.admin', { models: { 'layout.admin': settingsModel() } }, '/panel/settings/mail');
-
-        expect(screen.getByRole('button', { name: 'Mail' })).toHaveAttribute('aria-expanded', 'false');
-    });
-
-    it('toggles the disclosure and closes it after navigation', async () => {
-        const panel = await renderLayout(
-            'layout.admin',
-            { fixtures: { 'layout.admin': 'default' } },
-            '/panel/settings'
-        );
-        const disclosure = screen.getByRole('button', { name: 'Settings' });
-
-        fireEvent.click(disclosure);
-        expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-        fireEvent.click(disclosure);
-        expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-        fireEvent.click(disclosure);
-        await act(async () => panel.navigate({ to: '/panel/users' }));
-
-        await waitFor(() =>
-            expect(screen.getByRole('button', { name: 'Users' })).toHaveAttribute('aria-expanded', 'false')
-        );
-        expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('data-status', 'active');
-    });
-
-    it('does not confuse items with a shared path prefix', async () => {
-        await renderLayout('layout.admin', { fixtures: { 'layout.admin': 'default' } }, '/panel/users-extra');
-
-        expect(screen.getByRole('button', { name: 'Administration' })).toBeInTheDocument();
+        expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+        expect(screen.getByRole('main')).toHaveTextContent('Routed page');
     });
 });
 

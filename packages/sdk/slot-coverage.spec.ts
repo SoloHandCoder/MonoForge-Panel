@@ -29,6 +29,7 @@ const anchorFiles = [
     '../../resources/scripts/themes/classic/views/layout/AdminLayout.tsx',
     '../../resources/scripts/themes/classic/views/layout/ServerLayout.tsx',
     '../../resources/scripts/themes/classic/views/layout/AppLayout.tsx',
+    '../../resources/scripts/themes/classic/views/layout/SidebarNav.tsx',
     '../../resources/scripts/themes/classic/views/dashboard/ServerList.tsx',
     '../../resources/scripts/themes/classic/views/account/AccountOverview.tsx',
     '../../resources/scripts/themes/classic/views/dashboard/ServerCardIdentity.tsx',
