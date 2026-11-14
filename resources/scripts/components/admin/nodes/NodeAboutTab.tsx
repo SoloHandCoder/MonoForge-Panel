@@ -100,7 +100,7 @@ export default function NodeAboutTab() {
                                 <SystemInformationValue info={info} error={infoError}>
                                     {(value) => <Code>{value.version}</Code>}
                                 </SystemInformationValue>
-                                {version && (
+                                {version?.daemon && (
                                     <span className='text-xs text-muted-foreground ml-2'>Latest: {version.daemon}</span>
                                 )}
                             </span>

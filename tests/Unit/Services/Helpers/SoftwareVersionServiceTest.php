@@ -39,6 +39,7 @@ test('makes no request and reports the panel as current when no CDN URL is set',
 
     expect($service->isLatestPanel())->toBeTrue()
         ->and($service->getPanel())->toBe(config('app.version'))
+        ->and($service->getDaemon())->toBe('')
         ->and($service->getDiscord())->toBe('')
         ->and($service->getDonations())->toBe('')
         ->and($requests)->toBe(0);

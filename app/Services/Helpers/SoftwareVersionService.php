@@ -34,11 +34,11 @@ class SoftwareVersionService
     }
 
     /**
-     * Get the latest version of the daemon from the CDN servers.
+     * Get the latest version of the daemon from the CDN servers, or an empty string when it is unknown.
      */
     public function getDaemon(): string
     {
-        return $this->versionData()['wings'] ?? 'error';
+        return $this->versionData()['wings'] ?? '';
     }
 
     /**
