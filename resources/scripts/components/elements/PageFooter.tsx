@@ -11,10 +11,7 @@ function CorePageFooter({ className }: PageFooterProps) {
     return (
         <div {...ui('root', className)}>
             <p {...ui('text')}>
-                <a rel='noopener nofollow noreferrer' href='https://pterodactyl.io' target='_blank' {...ui('link')}>
-                    Pterodactyl&reg;
-                </a>
-                &nbsp;&copy; 2015 - <span suppressHydrationWarning>{new Date().getFullYear()}</span>
+                &copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> MonoForge
             </p>
         </div>
     );

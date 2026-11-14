@@ -24,7 +24,7 @@
                 <link rel="manifest" href="/favicons/manifest.json">
             @endunless
             @unless ($extensionHead->replaces('link', 'mask-icon'))
-                <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#3d7bfd">
+                <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#8b5cf6">
             @endunless
             @unless ($extensionHead->replaces('link', 'shortcut icon'))
                 <link rel="shortcut icon" href="/favicons/favicon.ico">
