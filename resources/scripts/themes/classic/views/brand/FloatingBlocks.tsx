@@ -51,7 +51,7 @@ export default function FloatingBlocks({ count = 14, className }: Props) {
             {blocks.map(({ key, style }) => (
                 <span
                     key={key}
-                    className='absolute -bottom-10 rounded-sm border border-[rgba(196,181,253,.35)] bg-gradient-to-br from-[rgba(139,92,246,.35)] to-[rgba(139,92,246,.05)] opacity-0 animate-float-up'
+                    className='absolute -bottom-10 rounded-sm border border-[rgba(196,181,253,.35)] bg-linear-to-br from-[rgba(139,92,246,.35)] to-[rgba(139,92,246,.05)] opacity-0 animate-float-up'
                     style={style}
                 />
             ))}

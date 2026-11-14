@@ -27,7 +27,7 @@
   </defs>
 
   <g id="background">
-    <rect fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#bg)"/>
   </g>
 
   <g id="mark" transform="translate(512 540) scale(1.09) translate(-512 -475)">
