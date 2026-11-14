@@ -192,7 +192,7 @@
                         "batch": null,
                         "event": "admin:server.build",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "name": "Survival"
@@ -285,7 +285,7 @@
                         "batch": "ba7c0009-0000-4000-8000-000000000009",
                         "event": "server:backup.start",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "name": "Nightly",

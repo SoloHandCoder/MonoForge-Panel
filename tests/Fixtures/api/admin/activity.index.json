@@ -12,7 +12,7 @@
                         "batch": null,
                         "event": "admin:node.update",
                         "is_api": true,
-                        "ip": "203.0.113.6",
+                        "ip": null,
                         "description": "Updated the node configuration.",
                         "properties": {
                             "name": "node-alpha",
@@ -33,7 +33,7 @@
                         "batch": null,
                         "event": "admin:user.create",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "email": "owner@example.test"
@@ -49,7 +49,7 @@
                         "batch": null,
                         "event": "admin:server.build",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "name": "Survival"
@@ -84,7 +84,7 @@
                         "batch": null,
                         "event": "admin:node.update",
                         "is_api": true,
-                        "ip": "203.0.113.6",
+                        "ip": null,
                         "description": "Updated the node configuration.",
                         "properties": {
                             "name": "node-alpha",
@@ -128,7 +128,7 @@
                         "batch": null,
                         "event": "admin:user.create",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "email": "owner@example.test"
@@ -167,7 +167,7 @@
                         "batch": null,
                         "event": "admin:server.build",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "name": "Survival"
@@ -225,7 +225,7 @@
                         "batch": null,
                         "event": "admin:node.update",
                         "is_api": true,
-                        "ip": "203.0.113.6",
+                        "ip": null,
                         "description": "Updated the node configuration.",
                         "properties": {
                             "name": "node-alpha",
@@ -324,7 +324,7 @@
                         "batch": null,
                         "event": "admin:user.create",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "email": "owner@example.test"
@@ -418,7 +418,7 @@
                         "batch": null,
                         "event": "admin:server.build",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "name": "Survival"
@@ -549,7 +549,7 @@
                         "batch": null,
                         "event": "admin:node.update",
                         "is_api": true,
-                        "ip": "203.0.113.6",
+                        "ip": null,
                         "description": "Updated the node configuration.",
                         "properties": {
                             "name": "node-alpha",
@@ -591,7 +591,7 @@
                         "batch": null,
                         "event": "admin:user.create",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "email": "owner@example.test"
@@ -649,7 +649,7 @@
                         "batch": null,
                         "event": "admin:user.create",
                         "is_api": false,
-                        "ip": "203.0.113.5",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "email": "owner@example.test"
