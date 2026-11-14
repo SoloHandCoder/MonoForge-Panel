@@ -36,7 +36,9 @@ describe('MonoForge tokens', () => {
 
     it('uses bundled Inter Variable', () => {
         expect(tokens).toContain("--font-sans: 'Inter Variable'");
-        expect(css).toContain("@import '@fontsource-variable/inter'");
+        expect(css).toContain("font-family: 'Inter Variable'");
+        expect(css).toContain('/assets/fonts/inter-latin-wght-normal.woff2');
+        expect(css).not.toContain('fonts.googleapis.com');
     });
 
     it('honours reduced motion', () => {
