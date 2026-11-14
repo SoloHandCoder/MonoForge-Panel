@@ -68,11 +68,13 @@ arch('no sleeping, debugging, or environment reads outside config')
 // One rule per namespace: Pest silently passes multi-target expect([...]) here.
 foreach ([
     'Pterodactyl\Actions' => [],
-    'Pterodactyl\Console' => [],
+    // The panel importer reads another panel's database with that panel's APP_KEY,
+    // so it works with explicit connections and encrypters by design.
+    'Pterodactyl\Console' => ['Pterodactyl\Console\Commands\Migration'],
     'Pterodactyl\Http' => [],
     // Deliberate seams: the tags migration hands the backfiller the connection it
     // runs on, and the extension repository resolves during provider boot.
-    'Pterodactyl\Services' => [TagBackfiller::class, ExtensionRepository::class],
+    'Pterodactyl\Services' => [TagBackfiller::class, ExtensionRepository::class, 'Pterodactyl\Services\Migration'],
 ] as $namespace => $seams) {
     arch("{$namespace} uses facades for framework services")
         ->expect($namespace)

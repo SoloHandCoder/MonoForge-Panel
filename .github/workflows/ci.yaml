@@ -3,9 +3,11 @@ name: Tests
 on:
   push:
     branches:
+      - "main"
       - "2.0-develop"
   pull_request:
     branches:
+      - "main"
       - "2.0-develop"
 
 concurrency:
