@@ -9,6 +9,7 @@ use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
+use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
@@ -35,9 +36,34 @@ final class Scheduler
             $schedule->command(PruneCommand::class, ['--model' => [ActivityLog::class]])->daily()->withoutOverlapping();
         }
 
+        $this->scheduleMonoForgeUpdates($schedule);
+
         if (config('pterodactyl.telemetry.enabled')) {
             $this->scheduleTelemetry($schedule);
         }
+    }
+
+    /**
+     * Check for MonoForge builds daily (notify) or check and install them hourly (auto), and
+     * pick up updates requested from the admin area within a minute. These run as the panel
+     * user from cron, so updating never needs root.
+     */
+    private function scheduleMonoForgeUpdates(Schedule $schedule): void
+    {
+        $mode = config('monoforge.update.mode');
+        if ($mode !== 'notify' && $mode !== 'auto') {
+            return;
+        }
+
+        $schedule->command(UpdateCommand::class, ['--pending'])->everyMinute()->withoutOverlapping(120)->runInBackground();
+
+        if ($mode === 'auto') {
+            $schedule->command(UpdateCommand::class)->hourly()->withoutOverlapping(120)->runInBackground();
+
+            return;
+        }
+
+        $schedule->command(UpdateCommand::class, ['--check'])->daily()->withoutOverlapping();
     }
 
     /**

@@ -6,6 +6,7 @@ import AdvancedSettingsForm from '@/components/admin/settings/AdvancedSettingsFo
 import GeneralSettingsForm from '@/components/admin/settings/GeneralSettingsForm';
 import MailSettingsForm from '@/components/admin/settings/MailSettingsForm';
 import SettingsTabButton from '@/components/admin/settings/SettingsTabButton';
+import UpdateSettingsForm from '@/components/admin/settings/UpdateSettingsForm';
 import { httpErrorToHuman } from '@/api/http';
 import { ServerError } from '@/components/elements/ScreenBlock';
 import { Alert } from '@/components/elements/alert';
@@ -87,7 +88,12 @@ export default function SettingsContainer() {
             </div>
             {settings ? (
                 <div aria-busy={isFetching}>
-                    {tab === 'general' && <GeneralSettingsForm settings={settings} />}
+                    {tab === 'general' && (
+                        <>
+                            <GeneralSettingsForm settings={settings} />
+                            <UpdateSettingsForm readOnly={settings.meta.load_environment_only} />
+                        </>
+                    )}
                     {tab === 'mail' && <MailSettingsForm settings={settings} />}
                     {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
                 </div>

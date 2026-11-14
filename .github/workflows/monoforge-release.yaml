@@ -1,0 +1,112 @@
+name: MonoForge Release
+
+# Builds a ready-to-run panel tarball for every push to main and publishes it as a
+# GitHub release tagged build-<short sha>. Installed panels check the latest of these
+# releases and update themselves from its assets (see MonoForgeUpdateService).
+#
+# Releases are created with the workflow GITHUB_TOKEN, so they do not trigger other
+# workflows (docker.yaml listens for published releases).
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: monoforge-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The live panel runs PHP 8.3, so the production dependencies are resolved on it.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: bcmath, cli, curl, gd, intl, mbstring, mysql, openssl, pdo, posix, tokenizer, xml, zip
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install production PHP dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress --prefer-dist
+
+      - name: Build the frontend
+        run: |
+          npm ci
+          npm run build:production
+
+      - name: Write version.json
+        id: version
+        run: |
+          short="${GITHUB_SHA::7}"
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -n --arg version "$short" --arg commit "$GITHUB_SHA" --arg built_at "$built_at" \
+            '{version: $version, commit: $commit, built_at: $built_at}' > version.json
+          cat version.json
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      - name: Pack the panel
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          tarball="$RUNNER_TEMP/dist/monoforge-panel.tar"
+          # Everything the panel needs to run, without development files, secrets or runtime data.
+          tar -cf "$tarball" \
+            --exclude=./.git \
+            --exclude=./.github \
+            --exclude=./node_modules \
+            --exclude='./packages/*/node_modules' \
+            --exclude=./tests \
+            --exclude='./.env*' \
+            --exclude=./storage \
+            --exclude='./bootstrap/cache/*.php' \
+            --exclude=./.superpowers \
+            .
+          # storage/ ships as its empty skeleton (the tracked .gitignore files) only.
+          git ls-files storage | sed 's|^|./|' | tar -rf "$tarball" --no-recursion -T -
+          gzip -9 "$tarball"
+          cp version.json "$RUNNER_TEMP/dist/version.json"
+          cd "$RUNNER_TEMP/dist"
+          sha256sum monoforge-panel.tar.gz > monoforge-panel.tar.gz.sha256
+          cat monoforge-panel.tar.gz.sha256
+          ls -lh
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: build-${{ steps.version.outputs.short }}
+        run: |
+          cd "$RUNNER_TEMP/dist"
+          notes="MonoForge Panel build of ${GITHUB_SHA} on main. Installed panels pick this up through their update check."
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" monoforge-panel.tar.gz monoforge-panel.tar.gz.sha256 version.json --clobber
+            gh release edit "$TAG" --latest
+          else
+            gh release create "$TAG" monoforge-panel.tar.gz monoforge-panel.tar.gz.sha256 version.json \
+              --target "$GITHUB_SHA" \
+              --title "MonoForge build ${{ steps.version.outputs.short }}" \
+              --notes "$notes" \
+              --latest
+          fi
+
+      - name: Keep the last 10 builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+            while read -r tag; do
+              echo "Deleting old build release $tag"
+              gh release delete "$tag" --yes --cleanup-tag
+            done

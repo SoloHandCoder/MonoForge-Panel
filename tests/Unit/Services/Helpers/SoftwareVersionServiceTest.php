@@ -17,7 +17,8 @@ use RuntimeException;
 uses(TestCase::class);
 test('normalizes version service response fields', function (): void {
     $service = service(['panel' => '2.1.0', 'wings' => '1.12.0', 'discord' => 'https://example.com/discord', 'donations' => 'https://example.com/donate']);
-    expect($service->getPanel())->toBe('2.1.0');
+    // The panel version comes from MonoForge's own builds, never the Pterodactyl CDN.
+    expect($service->getPanel())->toBe(config('app.version'));
     expect($service->getDaemon())->toBe('1.12.0');
     expect($service->getDiscord())->toBe('https://example.com/discord');
     expect($service->getDonations())->toBe('https://example.com/donate');

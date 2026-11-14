@@ -2745,6 +2745,13 @@ export type AdminUpdateApiKeyRequest = {
     r_server_databases?: number;
 };
 
+export type AdminUpdateUpdateSettingsRequest = {
+    /**
+     * The mode.
+     */
+    mode: 'off' | 'notify' | 'auto';
+};
+
 export type ApplicationCreateUserRequest = {
     /**
      * An external identifier for this resource. Must not be greater than 191 characters.
@@ -3934,6 +3941,102 @@ export type AdminListEggCatalogResponseBody = {
  * Raw egg export JSON document returned as a text download.
  */
 export type AdminExportEggResponseBody = string;
+
+export type AdminGetUpdateStatusResponseBody = {
+    /**
+     * off, notify or auto.
+     */
+    mode: 'off' | 'notify' | 'auto';
+    /**
+     * The running build, or the app version when it is unknown.
+     */
+    current_version: string;
+    /**
+     * The running build, or null when the panel has no version.json.
+     */
+    current: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+    } | null;
+    /**
+     * The latest build on GitHub, or null when it is unknown or update checks are off.
+     */
+    latest: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+        tag: string;
+        url: string;
+    } | null;
+    /**
+     * Whether the latest build should replace the running one.
+     */
+    update_available: boolean;
+    /**
+     * The last requested or applied update.
+     */
+    status: {
+        /**
+         * idle, queued, running, success or failed.
+         */
+        state: 'idle' | 'queued' | 'running' | 'success' | 'failed';
+        step: string | null;
+        message: string | null;
+        from: string | null;
+        to: string | null;
+        error: string | null;
+        updated_at: string | null;
+    };
+};
+
+export type AdminApplyUpdateResponseBody = {
+    /**
+     * off, notify or auto.
+     */
+    mode: 'off' | 'notify' | 'auto';
+    /**
+     * The running build, or the app version when it is unknown.
+     */
+    current_version: string;
+    /**
+     * The running build, or null when the panel has no version.json.
+     */
+    current: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+    } | null;
+    /**
+     * The latest build on GitHub, or null when it is unknown or update checks are off.
+     */
+    latest: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+        tag: string;
+        url: string;
+    } | null;
+    /**
+     * Whether the latest build should replace the running one.
+     */
+    update_available: boolean;
+    /**
+     * The last requested or applied update.
+     */
+    status: {
+        /**
+         * idle, queued, running, success or failed.
+         */
+        state: 'idle' | 'queued' | 'running' | 'success' | 'failed';
+        step: string | null;
+        message: string | null;
+        from: string | null;
+        to: string | null;
+        error: string | null;
+        updated_at: string | null;
+    };
+};
 
 export type ApplicationGetNodeConfigurationResponseBody = {
     debug?: boolean;
@@ -10710,6 +10813,101 @@ export type AdminGetVersionInformationResponses = {
 };
 
 export type AdminGetVersionInformationResponse = AdminGetVersionInformationResponses[keyof AdminGetVersionInformationResponses];
+
+export type AdminGetUpdateStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/updates/status';
+};
+
+export type AdminGetUpdateStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetUpdateStatusError = AdminGetUpdateStatusErrors[keyof AdminGetUpdateStatusErrors];
+
+export type AdminGetUpdateStatusResponses = {
+    /**
+     * Update status returned.
+     */
+    200: AdminGetUpdateStatusResponseBody;
+};
+
+export type AdminGetUpdateStatusResponse = AdminGetUpdateStatusResponses[keyof AdminGetUpdateStatusResponses];
+
+export type AdminApplyUpdateData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/updates/apply';
+};
+
+export type AdminApplyUpdateErrors = {
+    /**
+     * Updates are off, one is already running or there is nothing newer to install.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminApplyUpdateError = AdminApplyUpdateErrors[keyof AdminApplyUpdateErrors];
+
+export type AdminApplyUpdateResponses = {
+    /**
+     * Update queued.
+     */
+    202: AdminApplyUpdateResponseBody;
+};
+
+export type AdminApplyUpdateResponse = AdminApplyUpdateResponses[keyof AdminApplyUpdateResponses];
+
+export type AdminUpdateUpdateSettingsData = {
+    body: AdminUpdateUpdateSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/updates/settings';
+};
+
+export type AdminUpdateUpdateSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateUpdateSettingsError = AdminUpdateUpdateSettingsErrors[keyof AdminUpdateUpdateSettingsErrors];
+
+export type AdminUpdateUpdateSettingsResponses = {
+    /**
+     * Update mode saved.
+     */
+    204: void;
+};
+
+export type AdminUpdateUpdateSettingsResponse = AdminUpdateUpdateSettingsResponses[keyof AdminUpdateUpdateSettingsResponses];
 
 export type ApplicationListUsersData = {
     body?: never;
