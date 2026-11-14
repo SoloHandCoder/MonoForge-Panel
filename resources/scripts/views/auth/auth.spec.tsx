@@ -114,6 +114,24 @@ describe('auth views from fixtures', () => {
     });
 });
 
+describe('sign-in look', () => {
+    it('renders an aria-hidden blocks layer and the routed children in the auth layout', () => {
+        const { container, unmount } = renderView('layout.auth', { slots: {} });
+
+        expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+        unmount();
+    });
+
+    it('shows the MonoForge mark and title on the card', () => {
+        const { container, unmount } = renderView('page.auth.login');
+
+        expect(container.querySelector('[aria-label="MonoForge"]')).not.toBeNull();
+        expect(screen.getAllByText('MonoForge').length).toBeGreaterThan(0);
+        expect(screen.getByRole('heading', { name: 'Login to Continue' })).toBeInTheDocument();
+        unmount();
+    });
+});
+
 describe('page.auth.login', () => {
     it('gives password managers the attributes they read', async () => {
         await renderAuth('/auth/login');

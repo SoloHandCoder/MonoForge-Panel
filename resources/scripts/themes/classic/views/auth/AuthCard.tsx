@@ -1,3 +1,4 @@
+/* oxlint-disable rules/design-tokens -- the card radius is the brand's fixed 18px */
 import type { ReactNode } from 'react';
 import { cn, Form } from '@/sdk';
 import MonoForgeMark from '../brand/MonoForgeMark';
@@ -9,17 +10,18 @@ interface Props {
     children: ReactNode;
 }
 
-/** The sign-in card: the form beside the mark, under a title and above the copyright. */
+/** The sign-in card: the mark and name above the title, the form below, and the copyright under the card. */
 export default function AuthCard({ title, submit, className, children }: Props) {
     return (
-        <div className={cn('sm:mx-auto sm:w-4/5 md:p-10 lg:w-3/5 xl:w-full xl:max-w-auth', className)}>
-            <h2 className='text-3xl text-center text-foreground font-medium py-4'>{title}</h2>
-            <Form form={{ handleSubmit: submit }} className='w-full flex'>
-                <div className='md:flex w-full bg-card text-card-foreground shadow-lg rounded-lg p-6 md:pl-0 mx-1'>
-                    <div className='flex-none select-none mb-6 md:mb-0 self-center'>
-                        <MonoForgeMark className='block w-32 md:w-56 h-auto mx-auto md:px-12' />
+        <div className={cn('mx-auto w-full max-w-md', className)}>
+            <Form form={{ handleSubmit: submit }} className='w-full'>
+                <div className='w-full rounded-[18px] border border-border bg-card p-8 text-card-foreground shadow-lg'>
+                    <div className='mb-6 flex select-none flex-col items-center gap-2'>
+                        <MonoForgeMark className='block size-12' />
+                        <p className='text-lg font-semibold tracking-wide text-foreground'>MonoForge</p>
                     </div>
-                    <div className='flex-1'>{children}</div>
+                    <h2 className='mb-6 text-center text-xl font-medium text-foreground'>{title}</h2>
+                    <div className='w-full'>{children}</div>
                 </div>
             </Form>
             <p className='text-center text-muted-foreground text-xs mt-4'>
