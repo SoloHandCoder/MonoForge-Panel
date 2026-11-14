@@ -1,21 +1,6 @@
-import { SubNavigation, SubNavigationLayout } from '@/sdk';
-import { Main, Slot, type ViewProps } from '@/sdk/theme';
-import { tabLabel } from './tabLabel';
+import { Main, type ViewProps } from '@/sdk/theme';
 
-export default function AccountLayout({ model, className, children }: ViewProps<'layout.account'>) {
-    return (
-        <SubNavigationLayout
-            className={className}
-            navigation={
-                <SubNavigation
-                    items={model.nav.items}
-                    renderItem={tabLabel}
-                    before={<Slot name='account.navigation.before' />}
-                    after={<Slot name='account.navigation.after' />}
-                />
-            }
-        >
-            <Main>{children}</Main>
-        </SubNavigationLayout>
-    );
+/** The sidebar shell draws this area's navigation, so the layout only places its pages. */
+export default function AccountLayout({ className, children }: ViewProps<'layout.account'>) {
+    return <Main className={className}>{children}</Main>;
 }

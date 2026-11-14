@@ -11,7 +11,6 @@ import {
     Icon,
     InputSpinner,
     PanelLink,
-    Tooltip,
 } from '@/sdk';
 import type { AppSearchModel, ViewProps } from '@/sdk/theme';
 import { TextField } from '../shared/fields';
@@ -91,17 +90,17 @@ export default function Search({ model, className }: ViewProps<'app.search'>) {
                     <Results model={model} />
                 </Dialog>
             )}
-            <Tooltip placement='bottom' content='Search'>
-                <button
-                    type='button'
-                    aria-label='Search'
-                    aria-keyshortcuts={model.shortcut.aria}
-                    className={cn('navigation-link', className)}
-                    onClick={model.show}
-                >
-                    <Icon icon={SearchIcon} />
-                </button>
-            </Tooltip>
+            <button
+                type='button'
+                aria-label='Search'
+                aria-keyshortcuts={model.shortcut.aria}
+                className={cn('navigation-link', className)}
+                onClick={model.show}
+            >
+                <Icon icon={SearchIcon} className='size-4 shrink-0' aria-hidden />
+                <span className='min-w-0 flex-1 truncate text-left'>Search</span>
+                <kbd className='font-sans text-xs text-muted-foreground'>{model.shortcut.label}</kbd>
+            </button>
         </>
     );
 }

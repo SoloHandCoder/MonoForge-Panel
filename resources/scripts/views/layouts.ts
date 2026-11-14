@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import { useCurrentUser } from '@/api/account/queries';
-import { serverResourceUsageQueryOptions } from '@/api/account/servers/queries';
+import { serverResourceUsageQueryOptions, useAccountServers } from '@/api/account/servers/queries';
 import { useLogout } from '@/api/auth/queries';
 import { useCurrentServer } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
@@ -42,6 +42,8 @@ export interface AppLayoutModel {
     readonly links: readonly AppLayoutLink[];
     /** Where the user is, with the model of that area's layout, so the shell can draw its navigation. */
     readonly area: AppArea;
+    /** The user's servers on every page of the dashboard's list, from its first page; null until that loads. */
+    readonly serverCount: number | null;
     readonly user: {
         readonly uuid: string;
         readonly username: string;
@@ -257,12 +259,14 @@ function useAppLayoutModel(): AppLayoutModel {
     const { scheme, preference, schemes, setScheme } = useTheme();
     const { mutate, isPending } = useLogout();
     const area = useAppArea();
+    const serverCount = useAccountServers({ page: 1 }).data?.meta.pagination.total ?? null;
 
     return useMemo(
         () => ({
             brand,
             links: appLinks(rootAdmin),
             area,
+            serverCount,
             user: { uuid, username, email, rootAdmin },
             scheme,
             preference,
@@ -271,7 +275,21 @@ function useAppLayoutModel(): AppLayoutModel {
             signOut: () => mutate({}),
             signingOut: isPending,
         }),
-        [brand, area, uuid, username, email, rootAdmin, scheme, preference, schemes, setScheme, mutate, isPending]
+        [
+            brand,
+            area,
+            serverCount,
+            uuid,
+            username,
+            email,
+            rootAdmin,
+            scheme,
+            preference,
+            schemes,
+            setScheme,
+            mutate,
+            isPending,
+        ]
     );
 }
 
@@ -288,6 +306,7 @@ const appLayoutFixture = (
     brand,
     links: appLinks(rootAdmin),
     area,
+    serverCount: null,
     user: { uuid: '11111111-1111-4111-8111-111111111111', username: 'alex', email: 'alex@example.test', rootAdmin },
     scheme: schemes[0] ?? 'dark',
     preference: schemes[0] ?? 'dark',

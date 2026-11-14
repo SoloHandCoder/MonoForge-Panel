@@ -134,7 +134,7 @@ it('renders a view synchronously from fixtures with a theme layered over classic
     });
 
     expect(container.querySelector('[data-aurora-layout] main')).not.toBeNull();
-    expect(container.querySelector('a[aria-label="Admin"]')).toHaveAttribute('href', '/panel');
+    expect(container.querySelector('a[href="/panel"]')).toHaveTextContent('Admin area');
     unmount();
     expect(container.isConnected).toBe(false);
 });
