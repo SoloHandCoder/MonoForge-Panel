@@ -152,7 +152,8 @@ class ImportM12LabsCommand extends Command
             $key = (string) base64_decode(mb_substr($key, 7), true);
         }
 
-        $cipher = match (mb_strlen($key)) {
+        // The decoded key is raw bytes, so count bytes ('8bit'), not characters.
+        $cipher = match (mb_strlen($key, '8bit')) {
             32 => 'AES-256-CBC',
             16 => 'AES-128-CBC',
             default => throw new RuntimeException('That is not a valid Laravel APP_KEY. Expected a 16 or 32 byte key, usually written as base64:…'),

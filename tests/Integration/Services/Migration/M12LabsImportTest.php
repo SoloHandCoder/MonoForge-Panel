@@ -27,11 +27,17 @@ const NODE_UUID = 'b0a1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d';
 
 const SERVER_UUID = 'c1b2a3d4-e5f6-4b7a-9c8d-0e1f2a3b4c5d';
 
-/** The m12labs panel's APP_KEY: 32 bytes, as AES-256-CBC needs. */
-const SOURCE_KEY = 'm12labs-import-test-key-32-bytes';
+/**
+ * The m12labs panel's APP_KEY: 32 raw bytes, as AES-256-CBC needs. Real keys are
+ * random bytes, not text, so this one includes bytes that are not valid UTF-8.
+ */
+function sourceKey(): string
+{
+    return (string) hex2bin('c328a0a1e228a1f0288cbcf09028bc80fffe0102030405060708090a0b0c0d0e');
+}
 
 beforeEach(function (): void {
-    seedSourcePanel(buildSourceDatabase(), new Encrypter(SOURCE_KEY, 'AES-256-CBC'));
+    seedSourcePanel(buildSourceDatabase(), new Encrypter(sourceKey(), 'AES-256-CBC'));
     emptyTargetTables();
 });
 
@@ -41,7 +47,7 @@ afterEach(function (): void {
 });
 
 test('imports an m12labs panel and maps what changed', function (): void {
-    $summary = runImport(source(), SOURCE_KEY);
+    $summary = runImport(source(), sourceKey());
 
     // Nodes: public ports become the one port per service, locations are created.
     $node = DB::table('nodes')->where('uuid', NODE_UUID)->sole();
@@ -80,7 +86,7 @@ test('imports an m12labs panel and maps what changed', function (): void {
 });
 
 test('a dry run writes nothing', function (): void {
-    runImport(source(), SOURCE_KEY, dryRun: true);
+    runImport(source(), sourceKey(), dryRun: true);
 
     expect(DB::table('users')->count())->toBe(0)
         ->and(DB::table('nodes')->count())->toBe(0)
@@ -97,8 +103,25 @@ test('a wrong source APP_KEY is refused before anything is written', function ()
 test('an import into a panel that already has data is refused', function (): void {
     DB::table('nests')->insert(['id' => 99, 'uuid' => Uuid::uuid4()->toString(), 'author' => 'a@example.test', 'name' => 'Existing']);
 
-    expect(fn (): ImportSummary => runImport(source(), SOURCE_KEY))
+    expect(fn (): ImportSummary => runImport(source(), sourceKey()))
         ->toThrow(RuntimeException::class, 'already contain data: nests');
+});
+
+test('the artisan command reads a base64 APP_KEY and runs a dry run', function (): void {
+    $this->artisan('p:migrate:m12labs', [
+        '--host' => config('database.connections.mysql.host'),
+        '--port' => config('database.connections.mysql.port'),
+        '--database' => SOURCE_DATABASE,
+        '--username' => config('database.connections.mysql.username'),
+        '--password' => config('database.connections.mysql.password'),
+        '--source-key' => 'base64:'.base64_encode(sourceKey()),
+        '--dry-run' => true,
+        '--no-interaction' => true,
+    ])
+        ->expectsOutputToContain('Dry run finished')
+        ->assertExitCode(0);
+
+    expect(DB::table('users')->count())->toBe(0);
 });
 
 function runImport(Connection $source, string $sourceKey, bool $dryRun = false): ImportSummary
