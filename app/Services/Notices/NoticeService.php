@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Notices;
 
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Pterodactyl\Enum\NoticeLevel;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
@@ -14,11 +14,11 @@ use Pterodactyl\Models\UserNotice;
  */
 class NoticeService
 {
-    public function __construct(private readonly ConnectionInterface $connection) {}
-
     /**
      * Notify a user. A notice with a `kind` replaces the user's unread notice of that kind instead
      * of stacking a second one, so a repeated check (a low balance each hour) shows one notice.
+     *
+     * An action link must be a panel path or an http(s) URL; any other link is dropped with its label.
      */
     public function notify(
         User $user,
@@ -29,12 +29,13 @@ class NoticeService
         ?string $actionLabel = null,
         ?string $actionUrl = null,
     ): UserNotice {
+        $url = ActionUrl::sanitize($actionUrl);
         $attributes = [
             'level' => NoticeLevel::from($level),
             'title' => $title,
             'body' => $body,
-            'action_label' => $actionLabel,
-            'action_url' => $actionUrl,
+            'action_label' => $url === null ? null : $actionLabel,
+            'action_url' => $url,
             'kind' => $kind,
         ];
 
@@ -42,16 +43,24 @@ class NoticeService
             return $user->notices()->create($attributes);
         }
 
-        return $this->connection->transaction(function () use ($user, $kind, $attributes): UserNotice {
-            $existing = $user->notices()->unread()->where('kind', $kind)->lockForUpdate()->first();
+        $existing = $this->unreadOfKind($user, $kind);
 
-            if ($existing === null) {
+        if (! $existing instanceof UserNotice) {
+            try {
                 return $user->notices()->create($attributes);
+            } catch (UniqueConstraintViolationException $exception) {
+                // A concurrent notify created the unread notice of this kind first; update that one.
+                $existing = $this->unreadOfKind($user, $kind) ?? throw $exception;
             }
+        }
 
-            $existing->fill($attributes)->save();
+        $existing->fill($attributes)->save();
 
-            return $existing;
-        });
+        return $existing;
+    }
+
+    private function unreadOfKind(User $user, string $kind): ?UserNotice
+    {
+        return $user->notices()->unread()->where('kind', $kind)->first();
     }
 }

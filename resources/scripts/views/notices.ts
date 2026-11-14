@@ -15,17 +15,41 @@ const DISMISSED_KEY = 'monoforge:dismissed-announcements';
 
 const level = (value: string): PanelNoticeLevel => (LEVELS.has(value) ? (value as PanelNoticeLevel) : 'info');
 
-/** Only links within the panel or to http(s) pages; a `javascript:` url never becomes a link. */
-export const safeActionUrl = (url: string | null | undefined): string | null => {
-    if (!url) {
+/** Browsers drop whitespace and control characters and read `\` as `/`, so `/\evil.example` would leave the panel. */
+const hasUnsafeCharacter = (url: string): boolean =>
+    [...url].some((character) => {
+        const code = character.codePointAt(0) ?? 0;
+
+        return code <= 0x20 || code === 0x7f || character === '\\';
+    });
+
+const parseUrl = (url: string, base?: string): URL | null => {
+    try {
+        return new URL(url, base);
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Only paths within the panel or http(s) pages; a `javascript:` url never becomes a link. The server
+ * applies the same rules when it stores a notice (`ActionUrl::sanitize`).
+ */
+export const safeActionUrl = (
+    url: string | null | undefined,
+    origin: string = globalThis.location?.origin ?? ''
+): string | null => {
+    if (!url || hasUnsafeCharacter(url)) {
         return null;
     }
 
-    if (url.startsWith('/') && !url.startsWith('//')) {
-        return url;
+    if (url.startsWith('/')) {
+        return !url.startsWith('//') && parseUrl(url, origin)?.origin === origin ? url : null;
     }
 
-    return /^https?:\/\//i.test(url) ? url : null;
+    const parsed = parseUrl(url);
+
+    return parsed && (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? url : null;
 };
 
 /** A dismissal is remembered per update, so an edited announcement shows again. */

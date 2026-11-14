@@ -67,11 +67,28 @@ describe('panelNotices', () => {
 });
 
 describe('safeActionUrl', () => {
+    const origin = 'https://panel.monoforge.net';
+
     it('keeps panel paths and http links only', () => {
-        expect(safeActionUrl('/account')).toBe('/account');
-        expect(safeActionUrl('https://monoforge.net/billing')).toBe('https://monoforge.net/billing');
-        expect(safeActionUrl('//evil.example')).toBeNull();
-        expect(safeActionUrl('javascript:alert(1)')).toBeNull();
-        expect(safeActionUrl(null)).toBeNull();
+        expect(safeActionUrl('/account', origin)).toBe('/account');
+        expect(safeActionUrl('/account?tab=billing#top', origin)).toBe('/account?tab=billing#top');
+        expect(safeActionUrl('https://monoforge.net/billing', origin)).toBe('https://monoforge.net/billing');
+        expect(safeActionUrl('http://monoforge.net', origin)).toBe('http://monoforge.net');
+        expect(safeActionUrl('javascript:alert(1)', origin)).toBeNull();
+        expect(safeActionUrl('data:text/html,hi', origin)).toBeNull();
+        expect(safeActionUrl('account', origin)).toBeNull();
+        expect(safeActionUrl(null, origin)).toBeNull();
+    });
+
+    it('rejects relative links that a browser would send off-site', () => {
+        for (const url of [
+            '//evil.example',
+            '/\\evil.example',
+            '/\t/evil.example',
+            '/ /evil.example',
+            '/\n/evil.example',
+        ]) {
+            expect(safeActionUrl(url, origin), url).toBeNull();
+        }
     });
 });

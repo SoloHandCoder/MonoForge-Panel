@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\NoticeControllerTest;
 
+use Illuminate\Support\Facades\DB;
 use Pterodactyl\Models\Announcement;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
@@ -88,4 +89,52 @@ test('notify replaces an unread notice of the same kind instead of stacking it',
     expect($third->id)->not->toBe($first->id)
         ->and($user->notices()->count())->toBe(4)
         ->and($user->notices()->unread()->count())->toBe(3);
+});
+
+test('notify updates the notice a concurrent notify created first instead of failing', function (): void {
+    $user = User::factory()->create();
+    $raced = false;
+
+    // Another request inserts the unread notice of this kind between the lookup and the insert.
+    UserNotice::creating(function (UserNotice $notice) use ($user, &$raced): void {
+        if ($raced) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('user_notices')->insert([
+            'user_id' => $user->id,
+            'level' => 'warning',
+            'title' => 'Low balance',
+            'body' => 'From the other request.',
+            'kind' => 'billing.low_balance',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    try {
+        $notice = $this->app->make(NoticeService::class)
+            ->notify($user, 'danger', 'Low balance', 'One day left.', 'billing.low_balance');
+    } finally {
+        UserNotice::flushEventListeners();
+    }
+
+    expect($raced)->toBeTrue()
+        ->and($user->notices()->count())->toBe(1)
+        ->and($notice->refresh()->body)->toBe('One day left.')
+        ->and($notice->level->value)->toBe('danger');
+});
+
+test('notify drops an action link that would leave the panel', function (): void {
+    $user = User::factory()->create();
+    $service = $this->app->make(NoticeService::class);
+
+    $unsafe = $service->notify($user, 'info', 'Hi', 'Body.', null, 'Open', '/\\evil.example');
+    $safe = $service->notify($user, 'info', 'Hi', 'Body.', null, 'Top up', '/account');
+
+    expect($unsafe->action_url)->toBeNull()
+        ->and($unsafe->action_label)->toBeNull()
+        ->and($safe->action_url)->toBe('/account')
+        ->and($safe->action_label)->toBe('Top up');
 });
