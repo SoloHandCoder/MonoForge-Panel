@@ -53,7 +53,11 @@ describe('LiveUsageContainer', () => {
 
         const rows = within(document.getElementById('node-usage-1-servers')!).getAllByRole('listitem');
 
-        expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual(['Busy', 'Idle', 'Awaiting']);
+        expect(rows.map((row) => within(row).getAllByRole('link')[0].textContent)).toEqual([
+            'Busy',
+            'Idle',
+            'Awaiting',
+        ]);
         expect(within(rows[0]).getByText('250% / 400%')).toBeInTheDocument();
         expect(within(rows[1]).getByText('0%')).toBeInTheDocument();
         expect(within(rows[2]).getByText('Unknown')).toBeInTheDocument();
