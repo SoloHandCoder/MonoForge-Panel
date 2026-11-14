@@ -49,21 +49,23 @@ export default function OverviewContainer() {
                 <>
                     <OverviewVersionCard version={version} />
                     <div className='mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4'>
-                        {externalLinks(version).map((link) => (
-                            <a
-                                key={link.href}
-                                href={link.href}
-                                target='_blank'
-                                rel='noreferrer'
-                                className={cn(
-                                    'inline-flex items-center justify-center rounded-sm border border-border bg-card px-4 py-3 text-sm font-medium text-foreground no-underline hover:text-accent',
-                                    interactiveSurfaceClass
-                                )}
-                            >
-                                <Icon icon={link.icon} className='mr-2 h-4 w-4' />
-                                {link.label}
-                            </a>
-                        ))}
+                        {externalLinks(version)
+                            .filter((link) => link.href !== '')
+                            .map((link) => (
+                                <a
+                                    key={link.href}
+                                    href={link.href}
+                                    target='_blank'
+                                    rel='noreferrer'
+                                    className={cn(
+                                        'inline-flex items-center justify-center rounded-sm border border-border bg-card px-4 py-3 text-sm font-medium text-foreground no-underline hover:text-accent',
+                                        interactiveSurfaceClass
+                                    )}
+                                >
+                                    <Icon icon={link.icon} className='mr-2 h-4 w-4' />
+                                    {link.label}
+                                </a>
+                            ))}
                     </div>
                 </>
             ) : (
