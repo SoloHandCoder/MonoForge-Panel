@@ -101,8 +101,8 @@ final readonly class ServerClient
             'query' => ['size' => $lines, 'lines' => $lines],
         ]);
 
-        if (str_starts_with(strtolower((string) $response->header('Content-Type')), 'text/plain')) {
-            $body = rtrim(str_replace("\r\n", "\n", $response->body()), "\n");
+        if (str_starts_with(mb_strtolower((string) $response->header('Content-Type')), 'text/plain')) {
+            $body = mb_rtrim(str_replace("\r\n", "\n", $response->body()), "\n");
 
             return $body === '' ? [] : array_slice(explode("\n", $body), -$lines);
         }

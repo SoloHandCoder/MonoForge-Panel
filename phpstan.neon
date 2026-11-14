@@ -27,7 +27,7 @@ parameters:
         ViteManifest: 'array<string, ViteManifestEntry>'
         JwtClaims: 'array<non-empty-string, mixed>'
         SoftwareVersionData: 'array{panel?: string, wings?: string, discord?: string, donations?: string}'
-        NodeConfiguration: 'array{debug: bool, uuid: string, token_id: string, token: string, api: array{host: string, port: int, ssl: array{enabled: bool, cert: string, key: string}, upload_limit: int}, system: array{data: string, sftp: array{bind_port: int}}, allowed_mounts: list<string>, remote: string}'
+        NodeConfiguration: 'array{debug: bool, uuid: string, token_id: string, token: string, api: array{host: string, port: int, ssl: array{enabled: bool, cert: string, key: string}, upload_limit: int}, system: array{data: string, sftp: array{bind_port: int}, backups: array{s3: array{streaming: bool}}}, allowed_mounts: list<string>, remote: string}'
         BackupDiskConfig: 'array{}|array{adapter: string, key?: string, secret?: string, token?: string, bucket?: string, prefix?: string, options?: array<string, mixed>, ...<string, mixed>}'
         S3BackupDiskConfig: 'array{adapter: string, bucket: string, key?: string, secret?: string, token?: string, prefix?: string, options?: array<string, mixed>, ...<string, mixed>}'
         EggConfigurationFiles: 'array<string, array{find: array<mixed>, ...<string, mixed>}>'
