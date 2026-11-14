@@ -11,9 +11,14 @@ use stdClass;
 trait FormatsActivityLogs
 {
     /**
+     * Property keys that may carry node addresses and are never shown to non-admins.
+     */
+    private const array NODE_ADDRESS_KEYS = ['fqdn', 'node_ip'];
+
+    /**
      * @return array{id: string, batch: string|null, event: string, is_api: bool, ip: string|null, description: string|null, properties: object, has_additional_metadata: bool, timestamp: string}
      */
-    protected function activityAttributes(ActivityLog $model, bool $canViewIp): array
+    protected function activityAttributes(ActivityLog $model, bool $canViewIp, bool $isAdminViewer = false): array
     {
         return [
             // This is not for security, it is only to provide a unique identifier to
@@ -23,9 +28,9 @@ trait FormatsActivityLogs
             'batch' => $model->batch,
             'event' => $model->event,
             'is_api' => ($model->api_key_id ?? 0) > 0,
-            'ip' => $canViewIp ? $model->ip : null,
+            'ip' => $canViewIp ? $model->visibleIp() : null,
             'description' => $model->description,
-            'properties' => $this->activityProperties($model, $canViewIp),
+            'properties' => $this->activityProperties($model, $canViewIp, $isAdminViewer),
             'has_additional_metadata' => $this->activityHasAdditionalMetadata($model),
             'timestamp' => $model->timestamp->toAtomString(),
         ];
@@ -35,16 +40,19 @@ trait FormatsActivityLogs
      * Transforms any array values in the properties into a countable field for easier
      * use within the translation outputs.
      */
-    protected function activityProperties(ActivityLog $model, bool $canViewIp): object
+    protected function activityProperties(ActivityLog $model, bool $canViewIp, bool $isAdminViewer = false): object
     {
         $values = $model->propertyValues();
         if ($values === []) {
             return new stdClass;
         }
 
+        $ipHidden = ! $canViewIp || $model->visibleIp() === null;
+
         $properties = collect($values)
-            ->mapWithKeys(function (mixed $value, string $key) use ($canViewIp): array {
-                if ($key === 'ip' && ! $canViewIp) {
+            ->except($isAdminViewer ? [] : self::NODE_ADDRESS_KEYS)
+            ->mapWithKeys(function (mixed $value, string $key) use ($ipHidden): array {
+                if ($key === 'ip' && $ipHidden) {
                     return [$key => '[hidden]'];
                 }
 

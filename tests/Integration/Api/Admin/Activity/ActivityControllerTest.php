@@ -12,7 +12,7 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
-test('activity is returned newest first', function () {
+test('activity is returned newest first', function (): void {
     $server = $this->createServerModel();
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
     Activity::event('admin:server.reinstall')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
@@ -24,7 +24,7 @@ test('activity is returned newest first', function () {
     $response->assertJsonPath('data.0.attributes.event', 'admin:server.reinstall');
     $response->assertJsonPath('data.1.attributes.event', 'admin:server.build');
 });
-test('administrative activity spans every server rather than one', function () {
+test('administrative activity spans every server rather than one', function (): void {
     $first = $this->createServerModel();
     $second = $this->createServerModel();
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($first)->property('name', $first->name)->log();
@@ -34,7 +34,7 @@ test('administrative activity spans every server rather than one', function () {
 
     expect($events)->toContain('admin:server.build', 'admin:server.suspend');
 });
-test('customer activity is excluded from the administrative log', function () {
+test('customer activity is excluded from the administrative log', function (): void {
     $server = $this->createServerModel();
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
     Activity::event('server:power.start')->actor($this->getAdminUser())->subject($server)->log();
@@ -50,7 +50,7 @@ test('customer activity is excluded from the administrative log', function () {
     expect($events)->not->toContain('user:account.password-changed');
     expect($events)->not->toContain('auth:success');
 });
-test('activity can be filtered by event and includes the actor', function () {
+test('activity can be filtered by event and includes the actor', function (): void {
     $server = $this->createServerModel();
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
     Activity::event('admin:server.suspend')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
@@ -61,16 +61,16 @@ test('activity can be filtered by event and includes the actor', function () {
     $response->assertJsonPath('data.0.attributes.event', 'admin:server.suspend');
     $response->assertJsonPath('data.0.attributes.relationships.actor.attributes.email', $this->getAdminUser()->email);
 });
-test('the originating address is exposed to administrators', function () {
+test('the originating address of an administrator is never exposed', function (): void {
     $server = $this->createServerModel();
-    Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->withRequestMetadata()->log();
+    Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property(['name' => $server->name, 'ip' => '203.0.113.9'])->withRequestMetadata()->log();
 
     $row = $this->getJson(route('api.admin.activity'))->assertOk()->json('data.0.attributes');
 
-    expect($row['ip'])->toBe('127.0.0.1');
-    expect($row['properties']['ip'])->toBe('127.0.0.1');
+    expect($row['ip'])->toBeNull();
+    expect($row['properties']['ip'])->toBe('[hidden]');
 });
-test('disabled events are never listed', function () {
+test('disabled events are never listed', function (): void {
     $server = $this->createServerModel();
     Activity::event(ActivityLog::DISABLED_EVENTS[0])->actor($this->getAdminUser())->subject($server)->log();
 
@@ -78,7 +78,7 @@ test('disabled events are never listed', function () {
 
     expect($events)->not->toContain(ActivityLog::DISABLED_EVENTS[0]);
 });
-test('the event filter cannot reach outside the administrative namespace', function () {
+test('the event filter cannot reach outside the administrative namespace', function (): void {
     $server = $this->createServerModel();
     Activity::event('server:power.start')->actor($this->getAdminUser())->subject($server)->log();
 
@@ -86,14 +86,14 @@ test('the event filter cannot reach outside the administrative namespace', funct
 
     $response->assertJsonCount(0, 'data');
 });
-test('endpoint requires an authenticated administrator', function () {
+test('endpoint requires an authenticated administrator', function (): void {
     $this->app->get('auth')->forgetGuards();
     $this->getJson(route('api.admin.activity'))->assertUnauthorized();
 
     $this->actingAs(User::factory()->create(['root_admin' => false]));
     $this->getJson(route('api.admin.activity'))->assertForbidden();
 });
-test('activity can be filtered by the user that performed it', function () {
+test('activity can be filtered by the user that performed it', function (): void {
     $server = $this->createServerModel();
     $other = User::factory()->create(['username' => 'someone-else', 'email' => 'else@example.com']);
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
@@ -105,7 +105,7 @@ test('activity can be filtered by the user that performed it', function () {
     $byEmail = collect($this->getJson(route('api.admin.activity', ['filter' => ['user' => 'else@example.com']]))->assertOk()->json('data'))->pluck('attributes.event');
     expect($byEmail->all())->toBe(['admin:server.suspend']);
 });
-test('the user filter combines with the event filter', function () {
+test('the user filter combines with the event filter', function (): void {
     $server = $this->createServerModel();
     $other = User::factory()->create(['username' => 'someone-else']);
     Activity::event('admin:server.build')->actor($other)->subject($server)->property('name', $server->name)->log();
@@ -117,13 +117,13 @@ test('the user filter combines with the event filter', function () {
     $response->assertJsonCount(1, 'data');
     $response->assertJsonPath('data.0.attributes.event', 'admin:server.suspend');
 });
-test('an entry without a user actor is excluded by the user filter', function () {
+test('an entry without a user actor is excluded by the user filter', function (): void {
     $server = $this->createServerModel();
     Activity::event('admin:server.build')->anonymous()->subject($server)->property('name', $server->name)->log();
 
     $this->getJson(route('api.admin.activity', ['filter' => ['user' => 'anything']]))->assertOk()->assertJsonCount(0, 'data');
 });
-test('filtering by user id matches only that user', function () {
+test('filtering by user id matches only that user', function (): void {
     $server = $this->createServerModel();
     $dan = User::factory()->create(['username' => 'dan']);
     $danny = User::factory()->create(['username' => 'danny']);
@@ -137,7 +137,7 @@ test('filtering by user id matches only that user', function () {
     expect($byId->json('data'))->toHaveCount(1);
     $byId->assertJsonPath('data.0.attributes.event', 'admin:server.build');
 });
-test('filter options list the events and users present in the log', function () {
+test('filter options list the events and users present in the log', function (): void {
     $server = $this->createServerModel();
     $other = User::factory()->create(['username' => 'zz-last']);
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
@@ -150,7 +150,7 @@ test('filter options list the events and users present in the log', function () 
     expect(collect($data['users'])->pluck('username')->all())->toContain('zz-last');
     expect(collect($data['users'])->pluck('id')->all())->toContain($other->id);
 });
-test('filter options never leak customer activity into the admin log', function () {
+test('filter options never leak customer activity into the admin log', function (): void {
     $server = $this->createServerModel();
     Activity::event('server:power.start')->actor($this->getAdminUser())->subject($server)->log();
 
@@ -159,12 +159,12 @@ test('filter options never leak customer activity into the admin log', function 
     expect($data['events'])->toBe([]);
     expect($data['users'])->toBe([]);
 });
-test('filter options require administrator access', function () {
+test('filter options require administrator access', function (): void {
     $this->actingAs(User::factory()->create(['root_admin' => false]));
 
     $this->getJson(route('api.admin.activity.filters'))->assertForbidden();
 });
-test('the exact event filter does not match longer event names', function () {
+test('the exact event filter does not match longer event names', function (): void {
     $node = $this->createServerModel()->node;
     Activity::event('admin:node-allocation.delete')->actor($this->getAdminUser())->subject($node)->property('address', '10.0.0.1')->property('port', 25565)->log();
     Activity::event('admin:node-allocation.delete-block')->actor($this->getAdminUser())->subject($node)->property('address', '10.0.0.1')->log();
@@ -176,12 +176,12 @@ test('the exact event filter does not match longer event names', function () {
     $exact->assertJsonPath('data.0.attributes.event', 'admin:node-allocation.delete');
 });
 
-test('malformed activity user filters return 422', function () {
+test('malformed activity user filters return 422', function (): void {
     $this->getJson(route('api.admin.activity', ['filter' => ['user' => ['nested' => 'value']]]))
         ->assertUnprocessable()->assertJsonPath('errors.0.meta.source_field', 'filter.user');
 });
 
-test('activity filters and pagination are validated in field order', function () {
+test('activity filters and pagination are validated in field order', function (): void {
     $this->getJson(route('api.admin.activity', ['filter' => ['user_id' => 0, 'event' => ['admin'], 'ip' => ['127.0.0.1']], 'page' => 0]))
         ->assertUnprocessable()
         ->assertJsonCount(4, 'errors')
@@ -191,10 +191,20 @@ test('activity filters and pagination are validated in field order', function ()
         ->assertJsonPath('errors.3.meta.source_field', 'page');
 });
 
-test('actor filters retain commas in email addresses', function () {
+test('actor filters retain commas in email addresses', function (): void {
     $actor = User::factory()->create(['email' => 'comma,actor@example.com']);
     Activity::event('admin:user.create')->actor($actor)->subject($actor)->property('username', $actor->username)->log();
 
     $this->getJson(route('api.admin.activity', ['filter' => ['user' => 'comma,actor@example.com']]))
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.attributes.event', 'admin:user.create');
+});
+test('admin activity hides system addresses but keeps normal user addresses', function (): void {
+    $server = $this->createServerModel();
+    $user = User::factory()->create(['root_admin' => false]);
+    Activity::event('admin:server.build')->anonymous()->subject($server)->withRequestMetadata()->log();
+    Activity::event('admin:server.suspend')->actor($user)->subject($server)->withRequestMetadata()->log();
+
+    $rows = collect($this->getJson(route('api.admin.activity'))->assertOk()->json('data'))->pluck('attributes.ip', 'attributes.event');
+
+    expect($rows['admin:server.build'])->toBeNull()->and($rows['admin:server.suspend'])->toBe('127.0.0.1');
 });

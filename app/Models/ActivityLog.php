@@ -91,6 +91,21 @@ class ActivityLog extends Model implements Identifiable
         return $this->hasOne(ApiKey::class, 'id', 'api_key_id');
     }
 
+    /**
+     * The originating address as it may be shown to anyone. It is withheld when the
+     * actor is a root administrator or when no user actor performed the action, such
+     * as system, node and Wings triggered events.
+     */
+    public function visibleIp(): ?string
+    {
+        $actor = $this->actor;
+        if (! $actor instanceof User || $actor->root_admin) {
+            return null;
+        }
+
+        return $this->ip;
+    }
+
     /** @return array<string, mixed> */
     public function propertyValues(): array
     {
