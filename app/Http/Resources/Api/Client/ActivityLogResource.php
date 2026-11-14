@@ -62,11 +62,9 @@ class ActivityLogResource extends ClientResource
     }
 
     /**
-     * Determines if the user can view the IP address in the output because they are an
-     * administrator, because they are the actor that performed the action, or because
-     * the entry never had an actor and the action was performed against them. That last
-     * case covers anonymous attempts such as a failed log in, where the address belongs
-     * to whoever made the attempt rather than to an identified user.
+     * Determines if the viewer may see the address of this entry: administrators can, and
+     * everyone else only for entries they performed themselves. Entries performed by a
+     * root administrator or without a user actor are additionally withheld by the model.
      */
     private function canViewIP(): bool
     {
@@ -75,15 +73,15 @@ class ActivityLogResource extends ClientResource
             return true;
         }
 
-        if ($this->resource->actor_id !== null) {
-            $actor = $this->resource->actor;
-
-            return $actor instanceof Model && $actor->is($user);
+        if ($this->resource->isAnonymousAuthAttempt()) {
+            return $this->resource->subjects->contains(
+                fn (ActivityLogSubject $subject): bool => $subject->subject_type === $user->getMorphClass()
+                    && $subject->subject_id === $user->getKey()
+            );
         }
 
-        return $this->resource->subjects->contains(
-            fn (ActivityLogSubject $subject): bool => $subject->subject_type === $user->getMorphClass()
-                && $subject->subject_id === $user->getKey()
-        );
+        $actor = $this->resource->actor;
+
+        return $actor instanceof Model && $actor->is($user);
     }
 }

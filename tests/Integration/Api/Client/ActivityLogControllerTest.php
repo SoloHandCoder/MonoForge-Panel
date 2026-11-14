@@ -8,9 +8,10 @@ use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\User;
+use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
-uses(\Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase::class);
-test('account activity is returned', function () {
+uses(ClientApiIntegrationTestCase::class);
+test('account activity is returned', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
     Activity::event('user:account.email-changed')->actor($user)->subject($user)->log();
@@ -18,7 +19,7 @@ test('account activity is returned', function () {
     Activity::event('user:account.email-changed')->actor($other = User::factory()->create())->subject($other)->log();
     $this->actingAs($user)->getJson('/api/client/account/activity')->assertOk()->assertJsonPath('object', 'list')->assertJsonCount(1, 'data')->assertJsonPath('data.0.object', 'activity_log')->assertJsonPath('data.0.attributes.event', 'user:account.email-changed');
 });
-test('account activity includes the logged properties', function () {
+test('account activity includes the logged properties', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
     Activity::event('user:account.email-changed')->actor($user)->subject($user)
@@ -30,29 +31,29 @@ test('account activity includes the logged properties', function () {
         ->assertJsonPath('data.0.attributes.properties.old', 'old@example.com')
         ->assertJsonPath('data.0.attributes.properties.new', 'new@example.com');
 });
-test('account activity can be filtered by event', function () {
+test('account activity can be filtered by event', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
     Activity::event('user:account.email-changed')->actor($user)->subject($user)->log();
     Activity::event('user:account.password-changed')->actor($user)->subject($user)->log();
     $this->actingAs($user)->getJson('/api/client/account/activity?filter[event]=password-changed')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.attributes.event', 'user:account.password-changed');
 });
-test('account activity requires authentication', function () {
+test('account activity requires authentication', function (): void {
     $this->getJson('/api/client/account/activity')->assertUnauthorized();
 });
-test('server activity is returned', function () {
+test('server activity is returned', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     Activity::event('server:power.start')->actor($user)->subject($server)->log();
     // Activity on another server must not leak into this listing.
     Activity::event('server:power.start')->actor($user)->subject($this->createServerModel())->log();
     $this->actingAs($user)->getJson($this->link($server, '/activity'))->assertOk()->assertJsonPath('object', 'list')->assertJsonCount(1, 'data')->assertJsonPath('data.0.attributes.event', 'server:power.start');
 });
-test('server activity requires permission', function () {
+test('server activity requires permission', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ControlConsole->value]);
     $this->getJson($this->link($server, '/activity'))->assertUnauthorized();
     $this->actingAs($user)->getJson($this->link($server, '/activity'))->assertForbidden();
 });
-test('the reserved ip property is hidden from other viewers while other addresses are not', function () {
+test('the reserved ip property is hidden from other viewers while other addresses are not', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $other = User::factory()->create();
     Activity::event('server:power.start')
@@ -66,7 +67,7 @@ test('the reserved ip property is hidden from other viewers while other addresse
     expect($properties['ip'])->toBe('[hidden]');
     expect($properties['address'])->toBe('10.0.0.1');
 });
-test('a failed log in reveals the attempt address to the account it targeted', function () {
+test('a failed log in reveals the attempt address to the account it targeted', function (): void {
     $user = User::factory()->create(['root_admin' => false]);
     Activity::event('auth:fail')->anonymous()->subject($user)->withRequestMetadata()->log();
 
@@ -76,7 +77,7 @@ test('a failed log in reveals the attempt address to the account it targeted', f
     expect($row['ip'])->toBe('127.0.0.1');
     expect($row['properties']['ip'])->toBe('127.0.0.1');
 });
-test('an entry with an actor never reveals that actor address to its subject', function () {
+test('an entry with an actor never reveals that actor address to its subject', function (): void {
     $owner = User::factory()->create(['root_admin' => false]);
     $subuser = User::factory()->create(['root_admin' => false]);
     Activity::event('server:subuser.create')->actor($owner)->subject($subuser)->withRequestMetadata()->log();
@@ -87,7 +88,7 @@ test('an entry with an actor never reveals that actor address to its subject', f
     expect($row['ip'])->toBeNull();
     expect($row['properties']['ip'])->toBe('[hidden]');
 });
-test('an entry whose actor was deleted never reveals that actor address to its subject', function () {
+test('an entry whose actor was deleted never reveals that actor address to its subject', function (): void {
     $owner = User::factory()->create(['root_admin' => false]);
     $subuser = User::factory()->create(['root_admin' => false]);
     Activity::event('server:subuser.create')->actor($owner)->subject($subuser)->withRequestMetadata()->log();
@@ -99,7 +100,7 @@ test('an entry whose actor was deleted never reveals that actor address to its s
     expect($row['ip'])->toBeNull();
     expect($row['properties']['ip'])->toBe('[hidden]');
 });
-test('an entry on a server whose actor was deleted does not reveal that actor address', function () {
+test('an entry on a server whose actor was deleted does not reveal that actor address', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $other = User::factory()->create(['root_admin' => false]);
     Activity::event('server:power.start')->actor($other)->subject($server)->subject($user)->withRequestMetadata()->log();
@@ -110,7 +111,7 @@ test('an entry on a server whose actor was deleted does not reveal that actor ad
     expect($row['ip'])->toBeNull();
     expect($row['properties']['ip'])->toBe('[hidden]');
 });
-test('an administrator sees the same address in both fields', function () {
+test('an administrator sees the same address in both fields', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $user->update(['root_admin' => true]);
     Activity::event('server:power.start')->actor(User::factory()->create())->subject($server)->withRequestMetadata()->log();
@@ -120,7 +121,7 @@ test('an administrator sees the same address in both fields', function () {
     expect($row['ip'])->toBe('127.0.0.1');
     expect($row['properties']['ip'])->toBe('127.0.0.1');
 });
-test('entries are identified by the log id rather than the subject pivot id', function () {
+test('entries are identified by the log id rather than the subject pivot id', function (): void {
     $user = User::factory()->create(['root_admin' => false]);
     $log = Activity::event('user:account.password-changed')->actor($user)->subject($user)->log();
 
@@ -129,7 +130,7 @@ test('entries are identified by the log id rather than the subject pivot id', fu
     expect($row['id'])->toBe(sha1((string) $log->id));
     expect(ActivityLog::query()->whereKey($log->id)->exists())->toBeTrue();
 });
-test('account activity can be filtered by the user that performed it', function () {
+test('account activity can be filtered by the user that performed it', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
     $admin = User::factory()->create(['username' => 'an-admin']);
@@ -140,7 +141,7 @@ test('account activity can be filtered by the user that performed it', function 
 
     expect($events->all())->toBe(['user:account.email-changed']);
 });
-test('server activity can be filtered by the user that performed it', function () {
+test('server activity can be filtered by the user that performed it', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $other = User::factory()->create(['username' => 'other-actor']);
     Activity::event('server:power.start')->actor($user)->subject($server)->log();
@@ -150,7 +151,7 @@ test('server activity can be filtered by the user that performed it', function (
 
     expect($events->all())->toBe(['server:power.stop']);
 });
-test('account filter options are scoped to that account', function () {
+test('account filter options are scoped to that account', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
     $admin = User::factory()->create(['username' => 'an-admin']);
@@ -165,7 +166,7 @@ test('account filter options are scoped to that account', function () {
     expect(collect($data['users'])->pluck('username')->all())->toContain('an-admin');
     expect(collect($data['users'])->pluck('username')->all())->not->toContain('stranger');
 });
-test('server filter options are scoped to that server and need permission', function () {
+test('server filter options are scoped to that server and need permission', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $other = User::factory()->create(['username' => 'other-actor']);
     Activity::event('server:power.start')->actor($user)->subject($server)->log();
@@ -180,7 +181,7 @@ test('server filter options are scoped to that server and need permission', func
     [$denied, $server] = $this->generateTestAccount([Permissions::ControlConsole->value]);
     $this->actingAs($denied)->getJson($this->link($server, '/activity/filters'))->assertForbidden();
 });
-test('filtering by user id is exact on the client feeds', function () {
+test('filtering by user id is exact on the client feeds', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $other = User::factory()->create(['username' => 'other-actor']);
     Activity::event('server:power.start')->actor($user)->subject($server)->log();
@@ -190,7 +191,7 @@ test('filtering by user id is exact on the client feeds', function () {
 
     expect($events->all())->toBe(['server:power.stop']);
 });
-test('an entry is only flagged as api when it points at a real key', function () {
+test('an entry is only flagged as api when it points at a real key', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $log = Activity::event('server:power.start')->actor($user)->subject($server)->log();
     $log->forceFill(['api_key_id' => 0])->save();
@@ -200,7 +201,7 @@ test('an entry is only flagged as api when it points at a real key', function ()
     expect($row['is_api'])->toBeFalse();
 });
 
-test('malformed activity user filters return 422 on the client feeds', function (string $feed) {
+test('malformed activity user filters return 422 on the client feeds', function (string $feed): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $endpoint = $feed === 'account' ? '/api/client/account/activity' : $this->link($server, '/activity');
 
@@ -208,7 +209,7 @@ test('malformed activity user filters return 422 on the client feeds', function 
         ->assertUnprocessable()->assertJsonPath('errors.0.meta.source_field', 'filter.user');
 })->with(['account', 'server']);
 
-test('activity filters and pagination are validated in field order on the client feeds', function (string $feed) {
+test('activity filters and pagination are validated in field order on the client feeds', function (string $feed): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $endpoint = $feed === 'account' ? '/api/client/account/activity' : $this->link($server, '/activity');
 
@@ -220,7 +221,7 @@ test('activity filters and pagination are validated in field order on the client
         ->assertJsonPath('errors.2.meta.source_field', 'per_page');
 })->with(['account', 'server']);
 
-test('server filter options respect hidden administrator activity', function () {
+test('server filter options respect hidden administrator activity', function (): void {
     config()->set('activity.hide_admin_activity', true);
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     $admin = User::factory()->create(['root_admin' => true]);
@@ -234,7 +235,7 @@ test('server filter options respect hidden administrator activity', function () 
     $response->assertJsonPath('data.users.0.id', $user->id);
 });
 
-test('disabled events and their actors are excluded from server filter options', function () {
+test('disabled events and their actors are excluded from server filter options', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::ActivityRead->value]);
     Activity::event(ActivityLog::DISABLED_EVENTS[0])->actor($user)->subject($server)->log();
 

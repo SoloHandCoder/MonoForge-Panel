@@ -35,8 +35,8 @@ class ActivityLogResource extends AdminResource
     }
 
     /**
-     * Reaching this resource already requires an administrative read permission, so the
-     * originating address is never masked the way it is on the client API.
+     * Reaching this resource already requires an administrative read permission, but the
+     * address is still withheld for root administrator and system originated entries.
      */
     public function toArray(Request $request): array
     {

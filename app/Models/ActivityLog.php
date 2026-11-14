@@ -91,6 +91,35 @@ class ActivityLog extends Model implements Identifiable
         return $this->hasOne(ApiKey::class, 'id', 'api_key_id');
     }
 
+    /**
+     * The originating address as it may be shown to anyone. It is withheld when the
+     * actor is a root administrator or when no user actor performed the action, such
+     * as system, node and Wings triggered events. Anonymous authentication attempts
+     * against an account keep their address, as it belongs to whoever made the attempt.
+     */
+    public function visibleIp(): ?string
+    {
+        if ($this->isAnonymousAuthAttempt()) {
+            return $this->ip;
+        }
+
+        $actor = $this->actor;
+        if (! $actor instanceof User || $actor->root_admin) {
+            return null;
+        }
+
+        return $this->ip;
+    }
+
+    /**
+     * Whether this is an authentication attempt (failed login, password reset, ...)
+     * that was made without any identified actor.
+     */
+    public function isAnonymousAuthAttempt(): bool
+    {
+        return $this->actor_id === null && str_starts_with($this->event, 'auth:');
+    }
+
     /** @return array<string, mixed> */
     public function propertyValues(): array
     {

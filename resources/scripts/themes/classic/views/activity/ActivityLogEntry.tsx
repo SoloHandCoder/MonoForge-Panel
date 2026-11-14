@@ -97,12 +97,10 @@ export default function ActivityLogEntry({ entry }: { entry: ActivityEntry }) {
                         />
                     </p>
                     <div className='mt-1 flex items-center text-sm'>
-                        {entry.ip && (
-                            <span>
-                                {entry.ip}
-                                <span className='text-muted-foreground'>&nbsp;|&nbsp;</span>
-                            </span>
-                        )}
+                        <span>
+                            {entry.ip ?? <span className='text-muted-foreground'>Hidden</span>}
+                            <span className='text-muted-foreground'>&nbsp;|&nbsp;</span>
+                        </span>
                         <Tooltip placement='right' content={formatDate(entry.timestamp, 'MMM Do, YYYY H:mm:ss')}>
                             <span>{fromNow(entry.timestamp)}</span>
                         </Tooltip>
