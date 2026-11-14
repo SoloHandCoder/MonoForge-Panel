@@ -1506,8 +1506,8 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | --- | --- | --- | --- | --- | --- |
 | `layout.account` | account | `AccountLayoutModel` |  | `account.navigation.before` `account.navigation.after` | default, extension |
 | `layout.admin` | admin | `AdminLayoutModel` |  | `panel.navigation.before` `panel.navigation.after` | default, extension |
-| `layout.app` | app | `AppLayoutModel` |  | `nav.items.before` `nav.items.after`<br>where it draws an area's navigation: `account.navigation.before` `account.navigation.after` `server.navigation.before` `server.navigation.after` `panel.navigation.before` `panel.navigation.after` | user, admin, schemes, logo, accountArea, serverArea, adminArea |
-| `layout.auth` | auth | `AuthLayoutModel` |  |  | default, logo |
+| `layout.app` | app | `AppLayoutModel` |  | `nav.items.before` `nav.items.after`<br>where it draws an area's navigation: `account.navigation.before` `account.navigation.after` `server.navigation.before` `server.navigation.after` `panel.navigation.before` `panel.navigation.after` | user, admin, schemes, logo, notices, accountArea, serverArea, adminArea |
+| `layout.auth` | auth | `AuthLayoutModel` |  |  | default, logo, notices |
 | `layout.server` | server | `ServerLayoutModel` |  | `server.navigation.before` `server.navigation.after` | owner, subuser, admin, offline, installing, suspended |
 
 #### Pages

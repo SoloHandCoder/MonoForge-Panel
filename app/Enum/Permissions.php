@@ -93,6 +93,11 @@ enum Permissions: string
 
     case AdminActivityRead = 'admin:activity.read';
 
+    case AdminAnnouncementsRead = 'admin:announcements.read';
+    case AdminAnnouncementsCreate = 'admin:announcements.create';
+    case AdminAnnouncementsUpdate = 'admin:announcements.update';
+    case AdminAnnouncementsDelete = 'admin:announcements.delete';
+
     // Server subuser permissions, granted per-server and checked via ServerPolicy.
     case WebsocketConnect = 'websocket.connect';
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Admin\ActivityController;
 use Pterodactyl\Http\Controllers\Api\Admin\ActivityFilterController;
+use Pterodactyl\Http\Controllers\Api\Admin\Announcements\AnnouncementController;
 use Pterodactyl\Http\Controllers\Api\Admin\ApiKeys\ApiKeyController;
 use Pterodactyl\Http\Controllers\Api\Admin\DatabaseHosts\DatabaseHostController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\EggCatalogController;
@@ -70,6 +71,24 @@ Route::get('/languages', LanguagesController::class)->name('api.admin.languages'
 
 Route::get('/activity', ActivityController::class)->name('api.admin.activity');
 Route::get('/activity/filters', ActivityFilterController::class)->name('api.admin.activity.filters');
+
+/*
+|--------------------------------------------------------------------------
+| Announcement Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/announcements
+|
+*/
+Route::prefix('/announcements')->name('api.admin.announcements')->group(function (): void {
+    Route::get('/', [AnnouncementController::class, 'index']);
+    Route::get('/{announcement:id}', [AnnouncementController::class, 'show'])->name('.view');
+
+    Route::post('/', [AnnouncementController::class, 'store'])->name('.store');
+    Route::put('/{announcement:id}', [AnnouncementController::class, 'update'])->name('.update');
+
+    Route::delete('/{announcement:id}', [AnnouncementController::class, 'destroy'])->name('.delete');
+});
 
 /*
 |--------------------------------------------------------------------------

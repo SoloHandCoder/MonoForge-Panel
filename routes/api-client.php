@@ -11,6 +11,7 @@ use Pterodactyl\Http\Controllers\Api\Client\ActivityLogFilterController;
 use Pterodactyl\Http\Controllers\Api\Client\ApiKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
+use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\BackupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\CommandController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\DatabaseController;
@@ -46,6 +47,9 @@ use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 Route::get('/', [ClientController::class, 'index'])->name('api:client.index');
 Route::get('/permissions', [ClientController::class, 'permissions']);
 Route::get('/extension-progress/{extension}/{job}', [ExtensionProgressController::class, 'user'])->where('extension', '[a-z][a-z0-9-]{0,47}')->whereUuid('job')->name('api:client.extension-progress');
+
+Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
+Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
 
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function (): void {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function (): void {

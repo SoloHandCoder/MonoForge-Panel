@@ -252,6 +252,7 @@
             "admin",
             "schemes",
             "logo",
+            "notices",
             "accountArea",
             "serverArea",
             "adminArea"
@@ -267,7 +268,8 @@
         "slots": [],
         "fixtures": [
             "default",
-            "logo"
+            "logo",
+            "notices"
         ],
         "classic": {
             "file": "views/layout/AuthLayout.tsx",

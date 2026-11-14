@@ -11,6 +11,7 @@ import { SCREEN_ROOTS } from '@/extensions/registry';
 import type { CorePanelDestination } from '@/sdk/navigation';
 import { useBrandLogo } from './brand';
 import { createTestServer } from './fixtures';
+import { useAppNotices, useAuthNotices } from './notices';
 import { navItemDestination, useNavigation, type NavArea, type NavigationModel, type NavItem } from './navigation';
 import { implementViews } from './registry';
 import { runState, serverConflict, type ServerConflict, type ServerRunState } from './server/state';
@@ -23,8 +24,27 @@ export interface LayoutBrand {
     readonly logoUrl: string | null;
 }
 
+export type PanelNoticeLevel = 'info' | 'success' | 'warning' | 'danger';
+
+/** An announcement for everyone, or a notice for the signed-in user, shown above the page. */
+export interface PanelNotice {
+    /** `announcement:<id>` or `notice:<id>`. */
+    readonly id: string;
+    readonly level: PanelNoticeLevel;
+    readonly title: string;
+    readonly body: string;
+    /** Whether the notice offers a dismiss button. */
+    readonly dismissible: boolean;
+    /** A link to act on the notice, such as topping up a balance. */
+    readonly action: { readonly label: string; readonly url: string } | null;
+}
+
 export interface AuthLayoutModel {
     readonly brand: LayoutBrand;
+    /** The active announcements, shown above the sign-in card. */
+    readonly notices: readonly PanelNotice[];
+    /** Hides a dismissible announcement in this browser. */
+    readonly dismissNotice: (id: string) => void;
 }
 
 export interface AppLayoutLink {
@@ -60,6 +80,10 @@ export interface AppLayoutModel {
     readonly setScheme: ((preference: ThemeSchemePreference) => void) | null;
     readonly signOut: () => void;
     readonly signingOut: boolean;
+    /** Announcements and the user's own notices, shown above every page and refreshed each minute. */
+    readonly notices: readonly PanelNotice[];
+    /** Hides a notice: a dismissible announcement in this browser, a user's notice by marking it read. */
+    readonly dismissNotice: (id: string) => void;
 }
 
 export interface AccountLayoutModel {
@@ -136,8 +160,9 @@ function useBrand(): LayoutBrand {
 
 function useAuthLayoutModel(): AuthLayoutModel {
     const brand = useBrand();
+    const { notices, dismissNotice } = useAuthNotices();
 
-    return useMemo(() => ({ brand }), [brand]);
+    return useMemo(() => ({ brand, notices, dismissNotice }), [brand, notices, dismissNotice]);
 }
 
 function useAccountLayoutModel(): AccountLayoutModel {
@@ -260,6 +285,7 @@ function useAppLayoutModel(): AppLayoutModel {
     const { mutate, isPending } = useLogout();
     const area = useAppArea();
     const serverCount = useAccountServers({ page: 1 }).data?.meta.pagination.total ?? null;
+    const { notices, dismissNotice } = useAppNotices();
 
     return useMemo(
         () => ({
@@ -274,6 +300,8 @@ function useAppLayoutModel(): AppLayoutModel {
             setScheme: schemes.length > 1 ? setScheme : null,
             signOut: () => mutate({}),
             signingOut: isPending,
+            notices,
+            dismissNotice,
         }),
         [
             brand,
@@ -289,6 +317,8 @@ function useAppLayoutModel(): AppLayoutModel {
             setScheme,
             mutate,
             isPending,
+            notices,
+            dismissNotice,
         ]
     );
 }
@@ -314,7 +344,45 @@ const appLayoutFixture = (
     setScheme: schemes.length > 1 ? noop : null,
     signOut: noop,
     signingOut: false,
+    notices: [],
+    dismissNotice: noop,
 });
+
+/** One notice of each level: announcements, and a user's notice with an action. */
+const noticesFixture: readonly PanelNotice[] = [
+    {
+        id: 'announcement:1',
+        level: 'danger',
+        title: 'Panel maintenance',
+        body: 'The panel restarts at 18:00 UTC for about ten minutes.',
+        dismissible: false,
+        action: null,
+    },
+    {
+        id: 'announcement:2',
+        level: 'warning',
+        title: 'Node maintenance',
+        body: 'Servers on one node restart tonight.',
+        dismissible: true,
+        action: null,
+    },
+    {
+        id: 'announcement:3',
+        level: 'info',
+        title: 'New eggs',
+        body: 'Three new game eggs are available.',
+        dismissible: true,
+        action: null,
+    },
+    {
+        id: 'notice:1',
+        level: 'success',
+        title: 'Backup restored',
+        body: 'Your server is back to yesterday.',
+        dismissible: true,
+        action: { label: 'Open account', url: '/account' },
+    },
+];
 
 const SERVER_ID = 'a1b2c3d4';
 
@@ -401,6 +469,7 @@ const adminNav = (extension = false) =>
     navFixture('admin', [
         ['', 'Overview', 'layout-dashboard'],
         ['activity', 'Activity', 'history'],
+        ['announcements', 'Announcements', 'megaphone'],
         ['settings', 'Settings', 'settings'],
         ['users', 'Users', 'users'],
         ['locations', 'Locations', 'map-pin'],
@@ -413,7 +482,7 @@ const adminNav = (extension = false) =>
         ['extensions', 'Extensions', 'blocks'],
         ['themes', 'Themes', 'palette'],
         ['api', 'API Keys', 'key-round'],
-        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('admin', 14)] as const] : []),
+        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('admin', 15)] as const] : []),
     ]);
 
 const adminUser = { uuid: '11111111-1111-4111-8111-111111111111', username: 'alex', email: 'alex@example.test' };
@@ -421,7 +490,11 @@ const adminUser = { uuid: '11111111-1111-4111-8111-111111111111', username: 'ale
 implementViews({
     'layout.auth': {
         use: useAuthLayoutModel,
-        fixtures: { default: () => ({ brand }), logo: () => ({ brand: logo }) },
+        fixtures: {
+            default: () => ({ brand, notices: [], dismissNotice: noop }),
+            logo: () => ({ brand: logo, notices: [], dismissNotice: noop }),
+            notices: () => ({ brand, notices: noticesFixture, dismissNotice: noop }),
+        },
     },
     'layout.app': {
         use: useAppLayoutModel,
@@ -430,6 +503,7 @@ implementViews({
             admin: () => appLayoutFixture(true),
             schemes: () => appLayoutFixture(false, ['dark', 'light']),
             logo: () => ({ ...appLayoutFixture(false), brand: logo }),
+            notices: () => ({ ...appLayoutFixture(false), notices: noticesFixture }),
             accountArea: () => appLayoutFixture(false, ['dark'], { kind: 'account', nav: accountNav() }),
             serverArea: () => appLayoutFixture(false, ['dark'], { kind: 'server', ...serverLayoutFixture() }),
             adminArea: () => appLayoutFixture(true, ['dark'], { kind: 'admin', nav: adminNav(), user: adminUser }),

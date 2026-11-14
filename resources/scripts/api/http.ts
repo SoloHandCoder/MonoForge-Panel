@@ -13,7 +13,8 @@ const http: AxiosInstance = axios.create({
     },
 });
 
-const shouldTrackHttpProgress = (url?: string): boolean => !url?.endsWith('/resources');
+// Background polls (server resources, the notice feed) do not move the progress bar.
+const shouldTrackHttpProgress = (url?: string): boolean => !url?.endsWith('/resources') && !url?.includes('/notices');
 
 http.interceptors.request.use((req) => {
     if (req.data instanceof FormData) {

@@ -1,9 +1,10 @@
 /* oxlint-disable rules/design-tokens -- the sign-in backdrop uses the fixed brand gradient */
 import { cn, Main, type ViewProps } from '@/sdk/theme';
 import FloatingBlocks from '../brand/FloatingBlocks';
+import NoticeStack from './NoticeStack';
 
-/** A full-height page: drifting violet blocks over the brand gradient, the sign-in card centred above them. */
-export default function AuthLayout({ className, children }: ViewProps<'layout.auth'>) {
+/** A full-height page: drifting violet blocks over the brand gradient, the announcements and the sign-in card centred above them. */
+export default function AuthLayout({ model, className, children }: ViewProps<'layout.auth'>) {
     return (
         <div
             className={cn(
@@ -13,7 +14,14 @@ export default function AuthLayout({ className, children }: ViewProps<'layout.au
             )}
         >
             <FloatingBlocks />
-            <Main className='relative z-10 w-full'>{children}</Main>
+            <Main className='relative z-10 w-full'>
+                <NoticeStack
+                    notices={model.notices}
+                    onDismiss={model.dismissNotice}
+                    className='mx-auto mb-4 w-full max-w-md'
+                />
+                {children}
+            </Main>
         </div>
     );
 }

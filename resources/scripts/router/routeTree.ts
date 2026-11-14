@@ -47,6 +47,7 @@ import { adminThemesQueryOptions } from '@/api/admin/themes/queries';
 import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags/queries';
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
+import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
 import {
     adminLocationListQueryParams,
@@ -813,6 +814,15 @@ const panelChildren = [
             () => import('@/components/admin/activity/ActivityContainer'),
             ['panel.activity.before', 'panel.activity.after']
         ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'announcements',
+        staticData: { nav: { label: 'Announcements', icon: 'megaphone' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...adminAnnouncementsQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/admin/announcements/AnnouncementsContainer')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,

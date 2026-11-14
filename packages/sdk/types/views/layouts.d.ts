@@ -10,8 +10,28 @@ export interface LayoutBrand {
     /** The image the active theme's setting mapped to `--brand-logo` holds, if it has one. */
     readonly logoUrl: string | null;
 }
+export type PanelNoticeLevel = 'info' | 'success' | 'warning' | 'danger';
+/** An announcement for everyone, or a notice for the signed-in user, shown above the page. */
+export interface PanelNotice {
+    /** `announcement:<id>` or `notice:<id>`. */
+    readonly id: string;
+    readonly level: PanelNoticeLevel;
+    readonly title: string;
+    readonly body: string;
+    /** Whether the notice offers a dismiss button. */
+    readonly dismissible: boolean;
+    /** A link to act on the notice, such as topping up a balance. */
+    readonly action: {
+        readonly label: string;
+        readonly url: string;
+    } | null;
+}
 export interface AuthLayoutModel {
     readonly brand: LayoutBrand;
+    /** The active announcements, shown above the sign-in card. */
+    readonly notices: readonly PanelNotice[];
+    /** Hides a dismissible announcement in this browser. */
+    readonly dismissNotice: (id: string) => void;
 }
 export interface AppLayoutLink {
     readonly id: 'dashboard' | 'admin' | 'account';
@@ -46,6 +66,10 @@ export interface AppLayoutModel {
     readonly setScheme: ((preference: ThemeSchemePreference) => void) | null;
     readonly signOut: () => void;
     readonly signingOut: boolean;
+    /** Announcements and the user's own notices, shown above every page and refreshed each minute. */
+    readonly notices: readonly PanelNotice[];
+    /** Hides a notice: a dismissible announcement in this browser, a user's notice by marking it read. */
+    readonly dismissNotice: (id: string) => void;
 }
 export interface AccountLayoutModel {
     readonly nav: NavigationModel;
