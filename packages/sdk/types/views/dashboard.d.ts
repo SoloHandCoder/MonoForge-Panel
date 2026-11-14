@@ -73,6 +73,8 @@ export interface ServerListModel {
     readonly scope: DashboardScope;
     readonly canViewOthers: boolean;
     readonly canCreateServers: boolean;
+    /** The signed-in user's name, for the welcome. */
+    readonly username: string;
     readonly actions: {
         readonly setPage: (page: number) => void;
         readonly setScope: (scope: DashboardScope) => void;

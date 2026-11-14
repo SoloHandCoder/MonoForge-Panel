@@ -82,7 +82,7 @@ it('gives owners power actions from list data, which carries no per-server meta'
     }
 });
 
-it('renders the classic server list from a fixture, with a link and power state per row', async () => {
+it('renders the classic server list from a fixture, with a link and status pill per card', async () => {
     await renderInApp(
         <ViewFixtureProvider fixtures={{ 'dashboard.serverList': 'servers' }}>
             <View name='dashboard.serverList' />
@@ -92,11 +92,15 @@ it('renders the classic server list from a fixture, with a link and power state 
     const survival = await screen.findByRole('link', { name: 'Survival' });
 
     expect(survival).toHaveAttribute('href', '/server/a1b2c3d4');
-    expect(survival).toHaveAttribute('data-status', 'success');
-    expect(survival.querySelector('[data-part="status"]')).toHaveClass('bg-success');
-    expect(screen.getByRole('link', { name: 'Creative' }).querySelector('[data-part="status"]')).toHaveClass(
-        'bg-destructive'
-    );
+    const pill = (name: string) =>
+        screen
+            .getByRole('link', { name })
+            .closest('[data-part="server-card"]')
+            ?.querySelector('[data-part="status-pill"]');
+
+    expect(pill('Survival')).toHaveAttribute('data-tone', 'online');
+    expect(pill('Creative')).toHaveAttribute('data-tone', 'offline');
+    expect(screen.getAllByRole('link', { name: 'Console' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('switch')).toBeInTheDocument();
 });
 

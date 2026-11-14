@@ -94,6 +94,8 @@ export interface ServerListModel {
     readonly scope: DashboardScope;
     readonly canViewOthers: boolean;
     readonly canCreateServers: boolean;
+    /** The signed-in user's name, for the welcome. */
+    readonly username: string;
     readonly actions: {
         readonly setPage: (page: number) => void;
         readonly setScope: (scope: DashboardScope) => void;
@@ -244,6 +246,7 @@ const countPower = (items: readonly ServerListItem[], power: ServerRunState): nu
 function useServerListModel(): ServerListModel {
     const navigate = useNavigate();
     const { query, scope, rootAdmin } = useServerListQuery();
+    const { username } = useCurrentUser();
     const servers = query.data;
     const power = usePowerSender();
     // The same cache entries as the cards' own queries, so a card and its row never poll twice.
@@ -290,6 +293,7 @@ function useServerListModel(): ServerListModel {
             scope,
             canViewOthers: rootAdmin,
             canCreateServers: rootAdmin,
+            username,
             actions: {
                 setPage: (page: number) =>
                     void navigate({
@@ -307,7 +311,7 @@ function useServerListModel(): ServerListModel {
                     }),
             },
         };
-    }, [servers, usage, power, scope, rootAdmin, type, navigate]);
+    }, [servers, usage, power, scope, rootAdmin, username, type, navigate]);
 }
 
 function useServerCardModel({ server }: { readonly server: Server }): ServerCardModel {
@@ -376,6 +380,7 @@ const listFixture = (
         scope: 'mine',
         canViewOthers: true,
         canCreateServers: true,
+        username: 'Alex',
         actions: { setPage: noop, setScope: noop },
         ...options,
     };

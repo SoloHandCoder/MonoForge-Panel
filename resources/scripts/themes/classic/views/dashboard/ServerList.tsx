@@ -1,47 +1,46 @@
+/* oxlint-disable rules/design-tokens -- the card's hover border and glow are fixed brand violets */
+import type { CSSProperties } from 'react';
 import { Server as ServerIcon } from 'lucide-react';
 import {
-    cn,
     Empty,
     EmptyContent,
     EmptyDescription,
     EmptyHeader,
     EmptyMedia,
     EmptyTitle,
-    ListRow,
     NewLinkButton,
     PageHeading,
     Pagination,
     Spinner,
     Switch,
 } from '@/sdk';
-import { Slot, View, type ServerListItem, type ServerListModel, type UiTone, type ViewProps } from '@/sdk/theme';
+import ServerQuickActions from './ServerQuickActions';
+import Welcome from './Welcome';
+import { Slot, View, type ServerListItem, type ServerListModel, type ViewProps } from '@/sdk/theme';
 
-/** Running is good, starting and stopping are on their way, and anything else is down. */
-function status({ state }: ServerListItem): UiTone {
-    if (state.kind !== 'ready' || state.power === 'offline') {
-        return 'danger';
-    }
+const cardClass =
+    'group relative animate-rise rounded-[18px] border border-border bg-card p-5 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-[#4c3d86] hover:shadow-[0_16px_36px_-16px_rgba(139,92,246,.6)] focus-within:border-[#4c3d86]';
 
-    return state.power === 'running' ? 'success' : 'warning';
-}
-
-function ServerRow({ item, className }: { item: ServerListItem; className?: string }) {
+function ServerRow({ item, index }: { item: ServerListItem; index: number }) {
     const { server } = item;
+    const delay = `${Math.min(index * 0.08, 0.6).toFixed(2)}s`;
 
     return (
-        <ListRow
-            destination={{ to: '/server/$id', params: { id: item.identifier } }}
+        <article
+            data-part='server-card'
             aria-label={item.name}
-            status={status(item)}
-            className={cn('grid grid-cols-12 gap-4', className)}
+            className={cardClass}
+            style={{ '--rise-delay': delay } as CSSProperties}
         >
             <Slot name='dashboard.serverRow.before' data={server} />
-            <div className='col-span-12'>
-                <View name='dashboard.serverCard' server={server} />
-            </div>
+            <View name='dashboard.serverCard' server={server} />
             <Slot name='dashboard.serverRow.metrics.after' data={server} />
+            <ServerQuickActions
+                item={item}
+                className='relative z-10 mt-4 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100'
+            />
             <Slot name='dashboard.serverRow.after' data={server} />
-        </ListRow>
+        </article>
     );
 }
 
@@ -76,6 +75,7 @@ export default function ServerList({ model, className }: ViewProps<'dashboard.se
 
     return (
         <div className={className}>
+            <Welcome model={model} />
             <PageHeading
                 title='Servers'
                 className='mb-4'
@@ -110,9 +110,11 @@ export default function ServerList({ model, className }: ViewProps<'dashboard.se
                 >
                     {({ items }) =>
                         items.length > 0 ? (
-                            items.map((item, index) => (
-                                <ServerRow key={item.uuid} item={item} className={index > 0 ? 'mt-2' : undefined} />
-                            ))
+                            <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+                                {items.map((item, index) => (
+                                    <ServerRow key={item.uuid} item={item} index={index} />
+                                ))}
+                            </div>
                         ) : (
                             <NoServers model={model} />
                         )
