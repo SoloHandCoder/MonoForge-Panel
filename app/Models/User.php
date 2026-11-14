@@ -156,6 +156,14 @@ class User extends Authenticatable implements Identifiable
     }
 
     /**
+     * @return HasMany<UserNotice, $this>
+     */
+    public function notices(): HasMany
+    {
+        return $this->hasMany(UserNotice::class);
+    }
+
+    /**
      * Returns all the activity logs where this user is the subject - not to
      * be confused by activity logs where this user is the _actor_.
      *

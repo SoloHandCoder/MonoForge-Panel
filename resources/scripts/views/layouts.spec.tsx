@@ -6,6 +6,7 @@ import {
     serverResourceUsageQueryOptions,
     type ServerPowerState,
 } from '@/api/account/servers/queries';
+import { noticeFeedQueryOptions, publicNoticeFeedQueryOptions } from '@/api/notices/queries';
 import type { SdkServerResources } from '@/sdk/server';
 import { publishAreaNav } from '@/router/nav';
 import { createExtensionTestHost, createTestServer, type ExtensionTestHost } from '@/sdk/testing';
@@ -62,6 +63,12 @@ function seedServers(panel: ExtensionTestHost, total: number) {
         data: [],
         meta: { pagination: { total, count: 0, per_page: 50, current_page: 1, total_pages: 1 } },
     } as never);
+
+    // The shell's notice feeds, so it renders without a request.
+    const feed = { object: 'notice_feed', attributes: { announcements: [], notices: [] } };
+
+    panel.queryClient.setQueryData(noticeFeedQueryOptions().queryKey, feed);
+    panel.queryClient.setQueryData(publicNoticeFeedQueryOptions().queryKey, feed);
 }
 
 async function renderLayout(name: LayoutViewName, selection: ViewFixtureSelection | null, path = '/', servers = 0) {

@@ -3,6 +3,7 @@ import { Menu, Moon, Sun } from 'lucide-react';
 import { cn, DropdownMenu, Icon, SpinnerOverlay, usePanelLocation } from '@/sdk';
 import { Main, type AppLayoutModel, type ViewProps } from '@/sdk/theme';
 import MonoForgeMark from '../brand/MonoForgeMark';
+import NoticeStack from './NoticeStack';
 import SidebarNav, { sidebarItemClass } from './SidebarNav';
 
 const schemeLabels = { dark: 'Dark', light: 'Light' } as const;
@@ -105,7 +106,14 @@ export default function AppLayout({ model, className, children }: ViewProps<'lay
                     </div>
                 )}
             </aside>
-            <Main className='min-w-0 flex-1 animate-fade-in'>{children}</Main>
+            <Main className='min-w-0 flex-1 animate-fade-in'>
+                <NoticeStack
+                    notices={model.notices}
+                    onDismiss={model.dismissNotice}
+                    className='page-width pt-(--layout-page-spacing)'
+                />
+                {children}
+            </Main>
         </div>
     );
 }

@@ -22,6 +22,7 @@ use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Exceptions\ApiErrorResponse;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Http\Controllers\Base\PublicNoticeController;
 use Pterodactyl\Http\Middleware\Activity\TrackAPIKey;
 use Pterodactyl\Http\Middleware\Api\Admin\AuthenticateAdmin;
 use Pterodactyl\Http\Middleware\Api\Application\AuthenticateApplicationUser;
@@ -66,6 +67,11 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
                 ->scopeBindings()
                 ->group(base_path('routes/api-admin.php'));
         });
+
+        // The sign-in pages show active announcements before anyone has signed in.
+        Route::middleware('throttle:60,1')
+            ->get('/api/notices/public', PublicNoticeController::class)
+            ->name('api.notices.public');
 
         Route::middleware('daemon')
             ->prefix('/api/remote')

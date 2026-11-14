@@ -56,6 +56,29 @@ export type AdminAllocationResource = {
     object: string;
     attributes: AdminAllocationAttributes;
 };
+export type AdminAnnouncementAttributes = {
+    id: number;
+    title: string;
+    body: string;
+    level: 'info' | 'success' | 'warning' | 'danger';
+    starts_at: string | null;
+    ends_at: string | null;
+    dismissible: boolean;
+    status: 'active' | 'scheduled' | 'ended';
+    created_at: string;
+    updated_at: string;
+};
+export type AdminAnnouncementPaginatedResponse = {
+    object: string;
+    data: Array<AdminAnnouncementResource>;
+    meta: {
+        pagination: PaginationMeta;
+    };
+};
+export type AdminAnnouncementResource = {
+    object: string;
+    attributes: AdminAnnouncementAttributes;
+};
 export type AdminApiKeyAttributes = {
     identifier: string;
     memo: string;
@@ -1195,6 +1218,32 @@ export type ClientFileObjectResource = {
     object: string;
     attributes: ClientFileObjectAttributes;
 };
+export type ClientNoticeFeedAttributes = {
+    announcements: Array<{
+        id: number;
+        title: string;
+        body: string;
+        level: string;
+        dismissible: boolean;
+        starts_at: string;
+        ends_at: string;
+        updated_at: string;
+    }>;
+    notices: Array<{
+        id: number;
+        level: string;
+        title: string;
+        body: string;
+        action_label: string;
+        action_url: string;
+        kind: string;
+        created_at: string;
+    }>;
+};
+export type ClientNoticeFeedResource = {
+    object: string;
+    attributes: ClientNoticeFeedAttributes;
+};
 export type ClientRecoveryTokensAttributes = {
     tokens: Array<string>;
 };
@@ -1468,6 +1517,58 @@ export type ValidationErrorEnvelope = {
             rule?: string;
         };
     }>;
+};
+export type AdminCreateAnnouncementRequest = {
+    /**
+     * The title. Must not be greater than 191 characters.
+     */
+    title: string;
+    /**
+     * The body. Must not be greater than 5000 characters.
+     */
+    body: string;
+    /**
+     * The level.
+     */
+    level: 'info' | 'success' | 'warning' | 'danger';
+    /**
+     * The starts at. Must be a valid date.
+     */
+    starts_at?: string | null;
+    /**
+     * The ends at. Must be a valid date.
+     */
+    ends_at?: string | null;
+    /**
+     * The dismissible.
+     */
+    dismissible?: boolean;
+};
+export type AdminUpdateAnnouncementRequest = {
+    /**
+     * The title. Must not be greater than 191 characters.
+     */
+    title: string;
+    /**
+     * The body. Must not be greater than 5000 characters.
+     */
+    body: string;
+    /**
+     * The level.
+     */
+    level: 'info' | 'success' | 'warning' | 'danger';
+    /**
+     * The starts at. Must be a valid date.
+     */
+    starts_at?: string | null;
+    /**
+     * The ends at. Must be a valid date.
+     */
+    ends_at?: string | null;
+    /**
+     * The dismissible.
+     */
+    dismissible?: boolean;
 };
 export type AdminInstallExtensionRequest = {
     /**
@@ -4019,6 +4120,15 @@ export type AdminListActivityPerPageQueryParameter = number;
  * Comma-separated relationships to include. Supports actor.
  */
 export type AdminListActivityIncludeQueryParameter = string;
+/**
+ * Page number to return.
+ */
+export type AdminListAnnouncementsPageQueryParameter = number;
+/**
+ * Results to return per page.
+ */
+export type AdminListAnnouncementsPerPageQueryParameter = number;
+export type AdminGetAnnouncementAnnouncementIdPathParameter = number;
 export type AdminGetExtensionSettingsExtensionPathParameter = string;
 export type AdminGetExtensionIconExtensionPathParameter = string;
 export type AdminUploadExtensionSettingFileExtensionPathParameter = string;
@@ -4759,6 +4869,7 @@ export type ClientListClientServersFilterExternalIdQueryParameter = string;
 export type ClientListClientServersFilterWildcardQueryParameter = string;
 export type ClientGetExtensionJobProgressExtensionPathParameter = string;
 export type ClientGetExtensionJobProgressJobPathParameter = string;
+export type ClientMarkNoticeReadNoticePathParameter = string;
 /**
  * Page number to retrieve.
  */
@@ -5050,6 +5161,170 @@ export type AdminListActivityFilterOptionsResponses = {
     200: AdminListActivityFilterOptionsResponseBody;
 };
 export type AdminListActivityFilterOptionsResponse = AdminListActivityFilterOptionsResponses[keyof AdminListActivityFilterOptionsResponses];
+export type AdminListAnnouncementsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page number to return.
+         */
+        page?: AdminListAnnouncementsPageQueryParameter;
+        /**
+         * Results to return per page.
+         */
+        per_page?: AdminListAnnouncementsPerPageQueryParameter;
+    };
+    url: '/api/admin/announcements';
+};
+export type AdminListAnnouncementsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListAnnouncementsError = AdminListAnnouncementsErrors[keyof AdminListAnnouncementsErrors];
+export type AdminListAnnouncementsResponses = {
+    /**
+     * Announcements returned.
+     */
+    200: AdminAnnouncementPaginatedResponse;
+};
+export type AdminListAnnouncementsResponse = AdminListAnnouncementsResponses[keyof AdminListAnnouncementsResponses];
+export type AdminCreateAnnouncementData = {
+    body: AdminCreateAnnouncementRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/announcements';
+};
+export type AdminCreateAnnouncementErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateAnnouncementError = AdminCreateAnnouncementErrors[keyof AdminCreateAnnouncementErrors];
+export type AdminCreateAnnouncementResponses = {
+    /**
+     * Announcement created.
+     */
+    201: AdminAnnouncementResource;
+};
+export type AdminCreateAnnouncementResponse = AdminCreateAnnouncementResponses[keyof AdminCreateAnnouncementResponses];
+export type AdminDeleteAnnouncementData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the announcement.
+         */
+        announcement_id: AdminGetAnnouncementAnnouncementIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/announcements/{announcement_id}';
+};
+export type AdminDeleteAnnouncementErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteAnnouncementError = AdminDeleteAnnouncementErrors[keyof AdminDeleteAnnouncementErrors];
+export type AdminDeleteAnnouncementResponses = {
+    /**
+     * Announcement deleted.
+     */
+    204: void;
+};
+export type AdminDeleteAnnouncementResponse = AdminDeleteAnnouncementResponses[keyof AdminDeleteAnnouncementResponses];
+export type AdminGetAnnouncementData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the announcement.
+         */
+        announcement_id: AdminGetAnnouncementAnnouncementIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/announcements/{announcement_id}';
+};
+export type AdminGetAnnouncementErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetAnnouncementError = AdminGetAnnouncementErrors[keyof AdminGetAnnouncementErrors];
+export type AdminGetAnnouncementResponses = {
+    /**
+     * Announcement returned.
+     */
+    200: AdminAnnouncementResource;
+};
+export type AdminGetAnnouncementResponse = AdminGetAnnouncementResponses[keyof AdminGetAnnouncementResponses];
+export type AdminUpdateAnnouncementData = {
+    body: AdminUpdateAnnouncementRequest;
+    path: {
+        /**
+         * The ID of the announcement.
+         */
+        announcement_id: AdminGetAnnouncementAnnouncementIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/announcements/{announcement_id}';
+};
+export type AdminUpdateAnnouncementErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateAnnouncementError = AdminUpdateAnnouncementErrors[keyof AdminUpdateAnnouncementErrors];
+export type AdminUpdateAnnouncementResponses = {
+    /**
+     * Announcement updated.
+     */
+    200: AdminAnnouncementResource;
+};
+export type AdminUpdateAnnouncementResponse = AdminUpdateAnnouncementResponses[keyof AdminUpdateAnnouncementResponses];
 export type AdminListExtensionsData = {
     body?: never;
     path?: never;
@@ -11531,6 +11806,63 @@ export type ClientGetExtensionJobProgressResponses = {
     200: ClientGetExtensionJobProgressResponseBody;
 };
 export type ClientGetExtensionJobProgressResponse = ClientGetExtensionJobProgressResponses[keyof ClientGetExtensionJobProgressResponses];
+export type ClientListNoticesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/notices';
+};
+export type ClientListNoticesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListNoticesError = ClientListNoticesErrors[keyof ClientListNoticesErrors];
+export type ClientListNoticesResponses = {
+    /**
+     * Notices returned.
+     */
+    200: ClientNoticeFeedResource;
+};
+export type ClientListNoticesResponse = ClientListNoticesResponses[keyof ClientListNoticesResponses];
+export type ClientMarkNoticeReadData = {
+    body?: never;
+    path: {
+        /**
+         * The notice.
+         */
+        notice: ClientMarkNoticeReadNoticePathParameter;
+    };
+    query?: never;
+    url: '/api/client/notices/{notice}/read';
+};
+export type ClientMarkNoticeReadErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientMarkNoticeReadError = ClientMarkNoticeReadErrors[keyof ClientMarkNoticeReadErrors];
+export type ClientMarkNoticeReadResponses = {
+    /**
+     * Notice marked read.
+     */
+    204: void;
+};
+export type ClientMarkNoticeReadResponse = ClientMarkNoticeReadResponses[keyof ClientMarkNoticeReadResponses];
 export type ClientGetAccountData = {
     body?: never;
     path?: never;
