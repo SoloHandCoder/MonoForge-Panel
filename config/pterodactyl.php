@@ -89,12 +89,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | Information for the panel to use when contacting the CDN to confirm
-    | if panel is up to date.
+    | if panel is up to date. Empty by default: MonoForge does not
+    | check Pterodactyl releases.
     */
 
     'cdn' => [
         'cache_time' => 60,
-        'url' => 'https://cdn.pterodactyl.io/releases/latest.json',
+        'url' => env('PTERODACTYL_CDN_URL', ''),
     ],
 
     /*

@@ -30,7 +30,7 @@ class SoftwareVersionService
      */
     public function getPanel(): string
     {
-        return $this->versionData()['panel'] ?? 'error';
+        return $this->versionData()['panel'] ?? config()->string('app.version');
     }
 
     /**
@@ -46,7 +46,7 @@ class SoftwareVersionService
      */
     public function getDiscord(): string
     {
-        return $this->versionData()['discord'] ?? 'https://pterodactyl.io/discord';
+        return $this->versionData()['discord'] ?? '';
     }
 
     /**
@@ -54,7 +54,7 @@ class SoftwareVersionService
      */
     public function getDonations(): string
     {
-        return $this->versionData()['donations'] ?? 'https://github.com/sponsors/matthewpi';
+        return $this->versionData()['donations'] ?? '';
     }
 
     /**
@@ -87,9 +87,14 @@ class SoftwareVersionService
      */
     protected function cacheVersionData(): array
     {
-        $cached = $this->cache->remember(self::VERSION_CACHE_KEY, CarbonImmutable::now()->addMinutes(config()->integer('pterodactyl.cdn.cache_time', 60)), function (): array {
+        $url = config()->string('pterodactyl.cdn.url', '');
+        if ($url === '') {
+            return [];
+        }
+
+        $cached = $this->cache->remember(self::VERSION_CACHE_KEY, CarbonImmutable::now()->addMinutes(config()->integer('pterodactyl.cdn.cache_time', 60)), function () use ($url): array {
             try {
-                $response = $this->client->request('GET', config()->string('pterodactyl.cdn.url'), ['timeout' => 5, 'connect_timeout' => 2]);
+                $response = $this->client->request('GET', $url, ['timeout' => 5, 'connect_timeout' => 2]);
 
                 if ($response->getStatusCode() === 200) {
                     $data = json_decode($response->getBody()->__toString(), true, flags: JSON_THROW_ON_ERROR);
