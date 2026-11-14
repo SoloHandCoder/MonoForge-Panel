@@ -33,10 +33,14 @@ function greeting(model: ServerListModel, { online, total }: WelcomeStats): stri
     }
 
     if (!isLoaded(model) || online === 0) {
-        return ', welcome back.';
+        return ', here are your servers.';
     }
 
-    return online === total ? ', your worlds are running.' : `, ${online} of your ${total} servers are online.`;
+    if (online === total) {
+        return ', your worlds are running.';
+    }
+
+    return `, ${online} of your ${total} servers ${online === 1 ? 'is' : 'are'} online.`;
 }
 
 function Tile({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {

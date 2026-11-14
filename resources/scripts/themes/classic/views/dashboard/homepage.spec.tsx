@@ -135,12 +135,17 @@ describe('Welcome', () => {
     it.each([
         ['every server is online', [ready('running', 0, 1), ready('running', 0, 1)], ', your worlds are running.'],
         [
-            'some servers are online',
-            [ready('running', 0, 1), ready('offline', 0, 1)],
-            ', 1 of your 2 servers are online.',
+            'one of several servers is online',
+            [ready('running', 0, 1), ready('offline', 0, 1), ready('offline', 0, 1)],
+            ', 1 of your 3 servers is online.',
         ],
-        ['no server is online', [ready('offline', 0, 1)], ', welcome back.'],
-        ['there are no servers', [], ', welcome back.'],
+        [
+            'some servers are online',
+            [ready('running', 0, 1), ready('running', 0, 1), ready('offline', 0, 1)],
+            ', 2 of your 3 servers are online.',
+        ],
+        ['no server is online', [ready('offline', 0, 1)], ', here are your servers.'],
+        ['there are no servers', [], ', here are your servers.'],
     ])('says what is true when %s', async (_case, states, greeting) => {
         const servers = states.map((state, index) => item({ uuid: String(index), state }));
 
@@ -153,7 +158,7 @@ describe('Welcome', () => {
     it('does not claim the servers are running before they have loaded', async () => {
         await renderInApp(<Welcome model={listModel(threeServers(), { loading: true, pagination: null })} />);
 
-        expect(screen.getByText(/Hey/).textContent).toBe('Hey solohandcoder, welcome back.');
+        expect(screen.getByText(/Hey/).textContent).toBe('Hey solohandcoder, here are your servers.');
         expect(screen.queryByText('servers online')).not.toBeInTheDocument();
         expect(screen.queryByText('memory in use')).not.toBeInTheDocument();
     });
