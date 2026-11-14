@@ -1371,6 +1371,27 @@ included: the engine converts the terminal's colours to the hex and `rgba()` its
 | `--layout-sidebar-width` | Width of sidebars (`w-sidebar`). | `*-sidebar` |
 | `--spinner-overlay-opacity` | Opacity of the background behind a loading overlay. |  |
 
+#### Status, navigation and motion
+
+| Token | Role | Utilities |
+| --- | --- | --- |
+| `--status-online` | A running server: the status dot. |  |
+| `--status-online-bg` | A running server: the pill fill. |  |
+| `--status-online-fg` | A running server: the pill text. |  |
+| `--status-busy` | A starting or stopping server: the status dot. |  |
+| `--status-busy-bg` | A starting or stopping server: the pill fill. |  |
+| `--status-busy-fg` | A starting or stopping server: the pill text. |  |
+| `--status-offline` | An offline server: the status dot. |  |
+| `--status-offline-bg` | An offline server: the pill fill. |  |
+| `--status-offline-fg` | An offline server: the pill text. |  |
+| `--usage-from` | Start of the usage bar gradient. |  |
+| `--usage-to` | End of the usage bar gradient. |  |
+| `--active-item` | Fill of the active navigation item. |  |
+| `--active-item-foreground` | Text of the active navigation item. |  |
+| `--hover-row` | Hover fill of list rows. |  |
+| `--accent-soft` | Soft violet text for secondary emphasis. |  |
+| `--rise-delay` | Start delay of `animate-rise`; set it per element to stagger. |  |
+
 #### Shadows
 
 | Token | Role | Utilities |

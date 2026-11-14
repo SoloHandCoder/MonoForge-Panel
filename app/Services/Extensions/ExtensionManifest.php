@@ -74,9 +74,9 @@ class ExtensionManifest
         'in', 'inert', 'input', 'inset', 'invalid', 'landscape', 'last', 'layout', 'leading', 'lg', 'ltr',
         'marker', 'max', 'md', 'min', 'muted', 'noscript', 'not', 'nth', 'odd', 'only', 'open', 'optional',
         'panel', 'peer', 'perspective', 'placeholder', 'popover', 'portrait', 'primary', 'print', 'ptero',
-        'radius', 'radix', 'required', 'ring', 'rtl', 'scrollbar', 'secondary', 'selection', 'shadow',
-        'sidebar', 'sm', 'spacing', 'spinner', 'starting', 'state', 'success', 'sunken', 'supports', 'target',
-        'terminal', 'text', 'theme', 'tracking', 'tw', 'valid', 'visited', 'warning', 'xl',
+        'radius', 'radix', 'required', 'ring', 'rise', 'rtl', 'scrollbar', 'secondary', 'selection', 'shadow',
+        'sidebar', 'sm', 'spacing', 'spinner', 'starting', 'state', 'status', 'success', 'sunken', 'supports', 'target',
+        'terminal', 'text', 'theme', 'tracking', 'tw', 'usage', 'valid', 'visited', 'warning', 'xl',
     ];
 
     private function __construct(

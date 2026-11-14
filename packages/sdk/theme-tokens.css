@@ -1,8 +1,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-    --font-sans: 'IBM Plex Sans', 'Roboto', system-ui, sans-serif;
-    --font-header: 'IBM Plex Sans', 'Roboto', system-ui, sans-serif;
+    --font-sans: 'Inter Variable', 'IBM Plex Sans', system-ui, sans-serif;
+    --font-header: 'Inter Variable', 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 @theme inline {

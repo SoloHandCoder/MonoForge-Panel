@@ -5,6 +5,7 @@
  */
 @import 'tailwindcss';
 @import './theme-tokens.css';
+@import '@fontsource-variable/inter';
 
 @plugin '@tailwindcss/forms' {
     strategy: 'class';
@@ -44,8 +45,9 @@
  * extras are limited to success/warning product states and terminal-specific colours.
  */
 :root {
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --spinner-overlay-opacity: 45%;
+    --rise-delay: 0s;
 
     /* Layout: bridged to the `panel`, `auth` and `sidebar` container utilities (max-w-panel, w-sidebar, …). */
     --layout-content-width: 75rem;
@@ -58,7 +60,7 @@
 
     /* Browser chrome: native widget scheme and the `<meta name="theme-color">` the SPA keeps in sync. */
     --color-scheme: light;
-    --theme-color: #0e4688;
+    --theme-color: #0e0d15;
 
     /* Light tokens. They are unaudited, so classic offers only its dark scheme; a theme that declares `light` uses them. */
     --background: oklch(0.975 0.005 258.3);
@@ -104,39 +106,69 @@
 }
 
 .dark {
-    /* DARK - Pterodactyl (the shipping theme). */
+    /* DARK - MonoForge violet (the only scheme classic offers). */
     --color-scheme: dark;
-    --background: oklch(0.366 0.027 246.8);
-    --foreground: oklch(0.858 0.013 248);
-    --card: oklch(0.413 0.029 246.8);
-    --card-foreground: oklch(0.858 0.013 248);
-    --popover: oklch(0.478 0.027 246.6);
-    --popover-foreground: oklch(0.858 0.013 248);
-    --primary: oklch(0.55 0.188 259.8);
-    --primary-foreground: oklch(0.975 0.005 258.3);
-    --secondary: oklch(0.478 0.027 246.6);
-    --secondary-foreground: oklch(0.929 0.006 255);
-    --muted: oklch(0.413 0.029 246.8);
-    --muted-foreground: oklch(0.617 0.023 250);
-    --accent: oklch(0.715 0.126 215.2);
-    --accent-foreground: oklch(0.975 0.005 258.3);
+    --background: #0e0d15;
+    --foreground: #ece9f7;
+    --card: #17151f;
+    --card-foreground: #ece9f7;
+    --popover: #1d1a29;
+    --popover-foreground: #ece9f7;
+    --primary: #8b5cf6;
+    --primary-foreground: #ffffff;
+    --secondary: #27233a;
+    --secondary-foreground: #ece9f7;
+    --muted: #27233a;
+    --muted-foreground: #9d97b5;
+    --accent: #a78bfa;
+    --accent-foreground: #0e0d15;
     --destructive: oklch(0.637 0.237 25.331);
     --destructive-foreground: var(--primary-foreground);
-    --border: oklch(0.478 0.027 246.6);
+    --border: #27233a;
     --input: var(--border);
     --input-border: var(--input);
-    --ring: oklch(0.714 0.143 254.6);
-    --chart-1: oklch(0.797 0.134 211.5);
-    --chart-2: oklch(0.852 0.199 91.936);
+    --ring: #a78bfa;
+    --chart-1: #a78bfa;
+    --chart-2: #f59e0b;
     --chart-3: var(--primary);
-    --chart-4: oklch(0.723 0.219 149.579);
+    --chart-4: #3ee07a;
     --chart-5: var(--destructive);
-    --success: var(--chart-4);
+    --state-foreground: #0e0d15;
+    --success: #3ee07a;
     --success-foreground: var(--state-foreground);
-    --warning: var(--chart-2);
+    --warning: #f59e0b;
     --warning-foreground: var(--state-foreground);
     --caution: oklch(0.6 0.17 52);
     --caution-foreground: var(--primary-foreground);
+
+    /* Sidebar and navigation. */
+    --sidebar: #0b0a11;
+    --sidebar-foreground: #9d97b5;
+    --sidebar-primary: #8b5cf6;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #221c3a;
+    --sidebar-accent-foreground: #ddd3ff;
+    --sidebar-border: #27233a;
+    --sidebar-ring: #a78bfa;
+    --active-item: #221c3a;
+    --active-item-foreground: #ddd3ff;
+    --hover-row: #1a1726;
+    --accent-soft: #c4b5fd;
+
+    /* Server status pills: dot colour, pill background and pill text. */
+    --status-online: #3ee07a;
+    --status-online-bg: #14301f;
+    --status-online-fg: #7ef0a6;
+    --status-busy: #f59e0b;
+    --status-busy-bg: #33280f;
+    --status-busy-fg: #fcd34d;
+    --status-offline: #6b6680;
+    --status-offline-bg: #2a2632;
+    --status-offline-fg: #a8a2ba;
+
+    /* Usage bar gradient. */
+    --usage-from: #7c3aed;
+    --usage-to: #a78bfa;
 }
 
 /* Recessed surface on a card (progress tracks, code chips); --muted is identical to --card in the dark theme. */
@@ -360,4 +392,51 @@ body {
 
 ::-webkit-scrollbar-corner {
     background: transparent;
+}
+
+/*
+ * Motion. Only transform and opacity animate. `animate-rise` fades and lifts content in; stagger it
+ * by setting `--rise-delay` on each element. Reduced motion shows the final state with nothing moving.
+ */
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@utility animate-rise {
+    animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) var(--rise-delay, 0s) both;
+}
+
+@utility animate-fade-in {
+    animation: fade-in 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .hover\:-translate-y-0\.5:hover,
+    .hover\:-translate-y-1:hover {
+        transform: none !important;
+    }
 }

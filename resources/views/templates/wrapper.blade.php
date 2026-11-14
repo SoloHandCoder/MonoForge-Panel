@@ -35,7 +35,7 @@
             {{-- data-theme-token: the SPA keeps this tag equal to the --theme-color token.
                  A theme-color registered by an extension is left exactly as rendered. --}}
             @unless ($extensionHead->replaces('meta', 'theme-color'))
-                <meta name="theme-color" content="#0e4688" data-theme-token>
+                <meta name="theme-color" content="#0e0d15" data-theme-token>
             @endunless
             {{ $extensionHead }}
         @show
