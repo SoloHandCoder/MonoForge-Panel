@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { cn, Form } from '@/sdk';
 import MonoForgeMark from '../brand/MonoForgeMark';
+import { discordLinkProps } from '../brand/links';
 
 interface Props {
     title: string;
@@ -26,6 +27,10 @@ export default function AuthCard({ title, submit, className, children }: Props) 
             </Form>
             <p className='text-center text-muted-foreground text-xs mt-4'>
                 &copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> MonoForge
+                <span aria-hidden> · </span>
+                <a {...discordLinkProps} className='no-underline hover:text-foreground'>
+                    Join our Discord
+                </a>
             </p>
         </div>
     );

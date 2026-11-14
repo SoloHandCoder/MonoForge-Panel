@@ -2,6 +2,7 @@
 import { bytesToString, cn } from '@/sdk';
 import type { ServerListModel } from '@/sdk/theme';
 import FloatingBlocks from '../brand/FloatingBlocks';
+import { discordLinkProps } from '../brand/links';
 
 export interface WelcomeStats {
     online: number;
@@ -85,6 +86,12 @@ export default function Welcome({ model }: { model: ServerListModel }) {
                         )}
                     </div>
                 )}
+                <a
+                    {...discordLinkProps}
+                    className='mt-5 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-foreground no-underline transition-colors duration-150 hover:bg-white/10'
+                >
+                    Join the Discord
+                </a>
             </div>
         </section>
     );
