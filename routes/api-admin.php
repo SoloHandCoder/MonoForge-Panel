@@ -17,6 +17,8 @@ use Pterodactyl\Http\Controllers\Api\Admin\Eggs\ImportEggController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\ReorderVariablesController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\UpdateImportEggController;
 use Pterodactyl\Http\Controllers\Api\Admin\Extensions\ExtensionController;
+use Pterodactyl\Http\Controllers\Api\Admin\Insights\StorageController;
+use Pterodactyl\Http\Controllers\Api\Admin\Insights\UsageController;
 use Pterodactyl\Http\Controllers\Api\Admin\LanguagesController;
 use Pterodactyl\Http\Controllers\Api\Admin\Locations\EligibleNodesController;
 use Pterodactyl\Http\Controllers\Api\Admin\Locations\LocationController;
@@ -151,6 +153,19 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/system-information', SystemInformationController::class)->name('.system-information');
     Route::post('/deploy-token', DeployTokenController::class)->middleware(RequireSessionAuthentication::class)->name('.deploy-token');
     Route::get('/utilization', UtilizationController::class)->name('.utilization');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Insights Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/insights
+|
+*/
+Route::prefix('/insights')->name('api.admin.insights')->group(function (): void {
+    Route::get('/usage', UsageController::class)->name('.usage');
+    Route::get('/storage', StorageController::class)->name('.storage');
 });
 
 /*
