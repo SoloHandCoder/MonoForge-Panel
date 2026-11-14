@@ -1,5 +1,5 @@
 {
-    "name": "pterodactyl-panel",
+    "name": "monoforge-panel",
     "engines": {
         "node": ">=22.12"
     },
