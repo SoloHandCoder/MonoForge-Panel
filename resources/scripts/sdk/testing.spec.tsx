@@ -371,14 +371,15 @@ it('renders a view measuring itself without stubbing browser APIs', () => {
 it('renders nested views from their fixtures, each from the inputs it is placed with', () => {
     const { container } = renderView('dashboard.serverList', { fixture: 'servers' });
     const creative = container.querySelector('a[aria-label="Creative"]');
+    const card = (name: string) => container.querySelector(`article[aria-label="${name}"]`);
 
     expect(creative).toHaveAttribute('href', '/server/e5f6a7b8');
-    // Each row's card is its own server's, with the state of its row.
-    expect(creative).toHaveTextContent('Creative');
-    expect(creative).toHaveAttribute('data-status', 'danger');
-    expect(container.querySelector('a[aria-label="Survival"]')).toHaveTextContent('Survival');
-    expect(container.querySelector('a[aria-label="Lobby"]')).toHaveTextContent('Suspended');
-    expect(container.querySelectorAll('[data-ui="list-row"][data-part="status"]')).toHaveLength(3);
+    // Each card is its own server's, with the state of its row.
+    expect(card('Creative')).toHaveTextContent('Creative');
+    expect(card('Creative')?.querySelector('[data-part="status-pill"]')).toHaveAttribute('data-tone', 'offline');
+    expect(card('Survival')).toHaveTextContent('Survival');
+    expect(card('Lobby')).toHaveTextContent('Suspended');
+    expect(container.querySelectorAll('[data-part="server-card"]')).toHaveLength(3);
 });
 
 describe('slots', () => {
