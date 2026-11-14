@@ -56,6 +56,14 @@ describe('useConsoleSocketLogs', () => {
         expect(screen.lines).toEqual([expect.stringContaining('history line')]);
     });
 
+    it('prefixes panel messages with the MonoForge prompt', () => {
+        mount();
+        socket.emit('status', 'running');
+
+        expect(screen.lines).toEqual([expect.stringContaining('container@monoforge~ ')]);
+        expect(screen.lines.join('')).not.toContain('pterodactyl');
+    });
+
     it('requests the history again only after Wings reports throttling it', () => {
         mount();
 

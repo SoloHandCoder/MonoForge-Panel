@@ -3,8 +3,7 @@ import type { Terminal } from 'ghostty-web';
 import { SocketEvent, SocketRequest } from '@/components/server/events';
 import { normalizeTransferStatus } from '@/components/server/transfer';
 import type { Websocket } from '@/plugins/Websocket';
-
-const TERMINAL_PRELUDE = '\u001b[1m\u001b[33mcontainer@pterodactyl~ \u001b[0m';
+import { TERMINAL_PRELUDE } from './prelude';
 
 // Wings answers a throttled request with this event, naming the request it dropped.
 const THROTTLED_EVENT = 'throttled';

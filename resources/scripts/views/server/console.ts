@@ -3,6 +3,7 @@ import type { Server } from '@/api/server/types';
 import { relationshipData } from '@/api/relationships';
 import { CHART_WINDOW_MS, type ServerGraphPoint, type ServerNetworkPoint } from '@/components/server/console/chart';
 import type { PowerAction } from '@/components/server/console/types';
+import { TERMINAL_PRELUDE } from '@/components/server/console/prelude';
 import { createSampleTerminal, useServerTerminal } from '@/components/server/console/useServerTerminal';
 import { SocketRequest } from '@/components/server/events';
 import { ip, mbToBytes } from '@/lib/formatters';
@@ -235,7 +236,7 @@ function useServerGraphsModel(): ServerGraphsModel {
 
 const noop = () => {};
 
-const PRELUDE = '\u001b[1m\u001b[33mcontainer@pterodactyl~ \u001b[0m';
+const PRELUDE = TERMINAL_PRELUDE;
 
 const RunningTerminal = createSampleTerminal([
     `${PRELUDE}Server marked as starting...`,
