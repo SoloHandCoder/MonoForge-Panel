@@ -12,6 +12,7 @@ use Pterodactyl\Http\Resources\Api\Concerns\FormatsActivityLogs;
 use Pterodactyl\Http\Resources\Api\Includes\IncludedResource;
 use Pterodactyl\Http\Resources\Api\NullResource;
 use Pterodactyl\Models\ActivityLog;
+use Pterodactyl\Models\ActivityLogSubject;
 use Pterodactyl\Models\User;
 
 /**
@@ -70,6 +71,13 @@ class ActivityLogResource extends ClientResource
         $user = $this->getUser();
         if ($user->root_admin) {
             return true;
+        }
+
+        if ($this->resource->isAnonymousAuthAttempt()) {
+            return $this->resource->subjects->contains(
+                fn (ActivityLogSubject $subject): bool => $subject->subject_type === $user->getMorphClass()
+                    && $subject->subject_id === $user->getKey()
+            );
         }
 
         $actor = $this->resource->actor;
