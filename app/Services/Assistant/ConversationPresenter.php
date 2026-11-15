@@ -94,7 +94,7 @@ class ConversationPresenter
                             'id' => ['type' => 'integer', 'example' => 2],
                             'name' => ['type' => 'string', 'example' => 'write_file'],
                             'label' => ['type' => 'string', 'example' => 'Write plugins/Example/config.yml'],
-                            'arguments' => ['type' => 'object', 'additionalProperties' => true, 'example' => ['path' => '/plugins/Example/config.yml']],
+                            'arguments' => [...self::JSON_FIELDS_SCHEMA, 'example' => ['path' => '/plugins/Example/config.yml']],
                             'details' => [
                                 'type' => 'array',
                                 'description' => 'Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.',
@@ -110,7 +110,7 @@ class ConversationPresenter
                             'needs_confirmation' => ['type' => 'boolean', 'example' => true],
                             'status' => ['type' => 'string', 'enum' => ['pending', 'approved', 'denied', 'running', 'done', 'failed'], 'example' => 'pending'],
                             'result_preview' => ['type' => 'string', 'nullable' => true, 'example' => null],
-                            'display' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'example' => null],
+                            'display' => [...self::JSON_FIELDS_SCHEMA, 'nullable' => true, 'example' => null],
                         ],
                     ],
                 ],
@@ -127,6 +127,27 @@ class ConversationPresenter
             'status' => 'idle',
             'updated_at' => '2026-11-18T12:01:00+00:00',
         ]],
+    ];
+
+    /** A JSON scalar, as tool arguments and display summaries hold them. */
+    private const array JSON_SCALAR_SCHEMA = ['oneOf' => [['type' => 'string'], ['type' => 'number'], ['type' => 'boolean']], 'nullable' => true];
+
+    /**
+     * Tool arguments and display summaries: fields holding a scalar, a list, or an object of
+     * scalars (such as edit_file's `edits`). No tool parameter or result nests deeper.
+     */
+    private const array JSON_FIELDS_SCHEMA = [
+        'type' => 'object',
+        'additionalProperties' => [
+            'oneOf' => [
+                ['type' => 'string'],
+                ['type' => 'number'],
+                ['type' => 'boolean'],
+                ['type' => 'array', 'items' => ['oneOf' => [self::JSON_SCALAR_SCHEMA, ['type' => 'object', 'additionalProperties' => self::JSON_SCALAR_SCHEMA]]]],
+                ['type' => 'object', 'additionalProperties' => self::JSON_SCALAR_SCHEMA],
+            ],
+            'nullable' => true,
+        ],
     ];
 
     public function __construct(private readonly AssistantBilling $billing) {}

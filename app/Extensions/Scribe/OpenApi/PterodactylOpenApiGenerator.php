@@ -18,6 +18,7 @@ use Pterodactyl\Extensions\Scribe\Attributes\ResponseFromResource;
 use Pterodactyl\Extensions\Scribe\Support\PterodactylDocumentation;
 use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
 use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
+use Pterodactyl\Http\Requests\Api\Admin\Assistant\StoreAiProviderRequest;
 use Pterodactyl\Models\Permission;
 use Pterodactyl\Services\Extensions\ExtensionPermissionRegistry;
 use Pterodactyl\Services\Extensions\ExtensionSettingDefinition;
@@ -1606,6 +1607,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'adminUpdateMinecraftVersionChangerSettings' => $this->enforceMinecraftVersionChangerSettingsBodySchema($properties),
             'adminUpdateExtensionSettings' => $this->enforceAdminExtensionSettingsBodySchema($properties),
             'adminUpdateThemeSettings' => $this->enforceAdminThemeSettingsBodySchema($properties),
+            'adminCreateAnAIProvider', 'adminUpdateAnAIProvider' => $this->enforceAiProviderBodySchema($properties),
             'clientPurchaseServer', 'clientQuoteAServer' => $this->enforceStorePurchaseBodySchema($properties),
             default => null,
         };
@@ -1702,6 +1704,27 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'description' => "Values keyed by setting name; null restores a setting's default.",
             'additionalProperties' => [...$this->extensionSettingScalarSchema(), 'nullable' => true],
             'example' => ['accent' => '#8b5cf6', 'compact' => true, 'radius' => 0.75],
+        ];
+    }
+
+    /**
+     * Extra headers are a map of header name to value, which Scribe reads as a list.
+     *
+     * @param  array<mixed>  $properties
+     */
+    private function enforceAiProviderBodySchema(array &$properties): void
+    {
+        if (! isset($properties['extra_headers'])) {
+            return;
+        }
+
+        $properties['extra_headers'] = [
+            'type' => 'object',
+            'nullable' => true,
+            'maxProperties' => StoreAiProviderRequest::MAX_HEADERS,
+            'description' => 'Header values keyed by header name. Every header is listed: a value sets it, null (or an empty string) keeps the stored value, and a header left out is removed.',
+            'additionalProperties' => ['type' => 'string', 'nullable' => true, 'maxLength' => 1024],
+            'example' => ['X-Title' => 'MonoForge'],
         ];
     }
 
