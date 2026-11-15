@@ -7,6 +7,7 @@ namespace Pterodactyl\Actions\Servers;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Pterodactyl\Contracts\Servers\ReadsServerStates;
 use Pterodactyl\Data\ServerState;
 use Pterodactyl\Data\ServerStateUnavailable;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
@@ -24,7 +25,7 @@ use Throwable;
  * unreachable node delays the batch by seconds rather than failing it. A failed reading is
  * remembered briefly, so many open dashboards do not keep waiting on a node that is down.
  */
-final readonly class ReadServerStates
+final readonly class ReadServerStates implements ReadsServerStates
 {
     /** How long a failed reading is reused before Wings is asked again. */
     public const int FAILURE_CACHE_SECONDS = 10;

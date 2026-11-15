@@ -12,7 +12,6 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
-use Pterodactyl\Actions\Servers\ReadServerStates;
 use Pterodactyl\Data\ServerState;
 use Pterodactyl\Data\ServerStateUnavailable;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
@@ -67,7 +66,7 @@ class ServerResourcesController extends ClientApiController
     #[ScribeResponse(self::EXAMPLE, description: 'Resource utilization returned for every accessible server requested.')]
     #[ResponseField('object', 'string', 'Always `server_resources`.', example: self::RESOURCE_NAME)]
     #[ResponseField('data', 'object', 'One entry per accessible server, keyed by the identifier it was requested with: its `stats`, or an `error` explaining why its utilization could not be read.')]
-    public function __invoke(GetServerResourcesRequest $request, ReadServerStates $states): JsonResponse
+    public function __invoke(GetServerResourcesRequest $request, ReadsServerStates $states): JsonResponse
     {
         $identifiers = $request->identifiers();
         $servers = $this->accessibleServers($request->user(), $identifiers);
