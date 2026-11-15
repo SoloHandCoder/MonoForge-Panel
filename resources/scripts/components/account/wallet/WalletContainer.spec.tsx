@@ -7,9 +7,9 @@ import type { TokenLedgerPage } from '@/api/account/wallet/queries';
 import { parseTokenAdjustment } from '@/components/admin/users/UserTokensCard';
 import WalletContainer from './WalletContainer';
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getWallet: vi.fn() }));
 
-vi.mock('@/api/http', () => ({ default: { get: mocks.get }, httpErrorToHuman: () => 'error' }));
+vi.mock('@/api/generated', () => ({ clientGetWallet: mocks.getWallet }));
 vi.mock('@/components/store/TokenPacks', () => ({ default: () => <p>Token packs</p> }));
 
 afterEach(() => {
@@ -58,7 +58,7 @@ const wrapper = ({ children }: PropsWithChildren) => (
 
 describe('WalletContainer', () => {
     it('shows the balance, the token packs and the signed history', async () => {
-        mocks.get.mockResolvedValue({ data: ledger });
+        mocks.getWallet.mockResolvedValue({ data: ledger });
 
         render(<WalletContainer />, { wrapper });
 
@@ -67,10 +67,7 @@ describe('WalletContainer', () => {
         expect(screen.getByText('Renewed My Server')).toBeInTheDocument();
         expect(screen.getByText('−500')).toBeInTheDocument();
         expect(screen.getByText('+2,000')).toBeInTheDocument();
-        expect(mocks.get).toHaveBeenCalledWith(
-            '/api/client/account/wallet',
-            expect.objectContaining({ params: { page: 1, per_page: 25 } })
-        );
+        expect(mocks.getWallet).toHaveBeenCalledWith(expect.objectContaining({ query: { page: 1, per_page: 25 } }));
     });
 });
 
