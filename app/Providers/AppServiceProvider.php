@@ -229,6 +229,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api.application', fn (Request $request): Limit => $this->apiLimit($request, 'application'));
         RateLimiter::for('api.admin', fn (Request $request): Limit => $this->apiLimit($request, 'admin'));
 
+        // "Check now" for MonoForge updates calls GitHub each time, so it is kept to 6 a minute.
+        RateLimiter::for('monoforge.update-check', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(6)->by($user instanceof User ? $user->uuid : (string) $request->ip());
+        });
+
         ResourceLimit::boot();
     }
 

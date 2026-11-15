@@ -4454,6 +4454,58 @@ export type AdminGetUpdateStatusResponseBody = {
     };
 };
 
+export type AdminCheckForUpdatesResponseBody = {
+    /**
+     * off, notify or auto.
+     */
+    mode: 'off' | 'notify' | 'auto';
+    /**
+     * The running build, or the app version when it is unknown.
+     */
+    current_version: string;
+    /**
+     * The running build, or null when the panel has no version.json.
+     */
+    current: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+    } | null;
+    /**
+     * The latest build on GitHub, or null when it is unknown or update checks are off.
+     */
+    latest: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+        tag: string;
+        url: string;
+    } | null;
+    /**
+     * off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).
+     */
+    check: 'off' | 'available' | 'current' | 'unknown';
+    /**
+     * Whether the latest build should replace the running one.
+     */
+    update_available: boolean;
+    /**
+     * The last requested or applied update.
+     */
+    status: {
+        /**
+         * idle, queued, running, success or failed.
+         */
+        state: 'idle' | 'queued' | 'running' | 'success' | 'failed';
+        step: string | null;
+        message: string | null;
+        from: string | null;
+        to: string | null;
+        error: string | null;
+        updated_at: string | null;
+    };
+};
+
 export type AdminApplyUpdateResponseBody = {
     /**
      * off, notify or auto.
@@ -11717,6 +11769,39 @@ export type AdminGetUpdateStatusResponses = {
 };
 
 export type AdminGetUpdateStatusResponse = AdminGetUpdateStatusResponses[keyof AdminGetUpdateStatusResponses];
+
+export type AdminCheckForUpdatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/updates/check';
+};
+
+export type AdminCheckForUpdatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * Too many checks; try again in a minute.
+     */
+    429: ErrorEnvelope;
+};
+
+export type AdminCheckForUpdatesError = AdminCheckForUpdatesErrors[keyof AdminCheckForUpdatesErrors];
+
+export type AdminCheckForUpdatesResponses = {
+    /**
+     * Update status returned after a fresh check.
+     */
+    200: AdminCheckForUpdatesResponseBody;
+};
+
+export type AdminCheckForUpdatesResponse = AdminCheckForUpdatesResponses[keyof AdminCheckForUpdatesResponses];
 
 export type AdminApplyUpdateData = {
     body?: never;

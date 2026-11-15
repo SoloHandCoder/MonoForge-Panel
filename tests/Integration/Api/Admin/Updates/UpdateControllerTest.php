@@ -7,6 +7,7 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Admin\Updates\UpdateControllerT
 use FilesystemIterator;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
@@ -131,4 +132,65 @@ test('non admins cannot see or apply updates', function (): void {
     $this->assertAccessDeniedJson($this->postJson(route('api.admin.updates.apply')));
     $this->assertAccessDeniedJson($this->putJson(route('api.admin.updates.settings'), ['mode' => 'auto']));
     expect($this->app->make(MonoForgeUpdateService::class)->hasPendingRequest())->toBeFalse();
+});
+
+test('check now bypasses the cached release and returns the status payload', function (): void {
+    // The status call caches the first release.
+    $this->getJson(route('api.admin.updates.status'))->assertOk()->assertJsonPath('latest.version', '9e8d7c6');
+
+    Http::swap(new HttpFactory);
+    Http::fake([LATEST_URL => Http::response([
+        'tag_name' => 'build-1a2b3c4',
+        'target_commitish' => '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d',
+        'published_at' => '2026-11-15T13:00:00Z',
+        'assets' => [['name' => 'monoforge-panel.tar.gz'], ['name' => 'monoforge-panel.tar.gz.sha256'], ['name' => 'version.json']],
+    ])]);
+
+    // The status endpoint keeps answering from the cache...
+    $this->getJson(route('api.admin.updates.status'))->assertOk()->assertJsonPath('latest.version', '9e8d7c6');
+
+    // ...while checking now asks GitHub again and refreshes the cache.
+    $this->postJson(route('api.admin.updates.check'))
+        ->assertOk()
+        ->assertJsonPath('mode', 'notify')
+        ->assertJsonPath('latest.version', '1a2b3c4')
+        ->assertJsonPath('check', 'available')
+        ->assertJsonPath('update_available', true)
+        ->assertJsonPath('status.state', 'idle');
+
+    $this->getJson(route('api.admin.updates.status'))->assertOk()->assertJsonPath('latest.version', '1a2b3c4');
+});
+
+test('check now does not call GitHub while update checks are off', function (): void {
+    config(['monoforge.update.mode' => 'off']);
+    Http::fake();
+
+    $this->postJson(route('api.admin.updates.check'))->assertOk()->assertJsonPath('check', 'off')->assertJsonPath('latest', null);
+    Http::assertNothingSent();
+});
+
+test('check now is limited to six requests a minute', function (): void {
+    foreach (range(1, 6) as $attempt) {
+        $this->postJson(route('api.admin.updates.check'))->assertOk();
+    }
+
+    $this->postJson(route('api.admin.updates.check'))->assertTooManyRequests();
+});
+
+test('non admins cannot check now, like the status they would read', function (): void {
+    $this->actingAsNonAdmin();
+    Http::fake();
+
+    $this->assertAccessDeniedJson($this->postJson(route('api.admin.updates.check')));
+    Http::assertNothingSent();
+});
+
+test('a root administrator API key cannot check now', function (): void {
+    $key = ApiKey::factory()->create(['user_id' => $this->getAdminUser()->id, 'key_type' => ApiKey::TYPE_ACCOUNT]);
+    $this->app['auth']->forgetGuards();
+
+    $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
+        ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token))
+        ->postJson(route('api.admin.updates.check'))
+        ->assertForbidden();
 });
