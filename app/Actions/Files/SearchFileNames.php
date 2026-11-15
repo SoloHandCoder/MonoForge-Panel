@@ -46,7 +46,7 @@ final readonly class SearchFileNames implements SearchesFileNames
 
         /** @var array{entries: list<array{path: string, name: string, is_file: bool, size: int}>, complete: bool} $index */
         $index = $this->cache->remember(
-            sprintf('server:%s:file-index:%s', $server->uuid, sha1($start)),
+            sprintf('server:%s:file-index:%s', $server->uuid, hash('sha256', $start)),
             self::CACHE_SECONDS,
             fn (): array => $this->walk($server, $start),
         );
