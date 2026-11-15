@@ -25,13 +25,17 @@ const splitPath = (path: string) => {
     return { name: path.slice(slash + 1), directory: path.slice(0, slash) || '/' };
 };
 
+/** How long typing must pause before quick open asks the server. */
+export const QUICK_OPEN_SEARCH_DELAY_MS = 300;
+
 function QuickOpenBody({ uuid, canSearch, onPick, onClose }: Omit<QuickOpenProps, 'open'>) {
     const queryClient = useQueryClient();
     const listId = useId();
     const [query, setQuery] = useState('');
     const [searched, setSearched] = useState('');
     const [selected, setSelected] = useState(0);
-    const search = useDebouncedCallback(setSearched, 250);
+    // One server search per pause in typing: the search walks the tree on Wings and has its own rate limit.
+    const search = useDebouncedCallback(setSearched, QUICK_OPEN_SEARCH_DELAY_MS);
     const listed = useMemo(() => listedServerFilePaths(queryClient, uuid), [queryClient, uuid]);
     const remote = useServerFileSearch(uuid, searched, canSearch);
     const remoteMatches = searched.trim().length >= FILE_SEARCH_MIN_LENGTH ? remote.data : undefined;

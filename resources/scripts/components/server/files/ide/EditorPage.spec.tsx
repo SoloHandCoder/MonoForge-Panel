@@ -357,6 +357,25 @@ it('opens a file by name with Ctrl+P, from loaded folders and the server search'
     );
 });
 
+it('sends one server search per pause in typing, not one per keystroke', async () => {
+    open();
+    await screen.findByRole('button', { name: 'server.properties' });
+
+    press('p');
+    const input = await screen.findByRole('combobox', { name: 'Search files by name' });
+    const searches = () => requests.filter((request) => request.path.endsWith('/files/search'));
+
+    for (const value of ['co', 'con', 'conf', 'confi', 'config']) {
+        fireEvent.change(input, { target: { value } });
+        // oxlint-disable-next-line no-await-in-loop -- keystrokes 100 ms apart, faster than the pause.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    expect(searches()).toEqual([]);
+    expect(await screen.findByRole('option', { name: /config\.yml/ })).toBeVisible();
+    expect(searches().map((request) => request.params)).toEqual([{ query: 'config' }]);
+});
+
 it('asks before leaving the editor with unsaved changes, but not when switching files', async () => {
     const editor = open('?path=%2Fconfig%2Fapp.yml');
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);

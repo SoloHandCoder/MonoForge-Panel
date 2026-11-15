@@ -169,7 +169,7 @@ Route::group([
 
     Route::group(['prefix' => '/files'], function (): void {
         Route::get('/list', [FileController::class, 'directory']);
-        Route::get('/search', [FileController::class, 'search']);
+        Route::middleware('throttle:files.search')->get('/search', [FileController::class, 'search']);
         Route::get('/contents', [FileController::class, 'contents']);
         Route::get('/download', [FileController::class, 'download']);
         Route::put('/rename', [FileController::class, 'rename']);

@@ -39,11 +39,15 @@ final readonly class FilesClient
         ]);
     }
 
-    /** @return list<DaemonFileObject> */
-    public function getDirectory(string $path): array
+    /**
+     * @param  int|null  $timeout  seconds to wait, instead of the panel's default
+     * @return list<DaemonFileObject>
+     */
+    public function getDirectory(string $path, ?int $timeout = null): array
     {
         $response = $this->connection->request('GET', "/api/servers/{$this->uuid}/files/list-directory", [
             'query' => ['directory' => $path],
+            ...($timeout !== null ? ['timeout' => $timeout] : []),
         ]);
         $data = $this->connection->decode($response, [
             'data' => ['array', 'list'],

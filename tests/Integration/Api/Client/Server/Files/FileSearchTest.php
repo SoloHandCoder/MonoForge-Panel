@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Server\Files\FileSearchTest;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Sleep;
 use Pterodactyl\Actions\Files\SearchFileNames;
 use Pterodactyl\Contracts\Files\ListsDirectories;
 use Pterodactyl\Enum\Permissions;
@@ -21,12 +22,22 @@ final class TreeLister implements ListsDirectories
     /** @var list<string> */
     public array $listed = [];
 
+    /** @var list<int|null> */
+    public array $timeouts = [];
+
+    /** @var (callable(string): void)|null Runs before each listing, e.g. to let time pass. */
+    public $before;
+
     /** @param array<string, list<array{name: string, file?: bool, symlink?: bool, size?: int}>> $tree */
     public function __construct(private array $tree) {}
 
-    public function list(Server $server, string $directory = '/'): array
+    public function list(Server $server, string $directory = '/', ?int $timeout = null): array
     {
         $this->listed[] = $directory;
+        $this->timeouts[] = $timeout;
+        if ($this->before !== null) {
+            ($this->before)($directory);
+        }
 
         throw_unless(array_key_exists($directory, $this->tree), DaemonConnectionException::class, new RuntimeException('missing'));
 
@@ -202,4 +213,64 @@ test('a missing starting directory is an error', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::FileRead->value]);
 
     $this->actingAs($user)->getJson($this->link($server, '/files/search?query=x&directory=/nope'))->assertServerError();
+});
+
+test('each listing waits a few seconds at most, and the walk stops at its time budget with what it found', function (): void {
+    $levels = [];
+    for ($i = 0; $i < 10; $i++) {
+        $levels[$i === 0 ? '/' : '/d'.implode('/d', range(1, $i))] = [
+            ['name' => 'config'.$i.'.yml', 'file' => true, 'size' => 10],
+            ['name' => 'd'.($i + 1), 'file' => false],
+        ];
+    }
+
+    $lister = tree(new TreeLister($levels));
+    // Every listing takes three seconds.
+    $lister->before = fn (): mixed => $this->travel(3)->seconds();
+    [$user, $server] = $this->generateTestAccount([Permissions::FileRead->value]);
+
+    $this->actingAs($user)->getJson($this->link($server, '/files/search?query=config'))
+        ->assertOk()
+        ->assertJsonPath('meta.truncated', true)
+        ->assertJsonPath('data.0.attributes.path', '/config0.yml');
+
+    expect(count($lister->listed))->toBe(3)
+        ->and(max($lister->timeouts))->toBeLessThanOrEqual(SearchFileNames::LIST_TIMEOUT_SECONDS)
+        ->and(min($lister->timeouts))->toBeGreaterThanOrEqual(1);
+});
+
+test('a search waits for another request walking the same tree and reuses its walk', function (): void {
+    $lister = minecraftTree();
+    [$user, $server] = $this->generateTestAccount([Permissions::FileRead->value]);
+    $key = sprintf('server:%s:file-index:%s', $server->uuid, hash('sha256', '/'));
+    $other = Cache::lock($key.':lock', 30);
+    expect($other->get())->toBeTrue();
+
+    // While this request waits, the other walk finishes, caches its index and lets go of the lock.
+    Sleep::fake();
+    Sleep::whenFakingSleep(function () use ($key, $other): void {
+        if (! Cache::has($key)) {
+            Cache::put($key, ['entries' => [['path' => '/walked-elsewhere.yml', 'name' => 'walked-elsewhere.yml', 'is_file' => true, 'size' => 1]], 'complete' => true], 60);
+            $other->release();
+        }
+    });
+
+    $this->actingAs($user)->getJson($this->link($server, '/files/search?query=walked'))
+        ->assertOk()
+        ->assertJsonPath('data.0.attributes.path', '/walked-elsewhere.yml');
+
+    expect($lister->listed)->toBe([]);
+});
+
+test('search has its own limit of 10 a minute per user and server', function (): void {
+    minecraftTree();
+    [$user, $server] = $this->generateTestAccount([Permissions::FileRead->value]);
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->actingAs($user)->getJson($this->link($server, '/files/search?query=config'))->assertOk();
+    }
+
+    $this->actingAs($user)->getJson($this->link($server, '/files/search?query=config'))->assertTooManyRequests();
+    // Listing a folder is not counted against it.
+    $this->actingAs($user)->getJson($this->link($server, '/files/list'))->assertOk();
 });

@@ -291,6 +291,8 @@ export const useServerFileSearch = (uuid: string, query: string, enabled = true)
         enabled: enabled && uuid.length > 0 && query.trim().length >= FILE_SEARCH_MIN_LENGTH,
         staleTime: 30_000,
         placeholderData: keepPreviousData,
+        // A refused or failed walk is not retried: the endpoint is rate limited.
+        retry: false,
     });
 
 export const useCreateDirectory = () => {

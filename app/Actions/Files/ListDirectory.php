@@ -10,8 +10,8 @@ use Pterodactyl\Models\Server;
 
 final readonly class ListDirectory implements ListsDirectories
 {
-    public function list(Server $server, string $directory = '/'): array
+    public function list(Server $server, string $directory = '/', ?int $timeout = null): array
     {
-        return Daemon::server($server)->files()->getDirectory($directory);
+        return Daemon::server($server)->files()->getDirectory($directory, $timeout);
     }
 }

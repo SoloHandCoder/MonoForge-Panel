@@ -248,6 +248,15 @@ class AppServiceProvider extends ServiceProvider
         // TrustProxies), so a flood from one address cannot use up Tebex's own deliveries.
         RateLimiter::for('tebex.webhook', fn (Request $request): Limit => Limit::perMinute(120)->by('tebex:'.$request->ip()));
 
+        // The editor's file-name search walks the tree on Wings: 10 a minute per user and server.
+        RateLimiter::for('files.search', function (Request $request): Limit {
+            $user = $request->user();
+            $server = $request->route('server');
+            $serverKey = $server instanceof Server ? $server->uuid : (is_string($server) ? $server : '');
+
+            return Limit::perMinute(10)->by('files-search:'.($user instanceof User ? $user->id : (string) $request->ip()).':'.$serverKey);
+        });
+
         // Store purchases: 3 attempts a minute per player, so one player retrying against a hung
         // node cannot keep the store-wide capacity lock busy for everyone else.
         RateLimiter::for('store.purchase', function (Request $request): Limit {

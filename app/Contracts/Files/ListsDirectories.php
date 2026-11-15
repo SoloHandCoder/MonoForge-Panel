@@ -10,9 +10,10 @@ use Pterodactyl\Models\Server;
 interface ListsDirectories
 {
     /**
+     * @param  int|null  $timeout  seconds to wait for Wings, instead of the panel's default
      * @return list<DaemonFileObject>
      *
      * @throws DaemonConnectionException
      */
-    public function list(Server $server, string $directory = '/'): array;
+    public function list(Server $server, string $directory = '/', ?int $timeout = null): array;
 }
