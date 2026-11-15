@@ -54,15 +54,18 @@ function allow(granted: boolean, permission: string): void {
     }
 }
 
-/** Where opening an entry leads: its directory, the editor for a readable text file, or nowhere. */
+/** The full-screen editor with this text file open. */
+function editorDestination(id: string, path: string): CorePanelDestination {
+    return { to: '/server/$id/editor', params: { id }, search: { path } };
+}
+
+/** Where opening an entry leads: its directory, the full-screen editor for a readable text file, or nowhere. */
 function entryDestination(id: string, file: FileObject, path: string, openable: boolean): CorePanelDestination | null {
     if (!openable) {
         return null;
     }
 
-    return file.attributes.is_file
-        ? { to: '/server/$id/files/$action', params: { id, action: 'edit' }, hash: encodePathSegments(path) }
-        : fileListDestination(id, path);
+    return file.attributes.is_file ? editorDestination(id, path) : fileListDestination(id, path);
 }
 
 /** The listing of the directory in the URL and its selection, as the file manager slots receive them. */
@@ -167,10 +170,7 @@ export default function useFileManagerModel(): FileManagerModel {
                     openable,
                     extractable: isFileObjectArchiveType(file),
                     destination: entryDestination(id, file, path, openable),
-                    editorDestination:
-                        file.attributes.is_file && openable
-                            ? { to: '/server/$id/editor', params: { id }, search: { path } }
-                            : null,
+                    editorDestination: file.attributes.is_file && openable ? editorDestination(id, path) : null,
                     file,
                 };
             }),
@@ -211,11 +211,7 @@ export default function useFileManagerModel(): FileManagerModel {
 
                 await (entry.kind === 'directory'
                     ? show(entry.path)
-                    : navigate({
-                          to: '/server/$id/files/$action',
-                          params: { id, action: 'edit' },
-                          hash: encodePathSegments(entry.path),
-                      }));
+                    : navigate({ to: '/server/$id/editor', params: { id }, search: { path: entry.path } }));
             },
             navigate: async (target) => {
                 await show(normalize(target.startsWith('/') ? target : join(directory, target)));

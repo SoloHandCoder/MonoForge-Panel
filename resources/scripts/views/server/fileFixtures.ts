@@ -95,7 +95,7 @@ export function createTestFileManagerEntry(options: Partial<FileManagerEntry> = 
         destination:
             kind === 'directory'
                 ? { to: '/server/$id/files', params: { id: TEST_SERVER }, hash: path }
-                : { to: '/server/$id/files/$action', params: { id: TEST_SERVER, action: 'edit' }, hash: path },
+                : { to: '/server/$id/editor', params: { id: TEST_SERVER }, search: { path } },
         editorDestination:
             kind === 'directory' ? null : { to: '/server/$id/editor', params: { id: TEST_SERVER }, search: { path } },
         file,

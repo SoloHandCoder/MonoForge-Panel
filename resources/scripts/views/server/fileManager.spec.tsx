@@ -200,7 +200,7 @@ it('replaces one nested view and keeps the native browser when a replacement fai
 
     expect(await screen.findByRole('link', { name: 'b.txt' })).toHaveAttribute(
         'href',
-        '/server/test-server/files/edit#/config/b.txt'
+        '/server/test-server/editor?path=%2Fconfig%2Fb.txt'
     );
     expect(screen.getByRole('button', { name: 'New file' })).toBeVisible();
     expect(screen.getByText('0 selected')).toBeVisible();
@@ -281,7 +281,7 @@ it('keeps the core link, checkbox and menu of a row whose details a replacement 
     expect(await screen.findAllByText('Custom presentation')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'config.json' })).toHaveAttribute(
         'href',
-        '/server/test-server/files/edit#/config.json'
+        '/server/test-server/editor?path=%2Fconfig.json'
     );
     fireEvent.click(await checkboxOf('config.json'));
     expect(await checkboxOf('config.json')).toHaveAttribute('aria-checked', 'true');
@@ -325,25 +325,31 @@ it('shows the listing error with a retry in place of the page', async () => {
     expect(screen.queryByRole('button', { name: 'New file' })).not.toBeInTheDocument();
 });
 
-it('links the full-screen editor from the toolbar and from the row menu of a text file', async () => {
+it('opens a text file in the full-screen editor and links the editor from the toolbar', async () => {
     open();
 
     expect(await screen.findByRole('link', { name: 'Open editor' })).toHaveAttribute(
         'href',
         '/server/test-server/editor?dir=%2Fconfig'
     );
-    await checkboxOf('b.txt');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open file options' }).at(-1)!);
-    expect(await screen.findByRole('menuitem', { name: /Open in editor/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'b.txt' })).toHaveAttribute(
         'href',
         '/server/test-server/editor?path=%2Fconfig%2Fb.txt'
     );
 });
 
-it('offers the editor to a user who may only read, but not for a folder', async () => {
+it('offers the editor to a user who may only read, while a folder still opens its listing', async () => {
     open(['file.read', 'file.read-content']);
 
     expect(await screen.findByRole('link', { name: 'Open editor' })).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'b.txt' })).toHaveAttribute(
+        'href',
+        '/server/test-server/editor?path=%2Fconfig%2Fb.txt'
+    );
+    expect(screen.getByRole('link', { name: 'plugins' })).toHaveAttribute(
+        'href',
+        '/server/test-server/files#/config/plugins'
+    );
     await checkboxOf('plugins');
     fireEvent.click(screen.getAllByRole('button', { name: 'Open file options' })[0]);
     expect(await screen.findByRole('menu')).toBeInTheDocument();

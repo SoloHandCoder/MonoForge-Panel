@@ -81,7 +81,7 @@ it('renders the native file browser from a fixture model without issuing core qu
 
     expect(screen.getByRole('link', { name: 'app.yml' })).toHaveAttribute(
         'href',
-        '/server/test-server/files/edit#/config/app.yml'
+        '/server/test-server/editor?path=%2Fconfig%2Fapp.yml'
     );
     expect(screen.getByRole('link', { name: 'plugins' })).toHaveAttribute(
         'href',
