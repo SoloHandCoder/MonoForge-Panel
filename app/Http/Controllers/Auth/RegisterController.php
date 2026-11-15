@@ -14,6 +14,7 @@ use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Http\Requests\Auth\RegisterRequest;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Throwable;
 
 #[Group('Authentication', 'Browser session authentication endpoints used by the panel frontend.', authenticated: false)]
@@ -51,7 +52,7 @@ class RegisterController extends Controller
     #[BodyParam('email', 'string', 'The new account email address.', required: true, example: 'player@example.com')]
     #[BodyParam('password', 'string', 'The new account password.', required: true, example: 'correct-horse-battery-staple')]
     #[BodyParam('password_confirmation', 'string', 'The password again.', required: true, example: 'correct-horse-battery-staple')]
-    #[BodyParam('terms', 'boolean', 'Whether the visitor agrees to the rules. Must be true.', required: true, example: true)]
+    #[BodyParam('terms', 'boolean', 'Whether the visitor agrees to the Terms of Service and Privacy Policy. Must be true.', required: true, example: true)]
     #[BodyParam('g-recaptcha-response', 'string', 'The captcha token (reCAPTCHA or Turnstile) when a captcha is enabled.', required: false, example: '03AFcWeA...', nullable: true)]
     #[ScribeResponse(self::REGISTER_COMPLETE_EXAMPLE, status: 201, description: 'The account was created and a browser session was established.')]
     #[ScribeResponse(status: 404, description: 'Sign-up is disabled.')]
@@ -68,6 +69,9 @@ class RegisterController extends Controller
             'name_first' => $username,
             'name_last' => $username,
         ], notify: false);
+
+        // The form cannot be sent without ticking the Terms of Service and Privacy Policy.
+        LegalSettings::recordAcceptance($user);
 
         return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
     }

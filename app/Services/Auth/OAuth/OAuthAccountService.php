@@ -82,12 +82,12 @@ final readonly class OAuthAccountService
     }
 
     /**
-     * Create a new panel account for an identity nobody has linked, then link it. The account
-     * gets a random password and the welcome email with a link to set one.
+     * Whether an account can be made from the identity: it needs a verified email that no
+     * account uses yet. Checked before the consent screen, and again when the account is made.
      *
      * @throws OAuthException
      */
-    public function register(OAuthIdentity $identity): User
+    public function ensureRegistrable(OAuthIdentity $identity): void
     {
         $label = $identity->provider->label();
 
@@ -97,6 +97,18 @@ final readonly class OAuthAccountService
             OAuthException::class,
             "A MonoForge account already uses this email address. Sign in with your password, then link {$label} from your account page.",
         );
+    }
+
+    /**
+     * Create a new panel account for an identity nobody has linked, then link it. The account
+     * gets a random password and the welcome email with a link to set one.
+     *
+     * @throws OAuthException
+     */
+    public function register(OAuthIdentity $identity): User
+    {
+        $label = $identity->provider->label();
+        $this->ensureRegistrable($identity);
 
         [$first, $last] = $this->names($identity);
 

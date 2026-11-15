@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\Service\Auth\OAuthException;
@@ -18,7 +19,10 @@ use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Providers\AppServiceProvider;
 use Pterodactyl\Services\Auth\OAuth\OAuthAccountService;
 use Pterodactyl\Services\Auth\OAuth\OAuthClient;
+use Pterodactyl\Services\Auth\OAuth\OAuthIdentity;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
+use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -29,6 +33,11 @@ class OAuthController extends Controller
 {
     /** The session flash the sign-in and account pages read the outcome from. */
     public const string RESULT_KEY = 'oauth_result';
+
+    /** Where a Discord/Google sign-up accepts the terms before its account is made. */
+    public const string CONSENT_PATH = '/auth/register/consent';
+
+    private const string TOO_MANY_SIGN_UPS = 'Too many accounts have been created from your network recently. Please try again later.';
 
     public function __construct(
         private readonly OAuthClient $client,
@@ -91,13 +100,16 @@ class OAuthController extends Controller
                 $this->accounts->refresh($account, $identity);
                 $user = $account->user;
             } elseif (filter_var(config('monoforge.auth.registration.enabled'), FILTER_VALIDATE_BOOL)) {
-                $limit = $this->registrationLimit($request);
-                if (RateLimiter::tooManyAttempts($limit['key'], $limit['max'])) {
-                    return $this->fail(false, 'Too many accounts have been created from your network recently. Please try again later.');
+                if ($this->registrationLimited($request)) {
+                    return $this->fail(false, self::TOO_MANY_SIGN_UPS);
                 }
 
-                $user = $this->accounts->register($identity);
-                RateLimiter::hit($limit['key'], $limit['decay']);
+                // The account is only made once the visitor accepts the Terms of Service and
+                // Privacy Policy on the consent screen, which posts to register() below.
+                $this->accounts->ensureRegistrable($identity);
+                OAuthRegistration::stash($request->session(), $identity);
+
+                return new RedirectResponse(self::CONSENT_PATH);
             } else {
                 return $this->fail(false, "No MonoForge account is linked to this {$label} account.");
             }
@@ -114,6 +126,53 @@ class OAuthController extends Controller
         $request->session()->flash(self::RESULT_KEY, ['status' => 'checkpoint', 'token' => $result->confirmationToken]);
 
         return new RedirectResponse('/auth/login');
+    }
+
+    /**
+     * Creates the account of a Discord/Google sign-up waiting on the consent screen, once the
+     * visitor accepts the Terms of Service and Privacy Policy, and signs it in.
+     *
+     * @throws ValidationException
+     */
+    public function register(Request $request, CompletesLogins $logins): JsonResponse
+    {
+        $request->validate(
+            ['terms' => ['accepted']],
+            ['terms.accepted' => 'You must agree to the Terms of Service and Privacy Policy to create an account.'],
+        );
+
+        $identity = OAuthRegistration::peek($request->session());
+        if (! $identity instanceof OAuthIdentity || ! $identity->provider->enabled()) {
+            OAuthRegistration::forget($request->session());
+
+            throw ValidationException::withMessages(['terms' => 'That sign up expired. Please continue with Discord or Google again.']);
+        }
+
+        if ($this->registrationLimited($request)) {
+            throw ValidationException::withMessages(['terms' => self::TOO_MANY_SIGN_UPS]);
+        }
+
+        try {
+            $user = $this->accounts->register($identity);
+        } catch (OAuthException $oAuthException) {
+            OAuthRegistration::forget($request->session());
+
+            throw ValidationException::withMessages(['terms' => $oAuthException->getMessage()]);
+        }
+
+        $limit = $this->registrationLimit($request);
+        RateLimiter::hit($limit['key'], $limit['decay']);
+        OAuthRegistration::forget($request->session());
+        LegalSettings::recordAcceptance($user);
+
+        return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
+    }
+
+    private function registrationLimited(Request $request): bool
+    {
+        $limit = $this->registrationLimit($request);
+
+        return RateLimiter::tooManyAttempts($limit['key'], $limit['max']);
     }
 
     /**
