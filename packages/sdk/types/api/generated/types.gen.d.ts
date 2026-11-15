@@ -5014,7 +5014,11 @@ export type AdminTestNodePlayitGgAgentResponseBody = {
 export type AdminImportExistingTunnelsResponseBody = {
     imported?: number;
     skipped?: number;
-    errors?: Array<unknown>;
+    errors?: Array<{
+        node_id?: number;
+        node_name?: string;
+        message?: string;
+    }>;
     results?: Array<{
         node_id?: number;
         node_name?: string;

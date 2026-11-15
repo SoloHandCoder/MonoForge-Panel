@@ -68,7 +68,9 @@ class TunnelController extends AdminApiController
     private const array IMPORT_EXAMPLE = [
         'imported' => 1,
         'skipped' => 2,
-        'errors' => [],
+        'errors' => [
+            ['node_id' => 2, 'node_name' => 'node-2', 'message' => 'This node has no playit.gg agent set up.'],
+        ],
         'results' => [
             [
                 'node_id' => 1,
