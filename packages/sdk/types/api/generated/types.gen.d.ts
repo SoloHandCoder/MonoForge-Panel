@@ -6827,8 +6827,14 @@ export type ClientReportACrashFromTheConsoleResponseBody = {
     } | null;
 };
 export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
-    uuid?: string;
-    title?: string;
+    /**
+     * The conversation UUID; open it in the server assistant.
+     */
+    uuid: string;
+    /**
+     * The conversation title.
+     */
+    title: string;
     /**
      * The conversation mode: crash_doctor.
      */

@@ -98,6 +98,8 @@ class CrashDoctorController extends ClientApiController
 
     #[Endpoint('Diagnose with the crash doctor', "Starts an assistant conversation in crash doctor mode: it reads the console, the newest file in crash-reports/ and the end of logs/latest.log (masked, and only what your permissions allow), then explains what happened and the likely cause, and offers fixes as tool calls you allow or deny. Give crash_id to diagnose a crash from the status, or null to check the server without one. Billed like any assistant conversation; refused with 402 when this month's free AI tokens are used up and the token balance is empty.")]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Diagnosis started.')]
+    #[ResponseField('uuid', 'string', 'The conversation UUID; open it in the server assistant.')]
+    #[ResponseField('title', 'string', 'The conversation title.')]
     #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
     #[ResponseField('mode', 'string', 'The conversation mode: crash_doctor.', schema: ConversationPresenter::MODE_SCHEMA)]
     #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
