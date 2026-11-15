@@ -10,11 +10,12 @@ use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 
 /**
  * Verifies tokens against Google reCAPTCHA or Cloudflare Turnstile. Both take the
- * same form-encoded "secret" and "response" and answer with "success" and "hostname".
+ * same form-encoded "secret" and "response" and answer with "success" and "hostname";
+ * Turnstile also returns the "action" the widget was rendered with.
  */
 final readonly class HttpCaptchaVerifier implements VerifiesCaptcha
 {
-    private const array FAILED = ['success' => false, 'hostname' => null];
+    private const array FAILED = ['success' => false, 'hostname' => null, 'action' => null];
 
     public function verify(string $provider, string $token, ?string $ip): array
     {
@@ -42,10 +43,12 @@ final readonly class HttpCaptchaVerifier implements VerifiesCaptcha
         }
 
         $hostname = $decoded['hostname'] ?? null;
+        $action = $decoded['action'] ?? null;
 
         return [
             'success' => ($decoded['success'] ?? false) === true,
             'hostname' => is_string($hostname) ? $hostname : null,
+            'action' => is_string($action) ? $action : null,
         ];
     }
 }

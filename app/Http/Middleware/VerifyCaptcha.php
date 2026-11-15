@@ -15,7 +15,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * Rejects requests without a valid token from the panel's captcha provider
  * (reCAPTCHA or Cloudflare Turnstile), and lets everything through when the
- * captcha is turned off. Registered as both "captcha" and "recaptcha".
+ * captcha is turned off. Registered as both "captcha" and "recaptcha"; a parameter
+ * (e.g. "captcha:register") names the Turnstile action the widget must have used.
  */
 class VerifyCaptcha
 {
@@ -24,7 +25,7 @@ class VerifyCaptcha
     /**
      * @param  Closure(Request): \Symfony\Component\HttpFoundation\Response  $next
      */
-    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
+    public function handle(Request $request, Closure $next, ?string $action = null): \Symfony\Component\HttpFoundation\Response
     {
         $provider = CaptchaSettings::provider();
         if ($provider === CaptchaSettings::NONE) {
@@ -33,10 +34,12 @@ class VerifyCaptcha
 
         $token = $this->token($request);
         $result = $token === ''
-            ? ['success' => false, 'hostname' => null]
+            ? ['success' => false, 'hostname' => null, 'action' => null]
             : $this->verifier->verify($provider, $token, $request->ip());
 
-        if ($result['success'] && $this->domainValid($provider, $result['hostname'], $request)) {
+        if ($result['success']
+            && $this->domainValid($provider, $result['hostname'], $request)
+            && $this->actionValid($provider, $result['action'], $action)) {
             return $next($request);
         }
 
@@ -64,15 +67,25 @@ class VerifyCaptcha
     }
 
     /**
-     * reCAPTCHA's shipped public keys cannot be limited to a domain, so the solved
-     * domain is compared with this request's. Turnstile keys are always domain-bound.
+     * The domain the captcha was solved on must be this request's, so a token solved
+     * on another site is useless here. Always checked for Turnstile; for reCAPTCHA it
+     * follows "recaptcha.verify_domain".
      */
     private function domainValid(string $provider, ?string $hostname, Request $request): bool
     {
-        if ($provider !== CaptchaSettings::RECAPTCHA || ! config()->boolean('recaptcha.verify_domain')) {
+        if ($provider === CaptchaSettings::RECAPTCHA && ! config()->boolean('recaptcha.verify_domain')) {
             return true;
         }
 
-        return $hostname === parse_url($request->url(), PHP_URL_HOST);
+        return $hostname !== null && $hostname === parse_url($request->url(), PHP_URL_HOST);
+    }
+
+    /**
+     * Turnstile tokens carry the action of the form that produced them, so a token
+     * solved on the login form cannot be spent on sign-up. reCAPTCHA v2 has no actions.
+     */
+    private function actionValid(string $provider, ?string $returned, ?string $expected): bool
+    {
+        return $provider !== CaptchaSettings::TURNSTILE || $expected === null || $returned === $expected;
     }
 }

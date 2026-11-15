@@ -11,7 +11,7 @@ interface VerifiesCaptcha
      * Never throws: an unreachable provider counts as a failed verification.
      *
      * @param  'recaptcha'|'turnstile'  $provider
-     * @return array{success: bool, hostname: string|null}
+     * @return array{success: bool, hostname: string|null, action: string|null}
      */
     public function verify(string $provider, string $token, ?string $ip): array;
 }

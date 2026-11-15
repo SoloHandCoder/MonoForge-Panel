@@ -4,6 +4,7 @@ import type { InvisibleRecaptchaHandle } from './InvisibleRecaptcha';
 /** The options of `turnstile.render` this widget passes. */
 interface TurnstileRenderOptions {
     sitekey: string;
+    action?: string;
     execution: 'render' | 'execute';
     appearance: 'always' | 'execute' | 'interaction-only';
     callback: (token: string) => void;
@@ -64,6 +65,8 @@ export function loadTurnstile(): Promise<TurnstileApi> {
 
 interface Props {
     siteKey: string;
+    /** Which form this is ("login", "register"...); the panel checks it when verifying the token. */
+    action?: string;
     ref?: React.Ref<InvisibleRecaptchaHandle>;
 }
 
@@ -71,7 +74,7 @@ interface Props {
  * Cloudflare Turnstile; call `ref.execute()` to obtain a token. The widget only shows itself
  * when Cloudflare wants the visitor to interact with it.
  */
-const Turnstile = ({ siteKey, ref }: Props) => {
+const Turnstile = ({ siteKey, action, ref }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetRef = useRef<{ api: TurnstileApi; id: string } | null>(null);
     const pendingRef = useRef<((token: string | null) => void) | null>(null);
@@ -96,6 +99,7 @@ const Turnstile = ({ siteKey, ref }: Props) => {
 
                 const id = api.render(container, {
                     sitekey: siteKey || '_invalid_key',
+                    action,
                     execution: 'execute',
                     appearance: 'interaction-only',
                     callback: (token: string) => settle(token || null),
@@ -125,7 +129,7 @@ const Turnstile = ({ siteKey, ref }: Props) => {
                 // The widget has already been removed.
             }
         };
-    }, [siteKey, settle]);
+    }, [siteKey, action, settle]);
 
     useImperativeHandle(
         ref,

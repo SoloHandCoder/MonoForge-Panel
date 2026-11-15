@@ -8,14 +8,22 @@ import Turnstile from '@/components/elements/Turnstile';
 function captchaLeaf(
     ref: RefObject<InvisibleRecaptchaHandle | null>,
     provider: Exclude<CaptchaProvider, 'none'>,
-    siteKey: string
+    siteKey: string,
+    action: CaptchaAction
 ): ComponentType {
-    const widget = provider === 'turnstile' ? Turnstile : InvisibleRecaptcha;
+    if (provider === 'turnstile') {
+        return function Captcha() {
+            return createElement(Turnstile, { ref, siteKey, action });
+        };
+    }
 
     return function Captcha() {
-        return createElement(widget, { ref, siteKey });
+        return createElement(InvisibleRecaptcha, { ref, siteKey });
     };
 }
+
+/** The form a captcha token is for; the panel rejects Turnstile tokens solved on another form. */
+export type CaptchaAction = 'login' | 'register' | 'password';
 
 /** The panel's captcha: the provider setting, or the legacy reCAPTCHA switch on older documents. */
 export function captchaSettings(settings: SiteSettings): { provider: CaptchaProvider; siteKey: string } {
@@ -35,13 +43,13 @@ interface AuthCaptcha {
     readonly token: () => Promise<string | null>;
 }
 
-export function useCaptcha(): AuthCaptcha {
+export function useCaptcha(action: CaptchaAction): AuthCaptcha {
     const ref = useRef<InvisibleRecaptchaHandle>(null);
     const { provider, siteKey } = captchaSettings(useSiteSettings());
     const enabled = provider !== 'none';
     const Captcha = useMemo(
-        () => (provider === 'none' ? null : captchaLeaf(ref, provider, siteKey || '')),
-        [provider, siteKey]
+        () => (provider === 'none' ? null : captchaLeaf(ref, provider, siteKey || '', action)),
+        [provider, siteKey, action]
     );
     const token = useCallback(async () => {
         if (!enabled) {

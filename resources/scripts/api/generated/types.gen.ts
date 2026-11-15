@@ -13578,6 +13578,10 @@ export type AuthRegisterErrors = {
      * The submitted data is invalid.
      */
     422: ValidationErrorEnvelope;
+    /**
+     * Too many sign-up attempts from this address or for this email.
+     */
+    429: ErrorEnvelope;
 };
 
 export type AuthRegisterError = AuthRegisterErrors[keyof AuthRegisterErrors];

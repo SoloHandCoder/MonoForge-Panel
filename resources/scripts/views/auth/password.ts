@@ -12,7 +12,7 @@ const newPassword = { type: 'password', autoComplete: 'new-password' } as const;
 
 function useForgotPasswordFormModel(): ForgotPasswordFormModel {
     const requestReset = useRequestPasswordResetEmail();
-    const { Captcha, token } = useCaptcha();
+    const { Captcha, token } = useCaptcha('password');
     const form = useForm({
         defaultValues: { email: '' },
         onSubmit: async ({ value, formApi }) => {
@@ -55,7 +55,7 @@ function useResetPasswordFormModel(): ResetPasswordFormModel {
     const { token: resetToken = '' } = useParams({ strict: false });
     const { email = '' } = parseEmailSearch(useSearch({ strict: false }));
     const resetPassword = usePerformPasswordReset();
-    const { Captcha, token } = useCaptcha();
+    const { Captcha, token } = useCaptcha('password');
     const form = useForm({
         defaultValues: { password: '', passwordConfirmation: '' },
         onSubmit: async ({ value }) => {

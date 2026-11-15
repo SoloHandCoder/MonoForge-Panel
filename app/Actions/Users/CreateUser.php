@@ -55,7 +55,7 @@ final readonly class CreateUser implements CreatesUsers
         ];
     }
 
-    public function create(array $input): User
+    public function create(array $input, bool $notify = true): User
     {
         $attributes = Validator::validate($input, self::rules());
         $extensions = ValidatedExtensionValues::of($input['extensions'] ?? null);
@@ -77,7 +77,9 @@ final readonly class CreateUser implements CreatesUsers
             ->property(['email' => $user->email, 'username' => $user->username, 'admin' => $user->root_admin])
             ->log();
 
-        $user->notify(new AccountCreated($user, $token));
+        if ($notify) {
+            $user->notify(new AccountCreated($user, $token));
+        }
 
         return $user;
     }

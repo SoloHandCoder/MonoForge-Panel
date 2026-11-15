@@ -14,7 +14,7 @@ const RULES_REQUIRED = 'You must agree to the rules to create an account.';
 
 function useRegisterFormModel(): RegisterFormModel {
     const register = useRegister();
-    const { Captcha, token } = useCaptcha();
+    const { Captcha, token } = useCaptcha('register');
     const form = useForm({
         defaultValues: { username: '', email: '', password: '', passwordConfirmation: '', terms: false },
         onSubmit: async ({ value }) => {

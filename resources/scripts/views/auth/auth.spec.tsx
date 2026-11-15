@@ -44,10 +44,16 @@ vi.mock('@/components/elements/InvisibleRecaptcha', () => ({
 }));
 
 vi.mock('@/components/elements/Turnstile', () => ({
-    default: function Turnstile({ ref }: { ref: Ref<{ execute: () => Promise<string | null> }> }) {
+    default: function Turnstile({
+        ref,
+        action,
+    }: {
+        ref: Ref<{ execute: () => Promise<string | null> }>;
+        action?: string;
+    }) {
         useImperativeHandle(ref, () => ({ execute: mocks.execute }));
 
-        return <div data-testid='turnstile' />;
+        return <div data-testid='turnstile' data-action={action} />;
     },
 }));
 
@@ -319,7 +325,8 @@ describe('sign-up', () => {
             registration: { enabled: true },
         });
 
-        expect(screen.getByTestId('turnstile')).toBeInTheDocument();
+        // The widget names its form, which the panel checks when verifying the token.
+        expect(screen.getByTestId('turnstile')).toHaveAttribute('data-action', 'register');
         expect(screen.getByRole('link', { name: 'Already have an account? Sign in' })).toHaveAttribute(
             'href',
             '/auth/login'

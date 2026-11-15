@@ -55,6 +55,7 @@ class RegisterController extends Controller
     #[BodyParam('g-recaptcha-response', 'string', 'The captcha token (reCAPTCHA or Turnstile) when a captcha is enabled.', required: false, example: '03AFcWeA...', nullable: true)]
     #[ScribeResponse(self::REGISTER_COMPLETE_EXAMPLE, status: 201, description: 'The account was created and a browser session was established.')]
     #[ScribeResponse(status: 404, description: 'Sign-up is disabled.')]
+    #[ScribeResponse(status: 429, description: 'Too many sign-up attempts from this address or for this email.')]
     public function __invoke(RegisterRequest $request, CreatesUsers $users, CompletesLogins $logins): JsonResponse
     {
         $username = $request->string('username')->toString();
@@ -66,7 +67,7 @@ class RegisterController extends Controller
             'password' => $request->string('password')->toString(),
             'name_first' => $username,
             'name_last' => $username,
-        ]);
+        ], notify: false);
 
         return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
     }

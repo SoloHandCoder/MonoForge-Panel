@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Routing\Route as IlluminateRoute;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,7 @@ use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
 use ReflectionFunctionAbstract;
+use Symfony\Component\HttpFoundation\Response;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -189,11 +191,48 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip());
         });
 
+        // Sign-up: 3 accounts an hour per IP and 1 attempt an hour per submitted email.
+        // Runs after the captcha, so failed captchas do not use anyone's attempts. Forms
+        // the validation rejects do not count either, so a taken username or a typo does
+        // not lock anyone out, except rejections of the email itself (probing for
+        // registered addresses), which count against that email.
+        RateLimiter::for('registration', function (Request $request): array {
+            $email = mb_strtolower(mb_trim($request->string('email')->toString()));
+
+            return [
+                Limit::perHour(3)->by('ip:'.$request->ip())
+                    ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY),
+                Limit::perHour(1)->by('email:'.$email)
+                    ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY
+                        || $this->rejectsField($response, 'email')),
+            ];
+        });
+
         RateLimiter::for('api.client', fn (Request $request): Limit => $this->apiLimit($request, 'client'));
         RateLimiter::for('api.application', fn (Request $request): Limit => $this->apiLimit($request, 'application'));
         RateLimiter::for('api.admin', fn (Request $request): Limit => $this->apiLimit($request, 'admin'));
 
         ResourceLimit::boot();
+    }
+
+    /**
+     * Whether a validation error response names the given field.
+     */
+    private function rejectsField(Response $response, string $field): bool
+    {
+        $body = json_decode((string) $response->getContent(), true);
+        $errors = is_array($body) ? ($body['errors'] ?? null) : null;
+        if (! is_array($errors)) {
+            return false;
+        }
+
+        foreach ($errors as $error) {
+            if (is_array($error) && Arr::get($error, 'meta.source_field') === $field) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function apiLimit(Request $request, string $name): Limit

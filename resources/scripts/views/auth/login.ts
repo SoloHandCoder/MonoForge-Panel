@@ -21,7 +21,7 @@ function useLoginFormModel(): LoginFormModel {
     const openCheckpoint = useOpenLoginCheckpoint();
     const route = useRouteSlotData();
     const login = useLogin();
-    const { Captcha, token } = useCaptcha();
+    const { Captcha, token } = useCaptcha('login');
     const registration = useSiteSettings().registration?.enabled ?? false;
     const form = useForm({
         defaultValues: { username: '', password: '' },
