@@ -144,12 +144,82 @@ test('edit_file refuses edits that touch, move, copy or add a hidden value', fun
     expect(fn (): string => EditFileTool::apply($original, $edits))->toThrow(ToolException::class, $message);
 })->with([
     'find on the rcon.password line' => [PROPERTIES, [['find' => 'rcon.password=', 'replace' => 'rcon.password=new']], 'touches a line with a hidden value'],
-    'find ending next to the secret line' => [PROPERTIES, [['find' => "Server\nrcon", 'replace' => "Server\n#rcon"]], 'touches a line with a hidden value'],
-    'moving the secret line down' => [PROPERTIES, [['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'touches a line with a hidden value'],
-    'a new secret' => [PROPERTIES, [['find' => 'max-players=20', 'replace' => "max-players=20\nquery.password=mine"]], 'moves, copies or changes a hidden value'],
+    'find ending next to the secret line' => [PROPERTIES, [['find' => "Server\nrcon", 'replace' => "Server\n#rcon"]], 'stay within one line'],
+    'moving the secret line down' => [PROPERTIES, [['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'stay within one line'],
+    'a new secret' => [PROPERTIES, [['find' => 'max-players=20', 'replace' => "max-players=20\nquery.password=mine"]], 'stay within one line'],
+    'a new secret on the same line' => [PROPERTIES, [['find' => 'max-players=20', 'replace' => 'query.password=mine']], 'moves, copies or changes a hidden value'],
     'YAML key turned into a block scalar (I-B probe)' => ["mysql:\n  password: A1secret\nmotd: hi\n", [['find' => 'mysql:', 'replace' => 'motd: |']], 'moves, copies or changes a hidden value'],
     'YAML key turned into an open quote (I-C probe)' => ["mysql:\n  password: A1secret\nmotd: hi\n", [['find' => 'mysql:', 'replace' => 'motd: "Welcome']], 'moves, copies or changes a hidden value'],
     'a secret written into a JSON string (I-C probe)' => ["{\n  \"password\": \"A1secret\",\n  \"join message\": \"Welcome!\"\n}\n", [['find' => '"Welcome!"', 'replace' => "\"Welcome! 'password': 'x'\""]], 'moves, copies or changes a hidden value'],
     'PHP heredoc' => ["<?php return [\n  'motd' => 'hi',\n  'password' => 'A1secret',\n];\n", [['find' => "'motd' => 'hi',", 'replace' => "'motd' => <<<EOT"]], 'moves, copies or changes a hidden value'],
     'text that occurs twice' => ["a=1\na=1\npassword=x\n", [['find' => 'a=1', 'replace' => 'a=2']], 'exactly once'],
+]);
+
+const VELOCITY = "motd = \"&3A Server\"\n[servers]\nlobby = \"127.0.0.1:30066\"\n[forced-hosts]\n# forwarding-secret\nsecret = \"MY-PROXY-SECRET\"\nping-passthrough = \"DISABLED\"\n";
+
+test('edit_file refuses the round-4 multi-line string attacks structurally', function (string $path, string $original, array $edits): void {
+    expect(fn (): string => EditFileTool::apply($original, $edits, $path))->toThrow(ToolException::class);
+})->with([
+    // The reviewer's velocity.toml probe: two edits that wrap the secret in a TOML """ string.
+    'velocity.toml two-edit """ attack' => ['/velocity.toml', VELOCITY, [
+        ['find' => 'motd = "&3A Server"', 'replace' => 'motd = """'],
+        ['find' => 'ping-passthrough = "DISABLED"', 'replace' => '"""'."\n".'ping-passthrough = "DISABLED"'],
+    ]],
+    'velocity.toml one-edit """ opener' => ['/velocity.toml', VELOCITY, [['find' => 'motd = "&3A Server"', 'replace' => 'motd = """']]],
+    'TOML """intro' => ['/velocity.toml', VELOCITY, [['find' => 'motd = "&3A Server"', 'replace' => 'motd = """Welcome']]],
+    "TOML '''" => ['/velocity.toml', VELOCITY, [['find' => 'motd = "&3A Server"', 'replace' => "motd = '''"]]],
+    'Lua [[ long string' => ['/config.lua', "motd = \"hi\"\npassword = \"S3cretPw\"\n", [['find' => 'motd = "hi"', 'replace' => 'motd = [[']]],
+    'Lua [==[ long string' => ['/config.lua', "motd = \"hi\"\npassword = \"S3cretPw\"\n", [['find' => 'motd = "hi"', 'replace' => 'motd = [==[']]],
+    'YAML key: |' => ['/config.yml', "motd: hi\nmysql:\n  password: A1secret\n", [['find' => 'mysql:', 'replace' => 'motd2: |']]],
+    'a continuation at the end' => ['/config.ini', "motd = hi\npassword = S3cretPw\n", [['find' => 'motd = hi', 'replace' => 'motd = hi \\']]],
+    'an odd quote' => ['/config.ini', "motd = hi\npassword = S3cretPw\n", [['find' => 'motd = hi', 'replace' => 'motd = "hi']]],
+]);
+
+test('edit_file refuses a JSON or YAML edit that moves a hidden value to another parsed key path', function (): void {
+    $json = "{\n  \"db\":\n    {\"password\": \"A1secret\"},\n  \"motd\": \"hi\"\n}\n";
+
+    // One line, balanced quotes, the masked value unchanged: only parsing sees that the password
+    // now sits under "public" instead of "db".
+    expect(fn (): string => EditFileTool::apply($json, [['find' => '"db":', 'replace' => '"public":']], '/config.json'))
+        ->toThrow(ToolException::class, 'moves, copies or changes a hidden value')
+        // A JSON file that would no longer parse is refused too.
+        ->and(fn (): string => EditFileTool::apply($json, [['find' => '"db":', 'replace' => '"db"']], '/config.json'))
+        ->toThrow(ToolException::class, 'no longer parse');
+
+    // An edit beside the secret that keeps it at its path is fine.
+    expect(EditFileTool::apply($json, [['find' => '"motd": "hi"', 'replace' => '"motd": "Welcome"']], '/config.json'))
+        ->toBe("{\n  \"db\":\n    {\"password\": \"A1secret\"},\n  \"motd\": \"Welcome\"\n}\n");
+
+    // YAML: indenting the parent makes the password a top-level key.
+    $yaml = "motd: hi\nmysql:\n  password: A1secret\n";
+    expect(fn (): string => EditFileTool::apply($yaml, [['find' => 'mysql:', 'replace' => '  mysql:']], '/config.yml'))
+        ->toThrow(ToolException::class);
+});
+
+test('edit_file keeps free editing in files without hidden values and the MOTD edit next to rcon.password', function (): void {
+    expect(EditFileTool::apply(PROPERTIES, [['find' => 'motd=A Minecraft Server', 'replace' => 'motd=Welcome to the server']], '/server.properties'))
+        ->toBe("motd=Welcome to the server\nrcon.password=hunter22\nrcon.port=25575\nmax-players=20\n")
+        // No hidden values: multi-line edits and string openers are the user's business.
+        ->and(EditFileTool::apply("motd = \"hi\"\nport = 1\n", [['find' => 'motd = "hi"', 'replace' => "motd = \"\"\"\nWelcome\n\"\"\""]], '/a.toml'))
+        ->toBe("motd = \"\"\"\nWelcome\n\"\"\"\nport = 1\n");
+});
+
+test('a line is self-contained only with balanced quotes, no multi-line delimiters and no continuation', function (string $line, bool $expected): void {
+    expect(EditFileTool::selfContained($line))->toBe($expected);
+})->with([
+    ['motd=Welcome', true],
+    ['motd = "Welcome" # note', true],
+    ['motd = "say \\"hi\\""', true],
+    ["motd: 'it''s'", true],
+    ['motd = """', false],
+    ['motd = [[', false],
+    ['motd = ]]', false],
+    ['motd = [==[', false],
+    ['motd: |', false],
+    ['motd: >- # folded', false],
+    ['motd = hi \\', false],
+    ['motd = (', false],
+    ['"motd": "hi",', false],
+    ['x = <<<EOT', false],
+    ["motd = 'open", false],
 ]);

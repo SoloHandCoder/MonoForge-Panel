@@ -540,7 +540,7 @@ test('edit_file refuses an edit on the rcon.password line and a moved secret lin
     expect($fakes['file']->callsFor('putContent'))->toBeEmpty();
 })->with([
     'find touches the rcon.password line' => [[['find' => 'rcon.password=hunter', 'replace' => 'rcon.password=mine']], 'touches a line with a hidden value'],
-    'moving the secret line' => [[['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'touches a line with a hidden value'],
+    'moving the secret line' => [[['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'stay within one line'],
     'a mask in the replacement' => [[['find' => 'motd=Old', 'replace' => 'motd='.SecretRedactor::PLACEHOLDER]], 'hidden value or address placeholder'],
 ]);
 
