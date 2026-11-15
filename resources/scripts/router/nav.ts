@@ -2,6 +2,9 @@ import type { ExtensionScreenRegistration } from '@/extensions/registry';
 
 export type NavArea = 'account' | 'server' | 'admin';
 
+/** A panel feature that can be switched off; its links hide while it is. */
+export type NavFeature = 'assistant';
+
 export interface RouteNavMeta {
     label: string;
     exact?: boolean;
@@ -14,6 +17,8 @@ export interface RouteNavMeta {
     badge?: string;
     /** A lucide icon name. */
     icon?: string;
+    /** Hides the link while the feature is off. */
+    feature?: NavFeature;
     /** Gates the link and supplies its live badge. */
     screen?: ExtensionScreenRegistration;
 }

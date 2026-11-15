@@ -1,5 +1,6 @@
 import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { useMatchRoute } from '@tanstack/react-router';
+import { useAssistantStatus } from '@/api/assistant';
 import { selectServerPermissions, useServerQuery } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
 import {
@@ -13,7 +14,7 @@ import {
 } from '@/extensions/registry';
 import { ScreenBadge, ScreenGate } from '@/extensions/screenNavigation';
 import { hasPermission } from '@/plugins/usePermissions';
-import { getAreaNav, type AreaNavEntry } from '@/router/nav';
+import { getAreaNav, type AreaNavEntry, type NavFeature } from '@/router/nav';
 import { useServerRouteId } from '@/router/params';
 import {
     PanelLink,
@@ -91,6 +92,15 @@ function isListed(entry: AreaNavEntry, server: Server | undefined): boolean {
     );
 }
 
+/** Which switchable features an area's links need, and whether each is on. */
+function useNavFeatures(area: NavArea): Readonly<Record<NavFeature, boolean>> {
+    // The server assistant is the only switchable feature so far; its status is only fetched where a link needs it.
+    const needsAssistant = area === 'server' && getAreaNav(area).some((entry) => entry.feature === 'assistant');
+    const assistant = useAssistantStatus(needsAssistant).data;
+
+    return useMemo(() => ({ assistant: !!assistant?.enabled && !!assistant.server_enabled }), [assistant]);
+}
+
 /**
  * The navigation of an area, filtered by subuser permissions and egg rules. Screens with a runtime
  * predicate stay listed; `<Navigation>` renders them once the predicate allows it.
@@ -99,16 +109,18 @@ export function useNavigation(area: NavArea): NavigationModel {
     const id = useServerRouteId();
     const serverId = area === 'server' ? (id ?? '') : '';
     const server = useServerQuery(serverId).data;
+    const features = useNavFeatures(area);
 
     return useMemo(() => {
         const params: Record<string, string> = serverId ? { id: serverId } : {};
         const items = getAreaNav(area)
             .map((entry, order) => ({ entry, item: toNavItem(area, entry, order, params) }))
             .filter(({ entry }) => area !== 'server' || isListed(entry, server))
+            .filter(({ entry }) => entry.feature === undefined || features[entry.feature])
             .map(({ item }) => item);
 
         return { items };
-    }, [area, serverId, server]);
+    }, [area, serverId, server, features]);
 }
 
 export interface ResourceTab {

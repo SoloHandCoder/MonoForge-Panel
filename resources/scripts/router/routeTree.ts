@@ -438,6 +438,22 @@ const serverChildren = [
         beforeLoad: requireServerPermission(['settings.*', 'file.sftp']),
         component: pageRoute('page.server.settings', ['settings.*', 'file.sftp']),
     }),
+    // Phase 4: the AI assistant. Its link also needs the assistant switched on (see useNavigation).
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'assistant',
+        staticData: {
+            nav: {
+                label: 'Assistant',
+                permission: 'assistant.use',
+                icon: 'bot',
+                group: 'overview',
+                feature: 'assistant',
+            },
+        },
+        beforeLoad: requireServerPermission('assistant.use'),
+        component: componentRoute(() => import('@/components/server/assistant/ServerAssistantContainer')),
+    }),
     createRoute({
         getParentRoute: () => serverRoute,
         path: 'activity',
@@ -1098,6 +1114,21 @@ const panelChildren = [
         params: idParam,
         component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
     }),
+    // Phase 4: the AI assistant. Every sub-tab path renders AssistantAdminContainer, which picks the tab
+    // from the path (see components/admin/assistant/assistantTabs.ts).
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'assistant',
+        staticData: { nav: { label: 'AI Assistant', icon: 'bot', group: 'system' } },
+        component: componentRoute(() => import('@/components/admin/assistant/AssistantAdminContainer')),
+    }),
+    ...(['providers', 'settings', 'usage'] as const).map((tab) =>
+        createRoute({
+            getParentRoute: () => panelRoute,
+            path: `assistant/${tab}`,
+            component: componentRoute(() => import('@/components/admin/assistant/AssistantAdminContainer')),
+        })
+    ),
     createRoute({
         getParentRoute: () => panelRoute,
         path: 'databases',

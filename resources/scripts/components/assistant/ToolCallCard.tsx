@@ -1,0 +1,184 @@
+import { useId, useState } from 'react';
+import { ChevronRight, LoaderCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
+import type { AssistantDecision, AssistantToolCall } from '@/api/assistant';
+import Badge from '@/components/elements/Badge';
+import Button from '@/components/elements/Button';
+import Icon from '@/components/elements/Icon';
+import { CopyButton } from '@/components/assistant/markdown';
+import {
+    confirmationWarning,
+    isDestructiveTool,
+    isSensitiveRead,
+    sensitiveIcon,
+    toolIcon,
+    toolStatusLabels,
+    toolStatusTones,
+} from '@/components/assistant/toolMeta';
+import { cn } from '@/lib/cn';
+
+export interface ToolCallCardProps {
+    call: AssistantToolCall;
+    /** Shows Allow / Deny on a pending call; left out where nobody can decide. */
+    onDecide?: (decision: AssistantDecision) => void;
+    /** The decision being sent, while it is. */
+    deciding?: AssistantDecision | null;
+}
+
+const hasArguments = (call: AssistantToolCall) => Object.keys(call.arguments).length > 0;
+
+function Section({ title, text }: { title: string; text: string }) {
+    return (
+        <div className='min-w-0'>
+            <div className='mb-1 flex items-center justify-between'>
+                <span className='text-xs font-medium tracking-wide text-muted-foreground uppercase'>{title}</span>
+                <CopyButton text={text} label={`Copy ${title.toLowerCase()}`} />
+            </div>
+            <pre className='max-h-64 overflow-auto rounded-lg border border-border bg-sunken p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground'>
+                {text}
+            </pre>
+        </div>
+    );
+}
+
+function ConfirmationBar({
+    call,
+    destructive,
+    onDecide,
+    deciding,
+}: Required<Pick<ToolCallCardProps, 'call' | 'onDecide'>> & {
+    destructive: boolean;
+    deciding?: AssistantDecision | null;
+}) {
+    return (
+        <div className='border-t border-inherit px-4 py-3'>
+            <p className={cn('flex items-start gap-2 text-sm', destructive ? 'text-destructive' : 'text-foreground')}>
+                <Icon
+                    icon={destructive ? ShieldAlert : TriangleAlert}
+                    className={cn('mt-0.5 size-4 shrink-0', destructive ? 'text-destructive' : 'text-warning')}
+                    aria-hidden
+                />
+                {confirmationWarning(call)}
+            </p>
+            <div className='mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end'>
+                <Button.Text
+                    type='button'
+                    isSecondary
+                    disabled={!!deciding}
+                    isLoading={deciding === 'deny'}
+                    onClick={() => onDecide('deny')}
+                    aria-label={`Deny: ${call.label}`}
+                >
+                    Deny
+                </Button.Text>
+                <Button
+                    type='button'
+                    color={destructive ? 'red' : 'primary'}
+                    disabled={!!deciding}
+                    isLoading={deciding === 'approve'}
+                    onClick={() => onDecide('approve')}
+                    aria-label={`Allow: ${call.label}`}
+                >
+                    Allow
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+type CardTone = 'danger' | 'warning' | 'normal';
+
+/** Red for a pending destructive call, amber for another pending one, plain otherwise. */
+const cardTone = (call: AssistantToolCall): CardTone => {
+    if (call.status !== 'pending' || !call.needs_confirmation) {
+        return 'normal';
+    }
+
+    return isDestructiveTool(call.name) ? 'danger' : 'warning';
+};
+
+const cardClasses = {
+    danger: 'border-destructive/50 bg-destructive/5',
+    warning: 'border-warning/50 bg-warning/5',
+    normal: 'border-border',
+} satisfies Record<CardTone, string>;
+
+const iconClasses = {
+    danger: 'bg-destructive/15 text-destructive',
+    warning: 'bg-warning/15 text-warning',
+    normal: 'bg-primary/10 text-primary',
+} satisfies Record<CardTone, string>;
+
+function Details({ call, id }: { call: AssistantToolCall; id: string }) {
+    return (
+        <div id={id} className='grid animate-fade-in gap-3 border-t border-border px-3 py-3'>
+            {hasArguments(call) && <Section title='Arguments' text={JSON.stringify(call.arguments, null, 2)} />}
+            {!!call.result_preview && <Section title='Result' text={call.result_preview} />}
+        </div>
+    );
+}
+
+function CallIcon({ call, tone }: { call: AssistantToolCall; tone: CardTone }) {
+    const busy = call.status === 'running' || call.status === 'approved';
+    const ToolIcon = isSensitiveRead(call) ? sensitiveIcon : toolIcon(call.name);
+
+    return (
+        <span
+            className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', iconClasses[tone])}
+            aria-hidden
+        >
+            <Icon icon={busy ? LoaderCircle : ToolIcon} className={cn('size-4', busy && 'animate-spin')} />
+        </span>
+    );
+}
+
+/** One tool call in the thread: what the assistant does, its arguments and result, and Allow / Deny while it waits. */
+export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCallCardProps) {
+    const [open, setOpen] = useState(false);
+    const detailsId = useId();
+    const tone = cardTone(call);
+    const destructive = isDestructiveTool(call.name);
+    const expandable = hasArguments(call) || !!call.result_preview;
+
+    return (
+        <div
+            data-testid='tool-call'
+            data-status={call.status}
+            data-tone={tone}
+            className={cn(
+                'animate-fade-in overflow-hidden rounded-xl border bg-card transition-colors duration-200',
+                cardClasses[tone]
+            )}
+        >
+            <div className='flex items-center gap-3 px-3 py-2.5'>
+                <CallIcon call={call} tone={tone} />
+                <div className='min-w-0 flex-1'>
+                    <p className='truncate text-sm font-medium text-foreground'>{call.label}</p>
+                    <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
+                </div>
+                <Badge tone={toolStatusTones[call.status]} variant='soft' size='sm' className='shrink-0'>
+                    {toolStatusLabels[call.status]}
+                </Badge>
+                {expandable && (
+                    <button
+                        type='button'
+                        aria-expanded={open}
+                        aria-controls={detailsId}
+                        aria-label={open ? 'Hide details' : 'Show details'}
+                        onClick={() => setOpen(!open)}
+                        className='inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-(--hover-row) hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+                    >
+                        <Icon
+                            icon={ChevronRight}
+                            className={cn('size-4 transition-transform duration-200', open && 'rotate-90')}
+                            aria-hidden
+                        />
+                    </button>
+                )}
+            </div>
+            {open && <Details call={call} id={detailsId} />}
+            {tone !== 'normal' && onDecide && (
+                <ConfirmationBar call={call} destructive={destructive} onDecide={onDecide} deciding={deciding} />
+            )}
+        </div>
+    );
+}
