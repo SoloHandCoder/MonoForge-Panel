@@ -11,11 +11,14 @@ use Pterodactyl\Models\UserOAuthAccount;
 
 /**
  * Copies rows of the old m12labs `user_oauth_accounts` table into MonoForge. User IDs are the
- * same in both panels because the core import kept them.
+ * same in both panels because the core import kept them, but a link is only written when the
+ * MonoForge user with that ID also has the m12labs user's email (`user_email` on the row): an
+ * ID that now belongs to someone else (a user who signed up after the import) must never get
+ * another person's Discord or Google login.
  */
 final class M12LabsOAuthLinkImporter
 {
-    public const array OUTCOMES = ['imported', 'already linked', 'missing user', 'conflict', 'invalid'];
+    public const array OUTCOMES = ['imported', 'already linked', 'missing user', 'user mismatch', 'conflict', 'invalid'];
 
     /**
      * @param  iterable<array<array-key, mixed>|object>  $rows
@@ -33,7 +36,7 @@ final class M12LabsOAuthLinkImporter
 
     /**
      * @param  array<array-key, mixed>  $row
-     * @return 'imported'|'already linked'|'missing user'|'conflict'|'invalid'
+     * @return 'imported'|'already linked'|'missing user'|'user mismatch'|'conflict'|'invalid'
      */
     public function importRow(array $row, bool $dryRun): string
     {
@@ -59,8 +62,14 @@ final class M12LabsOAuthLinkImporter
             return 'conflict';
         }
 
-        if (! User::query()->whereKey($userId)->exists()) {
+        $email = User::query()->whereKey($userId)->value('email');
+        if (! is_string($email)) {
             return 'missing user';
+        }
+
+        $sourceEmail = $row['user_email'] ?? null;
+        if (! is_string($sourceEmail) || mb_strtolower(mb_trim($sourceEmail)) !== mb_strtolower(mb_trim($email))) {
+            return 'user mismatch';
         }
 
         if (! $dryRun) {

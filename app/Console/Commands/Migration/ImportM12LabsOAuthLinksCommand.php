@@ -46,7 +46,13 @@ class ImportM12LabsOAuthLinksCommand extends Command
         }
 
         $dryRun = (bool) $this->option('dry-run');
-        $counts = (new M12LabsOAuthLinkImporter)->import($source->table('user_oauth_accounts')->orderBy('id')->cursor(), $dryRun);
+        // Each link carries its m12labs user's email, so it is only written to the same person here.
+        $rows = $source->table('user_oauth_accounts as links')
+            ->leftJoin('users', 'users.id', '=', 'links.user_id')
+            ->select(['links.*', 'users.email as user_email'])
+            ->orderBy('links.id')
+            ->cursor();
+        $counts = (new M12LabsOAuthLinkImporter)->import($rows, $dryRun);
 
         $this->info($dryRun ? 'Dry run finished. Nothing was written.' : 'Import finished.');
         $this->table(['Outcome', 'Links'], array_map(fn (string $outcome, int $count): array => [$outcome, $count], array_keys($counts), $counts));

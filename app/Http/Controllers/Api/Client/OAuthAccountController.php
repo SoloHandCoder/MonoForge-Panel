@@ -11,6 +11,7 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Knuckles\Scribe\Attributes\UrlParam;
+use Laravel\Sanctum\TransientToken;
 use Pterodactyl\Contracts\Users\UpdatesUserPasswords;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\DisplayException;
@@ -21,6 +22,7 @@ use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Services\Auth\OAuth\OAuthAccountService;
 use Pterodactyl\Services\Auth\OAuth\OAuthClient;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
@@ -81,6 +83,7 @@ class OAuthAccountController extends ClientApiController
         throw_if(! $provider instanceof OAuthProvider || ! $provider->enabled(), NotFoundHttpException::class);
 
         // The state lives in the browser session, so API keys cannot start a link.
+        $this->requireBrowserSession($request);
         throw_unless($request->hasSession(), DisplayException::class, 'Accounts can only be linked from the panel in your browser.');
 
         return new JsonResponse([
@@ -93,6 +96,8 @@ class OAuthAccountController extends ClientApiController
     #[ScribeResponse(status: 204, description: 'Account unlinked.')]
     public function unlink(ClientApiRequest $request, string $provider): JsonResponse
     {
+        $this->requireBrowserSession($request);
+
         $user = $request->user();
         $provider = OAuthProvider::tryFrom($provider) ?? throw new NotFoundHttpException;
         $account = UserOAuthAccount::query()->where('user_id', $user->id)->where('provider', $provider->value)->first()
@@ -115,6 +120,8 @@ class OAuthAccountController extends ClientApiController
     #[ScribeResponse(status: 204, description: 'Password set.')]
     public function setPassword(SetInitialPasswordRequest $request, UpdatesUserPasswords $passwords): JsonResponse
     {
+        $this->requireBrowserSession($request);
+
         $user = $request->user();
 
         throw_if($this->accounts->hasPassword($user), DisplayException::class, 'Your account already has a password. Change it from the password card instead.');
@@ -123,5 +130,20 @@ class OAuthAccountController extends ClientApiController
         Activity::event('user:account.password-set')->subject($user)->log();
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Linking, unlinking and setting the first password change how the account signs in, so
+     * they need the signed-in browser session: an API key alone must never be enough to give
+     * an account created through Discord or Google a password the key holder knows.
+     */
+    private function requireBrowserSession(ClientApiRequest $request): void
+    {
+        throw_unless(
+            // Sanctum hands session-authenticated users a TransientToken; API keys are real tokens.
+            $request->user()->currentAccessToken() instanceof TransientToken,
+            AccessDeniedHttpException::class,
+            'This action can only be performed from the panel in your browser, not with an API key.',
+        );
     }
 }
