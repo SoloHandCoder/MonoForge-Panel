@@ -5329,6 +5329,13 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -5367,6 +5374,13 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -5405,6 +5419,13 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -5443,6 +5464,13 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -5481,6 +5509,13 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -5504,7 +5539,10 @@ export type AdminListAiProvidersResponseBody = {
         base_url?: string;
         has_key?: boolean;
         model?: string;
-        extra_headers?: Array<unknown>;
+        extra_headers?: Array<{
+            name?: string;
+            has_value?: boolean;
+        }>;
         context_window?: number;
         supports_tools?: boolean;
         enabled?: boolean;
@@ -5530,7 +5568,10 @@ export type AdminCreateAnAiProviderResponseBody = {
     base_url?: string;
     has_key?: boolean;
     model?: string;
-    extra_headers?: Array<unknown>;
+    extra_headers?: Array<{
+        name?: string;
+        has_value?: boolean;
+    }>;
     context_window?: number;
     supports_tools?: boolean;
     enabled?: boolean;
@@ -5545,7 +5586,10 @@ export type AdminUpdateAnAiProviderResponseBody = {
     base_url?: string;
     has_key?: boolean;
     model?: string;
-    extra_headers?: Array<unknown>;
+    extra_headers?: Array<{
+        name?: string;
+        has_value?: boolean;
+    }>;
     context_window?: number;
     supports_tools?: boolean;
     enabled?: boolean;
@@ -6528,6 +6572,13 @@ export type ClientStartAnAssistantConversationResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -6566,6 +6617,13 @@ export type ClientGetAnAssistantConversationResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -6604,6 +6662,13 @@ export type ClientSendAnAssistantMessageResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -6642,6 +6707,13 @@ export type ClientAllowAnAssistantActionResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
@@ -6680,6 +6752,13 @@ export type ClientDenyAnAssistantActionResponseBody = {
             arguments: {
                 [key: string]: unknown;
             };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
             needs_confirmation: boolean;
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;

@@ -752,7 +752,7 @@ export const adminDeleteAnAiProvider = <ThrowOnError extends boolean = true>(opt
 /**
  * Update an AI provider
  *
- * Changes the fields that are sent. api_key: a new key replaces the stored one, null removes it, leaving it out keeps it.
+ * Changes the fields that are sent. api_key: a new key replaces the stored one, null removes it, leaving it out keeps it. extra_headers: list every header by name with a new value, or with null to keep its stored value; headers left out are removed. Header values are never returned.
  */
 export const adminUpdateAnAiProvider = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateAnAiProviderData, ThrowOnError>): RequestResult<AdminUpdateAnAiProviderResponses, AdminUpdateAnAiProviderErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateAnAiProviderResponses, AdminUpdateAnAiProviderErrors, ThrowOnError>({
     responseType: 'json',
