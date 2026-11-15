@@ -29,16 +29,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Sign-up
+    | Sign-up and login providers
     |--------------------------------------------------------------------------
     |
     | Whether visitors may create their own account at /auth/register. The admin
     | Settings page stores it as "monoforge:auth:registration:enabled".
     |
+    | Discord and Google sign in (Settings > Login providers, stored as
+    | "monoforge:auth:{provider}:*"). A provider is offered only while it is
+    | enabled and has both a client ID and a client secret.
+    |
     */
     'auth' => [
         'registration' => [
             'enabled' => (bool) env('MONOFORGE_REGISTRATION_ENABLED', false),
+        ],
+        'discord' => [
+            'enabled' => (bool) env('DISCORD_LOGIN_ENABLED', false),
+            'client_id' => env('DISCORD_CLIENT_ID', ''),
+            'client_secret' => env('DISCORD_CLIENT_SECRET', ''),
+        ],
+        'google' => [
+            'enabled' => (bool) env('GOOGLE_LOGIN_ENABLED', false),
+            'client_id' => env('GOOGLE_CLIENT_ID', ''),
+            'client_secret' => env('GOOGLE_CLIENT_SECRET', ''),
         ],
     ],
 

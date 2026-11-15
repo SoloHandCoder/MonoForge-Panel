@@ -79,16 +79,14 @@ enum OAuthProvider: string
 
     public function clientId(): string
     {
-        $value = config('monoforge.auth.'.$this->value.'.client_id');
-
-        return is_string($value) ? mb_trim($value) : '';
+        // Null when the setting was cleared.
+        return mb_trim((string) config('monoforge.auth.'.$this->value.'.client_id'));
     }
 
     public function clientSecret(): string
     {
-        $value = config('monoforge.auth.'.$this->value.'.client_secret');
-
-        return is_string($value) ? mb_trim($value) : '';
+        // Null when the setting was cleared.
+        return mb_trim((string) config('monoforge.auth.'.$this->value.'.client_secret'));
     }
 
     /**

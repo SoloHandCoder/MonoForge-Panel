@@ -1485,7 +1485,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
         // Older clients send only the smtp block: the driver defaults to smtp and the
         // sender falls back to smtp.from_*, so none of these are required on the wire.
         if (($pathItem['operationId'] ?? null) === 'adminUpdateMailSettings' && is_array($schema['required'] ?? null)) {
-            $schema['required'] = array_values(array_diff($schema['required'], ['driver', 'smtp', 'from_address']));
+            $schema['required'] = array_values(array_filter($schema['required'], fn (mixed $name): bool => ! in_array($name, ['driver', 'smtp', 'from_address'], true)));
             if ($schema['required'] === []) {
                 unset($schema['required']);
             }
