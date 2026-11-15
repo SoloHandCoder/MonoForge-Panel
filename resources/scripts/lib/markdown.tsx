@@ -161,9 +161,109 @@ function parseBlocks(source: string): Block[] {
     return parser.blocks;
 }
 
-// Order matters: code first (its content is literal), then links, then strong before emphasis.
-const INLINE =
-    /`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*(?!\s)(.+?)\*|(?<![\w])_(?!\s)(.+?)_(?![\w])/;
+/** The longest link label, link target and code or emphasis span the renderer turns into markup. */
+export const MAX_LINK_LABEL = 500;
+export const MAX_LINK_HREF = 2048;
+export const MAX_SPAN = 2000;
+
+type InlineToken =
+    | { kind: 'code' | 'strong' | 'em'; end: number; inner: string }
+    | { kind: 'link'; end: number; inner: string; href: string };
+
+/**
+ * The next position of a delimiter, remembered per delimiter. Lookups for one delimiter only
+ * move forward through the text, so a remembered position that is still ahead is the answer,
+ * and one that ran off the end stays off it: every character is searched at most once per
+ * delimiter, which keeps an unclosed `[[[[…` or `**a **a …` linear instead of quadratic.
+ */
+class DelimiterFinder {
+    private readonly found = new Map<string, number>();
+
+    constructor(private readonly text: string) {}
+
+    next(delimiter: string, from: number): number {
+        const known = this.found.get(delimiter);
+
+        if (known !== undefined && (known === -1 || known >= from)) {
+            return known;
+        }
+
+        const position = this.text.indexOf(delimiter, from);
+
+        this.found.set(delimiter, position);
+
+        return position;
+    }
+}
+
+const isWordChar = (char: string | undefined): boolean => char !== undefined && /\w/.test(char);
+const isSpace = (char: string | undefined): boolean => char !== undefined && /\s/.test(char);
+
+/** A span opened at `start` (after an `open`-long opener) and closed by `close`, within `max`. */
+function span(text: string, find: DelimiterFinder, start: number, open: number, close: string, max: number) {
+    const end = find.next(close, start + open);
+
+    return end > start + open && end - start - open <= max ? { end, inner: text.slice(start + open, end) } : null;
+}
+
+function linkAt(text: string, find: DelimiterFinder, start: number): InlineToken | null {
+    const label = span(text, find, start, 1, ']', MAX_LINK_LABEL);
+
+    if (!label || text[label.end + 1] !== '(') {
+        return null;
+    }
+
+    const target = span(text, find, label.end + 1, 1, ')', MAX_LINK_HREF);
+
+    return target && !/\s/.test(target.inner)
+        ? { kind: 'link', end: target.end + 1, inner: label.inner, href: target.inner }
+        : null;
+}
+
+function emphasisAt(text: string, find: DelimiterFinder, start: number): InlineToken | null {
+    const char = text[start];
+
+    if (char === '*' && text[start + 1] === '*') {
+        const strong = span(text, find, start, 2, '**', MAX_SPAN);
+
+        if (strong) {
+            return { kind: 'strong', end: strong.end + 2, inner: strong.inner };
+        }
+    }
+
+    if (isSpace(text[start + 1]) || (char === '_' && isWordChar(text[start - 1]))) {
+        return null;
+    }
+
+    const em = span(text, find, start, 1, char, MAX_SPAN);
+
+    if (!em || (char === '_' && isWordChar(text[em.end + 1]))) {
+        return null;
+    }
+
+    return { kind: 'em', end: em.end + 1, inner: em.inner };
+}
+
+/** The inline token opening at `start`, if any. */
+function tokenAt(text: string, find: DelimiterFinder, start: number): InlineToken | null {
+    switch (text[start]) {
+        case '`': {
+            const code = span(text, find, start, 1, '`', MAX_SPAN);
+
+            return code ? { kind: 'code', end: code.end + 1, inner: code.inner } : null;
+        }
+
+        case '[':
+            return linkAt(text, find, start);
+
+        case '*':
+        case '_':
+            return emphasisAt(text, find, start);
+
+        default:
+            return null;
+    }
+}
 
 const linkClass = 'font-medium text-accent underline underline-offset-2 hover:text-foreground';
 
@@ -190,51 +290,56 @@ function renderLink(label: string, href: string, id: string): ReactNode {
     );
 }
 
-/** One inline match: code, a link, strong or emphasis. */
-function renderToken(match: RegExpExecArray, id: string): ReactNode {
-    const [, code, label, href, strong, strongAlt, em, emAlt] = match;
+function renderToken(token: InlineToken, id: string): ReactNode {
+    switch (token.kind) {
+        case 'code':
+            return (
+                <code key={id} className='rounded bg-muted px-1 py-0.5 font-mono'>
+                    {token.inner}
+                </code>
+            );
 
-    if (code !== undefined) {
-        return (
-            <code key={id} className='rounded bg-muted px-1 py-0.5 font-mono'>
-                {code}
-            </code>
-        );
+        case 'link':
+            return renderLink(token.inner, token.href, id);
+
+        case 'strong':
+            return (
+                <strong key={id} className='font-semibold text-foreground'>
+                    {renderInline(token.inner, id)}
+                </strong>
+            );
+
+        case 'em':
+            return <em key={id}>{renderInline(token.inner, id)}</em>;
     }
-
-    if (label !== undefined && href !== undefined) {
-        return renderLink(label, href, id);
-    }
-
-    const bold = strong ?? strongAlt;
-
-    if (bold !== undefined) {
-        return (
-            <strong key={id} className='font-semibold text-foreground'>
-                {renderInline(bold, id)}
-            </strong>
-        );
-    }
-
-    return <em key={id}>{renderInline(em ?? emAlt ?? '', id)}</em>;
 }
 
+/** Code, links, strong and emphasis in one forward scan of the text. */
 function renderInline(text: string, key = 'i'): ReactNode[] {
+    const find = new DelimiterFinder(text);
     const nodes: ReactNode[] = [];
-    let rest = text;
+    let plain = 0;
     let index = 0;
 
-    for (let match = INLINE.exec(rest); match; match = INLINE.exec(rest)) {
-        if (match.index > 0) {
-            nodes.push(rest.slice(0, match.index));
+    for (let position = 0; position < text.length;) {
+        const token = tokenAt(text, find, position);
+
+        if (!token) {
+            position++;
+            continue;
         }
 
-        nodes.push(renderToken(match, `${key}-${index++}`));
-        rest = rest.slice(match.index + match[0].length);
+        if (position > plain) {
+            nodes.push(text.slice(plain, position));
+        }
+
+        nodes.push(renderToken(token, `${key}-${index++}`));
+        position = token.end;
+        plain = position;
     }
 
-    if (rest.length > 0) {
-        nodes.push(rest);
+    if (plain < text.length) {
+        nodes.push(text.slice(plain));
     }
 
     return nodes;

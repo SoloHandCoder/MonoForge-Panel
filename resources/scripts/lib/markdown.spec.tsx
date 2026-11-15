@@ -2,7 +2,7 @@
 
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import Markdown, { safeMarkdownHref } from './markdown';
+import Markdown, { MAX_LINK_LABEL, MAX_SPAN, renderMarkdown, safeMarkdownHref } from './markdown';
 
 afterEach(cleanup);
 
@@ -107,5 +107,29 @@ describe('markdown', () => {
         expect(safeMarkdownHref('http://example.com')).toBeNull();
         expect(safeMarkdownHref('javascript:alert(1)')).toBeNull();
         expect(safeMarkdownHref('mailto:someone@example.com')).toBeNull();
+    });
+
+    it('caps link labels and emphasis spans', () => {
+        const longLabel = `[${'a'.repeat(MAX_LINK_LABEL + 1)}](https://example.com)`;
+        const okLabel = `[${'a'.repeat(MAX_LINK_LABEL)}](https://example.com)`;
+        const longBold = `**${'b'.repeat(MAX_SPAN + 1)}**`;
+
+        expect(html(longLabel)).not.toContain('<a');
+        expect(html(okLabel)).toContain('<a');
+        expect(html(longBold)).not.toContain('<strong');
+        expect(html(`**${'b'.repeat(MAX_SPAN)}**`)).toContain('<strong');
+    });
+
+    it('renders 60 KB of unclosed openers in linear time', () => {
+        for (const opener of ['[', '**a ', '*a ', '`', '[a](', '_a ']) {
+            const source = opener.repeat(Math.ceil(60_000 / opener.length));
+            const started = performance.now();
+            const nodes = renderMarkdown(source);
+            const elapsed = performance.now() - started;
+
+            expect(nodes).toHaveLength(1);
+            // A quadratic scan of 60 KB takes seconds to minutes; the linear one a few milliseconds.
+            expect(elapsed, opener).toBeLessThan(500);
+        }
     });
 });
