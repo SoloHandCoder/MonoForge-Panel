@@ -369,3 +369,10 @@ test('M2: a turn that cannot get the lock in time hands the conversation back as
     Http::assertNothingSent();
     $lock->release();
 });
+
+test('M2: the conversation lock lasts as long as the whole job may run', function (): void {
+    $job = new RunAssistantTurn(1, 'token');
+
+    expect(AssistantAgent::lockSeconds())->toBe(RunAssistantTurn::TIMEOUT + RunAssistantTurn::LOCK_WAIT_SECONDS + 60)
+        ->and(AssistantAgent::lockSeconds())->toBeGreaterThan($job->timeout);
+});

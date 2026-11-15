@@ -15,8 +15,9 @@ use Throwable;
  * message, and again after the user allows or denies a tool call. It carries the run token the
  * conversation got when the turn started, so only this run may work on that turn.
  *
- * Turns run on their own "assistant" connection and queue, whose retry_after (960 s) is above
- * the timeout, so a slow turn is never handed to a second worker while it still runs.
+ * Turns run on their own "assistant" connection and queue, whose retry_after (1080 s) is above
+ * the timeout (1020 s: 120 s waiting for the lock plus 900 s of work), so a slow turn is never
+ * handed to a second worker while it still runs.
  */
 class RunAssistantTurn implements ShouldQueue
 {

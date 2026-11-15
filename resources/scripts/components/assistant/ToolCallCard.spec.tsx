@@ -160,6 +160,15 @@ describe('ToolCallCard', () => {
         expect(screen.getByText('say hi\\u{E0041}\\u{FE0F}\\u{3164}')).toBeInTheDocument();
     });
 
+    it('covers the variation selector supplement and other invisible ranges, but not an emoji selector', () => {
+        for (const codePoint of [0xe0100, 0xe01ef, 0x180b, 0x180f, 0x17b4, 0x206a, 0xfff9, 0x1d173, 0x2028, 0x2029]) {
+            expect(revealHidden(`a${String.fromCodePoint(codePoint)}b`).found).toBe(true);
+        }
+
+        expect(revealHidden('I ❤️ this')).toEqual({ text: 'I ❤️ this', found: false });
+        expect(revealHidden('a️b').found).toBe(true);
+    });
+
     it('offers no Allow on a pending call that a newer step replaced', () => {
         render(<ToolCallCard call={call()} onDecide={vi.fn()} superseded />);
 

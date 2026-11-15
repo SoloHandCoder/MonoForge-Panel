@@ -46,6 +46,12 @@ class AssistantAgent
         private readonly AssistantBilling $billing,
     ) {}
 
+    /** How long the conversation lock lasts: the whole job (the wait and the work), plus a margin. */
+    public static function lockSeconds(): int
+    {
+        return RunAssistantTurn::TIMEOUT + RunAssistantTurn::LOCK_WAIT_SECONDS + 60;
+    }
+
     public static function lockKey(int $conversationId): string
     {
         return "assistant:conversation:{$conversationId}:run";
@@ -57,7 +63,7 @@ class AssistantAgent
      */
     public function run(AiConversation $conversation, string $token, int $waitSeconds = 0): bool
     {
-        $lock = Cache::lock(self::lockKey($conversation->id), RunAssistantTurn::TIMEOUT + 60);
+        $lock = Cache::lock(self::lockKey($conversation->id), self::lockSeconds());
 
         try {
             $acquired = $waitSeconds > 0 ? $lock->block($waitSeconds) : $lock->get();
