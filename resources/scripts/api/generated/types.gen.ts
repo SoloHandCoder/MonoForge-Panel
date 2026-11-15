@@ -1471,6 +1471,27 @@ export type ClientFileSearchResultResource = {
     attributes: ClientFileSearchResultAttributes;
 };
 
+export type ClientModpackInstallAttributes = {
+    status: string;
+    step: string;
+    message: string | null;
+    project_title: string;
+    version_name: string;
+    files_done: number;
+    files_total: number;
+    /**
+     * created, skipped, or null before the backup step.
+     */
+    backup: string | null;
+    started_at: string;
+    finished_at: string | null;
+};
+
+export type ClientModpackInstallResource = {
+    object: string;
+    attributes: ClientModpackInstallAttributes;
+};
+
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
         id: number;
@@ -1497,6 +1518,49 @@ export type ClientNoticeFeedAttributes = {
 export type ClientNoticeFeedResource = {
     object: string;
     attributes: ClientNoticeFeedAttributes;
+};
+
+export type ClientPluginEnvironmentAttributes = {
+    platform: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    detected: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    /**
+     * Searchable catalogs by project type.
+     */
+    sources: {
+        plugin: Array<string>;
+        mod: Array<string>;
+        modpack: Array<string>;
+    };
+    loaders: Array<string>;
+    curseforge_enabled: boolean;
+};
+
+export type ClientPluginEnvironmentResource = {
+    object: string;
+    attributes: ClientPluginEnvironmentAttributes;
+};
+
+export type ClientPluginInstallAttributes = {
+    file_name: string;
+    directory: string;
+    version_number: string;
+};
+
+export type ClientPluginInstallResource = {
+    object: string;
+    attributes: ClientPluginInstallAttributes;
 };
 
 export type ClientRecoveryTokensAttributes = {
@@ -1726,7 +1790,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 
 export type ClientServerSubuserListResponse = {
@@ -3721,6 +3785,17 @@ export type AdminUpdateLegalDocumentRequest = {
     reaccept: boolean;
 };
 
+export type AdminUpdatePluginSettingsRequest = {
+    /**
+     * A new CurseForge API key, or blank to keep the stored one.
+     */
+    curseforge_key?: string | null;
+    /**
+     * Remove the stored key.
+     */
+    clear_curseforge_key?: boolean;
+};
+
 export type AdminUpdateStatusPageSettingsRequest = {
     /**
      * Whether the public status page is on.
@@ -4945,14 +5020,14 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 
 export type ClientCreateServerBackupRequest = {
@@ -5000,6 +5075,70 @@ export type ClientSendAnAssistantMessageRequest = {
      * The message. Must be at least 1 character. Must not be greater than 8000 characters.
      */
     message: string;
+};
+
+export type ClientInstallPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The catalog: modrinth, hangar or curseforge.
+     */
+    source: string;
+    /**
+     * The project's ID.
+     */
+    project: string;
+    /**
+     * The version's ID from the versions list.
+     */
+    version: string;
+};
+
+export type ClientUpdateInstalledPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+
+export type ClientRemoveInstalledPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+
+export type ClientInstallModpackRequest = {
+    /**
+     * The modpack's Modrinth project ID.
+     */
+    project: string;
+    /**
+     * The modpack version's ID.
+     */
+    version: string;
 };
 
 export type ClientRenameServerRequest = {
@@ -6385,6 +6524,11 @@ export type AdminUpdateLegalDocumentResponseBody = {
     updated_at?: string;
 };
 
+export type AdminGetPluginSettingsResponseBody = {
+    curseforge_key_set?: boolean;
+    set_in_env?: boolean;
+};
+
 export type AdminGetStatusPageSettingsResponseBody = {
     enabled?: boolean;
     public_url?: string;
@@ -7177,6 +7321,85 @@ export type ClientDenyAnAssistantActionResponseBody = {
         free_used?: number;
         free_limit?: number;
         charged_this_month?: number;
+    };
+};
+
+export type ClientSearchPluginsResponseBody = {
+    object?: string;
+    data?: Array<{
+        source?: string;
+        id?: string;
+        slug?: string;
+        title?: string;
+        description?: string;
+        author?: string;
+        icon_url?: string;
+        downloads?: number;
+        updated_at?: string;
+        url?: string;
+        client_only?: boolean;
+    }>;
+    meta?: {
+        pagination?: {
+            total?: number;
+            count?: number;
+            per_page?: number;
+            current_page?: number;
+            total_pages?: number;
+        };
+    };
+};
+
+export type ClientListPluginVersionsResponseBody = {
+    object?: string;
+    data?: Array<{
+        id?: string;
+        project_id?: string;
+        name?: string;
+        version_number?: string;
+        game_versions?: Array<string>;
+        loaders?: Array<string>;
+        channel?: string;
+        published_at?: string;
+        file?: {
+            filename?: string;
+            size?: number;
+            hashes?: {
+                sha1?: string;
+            };
+        };
+        installable?: boolean;
+    }>;
+};
+
+export type ClientListInstalledPluginsResponseBody = {
+    object?: string;
+    data?: Array<{
+        file_name?: string;
+        size?: number;
+        modified_at?: string;
+        sha1?: string;
+        project?: {
+            source?: string;
+            id?: string;
+            title?: string;
+            slug?: string;
+            icon_url?: string;
+            url?: string;
+        };
+        version?: {
+            id?: string;
+            name?: string;
+            version_number?: string;
+        };
+        update?: {
+            id?: string;
+            name?: string;
+            version_number?: string;
+        };
+    }>;
+    meta?: {
+        directory: string | null;
     };
 };
 
@@ -8787,6 +9010,102 @@ export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
+
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentLoaderQueryParameter = string;
+
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentGameVersionQueryParameter = string;
+
+export type ClientGetPluginEnvironmentServerUuidPathParameter = string;
+
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientSearchPluginsSourceQueryParameter = string;
+
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientSearchPluginsTypeQueryParameter = string;
+
+/**
+ * Search text.
+ */
+export type ClientSearchPluginsQueryQueryParameter = string;
+
+/**
+ * Result page, 20 per page.
+ */
+export type ClientSearchPluginsPageQueryParameter = number;
+
+/**
+ * relevance, downloads, updated or newest.
+ */
+export type ClientSearchPluginsSortQueryParameter = string;
+
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientSearchPluginsLoaderQueryParameter = string;
+
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientSearchPluginsGameVersionQueryParameter = string;
+
+export type ClientSearchPluginsServerUuidPathParameter = string;
+
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientListPluginVersionsSourceQueryParameter = string;
+
+/**
+ * The project's ID from the search results.
+ */
+export type ClientListPluginVersionsProjectQueryParameter = string;
+
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientListPluginVersionsTypeQueryParameter = string;
+
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListPluginVersionsLoaderQueryParameter = string;
+
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListPluginVersionsGameVersionQueryParameter = string;
+
+export type ClientListPluginVersionsServerUuidPathParameter = string;
+
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListInstalledPluginsLoaderQueryParameter = string;
+
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListInstalledPluginsGameVersionQueryParameter = string;
+
+export type ClientListInstalledPluginsServerUuidPathParameter = string;
+
+export type ClientInstallPluginServerUuidPathParameter = string;
+
+export type ClientUpdateInstalledPluginServerUuidPathParameter = string;
+
+export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
+
+export type ClientInstallModpackServerUuidPathParameter = string;
 
 export type ClientRenameServerServerUuidPathParameter = string;
 
@@ -16463,6 +16782,68 @@ export type AdminUpdateLegalDocumentResponses = {
 
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
 
+export type AdminGetPluginSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+
+export type AdminGetPluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetPluginSettingsError = AdminGetPluginSettingsErrors[keyof AdminGetPluginSettingsErrors];
+
+export type AdminGetPluginSettingsResponses = {
+    /**
+     * Plugin settings returned.
+     */
+    200: AdminGetPluginSettingsResponseBody;
+};
+
+export type AdminGetPluginSettingsResponse = AdminGetPluginSettingsResponses[keyof AdminGetPluginSettingsResponses];
+
+export type AdminUpdatePluginSettingsData = {
+    body?: AdminUpdatePluginSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+
+export type AdminUpdatePluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdatePluginSettingsError = AdminUpdatePluginSettingsErrors[keyof AdminUpdatePluginSettingsErrors];
+
+export type AdminUpdatePluginSettingsResponses = {
+    /**
+     * Plugin settings updated.
+     */
+    204: void;
+};
+
+export type AdminUpdatePluginSettingsResponse = AdminUpdatePluginSettingsResponses[keyof AdminUpdatePluginSettingsResponses];
+
 export type AdminGetStatusPageSettingsData = {
     body?: never;
     path?: never;
@@ -23285,6 +23666,492 @@ export type ClientDenyAnAssistantActionResponses = {
 };
 
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
+
+export type ClientGetPluginEnvironmentData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetPluginEnvironmentServerUuidPathParameter;
+    };
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientGetPluginEnvironmentLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientGetPluginEnvironmentGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins';
+};
+
+export type ClientGetPluginEnvironmentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientGetPluginEnvironmentError = ClientGetPluginEnvironmentErrors[keyof ClientGetPluginEnvironmentErrors];
+
+export type ClientGetPluginEnvironmentResponses = {
+    /**
+     * Plugin environment returned.
+     */
+    200: ClientPluginEnvironmentResource;
+};
+
+export type ClientGetPluginEnvironmentResponse = ClientGetPluginEnvironmentResponses[keyof ClientGetPluginEnvironmentResponses];
+
+export type ClientSearchPluginsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientSearchPluginsServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientSearchPluginsSourceQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientSearchPluginsTypeQueryParameter;
+        /**
+         * Search text.
+         */
+        query?: ClientSearchPluginsQueryQueryParameter;
+        /**
+         * Result page, 20 per page.
+         */
+        page?: ClientSearchPluginsPageQueryParameter;
+        /**
+         * relevance, downloads, updated or newest.
+         */
+        sort?: ClientSearchPluginsSortQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientSearchPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientSearchPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/search';
+};
+
+export type ClientSearchPluginsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientSearchPluginsError = ClientSearchPluginsErrors[keyof ClientSearchPluginsErrors];
+
+export type ClientSearchPluginsResponses = {
+    /**
+     * Search results returned.
+     */
+    200: ClientSearchPluginsResponseBody;
+};
+
+export type ClientSearchPluginsResponse = ClientSearchPluginsResponses[keyof ClientSearchPluginsResponses];
+
+export type ClientListPluginVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListPluginVersionsServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientListPluginVersionsSourceQueryParameter;
+        /**
+         * The project's ID from the search results.
+         */
+        project: ClientListPluginVersionsProjectQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientListPluginVersionsTypeQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListPluginVersionsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListPluginVersionsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/versions';
+};
+
+export type ClientListPluginVersionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientListPluginVersionsError = ClientListPluginVersionsErrors[keyof ClientListPluginVersionsErrors];
+
+export type ClientListPluginVersionsResponses = {
+    /**
+     * Versions returned.
+     */
+    200: ClientListPluginVersionsResponseBody;
+};
+
+export type ClientListPluginVersionsResponse = ClientListPluginVersionsResponses[keyof ClientListPluginVersionsResponses];
+
+export type ClientListInstalledPluginsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListInstalledPluginsServerUuidPathParameter;
+    };
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListInstalledPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListInstalledPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/installed';
+};
+
+export type ClientListInstalledPluginsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not list the folder.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientListInstalledPluginsError = ClientListInstalledPluginsErrors[keyof ClientListInstalledPluginsErrors];
+
+export type ClientListInstalledPluginsResponses = {
+    /**
+     * Installed plugins returned.
+     */
+    200: ClientListInstalledPluginsResponseBody;
+};
+
+export type ClientListInstalledPluginsResponse = ClientListInstalledPluginsResponses[keyof ClientListInstalledPluginsResponses];
+
+export type ClientInstallPluginData = {
+    body: ClientInstallPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/install';
+};
+
+export type ClientInstallPluginErrors = {
+    /**
+     * The file could not be installed: not allowed, no file, or a failed hash check.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientInstallPluginError = ClientInstallPluginErrors[keyof ClientInstallPluginErrors];
+
+export type ClientInstallPluginResponses = {
+    /**
+     * Plugin installed.
+     */
+    200: ClientPluginInstallResource;
+};
+
+export type ClientInstallPluginResponse = ClientInstallPluginResponses[keyof ClientInstallPluginResponses];
+
+export type ClientUpdateInstalledPluginData = {
+    body: ClientUpdateInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUpdateInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/update';
+};
+
+export type ClientUpdateInstalledPluginErrors = {
+    /**
+     * There is no update, or the new file could not be installed.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientUpdateInstalledPluginError = ClientUpdateInstalledPluginErrors[keyof ClientUpdateInstalledPluginErrors];
+
+export type ClientUpdateInstalledPluginResponses = {
+    /**
+     * Plugin updated.
+     */
+    200: ClientPluginInstallResource;
+};
+
+export type ClientUpdateInstalledPluginResponse = ClientUpdateInstalledPluginResponses[keyof ClientUpdateInstalledPluginResponses];
+
+export type ClientRemoveInstalledPluginData = {
+    body: ClientRemoveInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientRemoveInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/remove';
+};
+
+export type ClientRemoveInstalledPluginErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not delete the file.
+     */
+    502: ErrorEnvelope;
+};
+
+export type ClientRemoveInstalledPluginError = ClientRemoveInstalledPluginErrors[keyof ClientRemoveInstalledPluginErrors];
+
+export type ClientRemoveInstalledPluginResponses = {
+    /**
+     * Plugin removed.
+     */
+    204: void;
+};
+
+export type ClientRemoveInstalledPluginResponse = ClientRemoveInstalledPluginResponses[keyof ClientRemoveInstalledPluginResponses];
+
+export type ClientGetModpackInstallProgressData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
+};
+
+export type ClientGetModpackInstallProgressErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientGetModpackInstallProgressError = ClientGetModpackInstallProgressErrors[keyof ClientGetModpackInstallProgressErrors];
+
+export type ClientGetModpackInstallProgressResponses = {
+    /**
+     * Progress returned.
+     */
+    200: ClientModpackInstallResource;
+};
+
+export type ClientGetModpackInstallProgressResponse = ClientGetModpackInstallProgressResponses[keyof ClientGetModpackInstallProgressResponses];
+
+export type ClientInstallModpackData = {
+    body: ClientInstallModpackRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
+};
+
+export type ClientInstallModpackErrors = {
+    /**
+     * The version is not a modpack the panel can install.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * Another modpack install is running.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientInstallModpackError = ClientInstallModpackErrors[keyof ClientInstallModpackErrors];
+
+export type ClientInstallModpackResponses = {
+    /**
+     * Install started.
+     */
+    202: ClientModpackInstallResource;
+};
+
+export type ClientInstallModpackResponse = ClientInstallModpackResponses[keyof ClientInstallModpackResponses];
 
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
