@@ -1455,6 +1455,29 @@ export type ClientServerResource = {
         user_permissions: Array<string>;
     };
 };
+export type ClientServerResourcesError = {
+    object: 'error';
+    attributes: {
+        /**
+         * Why the server's resources could not be read.
+         */
+        code: 'suspended' | 'node_maintenance' | 'installing' | 'restoring_backup' | 'transferring' | 'daemon_error';
+        /**
+         * The HTTP status the single resources endpoint answers with for this server.
+         */
+        status: number;
+        detail: string;
+    };
+};
+export type ClientServerResourcesResponse = {
+    object: 'server_resources';
+    /**
+     * One entry per accessible server, keyed by the identifier it was requested with.
+     */
+    data: {
+        [key: string]: ClientStatsResource | ClientServerResourcesError;
+    };
+};
 export type ClientServerScheduleAttributes = {
     id: number;
     name: string;
@@ -6452,6 +6475,10 @@ export type ClientListClientServersFilterExternalIdQueryParameter = string;
 export type ClientListClientServersFilterWildcardQueryParameter = string;
 export type ClientGetExtensionJobProgressExtensionPathParameter = string;
 export type ClientGetExtensionJobProgressJobPathParameter = string;
+/**
+ * Comma-separated server identifiers: full UUIDs, short UUIDs or identifiers. At most 50 servers.
+ */
+export type ClientListServerResourcesServersQueryParameter = string;
 export type ClientMarkNoticeReadNoticePathParameter = string;
 export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
 export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
@@ -15128,6 +15155,39 @@ export type ClientGetExtensionJobProgressResponses = {
     200: ClientGetExtensionJobProgressResponseBody;
 };
 export type ClientGetExtensionJobProgressResponse = ClientGetExtensionJobProgressResponses[keyof ClientGetExtensionJobProgressResponses];
+export type ClientListServerResourcesData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Comma-separated server identifiers: full UUIDs, short UUIDs or identifiers. At most 50 servers.
+         */
+        servers: ClientListServerResourcesServersQueryParameter;
+    };
+    url: '/api/client/resources';
+};
+export type ClientListServerResourcesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientListServerResourcesError = ClientListServerResourcesErrors[keyof ClientListServerResourcesErrors];
+export type ClientListServerResourcesResponses = {
+    /**
+     * Resource utilization returned for every accessible server requested.
+     */
+    200: ClientServerResourcesResponse;
+};
+export type ClientListServerResourcesResponse = ClientListServerResourcesResponses[keyof ClientListServerResourcesResponses];
 export type ClientListNoticesData = {
     body?: never;
     path?: never;

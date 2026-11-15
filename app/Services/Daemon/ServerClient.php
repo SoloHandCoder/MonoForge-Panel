@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Daemon;
 
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Lcobucci\JWT\UnencryptedToken;
+use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Throwable;
+use UnexpectedValueException;
 
 final readonly class ServerClient
 {
@@ -17,6 +22,11 @@ final readonly class ServerClient
     public static function forServer(Server $server, ?Node $node = null): self
     {
         return new self($server->uuid, DaemonConnection::forNode($node ?? $server->node));
+    }
+
+    public static function onConnection(string $uuid, DaemonConnection $connection): self
+    {
+        return new self($uuid, $connection);
     }
 
     public function files(): FilesClient
@@ -32,22 +42,42 @@ final readonly class ServerClient
     /** @return DaemonStats */
     public function details(): array
     {
-        $response = $this->connection->request('GET', "/api/servers/{$this->uuid}", useStatusCode: false);
-        $data = $this->connection->decode($response, [
-            'data.state' => ['sometimes', 'string'],
-            'data.is_suspended' => ['sometimes', 'boolean:strict'],
-            'data.utilization' => ['sometimes', 'array'],
-            'data.utilization.memory_bytes' => ['sometimes', 'integer:strict'],
-            'data.utilization.cpu_absolute' => ['sometimes', 'numeric:strict'],
-            'data.utilization.disk_bytes' => ['sometimes', 'integer:strict'],
-            'data.utilization.uptime' => ['sometimes', 'integer:strict'],
-            'data.utilization.network' => ['sometimes', 'array'],
-            'data.utilization.network.rx_bytes' => ['sometimes', 'integer:strict'],
-            'data.utilization.network.tx_bytes' => ['sometimes', 'integer:strict'],
-        ]);
+        return $this->decodeDetails($this->connection->request('GET', "/api/servers/{$this->uuid}", useStatusCode: false));
+    }
 
-        /** @var DaemonStats $data */
-        return $data;
+    /**
+     * Adds the details request to an HTTP pool under $key, with its own timeouts, so the
+     * details of many servers are fetched at once. Read the result with detailsFromPool().
+     */
+    public function poolDetails(Pool $pool, string $key, int $timeout, int $connectTimeout): void
+    {
+        $this->connection->prepare($pool->as($key))
+            ->timeout($timeout)
+            ->connectTimeout($connectTimeout)
+            ->get("/api/servers/{$this->uuid}");
+    }
+
+    /**
+     * Decodes what an HTTP pool returned for poolDetails(), failing as details() would.
+     *
+     * @return DaemonStats
+     *
+     * @throws DaemonConnectionException
+     */
+    public function detailsFromPool(mixed $result): array
+    {
+        if ($result instanceof Response && $result->successful()) {
+            return $this->decodeDetails($result);
+        }
+
+        $exception = match (true) {
+            $result instanceof DaemonConnectionException => $result,
+            $result instanceof Response => new DaemonConnectionException(new RequestException($result), false),
+            $result instanceof Throwable => new DaemonConnectionException($result, false),
+            default => new DaemonConnectionException(new UnexpectedValueException('Wings returned no response.'), false),
+        };
+
+        throw $exception;
     }
 
     public function create(bool $startOnCompletion = true): void
@@ -124,5 +154,29 @@ final readonly class ServerClient
             'token' => 'Bearer '.$token->toString(),
             'server' => ['uuid' => $this->uuid, 'start_on_completion' => false],
         ]]);
+    }
+
+    /**
+     * @return DaemonStats
+     *
+     * @throws DaemonConnectionException
+     */
+    private function decodeDetails(Response $response): array
+    {
+        $data = $this->connection->decode($response, [
+            'data.state' => ['sometimes', 'string'],
+            'data.is_suspended' => ['sometimes', 'boolean:strict'],
+            'data.utilization' => ['sometimes', 'array'],
+            'data.utilization.memory_bytes' => ['sometimes', 'integer:strict'],
+            'data.utilization.cpu_absolute' => ['sometimes', 'numeric:strict'],
+            'data.utilization.disk_bytes' => ['sometimes', 'integer:strict'],
+            'data.utilization.uptime' => ['sometimes', 'integer:strict'],
+            'data.utilization.network' => ['sometimes', 'array'],
+            'data.utilization.network.rx_bytes' => ['sometimes', 'integer:strict'],
+            'data.utilization.network.tx_bytes' => ['sometimes', 'integer:strict'],
+        ]);
+
+        /** @var DaemonStats $data */
+        return $data;
     }
 }

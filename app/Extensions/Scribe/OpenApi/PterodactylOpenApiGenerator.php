@@ -12,9 +12,11 @@ use Illuminate\Support\Str;
 use Knuckles\Camel\Extraction\Response as ExtractedResponse;
 use Knuckles\Camel\Output\OutputEndpointData;
 use Knuckles\Scribe\Writing\OpenApiSpecGenerators\OpenApiGenerator;
+use Pterodactyl\Data\ServerStateUnavailable;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseFromResource;
 use Pterodactyl\Extensions\Scribe\Support\PterodactylDocumentation;
+use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
 use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
 use Pterodactyl\Models\Permission;
 use Pterodactyl\Services\Extensions\ExtensionPermissionRegistry;
@@ -173,6 +175,8 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'AuthPasswordResetEmailResponse' => $this->authPasswordResetEmailResponseSchema(),
             'AuthResetPasswordResponse' => $this->authResetPasswordResponseSchema(),
             'AuthUser' => $this->authUserSchema(),
+            'ClientServerResourcesError' => $this->clientServerResourcesErrorSchema(),
+            'ClientServerResourcesResponse' => $this->clientServerResourcesSchema(),
             'ClientSystemPermissionsResponse' => $this->clientSystemPermissionsSchema(),
             'ClientTwoFactorSetupResponse' => $this->clientTwoFactorSetupSchema(),
             'ErrorEnvelope' => $this->errorEnvelopeSchema(false),
@@ -689,6 +693,73 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
         ];
     }
 
+    /**
+     * The batched resources map: each requested server's stats resource, or why they could not be read.
+     *
+     * @return array<mixed>
+     */
+    private function clientServerResourcesSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['object', 'data'],
+            'properties' => [
+                'object' => [
+                    'type' => 'string',
+                    'enum' => [ServerResourcesController::RESOURCE_NAME],
+                    'example' => ServerResourcesController::RESOURCE_NAME,
+                ],
+                'data' => [
+                    'type' => 'object',
+                    'description' => 'One entry per accessible server, keyed by the identifier it was requested with.',
+                    'additionalProperties' => [
+                        'oneOf' => [
+                            ['$ref' => '#/components/schemas/ClientStatsResource'],
+                            ['$ref' => '#/components/schemas/ClientServerResourcesError'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /** @return array<mixed> */
+    private function clientServerResourcesErrorSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['object', 'attributes'],
+            'properties' => [
+                'object' => [
+                    'type' => 'string',
+                    'enum' => ['error'],
+                    'example' => 'error',
+                ],
+                'attributes' => [
+                    'type' => 'object',
+                    'required' => ['code', 'status', 'detail'],
+                    'properties' => [
+                        'code' => [
+                            'type' => 'string',
+                            'description' => "Why the server's resources could not be read.",
+                            'enum' => ServerStateUnavailable::CODES,
+                            'example' => ServerStateUnavailable::DAEMON_ERROR,
+                        ],
+                        'status' => [
+                            'type' => 'integer',
+                            'description' => 'The HTTP status the single resources endpoint answers with for this server.',
+                            'example' => 504,
+                        ],
+                        'detail' => [
+                            'type' => 'string',
+                            'example' => 'Could not establish a connection to the machine running this server. Please try again.',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
     /** @return array<mixed> */
     private function authLoginResponseSchema(): array
     {
@@ -930,6 +1001,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'authRequestPasswordResetEmail' => 'AuthPasswordResetEmailResponse',
             'authResetPassword' => 'AuthResetPasswordResponse',
             'clientListServerPermissions' => 'ClientSystemPermissionsResponse',
+            'clientListServerResources' => 'ClientServerResourcesResponse',
             'clientGetTwoFactorSetup' => 'ClientTwoFactorSetupResponse',
             default => null,
         };

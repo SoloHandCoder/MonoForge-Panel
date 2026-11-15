@@ -4,10 +4,11 @@ import { useNavigate } from '@tanstack/react-router';
 import { useCurrentUser } from '@/api/account/queries';
 import { billingNotice, useServerSubscription } from '@/api/billing/subscriptions';
 import {
+    serverResourceUsageBatchFilters,
     serverResourceUsageQueryOptions,
-    serverResourceUsageRefetchInterval,
     useAccountServers,
     useServerResourceUsage,
+    useServerResourceUsageBatch,
     type ClientStatsAttributes,
 } from '@/api/account/servers/queries';
 import { sendPowerActionInput, useSendPowerAction, type ServerPowerSignal } from '@/api/server/power/queries';
@@ -218,10 +219,13 @@ function usePowerSender(): PowerSender {
         () => ({
             send: (uuid, signal) =>
                 mutate(sendPowerActionInput(uuid, signal), {
-                    onSuccess: () =>
+                    onSuccess: () => {
                         void queryClient.invalidateQueries({
                             queryKey: serverResourceUsageQueryOptions(uuid).queryKey,
-                        }),
+                        });
+                        // On the dashboard the batch keeps the card current, so it is the one to refetch.
+                        void queryClient.invalidateQueries(serverResourceUsageBatchFilters(uuid));
+                    },
                 }),
             sending: isPending ? (variables?.path.server_uuid ?? null) : null,
         }),
@@ -263,13 +267,17 @@ function useServerListModel(): ServerListModel {
     const { username } = useCurrentUser();
     const servers = query.data;
     const power = usePowerSender();
-    // The same cache entries as the cards' own queries, so a card and its row never poll twice.
+    const tracked = useMemo(
+        () => (servers?.data ?? []).filter(tracksResources).map(({ attributes }) => attributes.uuid),
+        [servers]
+    );
+
+    // One request polls the page's usage and writes each server's own resources entry. The rows read
+    // those entries here and the cards read them through useServerResourceUsage; neither sends requests.
+    useServerResourceUsageBatch(tracked);
     const usage = useQueries({
         queries: (servers?.data ?? []).map((server) =>
-            Object.assign(serverResourceUsageQueryOptions(server.attributes.uuid), {
-                enabled: tracksResources(server),
-                refetchInterval: serverResourceUsageRefetchInterval,
-            })
+            Object.assign(serverResourceUsageQueryOptions(server.attributes.uuid), { enabled: false })
         ),
         combine: usageOf,
     });
