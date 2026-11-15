@@ -19,6 +19,7 @@ beforeAll(() => {
         { segment: 'api', label: 'API Credentials', icon: 'key-round' },
         { segment: 'ssh', label: 'SSH Keys', icon: 'terminal' },
         { segment: 'activity', label: 'Activity', icon: 'history' },
+        { segment: 'wallet', label: 'Wallet', icon: 'wallet' },
     ]);
 });
 
@@ -49,6 +50,7 @@ describe('SidebarNav on the dashboard', () => {
         expect(screen.getByRole('link', { name: 'Servers' })).toHaveAttribute('href', '/');
         expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
         expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/account/activity');
+        expect(screen.getByRole('link', { name: 'Wallet' })).toHaveAttribute('href', '/account/wallet');
         expect(screen.getByRole('link', { name: 'API keys' })).toHaveAttribute('href', '/account/api');
         expect(screen.getByRole('link', { name: 'SSH keys' })).toHaveAttribute('href', '/account/ssh');
         expect(screen.getByText('Developer')).toBeInTheDocument();

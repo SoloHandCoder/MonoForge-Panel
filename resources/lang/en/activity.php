@@ -246,6 +246,7 @@ return [
             'update' => 'Updated the user :email',
             'delete' => 'Deleted the user :email',
             'disable-2fa' => 'Disabled two-factor authentication for :email',
+            'adjust-tokens' => 'Adjusted the token balance of :email by :amount tokens: :reason',
         ],
     ],
 ];

@@ -29,6 +29,7 @@ import {
     Terminal,
     UserRound,
     Users,
+    Wallet,
     type LucideIcon,
 } from 'lucide-react';
 import { Avatar, Badge, cn, Icon, NamedIcon, PanelLink } from '@/sdk';
@@ -76,6 +77,7 @@ const icons = new Map<string, LucideIcon>([
     ['blocks', Blocks],
     ['palette', Palette],
     ['user-cog', ShieldCheck],
+    ['wallet', Wallet],
 ]);
 
 /** A sidebar row: hover tints it, the active one is lit and carries a violet bar at its left edge. */
@@ -168,7 +170,7 @@ function MainSlot({ at }: { at: 'before' | 'after' }) {
 }
 
 /** The core account pages the sidebar names itself, by their route. */
-const ACCOUNT_PAGES = new Set(['index', 'activity', 'api', 'ssh']);
+const ACCOUNT_PAGES = new Set(['index', 'activity', 'wallet', 'api', 'ssh']);
 
 const accountPage = (items: readonly NavItem[], id: string) =>
     items.find((item) => item.extensionId === undefined && item.id === id);
@@ -177,6 +179,7 @@ const accountPage = (items: readonly NavItem[], id: string) =>
 function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accountLink?: AppLayoutLink }) {
     const overview = accountPage(items, 'index');
     const activity = accountPage(items, 'activity');
+    const wallet = accountPage(items, 'wallet');
     const keys = [
         { item: accountPage(items, 'api'), label: 'API keys' },
         { item: accountPage(items, 'ssh'), label: 'SSH keys' },
@@ -188,6 +191,7 @@ function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accou
             {overview && <ItemLink item={overview} label='Account' />}
             {!overview && accountLink && <AppLink link={accountLink} label='Account' />}
             {activity && <ItemLink item={activity} label='Activity' />}
+            {wallet && <ItemLink item={wallet} label='Wallet' />}
             {keys.length + rest.length > 0 && <p className={groupLabelClass}>Developer</p>}
             {keys.map(({ item, label }) => (
                 <ItemLink key={item.id} item={item} label={label} />

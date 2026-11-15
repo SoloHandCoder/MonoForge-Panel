@@ -19,6 +19,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\TransientToken;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Facades\Activity;
+use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\Traits\HasAccessTokens;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
 use Pterodactyl\Notifications\SendPasswordReset as ResetPasswordNotification;
@@ -26,6 +27,7 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
 
 /**
  * @property-read int|null $subuser_of_count
+ * @property int $token_balance Denormalised ledger sum; change it only through TokenWallet.
  */
 #[Attributes\Identifiable('user')]
 #[Fillable([
@@ -70,6 +72,7 @@ class User extends Authenticatable implements Identifiable
         'language' => 'en',
         'use_totp' => false,
         'totp_secret' => null,
+        'token_balance' => 0,
     ];
 
     /**
@@ -83,6 +86,7 @@ class User extends Authenticatable implements Identifiable
             'gravatar' => 'boolean',
             'password' => 'hashed',
             'totp_authenticated_at' => 'datetime',
+            'token_balance' => 'int',
         ];
     }
 
@@ -161,6 +165,16 @@ class User extends Authenticatable implements Identifiable
     public function notices(): HasMany
     {
         return $this->hasMany(UserNotice::class);
+    }
+
+    /**
+     * The user's token ledger. Only TokenWallet writes it.
+     *
+     * @return HasMany<TokenTransaction, $this>
+     */
+    public function tokenTransactions(): HasMany
+    {
+        return $this->hasMany(TokenTransaction::class);
     }
 
     /**
