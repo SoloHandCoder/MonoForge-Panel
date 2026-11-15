@@ -9,7 +9,9 @@ import {
     useImportTunnels,
     useRecreateTunnel,
     useRetryTunnel,
+    useUnlinkedTunnels,
     useUpdateTunnelSettings,
+    READ_ONLY_KEY_MESSAGE,
     type ServerTunnel,
     type TunnelImportOutcome,
     type TunnelImportSummary,
@@ -18,6 +20,7 @@ import {
 } from '@/api/admin/tunnels/queries';
 import { useAppForm, Form } from '@/components/form';
 import AdminListEmpty from '@/components/admin/AdminListEmpty';
+import { Alert } from '@/components/elements/alert';
 import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
 import { NewButton } from '@/components/elements/NewButton';
@@ -354,6 +357,65 @@ function TunnelList() {
     );
 }
 
+/**
+ * Servers on playit.gg nodes without a linked tunnel, with the local address a tunnel must point at,
+ * so the owner knows what to create in the playit dashboard when the agent key is read-only.
+ */
+function UnlinkedServers() {
+    const { data } = useUnlinkedTunnels();
+
+    if (!data) {
+        return null;
+    }
+
+    const readOnly = data.nodes.filter((node) => node.read_only);
+
+    if (readOnly.length === 0 && data.servers.length === 0) {
+        return null;
+    }
+
+    return (
+        <TitledGreyBox title='Servers Without a Tunnel' className='mb-6'>
+            {readOnly.length > 0 && (
+                <Alert type='warning' title='Read-only agent key' className='mb-4'>
+                    {READ_ONLY_KEY_MESSAGE} Nodes: {readOnly.map((node) => node.name).join(', ')}.
+                </Alert>
+            )}
+            {data.servers.length === 0 ? (
+                <p className='text-sm text-muted-foreground'>Every server on a playit.gg node has a tunnel.</p>
+            ) : (
+                <>
+                    <p className='text-sm text-muted-foreground'>
+                        Create a tunnel in the playit.gg dashboard to each local address below. The panel links it to
+                        the server within ten minutes, or at once with Import existing tunnels. Until then players see
+                        &quot;Address pending&quot;.
+                    </p>
+                    <ul className='mt-4 divide-y divide-border text-sm'>
+                        {data.servers.map((server) => (
+                            <li
+                                key={server.server_id}
+                                className='flex flex-wrap items-center justify-between gap-2 py-2'
+                            >
+                                <span className='min-w-0'>
+                                    <span className='font-medium'>{server.server_name}</span>
+                                    <span className='ml-2 text-xs text-muted-foreground'>
+                                        #{server.server_id} on {server.node_name}
+                                    </span>
+                                </span>
+                                <CopyOnClick text={String(server.local_port)}>
+                                    <Code>
+                                        {server.local_ip}:{server.local_port}
+                                    </Code>
+                                </CopyOnClick>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </TitledGreyBox>
+    );
+}
+
 function SubdomainSettingsForm({ settings }: { settings: TunnelSettings }) {
     const update = useUpdateTunnelSettings();
     const form = useAppForm({
@@ -443,6 +505,7 @@ function SubdomainSettings() {
 export default function TunnelsTab() {
     return (
         <>
+            <UnlinkedServers />
             <TunnelList />
             <SubdomainSettings />
         </>

@@ -13,7 +13,7 @@ import {
 } from '@/api/server/network/queries';
 import { useCurrentServer } from '@/api/server/queries';
 import { ip } from '@/lib/formatters';
-import { playitAddress } from '@/lib/playit';
+import { addressPending, playitAddress } from '@/lib/playit';
 import { usePermissions } from '@/plugins/usePermissions';
 import { implementViews } from '../registry';
 import { pageStatus, pageStatusFixtures, type PageStatusModel } from '../pageStatus';
@@ -33,6 +33,8 @@ export interface ServerAllocationsModel {
     readonly allocations: readonly ServerAllocationItem[];
     /** The playit.gg address players connect to (such as `xyz.joinmc.link`), when the server has a live tunnel. */
     readonly playitAddress: string | null;
+    /** The server is on a playit.gg node and has no tunnel yet, so players have no public address to use. */
+    readonly addressPending?: boolean;
     /** The list has not loaded yet. */
     readonly loading: boolean;
     /** How many allocations the server may have; at 0 they are managed by an administrator. */
@@ -91,6 +93,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
     const { mutateAsync: deleteAllocation } = useDeleteServerAllocation();
     const listed = query.data?.data ?? noAllocations;
     const tunnel = server ? playitAddress(server.attributes) : null;
+    const pending = server ? addressPending(server.attributes) : false;
     const loading = query.data === undefined;
 
     return useMemo(() => {
@@ -100,6 +103,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
         return {
             allocations,
             playitAddress: tunnel,
+            addressPending: pending,
             loading,
             limit,
             permissions: { create, update, delete: remove },
@@ -123,6 +127,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
     }, [
         listed,
         tunnel,
+        pending,
         loading,
         limit,
         create,

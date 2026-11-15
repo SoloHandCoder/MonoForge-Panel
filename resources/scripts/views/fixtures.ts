@@ -11,6 +11,8 @@ export interface TestServerOptions {
     status?: Server['attributes']['status'];
     eggFeatures?: string[];
     eggTags?: string[];
+    /** The server is on a playit.gg node without a tunnel yet, so players see "Address pending". */
+    addressPending?: boolean;
 }
 
 /** A server payload for fixtures and tests. */
@@ -44,6 +46,7 @@ export function createTestServer(options: TestServerOptions = {}): Server {
             is_transferring: false,
             skip_scripts: false,
             playit_address: null,
+            address_pending: options.addressPending ?? false,
         },
         meta: { is_server_owner: owner, user_permissions: options.permissions ?? [] },
     };

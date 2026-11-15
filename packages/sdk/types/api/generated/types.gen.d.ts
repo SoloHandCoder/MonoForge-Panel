@@ -1423,6 +1423,10 @@ export type ClientServerAttributes = {
      * The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.
      */
     playit_address: string | null;
+    /**
+     * True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
+     */
+    address_pending: boolean;
     relationships?: {
         allocations?: ClientAllocationListResponse | NullResource;
         variables?: ClientEggVariableListResponse | NullResource;
@@ -5655,10 +5659,12 @@ export type AdminDisableExtensionResponseBody = {
 export type AdminGetNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
+    read_only?: boolean;
 };
 export type AdminUpdateNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
+    read_only?: boolean;
 };
 export type AdminTestNodePlayitGgAgentResponseBody = {
     success?: boolean;
@@ -5684,6 +5690,23 @@ export type AdminImportExistingTunnelsResponseBody = {
         result?: string;
         reason?: string;
         server_ids?: Array<number>;
+    }>;
+};
+export type AdminListServersWithoutATunnelResponseBody = {
+    nodes?: Array<{
+        id?: number;
+        name?: string;
+        read_only?: boolean;
+    }>;
+    servers?: Array<{
+        server_id?: number;
+        server_name?: string;
+        server_identifier?: string;
+        node_id?: number;
+        node_name?: string;
+        local_ip?: string;
+        local_port?: number;
+        tunnel_status?: string;
     }>;
 };
 export type AdminGetTunnelSettingsResponseBody = {
@@ -11046,6 +11069,30 @@ export type AdminImportExistingTunnelsResponses = {
     200: AdminImportExistingTunnelsResponseBody;
 };
 export type AdminImportExistingTunnelsResponse = AdminImportExistingTunnelsResponses[keyof AdminImportExistingTunnelsResponses];
+export type AdminListServersWithoutATunnelData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/tunnels/unlinked';
+};
+export type AdminListServersWithoutATunnelErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListServersWithoutATunnelError = AdminListServersWithoutATunnelErrors[keyof AdminListServersWithoutATunnelErrors];
+export type AdminListServersWithoutATunnelResponses = {
+    /**
+     * Servers without a tunnel returned.
+     */
+    200: AdminListServersWithoutATunnelResponseBody;
+};
+export type AdminListServersWithoutATunnelResponse = AdminListServersWithoutATunnelResponses[keyof AdminListServersWithoutATunnelResponses];
 export type AdminGetTunnelSettingsData = {
     body?: never;
     path?: never;

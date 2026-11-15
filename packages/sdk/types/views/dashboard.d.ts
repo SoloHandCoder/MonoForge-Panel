@@ -33,7 +33,10 @@ export interface ServerCardModel {
     readonly uuid: string;
     readonly name: string;
     readonly description: string | null;
+    /** The playit.gg address or the primary allocation; null while `addressPending`. */
     readonly address: string | null;
+    /** The server is on a playit.gg node and has no tunnel yet: show "Address pending", not the node's port. */
+    readonly addressPending?: boolean;
     readonly state: ServerCardState;
     readonly permissions: ServerCardPermissions;
     /** Send a power signal through the client API, with no console connection; the panel reports a failure. */

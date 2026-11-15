@@ -1,7 +1,10 @@
 import type { Server } from '@/api/server/types';
 
 /** The server attributes, with the playit.gg address the panel adds (until the generated types carry it). */
-type ServerAttributes = Server['attributes'] & { readonly playit_address?: string | null };
+type ServerAttributes = Server['attributes'] & {
+    readonly playit_address?: string | null;
+    readonly address_pending?: boolean;
+};
 
 /**
  * The playit.gg address of a server (such as `xyz.joinmc.link`), or null when the server has no live
@@ -9,6 +12,14 @@ type ServerAttributes = Server['attributes'] & { readonly playit_address?: strin
  */
 export function playitAddress(attributes: ServerAttributes): string | null {
     return attributes.playit_address || null;
+}
+
+/**
+ * Whether the server is on a node with a playit.gg agent but has no live tunnel yet. Its allocation
+ * (such as `0.0.0.0:25569`) is not reachable from outside then, so players see "Address pending".
+ */
+export function addressPending(attributes: ServerAttributes): boolean {
+    return attributes.address_pending === true && !playitAddress(attributes);
 }
 
 const prefixes = { secret_key: /^secret_key\s*=\s*/i, agent_id: /^agent_id\s*=\s*/i };

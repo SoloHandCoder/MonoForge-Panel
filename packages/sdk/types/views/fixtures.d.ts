@@ -10,6 +10,8 @@ export interface TestServerOptions {
     status?: Server['attributes']['status'];
     eggFeatures?: string[];
     eggTags?: string[];
+    /** The server is on a playit.gg node without a tunnel yet, so players see "Address pending". */
+    addressPending?: boolean;
 }
 /** A server payload for fixtures and tests. */
 export declare function createTestServer(options?: TestServerOptions): Server;

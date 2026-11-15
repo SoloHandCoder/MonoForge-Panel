@@ -5,7 +5,7 @@ import { httpErrorToHuman } from '@/api/http';
 import { relationshipData } from '@/api/relationships';
 import type { Server } from '@/api/server/types';
 import { ip } from '@/lib/formatters';
-import { playitAddress } from '@/lib/playit';
+import { addressPending, playitAddress } from '@/lib/playit';
 import { useDebouncedValue } from '@/plugins/useDebouncedValue';
 import { describeShortcut, useShortcut, type Shortcut } from '@/plugins/useShortcut';
 import type { CorePanelDestination } from '@/sdk/navigation';
@@ -55,12 +55,17 @@ const searchResult = ({ attributes }: Server): AppSearchResult => ({
     identifier: attributes.identifier,
     uuid: attributes.uuid,
     name: attributes.name,
-    addresses: [
-        ...[playitAddress(attributes)].filter((address) => address !== null),
-        ...relationshipData(attributes.relationships?.allocations)
-            .filter((allocation) => allocation.attributes.is_default)
-            .map(({ attributes: allocation }) => `${allocation.ip_alias || ip(allocation.ip)}:${allocation.port}`),
-    ],
+    // A server on a playit.gg node without a tunnel yet has no address players can use.
+    addresses: addressPending(attributes)
+        ? []
+        : [
+              ...[playitAddress(attributes)].filter((address) => address !== null),
+              ...relationshipData(attributes.relationships?.allocations)
+                  .filter((allocation) => allocation.attributes.is_default)
+                  .map(
+                      ({ attributes: allocation }) => `${allocation.ip_alias || ip(allocation.ip)}:${allocation.port}`
+                  ),
+          ],
     node: attributes.node,
     destination: { to: '/server/$id', params: { id: attributes.identifier } },
 });

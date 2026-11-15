@@ -147,6 +147,13 @@ describe('server.stats', () => {
         expect(screen.getAllByText('1h 2m 3s')).toHaveLength(2);
     });
 
+    it('shows "Address pending" instead of the node port while a playit.gg server has no tunnel', async () => {
+        await renderServer(<View name='server.stats' />, { addressPending: true });
+
+        expect(screen.getByText('Address pending')).toBeVisible();
+        expect(screen.queryByRole('button', { name: 'Copy the address' })).not.toBeInTheDocument();
+    });
+
     it('counts the players the console reports while the server runs', async () => {
         await renderServer(
             <>

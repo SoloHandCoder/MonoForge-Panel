@@ -68,7 +68,9 @@ export default function Stats({ model, className }: ViewProps<'server.stats'>) {
                         icon={<Globe aria-hidden='true' className='size-4' />}
                         label={model.tunnel ? 'Address · playit.gg' : 'Address'}
                     >
-                        <span className='font-mono'>{address ?? 'Not available'}</span>
+                        <span className='font-mono'>
+                            {address ?? (model.addressPending ? 'Address pending' : 'Not available')}
+                        </span>
                     </Row>
                 </div>
                 {address && <AddressCopy address={address} />}

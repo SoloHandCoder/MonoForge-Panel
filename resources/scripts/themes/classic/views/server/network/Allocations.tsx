@@ -146,6 +146,15 @@ export default function Allocations({ model, className }: ViewProps<'server.allo
     return (
         <div className={className}>
             <SpinnerOverlay visible={creating} />
+            {!model.playitAddress && model.addressPending && (
+                <div className='mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm'>
+                    <span className='text-muted-foreground'>Public address</span>
+                    <span className='font-medium'>Address pending</span>
+                    <span className='text-xs text-muted-foreground'>
+                        The public address appears here as soon as the server&apos;s tunnel is set up.
+                    </span>
+                </div>
+            )}
             {model.playitAddress && (
                 <div className='mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm'>
                     <span className='text-muted-foreground'>Public address (playit.gg)</span>

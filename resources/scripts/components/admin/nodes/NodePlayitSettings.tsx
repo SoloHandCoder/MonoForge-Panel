@@ -3,8 +3,10 @@ import {
     useAdminNodePlayit,
     useTestAdminNodePlayit,
     useUpdateAdminNodePlayit,
+    READ_ONLY_KEY_MESSAGE,
     type NodePlayitSettings,
 } from '@/api/admin/tunnels/queries';
+import { Alert } from '@/components/elements/alert';
 import Button from '@/components/elements/Button';
 import Spinner from '@/components/elements/Spinner';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
@@ -40,6 +42,11 @@ function PlayitForm({ nodeId, settings }: { nodeId: number; settings: NodePlayit
                     With the playit.gg agent running on this node, every new server gets a playit tunnel and players see
                     its address instead of the node&apos;s IP. Leave the agent ID empty to turn this off.
                 </p>
+                {settings.read_only && (
+                    <Alert type='warning' title='Read-only agent key' className='mt-4'>
+                        {READ_ONLY_KEY_MESSAGE} Saving a different key lets the panel try creating tunnels again.
+                    </Alert>
+                )}
                 <div className='mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2'>
                     <form.AppField
                         name='agentId'

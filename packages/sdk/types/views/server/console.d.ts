@@ -94,6 +94,8 @@ export interface ServerStatsModel {
     readonly address: string | null;
     /** `address` is the playit.gg tunnel address. */
     readonly tunnel: boolean;
+    /** The server is on a playit.gg node and has no tunnel yet: `address` is null and players see "Address pending". */
+    readonly addressPending?: boolean;
     /** Players online as the console reports them (Minecraft and Terraria); null when unknown or not running. */
     readonly players: ServerPlayers | null;
     /** Milliseconds since the server started; 0 while it is not running. */

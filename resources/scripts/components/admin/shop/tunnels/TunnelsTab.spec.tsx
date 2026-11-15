@@ -39,6 +39,25 @@ const summary: TunnelQueries.TunnelImportSummary = {
     ],
 };
 
+const unlinked: TunnelQueries.UnlinkedTunnels = {
+    nodes: [
+        { id: 1, name: 'node-1', read_only: true },
+        { id: 2, name: 'node-2', read_only: false },
+    ],
+    servers: [
+        {
+            server_id: 126,
+            server_name: 'Survival world',
+            server_identifier: '1a2b3c4d',
+            node_id: 1,
+            node_name: 'node-1',
+            local_ip: '127.0.0.1',
+            local_port: 25569,
+            tunnel_status: 'failed',
+        },
+    ],
+};
+
 const mutate = vi.fn((_node: number | undefined, options?: { onSuccess?: (result: typeof summary) => void }) =>
     options?.onSuccess?.(summary)
 );
@@ -62,6 +81,7 @@ vi.mock('@/api/admin/tunnels/queries', async (importOriginal) => ({
     useRecreateTunnel: () => idle,
     useUpdateTunnelSettings: () => idle,
     useImportTunnels: () => ({ mutate, isPending: false }),
+    useUnlinkedTunnels: () => ({ data: unlinked }),
 }));
 
 afterEach(() => {
@@ -89,5 +109,23 @@ describe('TunnelsTab', () => {
         expect(dialog.textContent).toContain('Linked to Survival world.');
         expect(dialog.textContent).toContain('Ambiguous');
         expect(dialog.textContent).toContain('node-1 · port 25577 · def.ply.gg:41000');
+    });
+
+    it('lists servers without a tunnel and says when an agent key is read-only', () => {
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <TunnelsTab />
+            </QueryClientProvider>
+        );
+
+        const alert = screen.getByRole('alert');
+
+        expect(alert.textContent).toContain(
+            'This agent key is read-only: create tunnels in the playit dashboard; the panel links them automatically.'
+        );
+        expect(alert.textContent).toContain('Nodes: node-1.');
+        expect(screen.getByText('Survival world')).toBeTruthy();
+        expect(screen.getByText('#126 on node-1')).toBeTruthy();
+        expect(screen.getByText('127.0.0.1:25569')).toBeTruthy();
     });
 });

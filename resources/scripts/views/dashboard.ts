@@ -16,7 +16,7 @@ import { selectServerPermissions } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
 import { relationshipData } from '@/api/relationships';
 import { ip, mbToBytes } from '@/lib/formatters';
-import { playitAddress } from '@/lib/playit';
+import { addressPending, playitAddress } from '@/lib/playit';
 import { useNow } from '@/plugins/useNow';
 import { hasPermission } from '@/plugins/usePermissions';
 import { getPageSearch, useDashboardSearch } from '@/router/pageSearch';
@@ -61,7 +61,10 @@ export interface ServerCardModel {
     readonly uuid: string;
     readonly name: string;
     readonly description: string | null;
+    /** The playit.gg address or the primary allocation; null while `addressPending`. */
     readonly address: string | null;
+    /** The server is on a playit.gg node and has no tunnel yet: show "Address pending", not the node's port. */
+    readonly addressPending?: boolean;
     readonly state: ServerCardState;
     readonly permissions: ServerCardPermissions;
     /** Send a power signal through the client API, with no console connection; the panel reports a failure. */
@@ -197,12 +200,14 @@ function cardPermissions(server: Server, rootAdmin = false): ServerCardPermissio
 
 // The playit.gg address when the server has a live tunnel, else its primary allocation.
 const primaryAddress = ({ attributes }: Server): string | null =>
-    playitAddress(attributes) ??
-    (relationshipData(attributes.relationships?.allocations)
-        .filter((allocation) => allocation.attributes.is_default)
-        .map(({ attributes: allocation }) => `${allocation.ip_alias || ip(allocation.ip)}:${allocation.port}`)
-        .join('') ||
-        null);
+    addressPending(attributes)
+        ? null
+        : (playitAddress(attributes) ??
+          (relationshipData(attributes.relationships?.allocations)
+              .filter((allocation) => allocation.attributes.is_default)
+              .map(({ attributes: allocation }) => `${allocation.ip_alias || ip(allocation.ip)}:${allocation.port}`)
+              .join('') ||
+              null));
 
 interface PowerSender {
     send(uuid: string, signal: ServerPowerSignal): void;
@@ -248,6 +253,7 @@ function cardModel(
         name,
         description,
         address: primaryAddress(server),
+        addressPending: addressPending(server.attributes),
         state: resolveState(server, stats),
         permissions: cardPermissions(server, rootAdmin),
         actions: { start: send('start'), stop: send('stop'), restart: send('restart') },

@@ -38,6 +38,29 @@ export interface ServerTunnelList {
 export interface NodePlayitSettings {
     agent_id: string | null;
     secret_set: boolean;
+    /** playit refused to create a tunnel with this key: tunnels are made in the playit dashboard and linked. */
+    read_only: boolean;
+}
+
+/** The text shown wherever a node's agent key is read-only. */
+export const READ_ONLY_KEY_MESSAGE =
+    'This agent key is read-only: create tunnels in the playit dashboard; the panel links them automatically.';
+
+export interface UnlinkedTunnelServer {
+    server_id: number;
+    server_name: string;
+    server_identifier: string;
+    node_id: number;
+    node_name: string;
+    /** The local IP and port the playit tunnel must point at. */
+    local_ip: string;
+    local_port: number;
+    tunnel_status: TunnelStatus | null;
+}
+
+export interface UnlinkedTunnels {
+    nodes: { id: number; name: string; read_only: boolean }[];
+    servers: UnlinkedTunnelServer[];
 }
 
 export interface NodePlayitInput {
@@ -105,6 +128,16 @@ export const adminTunnelsQueryOptions = (page = 1, status?: TunnelStatus) =>
 
 export const useAdminTunnels = (page = 1, status?: TunnelStatus) =>
     useQuery({ ...adminTunnelsQueryOptions(page, status), refetchInterval: 15_000 });
+
+/** Servers on playit.gg nodes that still need a tunnel, with the local port to point one at. */
+export const adminUnlinkedTunnelsQueryOptions = () =>
+    queryOptions({
+        queryKey: [...tunnelsKey, 'unlinked'],
+        queryFn: async ({ signal }): Promise<UnlinkedTunnels> =>
+            (await http.get<UnlinkedTunnels>('/api/admin/tunnels/unlinked', { signal })).data,
+    });
+
+export const useUnlinkedTunnels = () => useQuery({ ...adminUnlinkedTunnelsQueryOptions(), refetchInterval: 60_000 });
 
 const useTunnelAction = (action: 'retry' | 'recreate', done: string) => {
     const queryClient = useQueryClient();

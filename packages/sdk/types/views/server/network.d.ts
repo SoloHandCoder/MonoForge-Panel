@@ -15,6 +15,8 @@ export interface ServerAllocationsModel {
     readonly allocations: readonly ServerAllocationItem[];
     /** The playit.gg address players connect to (such as `xyz.joinmc.link`), when the server has a live tunnel. */
     readonly playitAddress: string | null;
+    /** The server is on a playit.gg node and has no tunnel yet, so players have no public address to use. */
+    readonly addressPending?: boolean;
     /** The list has not loaded yet. */
     readonly loading: boolean;
     /** How many allocations the server may have; at 0 they are managed by an administrator. */

@@ -12,7 +12,7 @@ export default function ServerCardAddress({ model, className }: ViewProps<'dashb
                     <p className='relative z-10 truncate font-mono text-xs'>{model.address}</p>
                 </CopyOnClick>
             ) : (
-                <p className='truncate font-mono text-xs'>{model.address}</p>
+                <p className='truncate font-mono text-xs'>{model.addressPending ? 'Address pending' : model.address}</p>
             )}
         </div>
     );

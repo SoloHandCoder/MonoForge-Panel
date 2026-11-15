@@ -119,6 +119,15 @@ it('gives a server card layer the server it was rendered for, and replaces one o
     expect(screen.getAllByText('127.0.0.1:25565')).toHaveLength(2);
 });
 
+it('shows "Address pending" on a server card whose playit.gg tunnel is not linked yet', () => {
+    rendered = renderView('dashboard.serverCard.address', {
+        model: createTestServerCard({ address: null, addressPending: true }),
+    });
+
+    expect(screen.getByText('Address pending')).toBeVisible();
+    expect(screen.queryByText('127.0.0.1:25565')).not.toBeInTheDocument();
+});
+
 it('renders a view synchronously from fixtures with a theme layered over classic', () => {
     function AppLayout({ Default }: ViewProps<'layout.app'>) {
         return (
