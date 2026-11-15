@@ -52,7 +52,7 @@ class NoticeController extends ClientApiController
     public function index(ClientApiRequest $request): NoticeFeedResource
     {
         return NoticeFeedResource::make([
-            'announcements' => Announcement::query()->active()->latest('id')->get(),
+            'announcements' => Announcement::showing(),
             'notices' => $request->user()->notices()->unread()->latest('id')->get(),
         ]);
     }

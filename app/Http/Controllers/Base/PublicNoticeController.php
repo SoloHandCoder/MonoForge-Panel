@@ -23,7 +23,7 @@ class PublicNoticeController extends Controller
         $notices = new Collection;
 
         return NoticeFeedResource::make([
-            'announcements' => Announcement::query()->active()->latest('id')->get(),
+            'announcements' => Announcement::showing(),
             'notices' => $notices,
         ])->toResponse($request);
     }

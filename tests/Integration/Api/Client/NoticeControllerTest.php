@@ -138,3 +138,30 @@ test('notify drops an action link that would leave the panel', function (): void
         ->and($safe->action_url)->toBe('/account')
         ->and($safe->action_label)->toBe('Top up');
 });
+
+test('showing announcements are read through the cache store and follow their schedule', function (): void {
+    $open = Announcement::factory()->create();
+    $scheduled = Announcement::factory()->create(['starts_at' => now()->addSeconds(10), 'ends_at' => now()->addSeconds(30)]);
+    Announcement::factory()->create(['ends_at' => now()->subSecond()]);
+
+    expect(Announcement::showing()->pluck('id')->all())->toBe([$open->id]);
+
+    // A write that bypasses the model is not seen while the entry lasts...
+    DB::table('announcements')->where('id', $open->id)->update(['title' => 'Raw write']);
+    expect(Announcement::showing()->first()?->title)->not->toBe('Raw write');
+
+    // ...but the schedule is applied on every read, within the entry's lifetime and without a write.
+    $this->travel(20)->seconds();
+    expect(Announcement::showing()->pluck('id')->all())->toBe([$scheduled->id, $open->id]);
+
+    $this->travel(20)->seconds();
+    expect(Announcement::showing()->pluck('id')->all())->toBe([$open->id]);
+    expect(Announcement::showing()->first()?->title)->not->toBe('Raw write');
+
+    // Saving or deleting through the model is seen at once.
+    $open->refresh()->fill(['title' => 'Saved'])->save();
+    expect(Announcement::showing()->first()?->title)->toBe('Saved');
+
+    $open->delete();
+    expect(Announcement::showing()->all())->toBe([]);
+});
