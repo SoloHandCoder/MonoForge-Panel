@@ -72,17 +72,55 @@ export const updateServerSubscriptionInput = (identifier: string, autoRenew: boo
     body: { auto_renew: autoRenew },
 });
 
+export const updateAutoSleepInput = (identifier: string, autoSleep: boolean) => ({
+    path: { server_uuid: identifier },
+    body: { auto_sleep: autoSleep },
+});
+
+type SubscriptionChange = { auto_renew?: boolean; auto_sleep?: boolean } | undefined;
+
+/** The toast for a saved change: auto-sleep when it was sent, automatic renewal otherwise. */
+export const subscriptionChangeMessage = (body: SubscriptionChange): string => {
+    if (body?.auto_sleep !== undefined) {
+        return body.auto_sleep ? 'Auto-sleep is on.' : 'Auto-sleep is off.';
+    }
+
+    return body?.auto_renew ? 'Automatic renewal is on.' : 'Automatic renewal is off.';
+};
+
 export const useUpdateServerSubscription = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
         ...clientUpdateServerSubscriptionMutation(),
         onSuccess: async (_data, variables) => {
-            await refreshAfterBilling(queryClient, variables.path.server_uuid);
-            toast.success(variables.body.auto_renew ? 'Automatic renewal is on.' : 'Automatic renewal is off.');
+            await Promise.all([
+                refreshAfterBilling(queryClient, variables.path.server_uuid),
+                invalidateGeneratedOperations(queryClient, ['clientGetServerSleepState']),
+            ]);
+            toast.success(subscriptionChangeMessage(variables.body));
         },
-        onError: (error) => notifyHttpError(error, 'Unable to change automatic renewal'),
+        onError: (error, variables) =>
+            notifyHttpError(
+                error,
+                variables.body?.auto_sleep === undefined
+                    ? 'Unable to change automatic renewal'
+                    : 'Unable to change auto-sleep'
+            ),
     });
+};
+
+/** "4h 20m" (or "3d 2h") of sleep, from seconds. */
+export const sleepDuration = (seconds: number): string => {
+    const minutes = Math.floor(Math.max(0, seconds) / 60);
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+
+    if (days > 0) {
+        return `${days}d ${hours}h`;
+    }
+
+    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 };
 
 const adminInput = (id: number) => ({ path: { server_admin_identifier: String(id) } });

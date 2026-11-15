@@ -1,6 +1,8 @@
 import {
     renewServerSubscriptionInput,
+    sleepDuration,
     timeUntil,
+    updateAutoSleepInput,
     updateServerSubscriptionInput,
     useRenewServerSubscription,
     useServerSubscription,
@@ -63,6 +65,48 @@ function SuspendedBanner({ subscription, now }: { subscription: ServerSubscripti
     );
 }
 
+/** The plan's pay-as-you-play terms, what sleeping saved, and the owner's switch. */
+export function AutoSleepSummary({ subscription }: { subscription: ServerSubscription }) {
+    const update = useUpdateServerSubscription();
+    const { sleep } = subscription;
+
+    if (!sleep.allowed) {
+        return null;
+    }
+
+    if (!sleep.supported) {
+        return <p className='text-muted-foreground'>Auto-sleep: not supported for this game yet.</p>;
+    }
+
+    return (
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='min-w-0 text-muted-foreground'>
+                <p>
+                    Sleeps after {sleep.idle_minutes} minutes without players; sleeping time costs{' '}
+                    {sleep.discount_percent}% less.
+                </p>
+                {sleep.last_saved_tokens > 0 && (
+                    <p className='font-medium text-foreground'>
+                        You saved {sleep.last_saved_tokens} tokens by sleeping at the last renewal.
+                    </p>
+                )}
+                {sleep.slept_seconds_this_period > 0 && (
+                    <p>
+                        Slept {sleepDuration(sleep.slept_seconds_this_period)} this period
+                        {sleep.saved_this_period > 0 ? `, ${sleep.saved_this_period} tokens off so far` : ''}.
+                    </p>
+                )}
+            </div>
+            <Switch
+                checked={sleep.enabled}
+                disabled={update.isPending}
+                label='Auto-sleep'
+                onChange={(checked) => update.mutate(updateAutoSleepInput(subscription.server_identifier, checked))}
+            />
+        </div>
+    );
+}
+
 /** Price, period, next renewal, automatic renewal and "Renew now" of an active shop server. */
 function SubscriptionSummary({ subscription }: { subscription: ServerSubscription }) {
     const update = useUpdateServerSubscription();
@@ -70,27 +114,30 @@ function SubscriptionSummary({ subscription }: { subscription: ServerSubscriptio
     return (
         <section
             aria-label='Subscription'
-            className='flex flex-col gap-3 rounded-lg border border-border bg-card p-4 text-sm text-card-foreground sm:flex-row sm:items-center'
+            className='flex flex-col gap-3 rounded-lg border border-border bg-card p-4 text-sm text-card-foreground'
         >
-            <div className='min-w-0 flex-1'>
-                <p className='font-semibold'>
-                    {subscription.price_tokens} tokens every {subscription.period_days} days
-                </p>
-                <p className='text-muted-foreground'>
-                    {subscription.auto_renew ? 'Renews' : 'Ends'} on{' '}
-                    {formatDate(subscription.next_renewal_at, dateFormat)}
-                    {subscription.auto_renew ? '' : ' unless renewed'}
-                </p>
+            <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+                <div className='min-w-0 flex-1'>
+                    <p className='font-semibold'>
+                        {subscription.price_tokens} tokens every {subscription.period_days} days
+                    </p>
+                    <p className='text-muted-foreground'>
+                        {subscription.auto_renew ? 'Renews' : 'Ends'} on{' '}
+                        {formatDate(subscription.next_renewal_at, dateFormat)}
+                        {subscription.auto_renew ? '' : ' unless renewed'}
+                    </p>
+                </div>
+                <Switch
+                    checked={subscription.auto_renew}
+                    disabled={update.isPending}
+                    label='Auto-renew'
+                    onChange={(checked) =>
+                        update.mutate(updateServerSubscriptionInput(subscription.server_identifier, checked))
+                    }
+                />
+                <RenewButton subscription={subscription} />
             </div>
-            <Switch
-                checked={subscription.auto_renew}
-                disabled={update.isPending}
-                label='Auto-renew'
-                onChange={(checked) =>
-                    update.mutate(updateServerSubscriptionInput(subscription.server_identifier, checked))
-                }
-            />
-            <RenewButton subscription={subscription} />
+            <AutoSleepSummary subscription={subscription} />
         </section>
     );
 }

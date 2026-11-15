@@ -51,6 +51,12 @@ export interface ShopPlan {
     egg_ids: number[];
     /** Null allows every deployable node. */
     node_ids: number[] | null;
+    /** Pay-as-you-play: owners may let the server sleep while nobody plays. */
+    sleep_allowed: boolean;
+    /** 0-100: how much less sleeping time costs at the renewal. */
+    sleep_discount_percent: number;
+    /** 5-1440: minutes without players before the server sleeps. */
+    sleep_idle_minutes: number;
 }
 
 export interface ShopPeriod {

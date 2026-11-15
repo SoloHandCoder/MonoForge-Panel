@@ -71,6 +71,7 @@ export const classicViews: ThemeViews = {
     'server.debug': lazyView(settings, 'ServerDebug'),
     'server.rename': lazyView(settings, 'ServerRename'),
     'server.reinstall': lazyView(settings, 'ServerReinstall'),
+    'server.autoSleep': lazyView(settings, 'ServerAutoSleep'),
 
     'page.server.console': lazyView(serverConsole, 'ConsolePage'),
     'server.terminal': lazyView(serverConsole, 'Terminal'),

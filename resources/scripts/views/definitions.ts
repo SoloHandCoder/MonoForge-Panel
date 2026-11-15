@@ -186,3 +186,4 @@ defineView('server.sftp', { context: 'server', ...settings });
 defineView('server.debug', { context: 'server', ...settings });
 defineView('server.rename', { context: 'server', ...settings });
 defineView('server.reinstall', { context: 'server', ...settings });
+defineView('server.autoSleep', { context: 'server', ...settings });

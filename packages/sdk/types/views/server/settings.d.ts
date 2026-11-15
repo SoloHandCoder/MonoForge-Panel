@@ -32,6 +32,24 @@ export interface ServerReinstallModel {
     /** Resolves whether the reinstall started; a failure has already been reported. */
     readonly reinstall: () => Promise<boolean>;
 }
+export interface ServerAutoSleepModel {
+    /** The viewer pays for this shop server and its plan includes auto-sleep; the block renders nothing otherwise. */
+    readonly allowed: boolean;
+    /** The game tells who is online (Minecraft Java for now); otherwise "not supported for this game yet". */
+    readonly supported: boolean;
+    readonly enabled: boolean;
+    /** Auto-sleep stopped the server and nobody has started it since. */
+    readonly sleeping: boolean;
+    /** How long the server must be empty before it sleeps. */
+    readonly idleMinutes: number;
+    /** How much less sleeping time costs at the renewal. */
+    readonly discountPercent: number;
+    /** What sleeping saved at the last renewal, in tokens. */
+    readonly lastSavedTokens: number;
+    readonly saving: boolean;
+    /** Resolves whether the switch was saved; a failure has already been reported. */
+    readonly setEnabled: (enabled: boolean) => Promise<boolean>;
+}
 declare module '../registry' {
     interface ViewModels {
         'page.server.settings': ServerSettingsPageModel;
@@ -39,5 +57,6 @@ declare module '../registry' {
         'server.debug': ServerDebugModel;
         'server.rename': ServerRenameModel;
         'server.reinstall': ServerReinstallModel;
+        'server.autoSleep': ServerAutoSleepModel;
     }
 }

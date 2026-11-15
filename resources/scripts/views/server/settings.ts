@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useCurrentUser } from '@/api/account/queries';
+import { updateAutoSleepInput, useServerSubscription, useUpdateServerSubscription } from '@/api/billing/subscriptions';
 import { useReinstallServer, useRenameServer } from '@/api/server/queries';
 import { canReinstallServer, SKIPPED_INSTALL_SCRIPT_MESSAGE } from '@/lib/serverStatus';
 import { usePermissions } from '@/plugins/usePermissions';
@@ -45,6 +46,25 @@ export interface ServerReinstallModel {
     readonly reinstall: () => Promise<boolean>;
 }
 
+export interface ServerAutoSleepModel {
+    /** The viewer pays for this shop server and its plan includes auto-sleep; the block renders nothing otherwise. */
+    readonly allowed: boolean;
+    /** The game tells who is online (Minecraft Java for now); otherwise "not supported for this game yet". */
+    readonly supported: boolean;
+    readonly enabled: boolean;
+    /** Auto-sleep stopped the server and nobody has started it since. */
+    readonly sleeping: boolean;
+    /** How long the server must be empty before it sleeps. */
+    readonly idleMinutes: number;
+    /** How much less sleeping time costs at the renewal. */
+    readonly discountPercent: number;
+    /** What sleeping saved at the last renewal, in tokens. */
+    readonly lastSavedTokens: number;
+    readonly saving: boolean;
+    /** Resolves whether the switch was saved; a failure has already been reported. */
+    readonly setEnabled: (enabled: boolean) => Promise<boolean>;
+}
+
 declare module '../registry' {
     interface ViewModels {
         'page.server.settings': ServerSettingsPageModel;
@@ -52,6 +72,7 @@ declare module '../registry' {
         'server.debug': ServerDebugModel;
         'server.rename': ServerRenameModel;
         'server.reinstall': ServerReinstallModel;
+        'server.autoSleep': ServerAutoSleepModel;
     }
 }
 
@@ -110,7 +131,46 @@ function useReinstallModel(): ServerReinstallModel {
     return useMemo(() => ({ allowed, unavailable, reinstall }), [allowed, unavailable, reinstall]);
 }
 
+function useAutoSleepModel(): ServerAutoSleepModel {
+    const { identifier } = useLoadedServer().attributes;
+    const subscription = useServerSubscription(identifier);
+    const { mutateAsync, isPending } = useUpdateServerSubscription();
+    const setEnabled = useCallback(
+        (enabled: boolean) => attempt(() => mutateAsync(updateAutoSleepInput(identifier, enabled))),
+        [mutateAsync, identifier]
+    );
+    const sleep = subscription?.status === 'active' ? subscription.sleep : null;
+
+    return useMemo(
+        () => ({
+            allowed: sleep?.allowed ?? false,
+            supported: sleep?.supported ?? false,
+            enabled: sleep?.enabled ?? false,
+            sleeping: sleep?.sleeping ?? false,
+            idleMinutes: sleep?.idle_minutes ?? 0,
+            discountPercent: sleep?.discount_percent ?? 0,
+            lastSavedTokens: sleep?.last_saved_tokens ?? 0,
+            saving: isPending,
+            setEnabled,
+        }),
+        [sleep, isPending, setEnabled]
+    );
+}
+
 const succeeded = async () => true;
+
+const autoSleepFixture = (options: Partial<ServerAutoSleepModel> = {}): ServerAutoSleepModel => ({
+    allowed: true,
+    supported: true,
+    enabled: true,
+    sleeping: false,
+    idleMinutes: 15,
+    discountPercent: 50,
+    lastSavedTokens: 120,
+    saving: false,
+    setEnabled: succeeded,
+    ...options,
+});
 
 const sftpFixture = (options: Partial<ServerSftpModel> = {}): ServerSftpModel => ({
     allowed: true,
@@ -151,6 +211,16 @@ implementViews({
             default: () => renameFixture(),
             empty: () => renameFixture({ values: { name: 'Survival', description: '' } }),
             denied: () => renameFixture({ allowed: false }),
+        },
+    },
+    'server.autoSleep': {
+        use: useAutoSleepModel,
+        fixtures: {
+            default: () => autoSleepFixture(),
+            off: () => autoSleepFixture({ enabled: false, lastSavedTokens: 0 }),
+            sleeping: () => autoSleepFixture({ sleeping: true }),
+            unsupported: () => autoSleepFixture({ supported: false, enabled: false }),
+            denied: () => autoSleepFixture({ allowed: false }),
         },
     },
     'server.reinstall': {

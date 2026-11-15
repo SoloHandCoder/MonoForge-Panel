@@ -1529,6 +1529,36 @@ export type ClientServerScheduleResource = {
     object: string;
     attributes: ClientServerScheduleAttributes;
 };
+export type ClientServerSleepAttributes = {
+    /**
+     * The plan allows auto-sleep and the game is supported.
+     */
+    available: boolean;
+    /**
+     * The game tells who is online (Minecraft Java for now).
+     */
+    supported: boolean;
+    /**
+     * The owner turned auto-sleep on.
+     */
+    enabled: boolean;
+    /**
+     * Auto-sleep stopped the server and nobody has started it since.
+     */
+    sleeping: boolean;
+    /**
+     * When it fell asleep (ISO 8601), or null.
+     */
+    sleep_started_at?: string | null;
+    /**
+     * The viewer may wake it (needs control.start).
+     */
+    can_wake: boolean;
+};
+export type ClientServerSleepResource = {
+    object: string;
+    attributes: ClientServerSleepAttributes;
+};
 export type ClientServerSubscriptionAttributes = {
     server_identifier: string;
     server_name: string;
@@ -1544,6 +1574,18 @@ export type ClientServerSubscriptionAttributes = {
     suspended_at: string | null;
     delete_at: string | null;
     can_renew_now: boolean;
+    sleep: {
+        allowed: boolean;
+        supported: boolean;
+        enabled: boolean;
+        sleeping: boolean;
+        sleep_started_at: string | null;
+        idle_minutes: number;
+        discount_percent: number;
+        slept_seconds_this_period: number;
+        saved_this_period: number;
+        last_saved_tokens: number;
+    };
 };
 export type ClientServerSubscriptionListResponse = {
     object: string;
@@ -1916,6 +1958,18 @@ export type AdminCreateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
+    /**
+     * The sleep allowed.
+     */
+    sleep_allowed?: boolean;
+    /**
+     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
+     */
+    sleep_discount_percent?: number;
+    /**
+     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
+     */
+    sleep_idle_minutes?: number;
 };
 export type AdminUpdateShopPlanRequest = {
     /**
@@ -1982,6 +2036,18 @@ export type AdminUpdateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
+    /**
+     * The sleep allowed.
+     */
+    sleep_allowed?: boolean;
+    /**
+     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
+     */
+    sleep_discount_percent?: number;
+    /**
+     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
+     */
+    sleep_idle_minutes?: number;
 };
 export type AdminCreateBillingPeriodRequest = {
     /**
@@ -4284,9 +4350,13 @@ export type ClientBuyTokenPackRequest = {
 };
 export type ClientUpdateServerSubscriptionRequest = {
     /**
-     * Renew automatically from the token balance.
+     * Renew automatically from the token balance. Required without auto_sleep.
      */
-    auto_renew: boolean;
+    auto_renew?: boolean;
+    /**
+     * Let the server sleep while nobody plays. Required without auto_renew.
+     */
+    auto_sleep?: boolean;
 };
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
@@ -4816,6 +4886,9 @@ export type AdminListShopPlansResponseBody = {
         };
         egg_ids?: Array<number>;
         node_ids?: string | null;
+        sleep_allowed?: boolean;
+        sleep_discount_percent?: number;
+        sleep_idle_minutes?: number;
     }>;
 };
 export type AdminCreateShopPlanResponseBody = {
@@ -4838,6 +4911,9 @@ export type AdminCreateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminGetShopPlanResponseBody = {
     id?: number;
@@ -4859,6 +4935,9 @@ export type AdminGetShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminUpdateShopPlanResponseBody = {
     id?: number;
@@ -4880,6 +4959,9 @@ export type AdminUpdateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminListBillingPeriodsResponseBody = {
     data?: Array<{
@@ -7834,6 +7916,8 @@ export type ClientListServerActivityServerUuidPathParameter = string;
 export type ClientListServerActivityFilterOptionsServerUuidPathParameter = string;
 export type ClientSendServerCommandServerUuidPathParameter = string;
 export type ClientSendPowerActionServerUuidPathParameter = string;
+export type ClientGetServerSleepStateServerUuidPathParameter = string;
+export type ClientWakeServerServerUuidPathParameter = string;
 /**
  * Comma-separated relationships to include. Supports "password" when the user can view database passwords.
  */
@@ -17412,7 +17496,7 @@ export type ClientListServerSubscriptionsResponses = {
 };
 export type ClientListServerSubscriptionsResponse = ClientListServerSubscriptionsResponses[keyof ClientListServerSubscriptionsResponses];
 export type ClientUpdateServerSubscriptionData = {
-    body: ClientUpdateServerSubscriptionRequest;
+    body?: ClientUpdateServerSubscriptionRequest;
     path: {
         /**
          * The server UUID.
@@ -18496,6 +18580,80 @@ export type ClientSendPowerActionResponses = {
     204: void;
 };
 export type ClientSendPowerActionResponse = ClientSendPowerActionResponses[keyof ClientSendPowerActionResponses];
+export type ClientGetServerSleepStateData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerSleepStateServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/sleep';
+};
+export type ClientGetServerSleepStateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetServerSleepStateError = ClientGetServerSleepStateErrors[keyof ClientGetServerSleepStateErrors];
+export type ClientGetServerSleepStateResponses = {
+    /**
+     * Sleep state returned.
+     */
+    200: ClientServerSleepResource;
+};
+export type ClientGetServerSleepStateResponse = ClientGetServerSleepStateResponses[keyof ClientGetServerSleepStateResponses];
+export type ClientWakeServerData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientWakeServerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/sleep/wake';
+};
+export type ClientWakeServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The server is not sleeping.
+     */
+    409: ErrorEnvelope;
+    /**
+     * Wings did not accept the start; try again later.
+     */
+    503: ErrorEnvelope;
+};
+export type ClientWakeServerError = ClientWakeServerErrors[keyof ClientWakeServerErrors];
+export type ClientWakeServerResponses = {
+    /**
+     * The server is starting.
+     */
+    204: void;
+};
+export type ClientWakeServerResponse = ClientWakeServerResponses[keyof ClientWakeServerResponses];
 export type ClientListServerDatabasesData = {
     body?: never;
     path: {
