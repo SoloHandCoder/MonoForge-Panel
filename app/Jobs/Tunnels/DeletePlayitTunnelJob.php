@@ -38,7 +38,8 @@ class DeletePlayitTunnelJob implements ShouldQueue
         try {
             $client->deleteTunnel((string) $node->playit_secret, $this->playitTunnelId);
         } catch (PlayitException $playitException) {
-            if ($this->attempts() < $this->tries) {
+            // A read-only agent key will never be allowed to delete it, so do not retry.
+            if ($playitException->reason !== PlayitClient::READ_ONLY && $this->attempts() < $this->tries) {
                 $this->release(self::BACKOFF[$this->attempts() - 1] ?? 3600);
 
                 return;

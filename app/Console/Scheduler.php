@@ -52,7 +52,7 @@ final class Scheduler
         // Token checkouts no payment was ever linked to, after 30 days (abandoned baskets).
         $schedule->command(PruneCommand::class, ['--model' => [TebexCheckout::class]])->daily()->withoutOverlapping()->onOneServer();
 
-        // Retry failed playit.gg tunnels and pick up addresses for pending ones.
+        // Link tunnels made in the playit.gg dashboard, retry failed ones and pick up addresses for pending ones.
         $schedule->command(SyncTunnelsCommand::class)->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
 
         // The public status page: one cheap reachability check of the panel and each shown node

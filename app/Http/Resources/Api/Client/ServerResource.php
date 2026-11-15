@@ -31,6 +31,7 @@ use UnexpectedValueException;
 #[ResponseField('feature_limits.backups', 'integer', example: 5, nullable: true)]
 #[ResponseField('egg_features', schema: ['type' => 'array', 'nullable' => true, 'items' => ['type' => 'string'], 'example' => ['eula']])]
 #[ResponseField('playit_address', type: 'string', description: 'The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.', example: 'xyz.joinmc.link', nullable: true)]
+#[ResponseField('address_pending', type: 'boolean', description: 'True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.', example: false)]
 #[ResponseField('egg_tags', schema: ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['minecraft']])]
 class ServerResource extends ClientResource
 {
@@ -59,6 +60,7 @@ class ServerResource extends ClientResource
         $server->loadMissing(['egg.tags', 'node', 'transfer', 'tunnel']);
 
         $egg = $server->egg ?? throw new UnexpectedValueException('The server does not have an egg relationship.');
+        $playit = resolve(TunnelService::class)->displayAddress($server);
 
         return [
             'server_owner' => $user->id === $server->owner_id,
@@ -102,7 +104,8 @@ class ServerResource extends ClientResource
             'is_installing' => ! $server->isInstalled(),
             'is_transferring' => ($server->transfer) !== null,
             'skip_scripts' => $server->skip_scripts,
-            'playit_address' => resolve(TunnelService::class)->displayAddress($server),
+            'playit_address' => $playit,
+            'address_pending' => $playit === null && $server->node->hasPlayitAgent(),
         ];
     }
 

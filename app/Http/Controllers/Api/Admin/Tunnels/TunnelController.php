@@ -15,6 +15,7 @@ use Knuckles\Scribe\Attributes\Subgroup;
 use Pterodactyl\Enum\TunnelStatus;
 use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
 use Pterodactyl\Http\Requests\Api\Admin\Tunnels\GetTunnelsRequest;
+use Pterodactyl\Http\Requests\Api\Admin\Tunnels\GetUnlinkedTunnelsRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Tunnels\ImportTunnelsRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Tunnels\StoreTunnelRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Tunnels\UpdateTunnelRequest;
@@ -111,6 +112,24 @@ class TunnelController extends AdminApiController
         ],
     ];
 
+    private const array UNLINKED_EXAMPLE = [
+        'nodes' => [
+            ['id' => 1, 'name' => 'node-1', 'read_only' => true],
+        ],
+        'servers' => [
+            [
+                'server_id' => 126,
+                'server_name' => 'Survival world',
+                'server_identifier' => '1a2b3c4d',
+                'node_id' => 1,
+                'node_name' => 'node-1',
+                'local_ip' => '127.0.0.1',
+                'local_port' => 25569,
+                'tunnel_status' => 'failed',
+            ],
+        ],
+    ];
+
     /**
      * List tunnels.
      */
@@ -180,6 +199,16 @@ class TunnelController extends AdminApiController
         $node = $request->filled('node') ? Node::query()->findOrFail($request->integer('node')) : null;
 
         return new JsonResponse($importer->import($node));
+    }
+
+    /**
+     * List servers that still need a tunnel.
+     */
+    #[Endpoint('List servers without a tunnel', "Returns the nodes with a playit.gg agent (with `read_only` set when playit refused to create a tunnel with the node's agent key) and every server on them without a linked tunnel, with the local IP and port a tunnel for it must point at. With a read-only key, create those tunnels in the playit dashboard: the scheduler links them every ten minutes, or Import existing tunnels links them at once. `tunnel_status` is the status of the server's unusable tunnel row (`failed` or `deleted`), or null when it has none. Only reads the panel's database.")]
+    #[ScribeResponse(self::UNLINKED_EXAMPLE, description: 'Servers without a tunnel returned.')]
+    public function unlinked(GetUnlinkedTunnelsRequest $request, TunnelImportService $importer): JsonResponse
+    {
+        return new JsonResponse($importer->unlinked());
     }
 
     /** The administrator is waiting, so move the tunnel on now instead of on the queue. */

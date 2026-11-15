@@ -15,6 +15,12 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
+// These tests cover the older tunnel list: the v1 run data call is answered "not found", so the
+// client falls back to `/tunnels/list` (TunnelReadOnlyTest covers run data itself).
+beforeEach(function (): void {
+    Http::fake(['api.playit.gg/v1/agents/rundata' => Http::response(['status' => 'error', 'data' => ['type' => 'path-not-found', 'message' => ['path' => '/v1/agents/rundata']]], 404)]);
+});
+
 const AGENT_ID = '5b9d1b0e-3c1f-4e8a-9a51-1f0e7d2c6b44';
 
 const SECRET_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -24,7 +30,7 @@ test('the node playit secret is write-only', function (): void {
 
     $this->putJson(route('api.admin.nodes.playit.update', $node->id), ['agent_id' => AGENT_ID, 'secret' => SECRET_KEY])
         ->assertOk()
-        ->assertExactJson(['agent_id' => AGENT_ID, 'secret_set' => true]);
+        ->assertExactJson(['agent_id' => AGENT_ID, 'secret_set' => true, 'read_only' => false]);
 
     // A blank secret keeps the stored one.
     $this->putJson(route('api.admin.nodes.playit.update', $node->id), ['agent_id' => AGENT_ID, 'secret' => ''])->assertOk();
@@ -38,7 +44,7 @@ test('the node playit secret is write-only', function (): void {
     // Removing the agent drops the secret too.
     $this->putJson(route('api.admin.nodes.playit.update', $node->id), ['agent_id' => null])
         ->assertOk()
-        ->assertExactJson(['agent_id' => null, 'secret_set' => false]);
+        ->assertExactJson(['agent_id' => null, 'secret_set' => false, 'read_only' => false]);
 });
 
 test('test connection lists the agent tunnels', function (): void {
@@ -79,7 +85,7 @@ test('a secret and agent id pasted from playit.toml are cleaned before they are 
 
     $this->putJson(route('api.admin.nodes.playit.update', $node->id), ['agent_id' => $agentId, 'secret' => $secret])
         ->assertOk()
-        ->assertExactJson(['agent_id' => AGENT_ID, 'secret_set' => true]);
+        ->assertExactJson(['agent_id' => AGENT_ID, 'secret_set' => true, 'read_only' => false]);
 
     $node->refresh();
     expect($node->playit_secret)->toBe(SECRET_KEY)
@@ -119,7 +125,7 @@ test('an agent id that is not a uuid is refused', function (): void {
 
 test('lists tunnels and retries a failed one', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => 'c0ffee00-0000-4000-8000-000000000001']]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => 'c0ffee00-0000-4000-8000-000000000001']]),
         'api.playit.gg/tunnels/list' => Http::response(['status' => 'success', 'data' => ['tunnels' => [[
             'id' => 'c0ffee00-0000-4000-8000-000000000001',
             'tunnel_type' => null,

@@ -20,6 +20,12 @@ use Pterodactyl\Tests\Integration\IntegrationTestCase;
 uses(IntegrationTestCase::class);
 uses(DatabaseTransactions::class);
 
+// These tests cover the older tunnel list: the v1 run data call is answered "not found", so the
+// client falls back to `/tunnels/list` (TunnelReadOnlyTest covers run data itself).
+beforeEach(function (): void {
+    Http::fake(['api.playit.gg/v1/agents/rundata' => Http::response(['status' => 'error', 'data' => ['type' => 'path-not-found', 'message' => ['path' => '/v1/agents/rundata']]], 404)]);
+});
+
 const AGENT = '5b9d1b0e-3c1f-4e8a-9a51-1f0e7d2c6b44';
 const TUNNEL = '0c8f1f4e-6f7b-4a2e-9a1d-2f6e3c1b7a90';
 const SECRET = 'agent-secret-value';
@@ -55,7 +61,7 @@ function listed(array $tunnel): array
 
 test('a new server on a node with an agent gets a tunnel that becomes active once allocated', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::sequence()
             ->push(listed(playitTunnel(['status' => 'pending'])))
             ->push(listed(playitTunnel(allocated()))),
@@ -75,23 +81,25 @@ test('a new server on a node with an agent gets a tunnel that becomes active onc
         ->and(resolve(TunnelService::class)->displayAddress($server))->toBe('xyz.joinmc.link:41234');
 
     Http::assertSent(function (Request $request) use ($server): bool {
-        if ($request->url() !== 'https://api.playit.gg/tunnels/create') {
+        if ($request->url() !== 'https://api.playit.gg/v1/tunnels/create') {
             return false;
         }
 
+        // The v1 create body.
         return $request->header('Authorization') === ['Agent-Key '.SECRET]
-            && $request['tunnel_type'] === 'minecraft-java'
-            && $request['port_type'] === 'tcp'
-            && $request['port_count'] === 1
-            && $request['origin'] === ['type' => 'agent', 'data' => ['agent_id' => AGENT, 'local_ip' => $server->allocation->ip, 'local_port' => $server->allocation->port]]
-            && $request['enabled'] === true
-            && array_key_exists('alloc', $request->data()) && $request['alloc'] === null;
+            && $request['protocol'] === ['type' => 'tunnel-type', 'details' => 'minecraft-java']
+            && $request['origin'] === ['type' => 'agent', 'data' => ['agent_id' => AGENT, 'config' => ['fields' => [
+                ['name' => 'local_ip', 'value' => $server->allocation->ip],
+                ['name' => 'local_port', 'value' => (string) $server->allocation->port],
+            ]]]]
+            && $request['endpoint'] === ['type' => 'region', 'details' => ['region' => 'global', 'port' => null]]
+            && $request['enabled'] === true;
     });
 });
 
 test('provision is idempotent', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::response(listed(playitTunnel(['status' => 'pending']))),
     ]);
 
@@ -100,11 +108,12 @@ test('provision is idempotent', function (): void {
 
     expect(ServerTunnel::query()->where('server_id', $server->id)->count())->toBe(1)
         ->and($again->playit_tunnel_id)->toBe(TUNNEL);
-    Http::assertSentCount(2);
+    // Create, then the run data call that falls back to the tunnel list.
+    Http::assertSentCount(3);
 });
 
 test('a playit failure never stops server creation and is kept on the tunnel', function (): void {
-    Http::fake(['api.playit.gg/tunnels/create' => Http::response(['status' => 'fail', 'data' => 'RequiresPlayitPremium'])]);
+    Http::fake(['api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'fail', 'data' => 'RequiresPlayitPremium'])]);
 
     $server = $this->createServerModel(['node_id' => playitNode()->id]);
 
@@ -129,7 +138,7 @@ test('an unreachable or error-answering playit marks the tunnel failed', functio
 
 test('the scheduler retries failed tunnels', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::sequence()
+        'api.playit.gg/v1/tunnels/create' => Http::sequence()
             ->push(['status' => 'fail', 'data' => 'AgentNotFound'])
             ->push(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::response(listed(playitTunnel(allocated()))),
@@ -147,7 +156,7 @@ test('the scheduler retries failed tunnels', function (): void {
 
 test('a tunnel playit dropped is forgotten and created again', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::sequence()
             ->push(['status' => 'success', 'data' => ['tunnels' => [], 'tcp_alloc' => [], 'udp_alloc' => []]])
             ->push(listed(playitTunnel(allocated()))),
@@ -162,7 +171,7 @@ test('a tunnel playit dropped is forgotten and created again', function (): void
 
 test('deleting the server deletes its tunnel on playit', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::response(listed(playitTunnel(allocated()))),
         'api.playit.gg/tunnels/delete' => Http::response(['status' => 'fail', 'data' => 'TunnelNotFound']),
     ]);
@@ -179,7 +188,7 @@ test('deleting the server deletes its tunnel on playit', function (): void {
 
 test('release marks the tunnel deleted and provision brings it back', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::response(listed(playitTunnel(allocated()))),
         'api.playit.gg/tunnels/delete' => Http::response(['status' => 'success', 'data' => null]),
     ]);
@@ -218,7 +227,7 @@ test('the agent secret is encrypted at rest and hidden from serialisation', func
 
 test('the client server resource carries the playit address', function (): void {
     Http::fake([
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => TUNNEL]]),
         'api.playit.gg/tunnels/list' => Http::response(listed(playitTunnel(allocated()))),
     ]);
 

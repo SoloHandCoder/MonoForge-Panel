@@ -48,3 +48,22 @@ test('reads the address players connect to from an allocated tunnel', function (
     'srv ignored for other games' => [['tunnel_type' => 'terraria', 'alloc' => ['status' => 'allocated', 'data' => ['assigned_domain' => 'abc.ply.gg', 'assigned_srv' => 'x.example', 'port_start' => 7777]]], 'abc.ply.gg:7777'],
     'ip hostname fallback' => [['alloc' => ['status' => 'allocated', 'data' => ['assigned_domain' => '', 'ip_hostname' => '147.185.221.1', 'port_start' => 5]]], '147.185.221.1:5'],
 ]);
+
+test('reads run data tunnels: display address, disabled reason and the local port from the agent config', function (): void {
+    $tunnel = [
+        'id' => 'a',
+        'display_address' => ' abc-def.joinmc.link ',
+        'disabled_reason' => null,
+        'agent_config' => ['fields' => [['name' => 'local_ip', 'value' => '127.0.0.1'], ['name' => 'local_port', 'value' => '25569']]],
+    ];
+
+    expect(PlayitClient::addressOf($tunnel))->toBe('abc-def.joinmc.link')
+        ->and(PlayitClient::localPort($tunnel))->toBe(25569)
+        ->and(PlayitClient::localIp($tunnel))->toBe('127.0.0.1')
+        ->and(PlayitClient::isAgentTunnel($tunnel))->toBeTrue()
+        ->and(PlayitClient::disabledReason($tunnel))->toBeNull()
+        ->and(PlayitClient::addressOf([...$tunnel, 'disabled_reason' => 'BandwidthLimit']))->toBeNull()
+        ->and(PlayitClient::disabledReason([...$tunnel, 'disabled_reason' => 'BandwidthLimit']))->toBe('BandwidthLimit')
+        ->and(PlayitClient::localPort(['agent_config' => ['fields' => [['name' => 'local_port', 'value' => 'abc']]]]))->toBeNull()
+        ->and(PlayitClient::localPort(['origin' => ['type' => 'agent', 'data' => ['local_port' => 25565]]]))->toBe(25565);
+});

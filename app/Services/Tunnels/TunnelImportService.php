@@ -32,6 +32,20 @@ use Pterodactyl\Models\Server;
  *     reason: string,
  *     server_ids: list<int>,
  * }
+ * @phpstan-type UnlinkedServer array{
+ *     server_id: int,
+ *     server_name: string,
+ *     server_identifier: string,
+ *     node_id: int,
+ *     node_name: string,
+ *     local_ip: string,
+ *     local_port: int,
+ *     tunnel_status: string|null,
+ * }
+ * @phpstan-type UnlinkedSummary array{
+ *     nodes: list<array{id: int, name: string, read_only: bool}>,
+ *     servers: list<UnlinkedServer>,
+ * }
  * @phpstan-type ImportSummary array{
  *     imported: int,
  *     skipped: int,
@@ -79,7 +93,7 @@ class TunnelImportService
             }
 
             try {
-                $remote = $this->client->listTunnels((string) $node->playit_secret, (string) $node->playit_agent_id);
+                $remote = $this->client->agentTunnels((string) $node->playit_secret, (string) $node->playit_agent_id);
             } catch (PlayitException $playitException) {
                 $summary['errors'][] = ['node_id' => $node->id, 'node_name' => $node->name, 'message' => $playitException->adminMessage()];
 
@@ -93,6 +107,43 @@ class TunnelImportService
         }
 
         return $summary;
+    }
+
+    /**
+     * The servers on nodes with a playit agent that have no tunnel yet, with the local port (and
+     * IP) a tunnel for them needs, so the owner knows what to create in the playit dashboard.
+     * Only reads the database.
+     *
+     * @return UnlinkedSummary
+     */
+    public function unlinked(): array
+    {
+        $nodes = Node::query()->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')->orderBy('id')->get()
+            ->filter(fn (Node $node): bool => $node->hasPlayitAgent())
+            ->values();
+
+        $servers = Server::query()
+            ->whereIn('node_id', $nodes->modelKeys())
+            ->with(['allocation', 'tunnel', 'node'])
+            ->orderBy('node_id')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Server $server): bool => $server->allocation instanceof Allocation
+                && (! $server->tunnel instanceof ServerTunnel || TunnelService::isReplaceable($server->tunnel)));
+
+        return [
+            'nodes' => array_values($nodes->map(fn (Node $node): array => ['id' => $node->id, 'name' => $node->name, 'read_only' => $node->isPlayitReadOnly()])->all()),
+            'servers' => array_values($servers->map(fn (Server $server): array => [
+                'server_id' => $server->id,
+                'server_name' => $server->name,
+                'server_identifier' => $server->uuidShort,
+                'node_id' => $server->node_id,
+                'node_name' => $server->node->name,
+                'local_ip' => TunnelService::localIpFor($server->allocation?->ip),
+                'local_port' => (int) $server->allocation?->port,
+                'tunnel_status' => $server->tunnel?->status->value,
+            ])->all()),
+        ];
     }
 
     /**
@@ -133,11 +184,9 @@ class TunnelImportService
     private function importTunnel(Node $node, array $tunnel, Collection $allocations): array
     {
         $id = is_string($tunnel['id'] ?? null) ? $tunnel['id'] : null;
-        $origin = is_array($tunnel['origin'] ?? null) ? $tunnel['origin'] : [];
-        $data = is_array($origin['data'] ?? null) ? $origin['data'] : [];
-        $localIp = is_string($data['local_ip'] ?? null) ? mb_strtolower($data['local_ip']) : null;
-        $localPort = is_int($data['local_port'] ?? null) ? $data['local_port'] : null;
-        $agentId = is_string($data['agent_id'] ?? null) ? mb_strtolower($data['agent_id']) : null;
+        $localIp = PlayitClient::localIp($tunnel);
+        $localPort = PlayitClient::localPort($tunnel);
+        $agentId = PlayitClient::agentIdOf($tunnel);
 
         $base = [
             'node_id' => $node->id,
@@ -158,7 +207,7 @@ class TunnelImportService
             return $this->outcome($base, self::ALREADY_LINKED, sprintf('Already linked to server #%d.', $linked->server_id), [$linked->server_id]);
         }
 
-        if (($origin['type'] ?? null) !== 'agent' || $localPort === null) {
+        if (! PlayitClient::isAgentTunnel($tunnel) || $localPort === null) {
             return $this->outcome($base, self::UNSUPPORTED, 'The tunnel has no local port to match (for example a managed tunnel), so it cannot be matched to a server.');
         }
 

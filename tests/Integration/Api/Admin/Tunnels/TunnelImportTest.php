@@ -19,6 +19,12 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
+// These tests cover the older tunnel list: the v1 run data call is answered "not found", so the
+// client falls back to `/tunnels/list` (TunnelReadOnlyTest covers run data itself).
+beforeEach(function (): void {
+    Http::fake(['api.playit.gg/v1/agents/rundata' => Http::response(['status' => 'error', 'data' => ['type' => 'path-not-found', 'message' => ['path' => '/v1/agents/rundata']]], 404)]);
+});
+
 const AGENT = '5b9d1b0e-3c1f-4e8a-9a51-1f0e7d2c6b44';
 const SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const TUNNEL_A = '0c8f1f4e-6f7b-4a2e-9a1d-2f6e3c1b7a90';
@@ -53,7 +59,7 @@ function fakePlayit(array ...$tunnels): void
 {
     Http::fake([
         'api.playit.gg/tunnels/list' => Http::response(['status' => 'success', 'data' => ['tunnels' => $tunnels, 'tcp_alloc' => [], 'udp_alloc' => []]]),
-        'api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => 'c0ffee00-0000-4000-8000-000000000001']]),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => 'c0ffee00-0000-4000-8000-000000000001']]),
         'api.playit.gg/tunnels/delete' => Http::response(['status' => 'success', 'data' => null]),
     ]);
 }
@@ -95,8 +101,8 @@ test('a hand-made tunnel is linked to the server on its port', function (): void
         ->imported_at->not->toBeNull()
         ->and(resolve(TunnelService::class)->displayAddress($server))->toBe('xyz.joinmc.link:41234');
 
-    // Only the agent's tunnel list was read; nothing was created or changed on playit.
-    Http::assertSentCount(1);
+    // Only the agent's tunnels were read (run data, then the list); nothing was created or changed on playit.
+    Http::assertSentCount(2);
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.playit.gg/tunnels/list'
         && $request['agent_id'] === AGENT
         && $request->header('Authorization') === ['Agent-Key '.SECRET]);
@@ -314,8 +320,8 @@ test('a new primary port leaves the imported tunnel on playit and gives the serv
         ->and(ServerTunnel::query()->where('server_id', $server->id)->sole())
         ->allocation_id->toBe($allocation->id)
         ->imported_at->toBeNull();
-    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.playit.gg/tunnels/create'
-        && $request['origin']['data']['local_port'] === 25570);
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.playit.gg/v1/tunnels/create'
+        && $request['origin']['data']['config']['fields'][1] === ['name' => 'local_port', 'value' => '25570']);
 });
 
 test('the admin recreating an imported tunnel deletes it on playit', function (): void {

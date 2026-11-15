@@ -306,7 +306,8 @@ Route::prefix('/tunnels')->name('api.admin.tunnels')->group(function (): void {
     Route::post('/', [TunnelController::class, 'store'])->name('.store');
     // Links tunnels made by hand on playit.gg to servers: a browser session only, never an API key.
     Route::post('/import', [TunnelController::class, 'import'])->middleware(RequireSessionAuthentication::class)->name('.import');
-    // `/settings` before `/{tunnel}` so the literal is not bound as a tunnel.
+    // `/unlinked` and `/settings` before `/{tunnel}` so the literals are not bound as a tunnel.
+    Route::get('/unlinked', [TunnelController::class, 'unlinked'])->name('.unlinked');
     Route::get('/settings', [TunnelSettingsController::class, 'show'])->name('.settings');
     Route::put('/settings', [TunnelSettingsController::class, 'update'])->name('.settings.update');
     Route::post('/{tunnel:id}/retry', [TunnelController::class, 'retry'])->name('.retry');

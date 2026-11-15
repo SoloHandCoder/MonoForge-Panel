@@ -52,6 +52,7 @@
                         "is_transferring": false,
                         "skip_scripts": false,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -158,6 +159,7 @@
                         "is_transferring": true,
                         "skip_scripts": true,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -261,6 +263,7 @@
                         "is_transferring": false,
                         "skip_scripts": false,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -428,6 +431,7 @@
                         "is_transferring": true,
                         "skip_scripts": true,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -560,6 +564,7 @@
                         "is_transferring": false,
                         "skip_scripts": false,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -687,6 +692,7 @@
                         "is_transferring": true,
                         "skip_scripts": true,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -812,6 +818,7 @@
                         "is_transferring": false,
                         "skip_scripts": false,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -946,6 +953,7 @@
                         "is_transferring": true,
                         "skip_scripts": true,
                         "playit_address": null,
+                        "address_pending": false,
                         "relationships": {
                             "allocations": {
                                 "object": "list",

@@ -30,6 +30,9 @@ class TunnelService
 {
     public const string NOT_CONFIGURED = 'This node has no playit.gg agent configured.';
 
+    /** Shown on tunnels of a node whose agent key playit only lets read. */
+    public const string READ_ONLY = 'This agent key is read-only: create tunnels in the playit dashboard; the panel links them automatically.';
+
     public function __construct(private readonly PlayitClient $client) {}
 
     /**
@@ -40,6 +43,15 @@ class TunnelService
     {
         return $tunnel->status === TunnelStatus::Deleted
             || ($tunnel->status === TunnelStatus::Failed && $tunnel->playit_tunnel_id === null);
+    }
+
+    /**
+     * The local IP a tunnel to an allocation on `$ip` uses: the agent runs on the node itself, so
+     * a wildcard bind (or anything that is not an IP) is reached on loopback.
+     */
+    public static function localIpFor(?string $ip): string
+    {
+        return is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP) !== false && ! in_array($ip, ['0.0.0.0', '::'], true) ? $ip : '127.0.0.1';
     }
 
     /**
@@ -61,6 +73,13 @@ class TunnelService
 
         if (! $server->node->hasPlayitAgent()) {
             return $this->fail($tunnel, self::NOT_CONFIGURED);
+        }
+
+        if ($server->node->isPlayitReadOnly() && ($tunnel->status === TunnelStatus::Deleted || $tunnel->playit_tunnel_id === null)) {
+            // The panel cannot create it; the scheduler links the one made in the playit dashboard.
+            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $server->allocation_id, 'imported_at' => null]);
+
+            return $this->waitForDashboard($tunnel);
         }
 
         if ($tunnel->status === TunnelStatus::Deleted) {
@@ -243,6 +262,12 @@ class TunnelService
 
         $secret = (string) $node->playit_secret;
 
+        if ($tunnel->playit_tunnel_id === null && $node->isPlayitReadOnly()) {
+            $this->waitForDashboard($tunnel);
+
+            return;
+        }
+
         try {
             if ($tunnel->playit_tunnel_id === null) {
                 $tunnel->fill([
@@ -255,8 +280,17 @@ class TunnelService
                 ])->save();
             }
 
-            $remote = $this->client->findTunnel($secret, (string) $tunnel->playit_tunnel_id);
+            $remote = $this->client->findTunnel($secret, (string) $tunnel->playit_tunnel_id, (string) $node->playit_agent_id);
         } catch (PlayitException $playitException) {
+            if ($playitException->reason === PlayitClient::READ_ONLY) {
+                // Stop trying to create tunnels on this node until its agent key changes.
+                $node->forceFill(['playit_mode' => Node::PLAYIT_READ_ONLY])->save();
+                Log::info(sprintf('playit.gg agent key of node #%d is read-only; tunnels there are now linked from the playit dashboard.', $node->id));
+                $this->waitForDashboard($tunnel);
+
+                return;
+            }
+
             $this->fail($tunnel, $playitException->getMessage());
 
             return;
@@ -270,7 +304,6 @@ class TunnelService
             return;
         }
 
-        $alloc = is_array($remote['alloc'] ?? null) ? $remote['alloc'] : [];
         $address = PlayitClient::addressOf($remote);
 
         if ($address !== null) {
@@ -279,9 +312,9 @@ class TunnelService
             return;
         }
 
-        if (($alloc['status'] ?? null) === 'disabled') {
-            $reason = is_array($alloc['data'] ?? null) && is_string($alloc['data']['reason'] ?? null) ? $alloc['data']['reason'] : 'unknown';
-            $this->fail($tunnel, 'playit.gg disabled the tunnel: '.$reason.'.');
+        $disabled = PlayitClient::disabledReason($remote);
+        if ($disabled !== null) {
+            $this->fail($tunnel, 'playit.gg disabled the tunnel: '.$disabled.'.');
 
             return;
         }
@@ -296,13 +329,11 @@ class TunnelService
     private function create(Server $server, Node $node, string $secret): string
     {
         $profile = TunnelProfile::forEgg($server->egg);
-        $ip = $server->allocation?->ip;
         $tunnel = [
             'name' => $this->tunnelName($server),
             'tunnel_type' => $profile['tunnel_type'],
             'port_type' => $profile['port_type'],
-            // The agent runs on the node itself; a wildcard bind is reached on loopback.
-            'local_ip' => is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP) !== false && ! in_array($ip, ['0.0.0.0', '::'], true) ? $ip : '127.0.0.1',
+            'local_ip' => self::localIpFor($server->allocation?->ip),
             'local_port' => (int) $server->allocation?->port,
         ];
 
@@ -331,6 +362,18 @@ class TunnelService
         }
 
         dispatch(new DeletePlayitTunnelJob($nodeId, $playitTunnelId))->afterCommit();
+    }
+
+    /**
+     * Park a tunnel the panel cannot create because the node's agent key is read-only. It stays
+     * failed without a playit id, so the scheduler links the tunnel the owner makes in the playit
+     * dashboard to it, and nothing is logged on every run.
+     */
+    private function waitForDashboard(ServerTunnel $tunnel): ServerTunnel
+    {
+        $tunnel->fill(['status' => TunnelStatus::Failed, 'playit_tunnel_id' => null, 'last_error' => self::READ_ONLY])->save();
+
+        return $tunnel;
     }
 
     private function fail(ServerTunnel $tunnel, string $error): ServerTunnel

@@ -24,6 +24,7 @@ class PlayitController extends AdminApiController
     private const array SETTINGS_EXAMPLE = [
         'agent_id' => '5b9d1b0e-3c1f-4e8a-9a51-1f0e7d2c6b44',
         'secret_set' => true,
+        'read_only' => false,
     ];
 
     private const array TEST_EXAMPLE = [
@@ -35,7 +36,7 @@ class PlayitController extends AdminApiController
     /**
      * Return the node's playit.gg agent. The secret is never returned, only whether one is stored.
      */
-    #[Endpoint('Get node playit.gg agent', 'Returns the playit.gg agent the panel creates server tunnels on for this node, and whether its secret is stored.')]
+    #[Endpoint('Get node playit.gg agent', 'Returns the playit.gg agent the panel creates server tunnels on for this node, whether its secret is stored, and whether playit refused to create a tunnel with it because the key is read-only (`read_only`). With a read-only key, tunnels are made in the playit dashboard and the panel links them to servers by local port.')]
     #[ScribeResponse(self::SETTINGS_EXAMPLE, description: 'playit.gg agent returned.')]
     public function show(GetPlayitSettingsRequest $request, Node $node): JsonResponse
     {
@@ -45,7 +46,7 @@ class PlayitController extends AdminApiController
     /**
      * Set or remove the node's playit.gg agent.
      */
-    #[Endpoint('Update node playit.gg agent', 'Sets the playit.gg agent id and secret for this node. A blank secret keeps the stored one; a null agent id removes the agent and its secret, and new servers on the node get no tunnel. Values pasted from playit.toml are cleaned first: surrounding whitespace, one pair of quotes and a leading `secret_key =` or `agent_id =` are removed. A secret that then does not look like a key (16 to 512 letters, digits, `-` or `_`) is refused with 422.')]
+    #[Endpoint('Update node playit.gg agent', 'Sets the playit.gg agent id and secret for this node. A blank secret keeps the stored one; a null agent id removes the agent and its secret, and new servers on the node get no tunnel. Values pasted from playit.toml are cleaned first: surrounding whitespace, one pair of quotes and a leading `secret_key =` or `agent_id =` are removed. A secret that then does not look like a key (16 to 512 letters, digits, `-` or `_`) is refused with 422. Changing the agent or the secret clears `read_only`, so the panel tries to create tunnels with the new key again.')]
     #[ScribeResponse(self::SETTINGS_EXAMPLE, description: 'playit.gg agent updated.')]
     public function update(UpdatePlayitSettingsRequest $request, Node $node): JsonResponse
     {
@@ -57,6 +58,11 @@ class PlayitController extends AdminApiController
             $node->playit_secret = null;
         } elseif ($secret !== '') {
             $node->playit_secret = $secret;
+        }
+
+        // Another key may be write-capable: let the panel find out on the next tunnel.
+        if ($node->isDirty(['playit_agent_id', 'playit_secret'])) {
+            $node->playit_mode = null;
         }
 
         $node->save();
@@ -89,13 +95,14 @@ class PlayitController extends AdminApiController
     }
 
     /**
-     * @return array{agent_id: string|null, secret_set: bool}
+     * @return array{agent_id: string|null, secret_set: bool, read_only: bool}
      */
     private function settings(Node $node): array
     {
         return [
             'agent_id' => $node->playit_agent_id,
             'secret_set' => is_string($node->playit_secret) && $node->playit_secret !== '',
+            'read_only' => $node->isPlayitReadOnly(),
         ];
     }
 }

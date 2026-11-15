@@ -35,7 +35,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -47,6 +47,9 @@ class Node extends Model implements Identifiable
     use Notifiable;
 
     public const string RESOURCE_NAME = 'node';
+
+    /** `playit_mode` once playit refused to create a tunnel because the agent key is read-only. */
+    public const string PLAYIT_READ_ONLY = 'read_only';
 
     public const int DAEMON_TOKEN_ID_LENGTH = 16;
 
@@ -115,6 +118,15 @@ class Node extends Model implements Identifiable
     {
         return is_string($this->playit_agent_id) && $this->playit_agent_id !== ''
             && is_string($this->playit_secret) && $this->playit_secret !== '';
+    }
+
+    /**
+     * Whether playit refused to create a tunnel with this node's agent key because the key is
+     * read-only. Tunnels are then made in the playit dashboard and the panel links them.
+     */
+    public function isPlayitReadOnly(): bool
+    {
+        return $this->playit_mode === self::PLAYIT_READ_ONLY;
     }
 
     public function getConnectionAddress(): string
