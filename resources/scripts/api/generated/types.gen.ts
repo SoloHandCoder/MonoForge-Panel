@@ -6906,14 +6906,6 @@ export type ClientListServerActivityFilterOptionsResponseBody = {
 
 export type ClientGetFileContentsResponseBody = string;
 
-export type ClientWriteFileContentsResponseBody = {
-    errors?: Array<{
-        code?: string;
-        status?: string;
-        detail?: string;
-    }>;
-};
-
 export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
@@ -21395,7 +21387,7 @@ export type ClientWriteFileContentsErrors = {
     /**
      * The contents are larger than the panel saves for editing (pterodactyl.files.max_edit_size).
      */
-    413: ClientWriteFileContentsResponseBody;
+    413: ErrorEnvelope;
     /**
      * The submitted data is invalid.
      */
