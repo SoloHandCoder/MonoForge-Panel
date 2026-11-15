@@ -70,14 +70,26 @@ export const useStartOAuthLogin = () =>
  * Creates the account of a Discord/Google sign-up waiting on the consent screen, once the visitor
  * agrees to the Terms of Service and Privacy Policy, and sends the signed-in browser on.
  */
+export interface OAuthSignUpConsent {
+    terms: boolean;
+    /** The nonce of the sign-up the screen showed. */
+    nonce: string;
+    /** The document versions the screen linked. */
+    termsVersion: number;
+    privacyVersion: number;
+}
+
 export const useCompleteOAuthSignUp = () =>
     useMutation({
-        mutationFn: async (terms: boolean) => {
+        mutationFn: async (consent: OAuthSignUpConsent) => {
             await authGetCsrfCookie();
 
             return (
                 await http.post<{ data: { complete: boolean; intended: string | null } }>('/auth/modules/register', {
-                    terms,
+                    terms: consent.terms,
+                    nonce: consent.nonce,
+                    terms_version: consent.termsVersion,
+                    privacy_version: consent.privacyVersion,
                 })
             ).data.data;
         },
@@ -85,6 +97,18 @@ export const useCompleteOAuthSignUp = () =>
             window.location.assign(intended || '/');
         },
         onError: (error) => notifyHttpError(error, 'Unable to create your account'),
+    });
+
+/** Drops the Discord/Google sign-up waiting on the consent screen, then goes back to sign in. */
+export const useCancelOAuthSignUp = () =>
+    useMutation({
+        mutationFn: async () => {
+            await authGetCsrfCookie();
+            await http.delete('/auth/modules/register');
+        },
+        onSettled: () => {
+            window.location.assign('/auth/login');
+        },
     });
 
 /** Starts linking a provider to the signed-in account. */

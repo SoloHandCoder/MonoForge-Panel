@@ -7,6 +7,7 @@ namespace Pterodactyl\Http\Controllers\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -38,6 +39,8 @@ class OAuthController extends Controller
     public const string CONSENT_PATH = '/auth/register/consent';
 
     private const string TOO_MANY_SIGN_UPS = 'Too many accounts have been created from your network recently. Please try again later.';
+
+    private const string SIGN_UP_EXPIRED = 'That sign up expired or was replaced. Please continue with Discord or Google again.';
 
     public function __construct(
         private readonly OAuthClient $client,
@@ -104,9 +107,20 @@ class OAuthController extends Controller
                     return $this->fail(false, self::TOO_MANY_SIGN_UPS);
                 }
 
-                // The account is only made once the visitor accepts the Terms of Service and
-                // Privacy Policy on the consent screen, which posts to register() below.
                 $this->accounts->ensureRegistrable($identity);
+
+                // A pending sign-up uses the IP's sign-up budget the moment it exists, counted
+                // atomically (increment, then compare), so sign-ups prepared in many sessions
+                // cannot all pass one check and be completed in parallel.
+                if (! $this->countSignUp($request)) {
+                    return $this->fail(false, self::TOO_MANY_SIGN_UPS);
+                }
+
+                // The account is only made once the visitor accepts the Terms of Service and
+                // Privacy Policy on the consent screen, which posts to register() below. A new
+                // session ID first: a session an attacker fixed must not hold the right to
+                // create, and sign in to, this account.
+                $request->session()->regenerate(true);
                 OAuthRegistration::stash($request->session(), $identity);
 
                 return new RedirectResponse(self::CONSENT_PATH);
@@ -137,21 +151,26 @@ class OAuthController extends Controller
     public function register(Request $request, CompletesLogins $logins): JsonResponse
     {
         $request->validate(
-            ['terms' => ['accepted']],
+            [
+                'terms' => ['accepted'],
+                'nonce' => ['required', 'string', 'max:64'],
+                'terms_version' => ['required', 'integer', 'min:1'],
+                'privacy_version' => ['required', 'integer', 'min:1'],
+            ],
             ['terms.accepted' => 'You must agree to the Terms of Service and Privacy Policy to create an account.'],
         );
 
-        $identity = OAuthRegistration::peek($request->session());
+        // Only the sign-up the visitor was shown: another one started in a second tab replaced
+        // the nonce, and an expired one has none.
+        $identity = OAuthRegistration::claim($request->session(), $request->string('nonce')->toString());
         if (! $identity instanceof OAuthIdentity || ! $identity->provider->enabled()) {
-            OAuthRegistration::forget($request->session());
-
-            throw ValidationException::withMessages(['terms' => 'That sign up expired. Please continue with Discord or Google again.']);
+            throw ValidationException::withMessages(['terms' => self::SIGN_UP_EXPIRED]);
         }
 
-        if ($this->registrationLimited($request)) {
-            throw ValidationException::withMessages(['terms' => self::TOO_MANY_SIGN_UPS]);
-        }
+        // And only the documents the visitor was shown.
+        LegalSettings::ensureShownVersions($request->integer('terms_version'), $request->integer('privacy_version'));
 
+        // The sign-up budget was already used when this sign-up was stashed (callback()).
         try {
             $user = $this->accounts->register($identity);
         } catch (OAuthException $oAuthException) {
@@ -160,12 +179,20 @@ class OAuthController extends Controller
             throw ValidationException::withMessages(['terms' => $oAuthException->getMessage()]);
         }
 
-        $limit = $this->registrationLimit($request);
-        RateLimiter::hit($limit['key'], $limit['decay']);
         OAuthRegistration::forget($request->session());
         LegalSettings::recordAcceptance($user);
 
         return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
+    }
+
+    /**
+     * Cancels the Discord/Google sign-up waiting on the consent screen ("Cancel" there).
+     */
+    public function cancelRegistration(Request $request): Response
+    {
+        OAuthRegistration::forget($request->session());
+
+        return new Response(status: Response::HTTP_NO_CONTENT);
     }
 
     private function registrationLimited(Request $request): bool
@@ -173,6 +200,17 @@ class OAuthController extends Controller
         $limit = $this->registrationLimit($request);
 
         return RateLimiter::tooManyAttempts($limit['key'], $limit['max']);
+    }
+
+    /**
+     * Uses one sign-up of the IP's budget: the counter is incremented first and compared after,
+     * so concurrent requests cannot all slip under the limit. False when the budget is spent.
+     */
+    private function countSignUp(Request $request): bool
+    {
+        $limit = $this->registrationLimit($request);
+
+        return RateLimiter::increment($limit['key'], $limit['decay']) <= $limit['max'];
     }
 
     /**

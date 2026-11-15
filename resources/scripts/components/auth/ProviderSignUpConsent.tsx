@@ -1,6 +1,7 @@
 /* oxlint-disable rules/design-tokens -- the card radius is the brand's fixed 18px */
 import { useId, useState } from 'react';
-import { useCompleteOAuthSignUp } from '@/api/account/oauth';
+import { useCancelOAuthSignUp, useCompleteOAuthSignUp } from '@/api/account/oauth';
+import { useLegalDocuments } from '@/api/legal';
 import { useSiteSettings } from '@/api/settings/queries';
 import Button from '@/components/elements/Button';
 import { LegalLink } from '@/components/legal/LegalLinks';
@@ -14,6 +15,10 @@ import { PanelLink } from '@/sdk/navigation';
 export default function ProviderSignUpConsent() {
     const pending = useSiteSettings()?.oauth?.registration ?? null;
     const complete = useCompleteOAuthSignUp();
+    const cancel = useCancelOAuthSignUp();
+    // The versions of the documents linked here: the server refuses a version published since.
+    const documents = useLegalDocuments();
+    const busy = complete.isPending || cancel.isPending;
     const [agreed, setAgreed] = useState(false);
     const termsId = useId();
 
@@ -29,7 +34,12 @@ export default function ProviderSignUpConsent() {
                     <form
                         onSubmit={(event) => {
                             event.preventDefault();
-                            complete.mutate(agreed);
+                            complete.mutate({
+                                terms: agreed,
+                                nonce: pending.nonce,
+                                termsVersion: documents.terms.version,
+                                privacyVersion: documents.privacy.version,
+                            });
                         }}
                     >
                         <p className='text-sm text-muted-foreground'>
@@ -43,13 +53,7 @@ export default function ProviderSignUpConsent() {
                             . One last step before we create your account:
                         </p>
                         <div className='mt-6 flex items-start gap-3'>
-                            <Checkbox
-                                id={termsId}
-                                name='terms'
-                                checked={agreed}
-                                onChange={setAgreed}
-                                disabled={complete.isPending}
-                            />
+                            <Checkbox id={termsId} name='terms' checked={agreed} onChange={setAgreed} disabled={busy} />
                             <label htmlFor={termsId} className='text-sm text-foreground'>
                                 I agree to the <LegalLink document='terms' /> and <LegalLink document='privacy' />
                             </label>
@@ -58,11 +62,21 @@ export default function ProviderSignUpConsent() {
                             type='submit'
                             size='xlarge'
                             className='mt-6 w-full justify-center'
-                            disabled={!agreed || complete.isPending}
+                            disabled={!agreed || busy}
                             isLoading={complete.isPending}
                         >
                             Create Account
                         </Button>
+                        {/* Drops the waiting sign-up, so nobody else on this browser can finish it. */}
+                        <Button.Text
+                            type='button'
+                            isSecondary
+                            className='mt-3 w-full justify-center'
+                            disabled={busy}
+                            onClick={() => cancel.mutate()}
+                        >
+                            Cancel
+                        </Button.Text>
                     </form>
                 ) : (
                     <p className='text-center text-sm text-muted-foreground'>

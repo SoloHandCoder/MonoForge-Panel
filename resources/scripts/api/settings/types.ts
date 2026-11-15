@@ -12,6 +12,8 @@ export interface OAuthRegistration {
     label: string;
     email: string;
     username: string;
+    /** One-time value the consent screen sends back, so it creates exactly this sign-up. */
+    nonce: string;
 }
 
 export type CaptchaProvider = 'none' | 'recaptcha' | 'turnstile';

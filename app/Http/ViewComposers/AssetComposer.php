@@ -72,7 +72,7 @@ class AssetComposer
     }
 
     /**
-     * @return array{providers: array<string, bool>, result: array{status: string, message?: string, token?: string|null}|null, registration: array{provider: string, label: string, email: string, username: string}|null}
+     * @return array{providers: array<string, bool>, result: array{status: string, message?: string, token?: string|null}|null, registration: array{provider: string, label: string, email: string, username: string, nonce: string}|null}
      */
     private function oauthPayload(): array
     {
@@ -98,6 +98,8 @@ class AssetComposer
                 'label' => $pending->provider->label(),
                 'email' => (string) $pending->email,
                 'username' => (string) ($pending->displayName ?? $pending->username),
+                // Posted back by the consent screen, so it creates exactly this sign-up.
+                'nonce' => (string) OAuthRegistration::nonce($this->request->session()),
             ] : null,
         ];
     }
