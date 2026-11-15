@@ -95,6 +95,8 @@ export interface FileManagerEntry {
     readonly extractable: boolean;
     /** Where opening it leads; null when it cannot be opened. */
     readonly destination: CorePanelDestination | null;
+    /** The full-screen editor with this file open; null for a folder or a file this user cannot read. */
+    readonly editorDestination: CorePanelDestination | null;
     /** The file as the API returns it, which `server.files.details` and the row slots receive. */
     readonly file: FileObject;
 }
@@ -156,6 +158,8 @@ export interface FileManagerModel {
     readonly permissions: FileManagerPermissions;
     /** The editor for a new file in the current directory. */
     readonly newFileDestination: CorePanelDestination;
+    /** The full-screen editor with the current directory expanded in its file tree. */
+    readonly editorDestination: CorePanelDestination;
     /** Uploads in progress, by name. */
     readonly uploads: readonly FileUpload[];
     /** A name relative to the current directory as the path it resolves to below /home/container/. */

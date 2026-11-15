@@ -1,3 +1,4 @@
+import { SquareCode } from 'lucide-react';
 import { Checkbox, cn, ErrorBoundary, NewButton, PanelLink } from '@/sdk';
 import { Slot, type ViewProps } from '@/sdk/theme';
 import Breadcrumbs from './Breadcrumbs';
@@ -25,16 +26,21 @@ export default function FileManagerToolbar({ model, className }: ViewProps<'serv
                         onChange={(checked) => model.actions.select(checked ? entries.map((entry) => entry.name) : [])}
                     />
                 </Breadcrumbs>
-                {model.permissions.create && (
-                    <div className={managerActionsClass}>
-                        <UploadStatus model={model} />
-                        <NewDirectoryButton model={model} />
-                        {model.permissions.update && <UploadButton model={model} />}
-                        <PanelLink destination={model.newFileDestination}>
-                            <NewButton>New file</NewButton>
-                        </PanelLink>
-                    </div>
-                )}
+                <div className={managerActionsClass}>
+                    {model.permissions.create && (
+                        <>
+                            <UploadStatus model={model} />
+                            <NewDirectoryButton model={model} />
+                            {model.permissions.update && <UploadButton model={model} />}
+                            <PanelLink destination={model.newFileDestination}>
+                                <NewButton>New file</NewButton>
+                            </PanelLink>
+                        </>
+                    )}
+                    <PanelLink destination={model.editorDestination}>
+                        <NewButton icon={SquareCode}>Open editor</NewButton>
+                    </PanelLink>
+                </div>
             </div>
             <Slot name='server.files.toolbar' data={model.slot} />
         </ErrorBoundary>

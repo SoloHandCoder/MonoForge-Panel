@@ -8,6 +8,7 @@ import {
     MoreHorizontal,
     PackageOpen,
     Pencil,
+    SquareCode,
     Trash2,
 } from 'lucide-react';
 import {
@@ -135,6 +136,15 @@ function ActionItems({ entry }: { entry: FileManagerEntry }) {
 
     return (
         <>
+            {entry.editorDestination && (
+                <DropdownMenuItem
+                    destination={entry.editorDestination}
+                    icon={SquareCode}
+                    description='Tabs, quick open, find'
+                >
+                    Open in editor
+                </DropdownMenuItem>
+            )}
             {permissions.update && (
                 <>
                     <DropdownMenuItem

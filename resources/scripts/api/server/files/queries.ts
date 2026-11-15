@@ -1,4 +1,11 @@
-import { useQuery, queryOptions, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+    keepPreviousData,
+    useQuery,
+    queryOptions,
+    useMutation,
+    useQueryClient,
+    type QueryClient,
+} from '@tanstack/react-query';
 import axios, { type AxiosProgressEvent } from 'axios';
 import { toast } from 'sonner';
 import { cleanDirectoryPath, fileBitsToString, newDirectoryDisplayName } from '@/helpers';
@@ -15,6 +22,7 @@ import {
     clientListFilesOptions,
     clientListFilesQueryKey,
     clientRenameFilesMutation,
+    clientSearchFilesOptions,
     clientWriteFileContentsMutation,
 } from '@/api/generated/@tanstack/react-query.gen';
 import {
@@ -254,6 +262,36 @@ export const serverFileContentQueryOptions = (uuid: string, file: string) =>
 
 export const useServerFileContent = (uuid: string, file: string, enabled = true) =>
     useQuery({ ...serverFileContentQueryOptions(uuid, file), enabled: uuid.length > 0 && file.length > 0 && enabled });
+
+/** The path of every file in a directory listing this session has already loaded, for quick open. */
+export const listedServerFilePaths = (queryClient: QueryClient, uuid: string): string[] =>
+    queryClient
+        .getQueryCache()
+        .findAll({ queryKey: allServerFilesQueryKey(uuid) })
+        .flatMap((query) => {
+            const [{ query: params }] = query.queryKey as ReturnType<typeof serverFilesQueryKey>;
+            const data = query.state.data as ClientListFilesResponse | undefined;
+            const directory = cleanDirectoryPath(params?.directory ?? '/').replace(/\/+$/, '');
+
+            return (data?.data ?? [])
+                .filter((file) => file.attributes.is_file)
+                .map((file) => `${directory}/${file.attributes.name}`);
+        });
+
+/** Quick open's server-side search starts at this many characters. */
+export const FILE_SEARCH_MIN_LENGTH = 2;
+
+export const serverFileSearchQueryOptions = (uuid: string, query: string) =>
+    clientSearchFilesOptions({ path: { server_uuid: uuid }, query: { query: query.trim() } });
+
+/** Files below the root whose path holds every word of the query; the server caps and caches the walk. */
+export const useServerFileSearch = (uuid: string, query: string, enabled = true) =>
+    useQuery({
+        ...serverFileSearchQueryOptions(uuid, query),
+        enabled: enabled && uuid.length > 0 && query.trim().length >= FILE_SEARCH_MIN_LENGTH,
+        staleTime: 30_000,
+        placeholderData: keepPreviousData,
+    });
 
 export const useCreateDirectory = () => {
     const queryClient = useQueryClient();

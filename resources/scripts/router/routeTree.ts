@@ -94,6 +94,7 @@ import {
     parseApiKeyListSearch,
     parseDashboardSearch,
     parseDatabaseHostListSearch,
+    parseEditorSearch,
     parseEmailSearch,
     parseLocationListSearch,
     parseMountListSearch,
@@ -360,6 +361,14 @@ const serverChildren = [
         path: 'files/$action',
         beforeLoad: requireServerPermission('file.*'),
         component: pageRoute('page.server.files.editor', 'file.*', FileEditorFrame),
+    }),
+    // Phase 5: the full-screen editor with tabs. Monaco loads with this route only.
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'editor',
+        validateSearch: parseEditorSearch,
+        beforeLoad: requireServerPermission(['file.read', 'file.read-content']),
+        component: componentRoute(() => import('@/components/server/files/ide/EditorPage')),
     }),
     createRoute({
         getParentRoute: () => serverRoute,

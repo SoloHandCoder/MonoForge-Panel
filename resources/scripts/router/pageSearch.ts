@@ -10,10 +10,12 @@ export type DashboardSearch = PageSearch & {
 };
 
 export interface RawSearch {
+    dir?: string | number | boolean | null;
     email?: string | number | boolean | null;
     event?: string | number | boolean | null;
     filter?: string | number | boolean | null;
     page?: string | number | boolean | null;
+    path?: string | number | boolean | null;
     sort?: string | number | boolean | null;
     type?: string | number | boolean | null;
     user?: string | number | boolean | null;

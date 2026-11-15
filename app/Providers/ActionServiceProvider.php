@@ -60,6 +60,7 @@ use Pterodactyl\Actions\Files\ListDirectory;
 use Pterodactyl\Actions\Files\PullFile;
 use Pterodactyl\Actions\Files\ReadFileContents;
 use Pterodactyl\Actions\Files\RenameFiles;
+use Pterodactyl\Actions\Files\SearchFileNames;
 use Pterodactyl\Actions\Files\WriteFileContents;
 use Pterodactyl\Actions\Locations\CreateLocation;
 use Pterodactyl\Actions\Locations\DeleteLocation;
@@ -180,6 +181,7 @@ use Pterodactyl\Contracts\Files\ListsDirectories;
 use Pterodactyl\Contracts\Files\PullsFiles;
 use Pterodactyl\Contracts\Files\ReadsFileContents;
 use Pterodactyl\Contracts\Files\RenamesFiles;
+use Pterodactyl\Contracts\Files\SearchesFileNames;
 use Pterodactyl\Contracts\Files\WritesFileContents;
 use Pterodactyl\Contracts\Locations\CreatesLocations;
 use Pterodactyl\Contracts\Locations\DeletesLocations;
@@ -271,6 +273,7 @@ class ActionServiceProvider extends ServiceProvider
         $this->app->bind(PullsFiles::class, PullFile::class);
         $this->app->bind(ReadsFileContents::class, ReadFileContents::class);
         $this->app->bind(ListsDirectories::class, ListDirectory::class);
+        $this->app->bind(SearchesFileNames::class, SearchFileNames::class);
 
         $this->app->bind(UpdatesExtensionSettings::class, UpdateExtensionSettings::class);
         $this->app->bind(ReplacesExtensionSettingFiles::class, ReplaceExtensionSettingFile::class);
