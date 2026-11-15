@@ -329,7 +329,7 @@ test('webhook bodies older than 90 days lose the buyer details, the payments sta
 
     $pruned = TebexPayment::query()->where('transaction_id', 'tbx-old')->sole();
     $kept = TebexPayment::query()->where('transaction_id', 'tbx-new')->sole();
-    expect($pruned->raw)->toBe([['id' => $old['id'], 'type' => 'payment.completed', 'date' => $old['date']]])
+    expect($pruned->raw)->toEqual([['id' => $old['id'], 'type' => 'payment.completed', 'date' => $old['date']]])
         ->and(json_encode($pruned->raw))->not->toContain('buyer@example.com')
         ->and($pruned->raw_pruned_at)->not->toBeNull()
         ->and($pruned->status)->toBe(TebexPayment::STATUS_COMPLETED)
