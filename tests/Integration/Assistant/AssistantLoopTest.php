@@ -58,7 +58,8 @@ test('an auto tool runs right away and the loop continues to a final answer', fu
         ->and($second[0]['content'])->toContain('untrusted data')
         ->and($second[2]['tool_calls'][0]['id'])->toBe('call_1')
         ->and($second[3])->toBe(['role' => 'tool', 'tool_call_id' => 'call_1', 'content' => 'echo: hi']);
-    Http::assertSent(fn (Request $request): bool => collect($request->data()['tools'])->pluck('function.name')->sort()->values()->all() === ['echo_text', 'pretend_delete']);
+    // The real tools (registered by AssistantToolServiceProvider) are offered next to the example ones.
+    Http::assertSent(fn (Request $request): bool => collect($request->data()['tools'])->pluck('function.name')->intersect(['echo_text', 'pretend_delete', 'read_console'])->count() === 3);
 });
 
 test('a tool that needs confirmation pauses the turn', function (): void {

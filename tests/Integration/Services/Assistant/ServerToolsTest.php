@@ -79,7 +79,7 @@ test('every server tool is registered under the server scope', function (): void
 });
 
 test('the registry only offers a subuser the tools their permissions allow', function (): void {
-    [$user, $server] = $this->generateTestAccount([Permissions::FileRead->value, Permissions::ControlStart->value]);
+    [$user, $server] = $this->generateTestAccount([Permissions::AssistantUse->value, Permissions::FileRead->value, Permissions::ControlStart->value]);
     $names = array_map(fn (AssistantTool $tool): string => $tool->name(), resolve(ToolRegistry::class)->for('server', context($user, $server)));
 
     expect($names)->toEqualCanonicalizing(['server_status', 'list_files', 'search_files', 'power']);
