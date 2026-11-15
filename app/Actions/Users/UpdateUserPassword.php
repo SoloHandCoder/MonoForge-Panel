@@ -19,6 +19,8 @@ final readonly class UpdateUserPassword implements UpdatesUserPasswords
     {
         $user = $this->users->update($user, ['password' => $password]);
         $user->setRememberToken(Str::random(60));
+        // Accounts created through Discord or Google now have a password they know.
+        $user->forceFill(['has_password' => true]);
         $user->save();
 
         Activity::event('user:account.password-changed')->subject($user)->log();

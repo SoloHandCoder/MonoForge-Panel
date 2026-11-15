@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Auth\ForgotPasswordController;
 use Pterodactyl\Http\Controllers\Auth\LoginCheckpointController;
 use Pterodactyl\Http\Controllers\Auth\LoginController;
+use Pterodactyl\Http\Controllers\Auth\OAuthController;
 use Pterodactyl\Http\Controllers\Auth\ResetPasswordController;
 
 /*
@@ -44,6 +45,19 @@ Route::middleware(['throttle:authentication'])->group(function (): void {
     Route::post('/password/reset', ResetPasswordController::class)
         ->name('auth.reset-password')
         ->middleware('recaptcha');
+
+    // Discord and Google sign in. The start endpoint returns the provider URL to send the
+    // browser to; the callback paths are registered with the providers, so keep them as
+    // they are. The callback drops `guest` because signed-in users come back to it when
+    // they link an account from their account page.
+    Route::post('/modules/{provider}', [OAuthController::class, 'start'])
+        ->whereIn('provider', ['discord', 'google'])
+        ->middleware('recaptcha')
+        ->name('auth.modules.start');
+    Route::get('/modules/{provider}/authenticate', [OAuthController::class, 'callback'])
+        ->whereIn('provider', ['discord', 'google'])
+        ->withoutMiddleware('guest')
+        ->name('auth.modules.authenticate');
 });
 
 // Remove the guest middleware and apply the authenticated middleware to this endpoint,

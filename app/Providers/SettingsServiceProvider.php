@@ -36,6 +36,13 @@ class SettingsServiceProvider extends ServiceProvider
         'pterodactyl:client_features:allocations:range_start',
         'pterodactyl:client_features:allocations:range_end',
         'monoforge:update:mode',
+        // Phase 2 Task G: Discord and Google login providers.
+        'monoforge:auth:discord:enabled',
+        'monoforge:auth:discord:client_id',
+        'monoforge:auth:discord:client_secret',
+        'monoforge:auth:google:enabled',
+        'monoforge:auth:google:client_id',
+        'monoforge:auth:google:client_secret',
     ];
 
     /**
@@ -62,6 +69,9 @@ class SettingsServiceProvider extends ServiceProvider
      */
     protected static array $encrypted = [
         'mail:mailers:smtp:password',
+        // Phase 2 Task G: Discord and Google login providers.
+        'monoforge:auth:discord:client_secret',
+        'monoforge:auth:google:client_secret',
     ];
 
     /**

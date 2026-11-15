@@ -56,6 +56,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferProgressController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\AdvancedController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
@@ -464,6 +465,9 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     Route::put('/mail', MailController::class)->name('.mail');
     Route::post('/mail/test', TestMailController::class)->name('.mail.test');
     Route::put('/advanced', AdvancedController::class)->name('.advanced');
+    // Phase 2 Task G: Discord and Google login providers.
+    Route::get('/login-providers', [LoginProvidersController::class, 'index'])->name('.login-providers');
+    Route::put('/login-providers', [LoginProvidersController::class, 'update'])->name('.login-providers.update');
 });
 
 /*
