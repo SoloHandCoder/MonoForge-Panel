@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
-use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Requests\Api\Client\Account\AcceptLegalDocumentsRequest;
 use Pterodactyl\Services\Legal\LegalSettings;
 
@@ -36,16 +34,7 @@ class LegalAcceptanceController extends ClientApiController
     #[ScribeResponse(self::EXAMPLE, description: 'Acceptance recorded.')]
     public function __invoke(AcceptLegalDocumentsRequest $request): JsonResponse
     {
-        $errors = [];
-        if ($request->integer('terms_version') !== LegalSettings::version(LegalDocument::Terms)) {
-            $errors['terms_version'] = 'The Terms of Service changed while you were reading. Please review the new version.';
-        }
-
-        if ($request->integer('privacy_version') !== LegalSettings::version(LegalDocument::Privacy)) {
-            $errors['privacy_version'] = 'The Privacy Policy changed while you were reading. Please review the new version.';
-        }
-
-        throw_if($errors !== [], ValidationException::withMessages($errors));
+        LegalSettings::ensureShownVersions($request->integer('terms_version'), $request->integer('privacy_version'));
 
         $user = $request->user();
         LegalSettings::recordAcceptance($user);

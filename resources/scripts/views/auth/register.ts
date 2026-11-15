@@ -1,5 +1,6 @@
 import { useField, useForm, useStore } from '@tanstack/react-form';
 import { useRegister } from '@/api/auth/queries';
+import { useLegalDocuments } from '@/api/legal';
 import { firstError } from '@/components/form/errors';
 import { boundField, fixtureField } from '../forms';
 import { implementViews } from '../registry';
@@ -15,6 +16,8 @@ const RULES_REQUIRED = 'You must agree to the Terms of Service and Privacy Polic
 function useRegisterFormModel(): RegisterFormModel {
     const register = useRegister();
     const { Captcha, token } = useCaptcha('register');
+    // The versions the linked documents were at when the form opened; the server refuses older ones.
+    const { terms: termsDocument, privacy: privacyDocument } = useLegalDocuments();
     const form = useForm({
         defaultValues: { username: '', email: '', password: '', passwordConfirmation: '', terms: false },
         onSubmit: async ({ value }) => {
@@ -32,6 +35,8 @@ function useRegisterFormModel(): RegisterFormModel {
                         password: value.password,
                         password_confirmation: value.passwordConfirmation,
                         terms: value.terms,
+                        terms_version: termsDocument.version,
+                        privacy_version: privacyDocument.version,
                         'g-recaptcha-response': captcha,
                     },
                 });

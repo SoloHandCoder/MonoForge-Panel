@@ -30,6 +30,9 @@ class RegisterRequest extends FormRequest
             'email' => $rules['email'],
             'password' => ['required', 'confirmed', ...CreateUser::passwordRules()],
             'terms' => ['accepted'],
+            // The document versions the form showed; the controller refuses older ones.
+            'terms_version' => ['required', 'integer', 'min:1'],
+            'privacy_version' => ['required', 'integer', 'min:1'],
         ];
     }
 

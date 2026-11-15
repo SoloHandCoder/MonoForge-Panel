@@ -342,9 +342,25 @@ describe('sign-up', () => {
     it('creates the account with a Turnstile token once the Terms of Service and Privacy Policy are accepted', async () => {
         mocks.register.mockReturnValue(new Promise(() => {}));
         mocks.execute.mockResolvedValue('turnstile-token');
+        const doc = (title: string, id: string, version: number) => ({
+            title,
+            url: `/legal/${id}`,
+            external: false,
+            version,
+            updatedAt: '',
+        });
+
         await renderAuth('/auth/register', false, {
             captcha: { provider: 'turnstile', siteKey: 'site-key' },
             registration: { enabled: true },
+            legal: {
+                pending: [],
+                documents: {
+                    terms: doc('Terms of Service', 'terms', 3),
+                    privacy: doc('Privacy Policy', 'privacy', 2),
+                    refunds: doc('Refund Policy', 'refunds', 1),
+                },
+            },
         });
 
         // The widget names its form, which the panel checks when verifying the token.
@@ -388,6 +404,9 @@ describe('sign-up', () => {
                 password: 'correct horse',
                 password_confirmation: 'correct horse',
                 terms: true,
+                // The versions the form showed, so a later publication is not accepted unseen.
+                terms_version: 3,
+                privacy_version: 2,
                 'g-recaptcha-response': 'turnstile-token',
             },
         });

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Legal;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\User;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Throwable;
 
 /**
@@ -27,6 +29,9 @@ final class LegalSettings
 {
     /** The version every document starts at, and the one users without a record count as having accepted. */
     public const int INITIAL_VERSION = 1;
+
+    /** Why a purchase is refused while updated documents wait to be accepted. */
+    public const string ACCEPT_FIRST = 'Please accept the updated terms first.';
 
     /** When the starter texts were written; shown as "Last updated" until an administrator saves. */
     public const string DEFAULT_UPDATED_AT = '2026-11-20';
@@ -144,6 +149,36 @@ final class LegalSettings
             fn (LegalDocument $document): bool => $document->requiresAcceptance()
                 && self::version($document) > self::acceptedVersion($user, $document),
         ));
+    }
+
+    /**
+     * Refuses an acceptance of versions other than the current ones: a document published while
+     * the form was open must be read before it can be accepted.
+     *
+     * @throws ValidationException
+     */
+    public static function ensureShownVersions(int $terms, int $privacy): void
+    {
+        $errors = [];
+        if ($terms !== self::version(LegalDocument::Terms)) {
+            $errors['terms_version'] = 'The Terms of Service changed while you were reading. Please review the new version.';
+        }
+
+        if ($privacy !== self::version(LegalDocument::Privacy)) {
+            $errors['privacy_version'] = 'The Privacy Policy changed while you were reading. Please review the new version.';
+        }
+
+        throw_if($errors !== [], ValidationException::withMessages($errors));
+    }
+
+    /**
+     * Refuses a purchase while the user has updated documents to accept.
+     *
+     * @throws ConflictHttpException
+     */
+    public static function ensureAccepted(User $user): void
+    {
+        throw_if(self::pendingFor($user) !== [], ConflictHttpException::class, self::ACCEPT_FIRST);
     }
 
     /** Records that the user accepted the current Terms of Service and Privacy Policy. */
