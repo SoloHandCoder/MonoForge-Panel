@@ -100,6 +100,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | AI assistant (phase 4)
+    |--------------------------------------------------------------------------
+    |
+    | The admin AI Assistant > Settings tab stores these as "monoforge:ai:*".
+    | ratio: AI tokens per panel token. free_tokens_monthly: AI tokens each user
+    | gets free per calendar month (the admin assistant is never charged).
+    | warn_percent: when the free allowance warning is shown. context_tokens:
+    | above this estimated size the oldest messages are summarised.
+    |
+    */
+    'ai' => [
+        'enabled' => false,
+        'server_enabled' => true,
+        'admin_enabled' => true,
+        'default_provider_id' => null,
+        'ratio' => 1000,
+        'free_tokens_monthly' => 50000,
+        'warn_percent' => 80,
+        'max_tool_iterations' => 8,
+        'context_tokens' => 24000,
+        'max_output_tokens' => 2048,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Privacy
     |--------------------------------------------------------------------------
     |

@@ -7,6 +7,10 @@ use Pterodactyl\Http\Controllers\Api\Admin\ActivityController;
 use Pterodactyl\Http\Controllers\Api\Admin\ActivityFilterController;
 use Pterodactyl\Http\Controllers\Api\Admin\Announcements\AnnouncementController;
 use Pterodactyl\Http\Controllers\Api\Admin\ApiKeys\ApiKeyController;
+use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AdminConversationController;
+use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AiProviderController;
+use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AssistantSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AssistantUsageController;
 use Pterodactyl\Http\Controllers\Api\Admin\DatabaseHosts\DatabaseHostController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\EggCatalogController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\EggController;
@@ -161,6 +165,37 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
     Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
     Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| AI Assistant Routes (phase 4)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/assistant
+|
+| The admin chat, providers (keys are write-only), settings and usage. Panel sessions only.
+|
+*/
+Route::prefix('/assistant')->name('api.admin.assistant')->middleware(RequireSessionAuthentication::class)->group(function (): void {
+    Route::get('/conversations', [AdminConversationController::class, 'index'])->name('.conversations')->withoutScopedBindings();
+    Route::post('/conversations', [AdminConversationController::class, 'store'])->middleware('throttle:20,1')->name('.conversations.store')->withoutScopedBindings();
+    Route::get('/conversations/{conversation}', [AdminConversationController::class, 'show'])->name('.conversations.view')->withoutScopedBindings();
+    Route::post('/conversations/{conversation}/messages', [AdminConversationController::class, 'message'])->middleware('throttle:30,1')->name('.conversations.message')->withoutScopedBindings();
+    Route::post('/conversations/{conversation}/tool-calls/{toolCall}/approve', [AdminConversationController::class, 'approve'])->name('.conversations.approve')->withoutScopedBindings();
+    Route::post('/conversations/{conversation}/tool-calls/{toolCall}/deny', [AdminConversationController::class, 'deny'])->name('.conversations.deny')->withoutScopedBindings();
+    Route::delete('/conversations/{conversation}', [AdminConversationController::class, 'destroy'])->name('.conversations.delete')->withoutScopedBindings();
+
+    Route::get('/providers', [AiProviderController::class, 'index'])->name('.providers');
+    Route::post('/providers', [AiProviderController::class, 'store'])->name('.providers.store');
+    Route::put('/providers/{provider:id}', [AiProviderController::class, 'update'])->name('.providers.update');
+    Route::delete('/providers/{provider:id}', [AiProviderController::class, 'destroy'])->name('.providers.delete');
+    Route::post('/providers/{provider:id}/test', [AiProviderController::class, 'test'])->middleware('throttle:10,1')->name('.providers.test');
+
+    Route::get('/settings', [AssistantSettingsController::class, 'index'])->name('.settings');
+    Route::put('/settings', [AssistantSettingsController::class, 'update'])->name('.settings.update');
+
+    Route::get('/usage', AssistantUsageController::class)->name('.usage');
 });
 
 /*

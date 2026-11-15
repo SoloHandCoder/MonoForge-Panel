@@ -42,6 +42,9 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
     /** @var array<string, class-string>|null */
     private ?array $resourceClasses = null;
 
+    /** @var array<string, array<string, array<mixed>>>|null */
+    private ?array $inlineFieldSchemas = null;
+
     /** @var array<string, true>|null */
     private ?array $sessionOnlyEndpoints = null;
 
@@ -414,13 +417,65 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             return;
         }
 
-        $this->replaceResponseSchemas($pathItem, fn (string $status): bool => str_starts_with($status, '2'), function (mixed $schema) use ($endpoint): mixed {
+        $declared = $this->inlineFieldSchemas()[$this->anonymousEndpointKey(mb_strtoupper($endpoint->httpMethods[0]), $endpoint->uri)] ?? [];
+
+        $this->replaceResponseSchemas($pathItem, fn (string $status): bool => str_starts_with($status, '2'), function (mixed $schema) use ($endpoint, $declared): mixed {
             if (is_array($schema) && ! isset($schema['$ref'])) {
                 $this->walkPropertiesApplyingResponseFields($schema, $endpoint);
+
+                // A top-level field declared with a raw schema (a list whose items an example
+                // cannot describe) takes that schema, keeping its description.
+                foreach ($declared as $name => $fieldSchema) {
+                    if (is_array($schema['properties'] ?? null) && is_array($schema['properties'][$name] ?? null)) {
+                        $description = $schema['properties'][$name]['description'] ?? null;
+                        $schema['properties'][$name] = $description === null ? $fieldSchema : [...$fieldSchema, 'description' => $description];
+                    }
+                }
             }
 
             return $schema;
         });
+    }
+
+    /**
+     * @return array<string, array<string, array<mixed>>> map of "METHOD uri" to the raw schemas of
+     *                                                    top-level fields declared on a controller
+     *                                                    method with ResponseField(schema: ...)
+     */
+    private function inlineFieldSchemas(): array
+    {
+        if ($this->inlineFieldSchemas !== null) {
+            return $this->inlineFieldSchemas;
+        }
+
+        $map = [];
+        foreach (Route::getRoutes()->getRoutes() as $route) {
+            $action = $route->getActionName();
+            [$class, $method] = str_contains($action, '@') ? explode('@', $action, 2) : [$action, '__invoke'];
+            if ($class === 'Closure' || ! class_exists($class) || ! method_exists($class, $method)) {
+                continue;
+            }
+
+            $schemas = [];
+            foreach ((new ReflectionMethod($class, $method))->getAttributes(ResponseField::class) as $attribute) {
+                $field = $attribute->newInstance();
+                if ($field->schema !== [] && ! str_contains($field->name, '.')) {
+                    $schemas[$field->name] = $field->schema;
+                }
+            }
+
+            if ($schemas === []) {
+                continue;
+            }
+
+            foreach ($route->methods() as $httpMethod) {
+                if (is_string($httpMethod) && $httpMethod !== 'HEAD' && $httpMethod !== 'OPTIONS') {
+                    $map[$this->anonymousEndpointKey($httpMethod, $route->uri())] = $schemas;
+                }
+            }
+        }
+
+        return $this->inlineFieldSchemas = $map;
     }
 
     /**
@@ -1140,7 +1195,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
     private function errorResponseSchema(string $status): ?string
     {
         return match ($status) {
-            '400', '401', '403', '404', '409', '429', '500', '502', '504' => 'ErrorEnvelope',
+            '400', '401', '402', '403', '404', '409', '429', '500', '502', '503', '504' => 'ErrorEnvelope',
             '422' => 'ValidationErrorEnvelope',
             default => null,
         };

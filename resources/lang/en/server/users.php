@@ -31,5 +31,6 @@ return [
         'schedule_read' => 'Allows a user permission to view schedules for a server.',
         'schedule_update' => 'Allows a user permission to make modifications to an existing server schedule.',
         'schedule_delete' => 'Allows a user to delete a schedule for the server.',
+        'assistant_use' => 'Allows a user to chat with the AI assistant on this server, limited to what their other permissions allow.',
     ],
 ];

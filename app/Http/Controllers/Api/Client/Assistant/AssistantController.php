@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Pterodactyl\Http\Controllers\Api\Client\Assistant;
+
+use Illuminate\Http\JsonResponse;
+use Knuckles\Scribe\Attributes\Endpoint;
+use Knuckles\Scribe\Attributes\Group;
+use Knuckles\Scribe\Attributes\Response as ScribeResponse;
+use Knuckles\Scribe\Attributes\Subgroup;
+use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
+use Pterodactyl\Http\Requests\Api\Client\GetAssistantStatusRequest;
+use Pterodactyl\Services\Assistant\AssistantBilling;
+use Pterodactyl\Services\Assistant\AssistantSettings;
+
+#[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
+#[Subgroup('Server Assistant', 'Chat with the AI assistant about a server. It can only do what your own permissions allow, and asks before sensitive actions.')]
+class AssistantController extends ClientApiController
+{
+    private const array EXAMPLE = [
+        'enabled' => true,
+        'server_enabled' => true,
+        'free_limit' => 50000,
+        'free_used' => 41000,
+        'ratio' => 1000,
+        'balance' => 250,
+        'warning' => 'near_limit',
+    ];
+
+    #[Endpoint('Get assistant status', 'Returns whether the AI assistant is turned on, the free AI tokens of this month (free_limit, free_used), how many AI tokens one panel token buys (ratio), the token balance, and a warning: null, near_limit, free_exhausted (now paid from the balance) or no_balance (the assistant cannot be used until the wallet is topped up).')]
+    #[ScribeResponse(self::EXAMPLE, description: 'Assistant status returned.')]
+    public function __invoke(GetAssistantStatusRequest $request, AssistantBilling $billing): JsonResponse
+    {
+        return new JsonResponse([
+            'enabled' => AssistantSettings::enabled(),
+            'server_enabled' => AssistantSettings::serverEnabled(),
+            ...$billing->status($request->user()),
+        ]);
+    }
+}

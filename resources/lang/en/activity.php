@@ -138,6 +138,9 @@ return [
             'edit' => 'Changed the :variable variable from ":old" to ":new"',
             'image' => 'Updated the Docker Image for the server from :old to :new',
         ],
+        'assistant' => [
+            'tool' => ':decision the assistant action ":label"',
+        ],
         'subuser' => [
             'create' => 'Added :email as a subuser',
             'update' => 'Updated the subuser permissions for :email',
@@ -149,6 +152,17 @@ return [
             'create' => 'Created the ":title" announcement',
             'update' => 'Updated the ":title" announcement',
             'delete' => 'Deleted the ":title" announcement',
+        ],
+        'assistant' => [
+            'tool' => ':decision the admin assistant action ":label"',
+            'settings' => [
+                'update' => 'Updated the AI assistant settings',
+            ],
+            'provider' => [
+                'create' => 'Added the ":name" AI provider',
+                'update' => 'Updated the ":name" AI provider',
+                'delete' => 'Deleted the ":name" AI provider',
+            ],
         ],
         'api-key' => [
             'create' => 'Created application API key :identifier',

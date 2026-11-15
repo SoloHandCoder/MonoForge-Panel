@@ -63,6 +63,17 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:shop:limits:memory_mb',
         'monoforge:shop:limits:disk_mb',
         'monoforge:shop:limits:cpu_percent',
+        // Phase 4 Task W: the AI assistant.
+        'monoforge:ai:enabled',
+        'monoforge:ai:server_enabled',
+        'monoforge:ai:admin_enabled',
+        'monoforge:ai:default_provider_id',
+        'monoforge:ai:ratio',
+        'monoforge:ai:free_tokens_monthly',
+        'monoforge:ai:warn_percent',
+        'monoforge:ai:max_tool_iterations',
+        'monoforge:ai:context_tokens',
+        'monoforge:ai:max_output_tokens',
         // Addresses hidden from activity entries.
         'monoforge:privacy:hidden_ips',
     ];
