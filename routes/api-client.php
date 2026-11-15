@@ -38,6 +38,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\StorePurchaseController;
 use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
+use Pterodactyl\Http\Controllers\Api\Client\TokenPurchaseController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
@@ -103,6 +104,8 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
 
     // The token balance and history (phase 3 Task Q).
     Route::get('/wallet', WalletController::class)->name('api:client.account.wallet');
+    // The return page after a Tebex token checkout follows the user's own checkout (phase 5 Task T).
+    Route::get('/wallet/purchases/{checkout}', TokenPurchaseController::class)->name('api:client.account.wallet.purchase');
 
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
     Route::post('/api-keys', [ApiKeyController::class, 'store']);

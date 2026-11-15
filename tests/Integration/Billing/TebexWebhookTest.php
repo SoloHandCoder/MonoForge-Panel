@@ -13,6 +13,7 @@ use Illuminate\Testing\TestResponse;
 use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
@@ -516,4 +517,38 @@ test('a second approve of a stale model credits and logs nothing', function (): 
         ->and($processor->approve($stale, $admin, null, true))->toBeFalse()
         ->and($stale->processed_at)->not->toBeNull()
         ->and(ActivityLog::query()->where('event', 'admin:tebex-payment.approve')->count())->toBe(1);
+});
+
+test("links the payment to the buyer's own checkout, so the return page can follow it", function (): void {
+    $user = User::factory()->create();
+    $pack = TokenPack::query()->create(['tebex_package_id' => '6012345', 'name' => '500 tokens', 'tokens' => 500, 'bonus_tokens' => 50]);
+    $checkout = TebexCheckout::query()->create(['uuid' => (string) Str::uuid(), 'user_id' => $user->id, 'token_pack_id' => $pack->id]);
+    $custom = ['user_id' => $user->id, 'pack_id' => $pack->id, 'checkout' => $checkout->uuid];
+
+    sendWebhook(paymentEvent('payment.completed', 'tbx-link', 6012345, $custom))->assertOk();
+
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-link')->sole();
+    expect($checkout->refresh()->tebex_payment_id)->toBe($payment->id)
+        ->and($checkout->status())->toBe(TebexCheckout::STATUS_COMPLETED);
+
+    // A refund of the same transaction keeps the link and the page shows it.
+    sendWebhook(paymentEvent('payment.refunded', 'tbx-link', 6012345, $custom))->assertOk();
+    expect($checkout->refresh()->tebex_payment_id)->toBe($payment->id)
+        ->and($checkout->status())->toBe(TebexCheckout::STATUS_REFUNDED);
+
+    // Another payment naming the same checkout does not take it over.
+    sendWebhook(paymentEvent('payment.completed', 'tbx-other', 6012345, $custom))->assertOk();
+    expect($checkout->refresh()->tebex_payment_id)->toBe($payment->id);
+});
+
+test("a payment is never linked to another user's checkout", function (): void {
+    $owner = User::factory()->create();
+    $buyer = User::factory()->create();
+    $pack = TokenPack::query()->create(['tebex_package_id' => '6012345', 'name' => '500 tokens', 'tokens' => 500]);
+    $checkout = TebexCheckout::query()->create(['uuid' => (string) Str::uuid(), 'user_id' => $owner->id, 'token_pack_id' => $pack->id]);
+
+    sendWebhook(paymentEvent('payment.completed', 'tbx-foreign', 6012345, ['user_id' => $buyer->id, 'pack_id' => $pack->id, 'checkout' => $checkout->uuid]))->assertOk();
+
+    expect($checkout->refresh()->tebex_payment_id)->toBeNull()
+        ->and(wallet()->balance($buyer))->toBe(500);
 });

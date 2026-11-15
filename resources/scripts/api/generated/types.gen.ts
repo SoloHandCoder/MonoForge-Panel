@@ -6701,7 +6701,14 @@ export type ClientListTokenPacksResponseBody = {
 };
 
 export type ClientBuyTokenPackResponseBody = {
-    url?: string;
+    /**
+     * The Tebex checkout page to send the user to.
+     */
+    url: string;
+    /**
+     * The checkout reference, to follow the payment with Get token purchase.
+     */
+    checkout: string;
 };
 
 export type ClientAcceptLegalDocumentsResponseBody = {
@@ -6718,6 +6725,38 @@ export type ClientListAccountActivityFilterOptionsResponseBody = {
             username?: string;
             email?: string;
         }>;
+    };
+};
+
+export type ClientGetTokenPurchaseResponseBody = {
+    /**
+     * The token purchase.
+     */
+    data: {
+        /**
+         * The checkout reference.
+         */
+        id: string;
+        /**
+         * The payment state confirmed by Tebex.
+         */
+        status: 'pending' | 'completed' | 'review' | 'refunded' | 'declined';
+        /**
+         * The name of the token pack bought, or null when the pack was deleted.
+         */
+        pack_name: string | null;
+        /**
+         * The tokens credited for the payment; 0 until it is completed.
+         */
+        tokens: number;
+        /**
+         * The user's token balance now.
+         */
+        balance: number;
+        /**
+         * When the checkout was started, in ISO 8601 format.
+         */
+        created_at: string;
     };
 };
 
@@ -8288,6 +8327,8 @@ export type ClientGetWalletPageQueryParameter = number;
  * Results to return per page. The maximum is 100.
  */
 export type ClientGetWalletPerPageQueryParameter = number;
+
+export type ClientGetTokenPurchaseCheckoutPathParameter = string;
 
 export type ClientDeleteAccountApiKeyIdentifierPathParameter = string;
 
@@ -19765,6 +19806,44 @@ export type ClientGetWalletResponses = {
 };
 
 export type ClientGetWalletResponse = ClientGetWalletResponses[keyof ClientGetWalletResponses];
+
+export type ClientGetTokenPurchaseData = {
+    body?: never;
+    path: {
+        /**
+         * The token pack checkout reference returned when the checkout was started.
+         */
+        checkout: ClientGetTokenPurchaseCheckoutPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/wallet/purchases/{checkout}';
+};
+
+export type ClientGetTokenPurchaseErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * No checkout of the authenticated user has this reference.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientGetTokenPurchaseError = ClientGetTokenPurchaseErrors[keyof ClientGetTokenPurchaseErrors];
+
+export type ClientGetTokenPurchaseResponses = {
+    /**
+     * Token purchase returned.
+     */
+    200: ClientGetTokenPurchaseResponseBody;
+};
+
+export type ClientGetTokenPurchaseResponse = ClientGetTokenPurchaseResponses[keyof ClientGetTokenPurchaseResponses];
 
 export type ClientListAccountApiKeysData = {
     body?: never;

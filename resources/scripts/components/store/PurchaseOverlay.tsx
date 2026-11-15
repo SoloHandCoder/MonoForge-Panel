@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Check, LayoutDashboard, Server, SquareTerminal } from 'lucide-react';
+import { Check, LayoutDashboard, Server, SquareTerminal, type LucideIcon } from 'lucide-react';
 import type { PurchaseResult } from '@/api/store/types';
 import { buttonClassName } from '@/components/elements/Button';
 import Icon from '@/components/elements/Icon';
@@ -18,7 +18,8 @@ export const PURCHASE_STEPS = [
 /** How long each step shows while the request runs; the last one waits for the answer. */
 export const PURCHASE_STEP_MS = 900;
 
-function Orb() {
+/** The spinning violet orb of the purchase screens, with an icon at its core. */
+export function Orb({ icon = Server }: { icon?: LucideIcon }) {
     // Reduced motion stops every animation here (panel.css), leaving the rings and core still.
     return (
         <div className='relative grid size-36 place-items-center' aria-hidden>
@@ -26,7 +27,7 @@ function Orb() {
             <div className='absolute inset-0 rounded-full border-2 border-primary/15 border-t-primary motion-safe:animate-spin motion-safe:[animation-duration:1.4s]' />
             <div className='absolute inset-4 rounded-full border-2 border-(--accent-soft)/10 border-b-(--accent-soft) motion-safe:animate-spin motion-safe:[animation-direction:reverse] motion-safe:[animation-duration:2.2s]' />
             <div className='absolute inset-9 rounded-full bg-linear-to-br from-(--usage-from) to-(--usage-to) shadow-2xl shadow-primary/60' />
-            <Icon icon={Server} className='relative size-7 text-primary-foreground' />
+            <Icon icon={icon} className='relative size-7 text-primary-foreground' />
         </div>
     );
 }

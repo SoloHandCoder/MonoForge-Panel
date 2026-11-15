@@ -1,5 +1,6 @@
 import { Coins } from 'lucide-react';
 import { useState } from 'react';
+import { rememberCheckout } from '@/api/account/wallet/purchases';
 import { httpErrorToHuman } from '@/api/http';
 import { isTebexCheckoutUrl, useTokenPackCheckout, useTokenPacks, type TokenPack } from '@/api/store/tokenPacks';
 import Button from '@/components/elements/Button';
@@ -8,38 +9,6 @@ import Spinner from '@/components/elements/Spinner';
 import PurchaseAgreement from '@/components/legal/PurchaseAgreement';
 
 const formatTokens = (tokens: number) => tokens.toLocaleString();
-
-/** What Tebex sent the player back with: `?tebex=complete` or `?tebex=cancelled`. */
-const checkoutOutcome = (): string | null => {
-    try {
-        return new URLSearchParams(window.location.search).get('tebex');
-    } catch {
-        return null;
-    }
-};
-
-function CheckoutOutcome() {
-    const outcome = checkoutOutcome();
-
-    if (outcome === 'complete') {
-        return (
-            <p role='status' className='mb-4 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm'>
-                Thanks for your purchase! Your tokens appear here as soon as Tebex confirms the payment, usually within
-                a minute.
-            </p>
-        );
-    }
-
-    if (outcome === 'cancelled') {
-        return (
-            <p role='status' className='mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm'>
-                The checkout was cancelled. Nothing was charged.
-            </p>
-        );
-    }
-
-    return null;
-}
 
 function PackCard({ pack, busy, onBuy }: { pack: TokenPack; busy: boolean; onBuy: () => void }) {
     return (
@@ -63,7 +32,8 @@ function PackCard({ pack, busy, onBuy }: { pack: TokenPack; busy: boolean; onBuy
 
 /**
  * The token packs on sale, each with a Buy button that opens the Tebex checkout. Rendered on the
- * Wallet page; it renders nothing while no Tebex store is connected.
+ * Wallet page; it renders nothing while no Tebex store is connected. The return from Tebex is
+ * shown by `TokenPurchaseReturn`.
  */
 export default function TokenPacks() {
     const { data, error, isLoading } = useTokenPacks();
@@ -76,9 +46,10 @@ export default function TokenPacks() {
         setRedirectError(false);
 
         try {
-            const url = await checkout.mutateAsync(pack.id);
+            const { url, checkout: reference } = await checkout.mutateAsync(pack.id);
 
             if (isTebexCheckoutUrl(url)) {
+                rememberCheckout(reference);
                 window.location.assign(url);
 
                 return;
@@ -106,7 +77,6 @@ export default function TokenPacks() {
 
     return (
         <Card title='Buy tokens' icon={Coins}>
-            <CheckoutOutcome />
             {redirectError && (
                 <p role='alert' className='mb-4 text-sm text-destructive'>
                     The store returned an unexpected checkout link, so it was not opened. Please try again.

@@ -93,10 +93,15 @@ class TebexSettings
         return mb_rtrim(config()->string('app.url'), '/').'/api/webhooks/tebex';
     }
 
-    /** Where Tebex sends the player back to, such as `/account/wallet?tebex=complete`. */
-    public function walletUrl(string $outcome): string
+    /**
+     * Where Tebex sends the player back to, such as `/account/wallet?tebex=complete&checkout=…`.
+     * The checkout reference only says which of the player's own checkouts to show.
+     */
+    public function walletUrl(string $outcome, ?string $checkout = null): string
     {
-        return mb_rtrim(config()->string('app.url'), '/').self::WALLET_PATH.'?tebex='.rawurlencode($outcome);
+        $url = mb_rtrim(config()->string('app.url'), '/').self::WALLET_PATH.'?tebex='.rawurlencode($outcome);
+
+        return $checkout === null ? $url : $url.'&checkout='.rawurlencode($checkout);
     }
 
     private function secret(string $key): string

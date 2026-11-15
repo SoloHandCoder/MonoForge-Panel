@@ -4,9 +4,13 @@ import { Card, cn, ContentBox, Icon, PageContentBlock, PageHeading, ServerError,
 import { httpErrorToHuman } from '@/api/http';
 import { formatTokens, useWallet } from '@/api/account/wallet/queries';
 import TokenPacks from '@/components/store/TokenPacks';
+import TokenPurchaseReturn from '@/components/store/TokenPurchaseReturn';
 import TokenLedgerTable from './TokenLedgerTable';
 
-/** The user's token balance, the packs to buy more with, and their token history. */
+/**
+ * The user's token balance, the packs to buy more with, and their token history. After a Tebex
+ * checkout it opens on the purchase's confirmation screen.
+ */
 export default function WalletContainer() {
     const [page, setPage] = useState(1);
     const { data, error, isFetching } = useWallet(page);
@@ -17,6 +21,7 @@ export default function WalletContainer() {
 
     return (
         <PageContentBlock title='Wallet'>
+            <TokenPurchaseReturn />
             <PageHeading
                 title='Wallet'
                 description='Tokens pay for your servers and are taken automatically each billing period.'
