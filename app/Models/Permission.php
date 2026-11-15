@@ -149,9 +149,9 @@ class Permission extends Model
 
         // Phase 6: one-click plugins, mods and modpacks.
         'plugins' => [
-            'description' => "Permissions that control a user's access to one-click plugins, mods and modpacks for this server.",
+            'description' => 'Install plugins, mods and modpacks. This can add code that runs on the server and overwrite its files, so only give it to people you would trust with the files.',
             'keys' => [
-                'manage' => 'Allows a user to install, update and remove plugins, mods and modpacks from Modrinth, Hangar and CurseForge. Browsing them needs the file read permission.',
+                'manage' => 'Install plugins, mods and modpacks — can add code and overwrite files on this server. Covers installing, updating and removing jars from Modrinth, Hangar and CurseForge, and modpacks whose files replace existing ones. Browsing them needs the file read permission.',
             ],
         ],
     ];

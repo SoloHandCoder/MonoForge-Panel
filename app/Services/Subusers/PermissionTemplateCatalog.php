@@ -77,6 +77,7 @@ final readonly class PermissionTemplateCatalog
                 Permissions::BackupDownload->value,
                 Permissions::BackupRestore->value,
             ],
+            // Only Co-owner may install plugins: plugins.manage adds code and overwrites files.
             'co-owner' => array_values(array_filter($keys, fn (string $key): bool => ! $this->reservedForOwner($key))),
         ];
 

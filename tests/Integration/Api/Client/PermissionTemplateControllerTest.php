@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\PermissionTemplateControllerTest;
 
+use Pterodactyl\Models\Permission;
 use Pterodactyl\Models\PermissionTemplate;
 use Pterodactyl\Models\User;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
@@ -44,6 +45,17 @@ test('the built-in templates hold what their names promise', function (): void {
         ->and($templates['builtin:builder'])->not->toContain('control.console')
         ->and($templates['builtin:co-owner'])->toContain('control.stop', 'settings.reinstall', 'database.view_password')
         ->and($templates['builtin:co-owner'])->not->toContain('user.create', 'user.read', 'user.update', 'user.delete');
+
+    // plugins.manage adds code and overwrites files: only the Co-owner template has it.
+    expect($templates['builtin:co-owner'])->toContain('plugins.manage');
+    foreach (['builtin:viewer', 'builtin:moderator', 'builtin:builder'] as $key) {
+        expect($templates[$key])->not->toContain('plugins.manage');
+    }
+});
+
+test('plugins.manage says plainly that it can add code and overwrite files', function (): void {
+    expect(Permission::permissions()->get('plugins')['keys']['manage'])->toStartWith('Install plugins, mods and modpacks — can add code and overwrite files on this server.')
+        ->and(__('server/users.permissions.plugins_manage'))->toBe('Install plugins, mods and modpacks — can add code and overwrite files on this server.');
 });
 
 test('a user creates, updates and deletes their own templates', function (): void {
