@@ -9,10 +9,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
+use Pterodactyl\Models\User;
+use Pterodactyl\Services\Auth\OAuth\OAuthIdentity;
+use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
 use Pterodactyl\Services\Captcha\CaptchaSettings;
 use Pterodactyl\Services\Extensions\ExtensionHeadTags;
 use Pterodactyl\Services\Extensions\ExtensionRepository;
 use Pterodactyl\Services\Helpers\AssetHashService;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Services\Themes\ThemeResolver;
 use Throwable;
 
@@ -59,6 +63,8 @@ class AssetComposer
             'registration' => [
                 'enabled' => config()->boolean('monoforge.auth.registration.enabled'),
             ],
+            // The legal documents, and those the signed-in user has to accept again.
+            'legal' => $this->legalPayload(),
             // Safe mode loads no extension bundles at all.
             'extensions' => $theme->safeMode ? [] : $this->extensionPayload(array_column($theme->chain, 'id')),
             'theme' => $theme->bootstrap(),
@@ -66,7 +72,7 @@ class AssetComposer
     }
 
     /**
-     * @return array{providers: array<string, bool>, result: array{status: string, message?: string, token?: string|null}|null}
+     * @return array{providers: array<string, bool>, result: array{status: string, message?: string, token?: string|null}|null, registration: array{provider: string, label: string, email: string, username: string}|null}
      */
     private function oauthPayload(): array
     {
@@ -77,6 +83,7 @@ class AssetComposer
 
         $result = $this->request->hasSession() ? $this->request->session()->get(OAuthController::RESULT_KEY) : null;
         $status = is_array($result) ? ($result['status'] ?? null) : null;
+        $pending = $this->request->hasSession() && ! Auth::check() ? OAuthRegistration::peek($this->request->session()) : null;
 
         return [
             'providers' => $providers,
@@ -85,7 +92,24 @@ class AssetComposer
                 'message' => is_string($result['message'] ?? null) ? $result['message'] : '',
                 'token' => is_string($result['token'] ?? null) ? $result['token'] : null,
             ] : null,
+            // A Discord/Google sign-up waiting for the visitor to accept the terms.
+            'registration' => $pending instanceof OAuthIdentity ? [
+                'provider' => $pending->provider->value,
+                'label' => $pending->provider->label(),
+                'email' => (string) $pending->email,
+                'username' => (string) ($pending->displayName ?? $pending->username),
+            ] : null,
         ];
+    }
+
+    /**
+     * @return array{documents: array<string, array{title: string, url: string, external: bool, version: int, updatedAt: string}>, pending: list<string>}
+     */
+    private function legalPayload(): array
+    {
+        $user = Auth::user();
+
+        return LegalSettings::sitePayload($user instanceof User ? $user : null);
     }
 
     /**

@@ -60,6 +60,7 @@ class PterodactylDocumentation
         'database' => ['string', 'The database ID.', 'Lk3jx4pQ'],
         'database_id' => ['string', 'The database ID.', 'Lk3jx4pQ'],
         'database_host' => ['integer', 'The database host ID.', 1],
+        'document' => ['string', 'The legal document: terms, privacy or refunds.', 'terms'],
         'databaseHost' => ['integer', 'The database host ID.', 1],
         'egg' => ['integer', 'The egg ID.', 1],
         'egg_id' => ['integer', 'The egg ID.', 1],

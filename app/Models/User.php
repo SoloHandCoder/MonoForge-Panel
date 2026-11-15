@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -28,6 +29,9 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
 /**
  * @property-read int|null $subuser_of_count
  * @property int $token_balance Denormalised ledger sum; change it only through TokenWallet.
+ * @property int|null $terms_accepted_version the Terms of Service version the user accepted (see LegalSettings)
+ * @property CarbonImmutable|null $terms_accepted_at
+ * @property int|null $privacy_accepted_version the Privacy Policy version the user accepted
  */
 #[Attributes\Identifiable('user')]
 #[Fillable([
@@ -44,7 +48,7 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
     'gravatar',
     'root_admin',
 ])]
-#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at', 'has_password'])]
+#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at', 'has_password', 'terms_accepted_version', 'terms_accepted_at', 'privacy_accepted_version'])]
 #[RouteKey('uuid')]
 class User extends Authenticatable implements Identifiable
 {
@@ -87,6 +91,9 @@ class User extends Authenticatable implements Identifiable
             'password' => 'hashed',
             'totp_authenticated_at' => 'datetime',
             'token_balance' => 'int',
+            'terms_accepted_version' => 'int',
+            'terms_accepted_at' => 'immutable_datetime',
+            'privacy_accepted_version' => 'int',
         ];
     }
 

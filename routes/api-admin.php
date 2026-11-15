@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Controllers\Api\Admin\ActivityController;
 use Pterodactyl\Http\Controllers\Api\Admin\ActivityFilterController;
 use Pterodactyl\Http\Controllers\Api\Admin\Announcements\AnnouncementController;
@@ -58,6 +59,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferProgressController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\AdvancedController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\LegalController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
@@ -576,6 +578,12 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     // Sign-up and captcha.
     Route::get('/registration', [RegistrationController::class, 'index'])->name('.registration');
     Route::put('/registration', [RegistrationController::class, 'update'])->name('.registration.update');
+
+    // Terms of Service, Privacy Policy and Refund Policy.
+    Route::get('/legal', [LegalController::class, 'index'])->name('.legal');
+    Route::put('/legal/{document}', [LegalController::class, 'update'])
+        ->whereIn('document', LegalDocument::values())
+        ->name('.legal.update');
 });
 
 /*

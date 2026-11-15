@@ -11,6 +11,7 @@ use Pterodactyl\Http\Controllers\Api\Client\ActivityLogFilterController;
 use Pterodactyl\Http\Controllers\Api\Client\ApiKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
+use Pterodactyl\Http\Controllers\Api\Client\LegalAcceptanceController;
 use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
 use Pterodactyl\Http\Controllers\Api\Client\OAuthAccountController;
 use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
@@ -81,6 +82,9 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
         Route::get('/two-factor', [TwoFactorController::class, 'index']);
         Route::post('/two-factor', [TwoFactorController::class, 'store']);
         Route::post('/two-factor/disable', [TwoFactorController::class, 'delete']);
+        // Outside the two-factor requirement: the panel asks for the updated terms before
+        // a user who still has to set up two-factor authentication can reach that page.
+        Route::post('/legal/accept', LegalAcceptanceController::class)->name('api:client.account.legal.accept');
     });
 
     Route::put('/email', [AccountController::class, 'updateEmail'])
