@@ -42,13 +42,14 @@ class ThemeRepository
 
     public function active(): string
     {
-        return $this->active ??= rescue(fn (): ?string => Setting::fetch(self::SETTING), report: false) ?: self::CLASSIC;
+        return $this->active ??= rescue(fn (): ?string => Setting::cached(self::SETTING), report: false) ?: self::CLASSIC;
     }
 
     public function setActive(string $id): void
     {
         if ($id === self::CLASSIC) {
             Setting::query()->where('key', self::SETTING)->delete();
+            Setting::forgetCache();
         } else {
             Setting::put(self::SETTING, $id);
         }

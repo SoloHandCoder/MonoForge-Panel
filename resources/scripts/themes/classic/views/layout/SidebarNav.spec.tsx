@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /* oxlint-disable rules/classic-theme-imports -- the spec publishes the account navigation and reads the layout fixtures */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { publishAreaNav } from '@/router/nav';
 import { createExtensionTestHost, renderView, type ExtensionTestHost, type RenderedView } from '@/sdk/testing';
 import { getViewDefinition } from '@/views/registry';
@@ -191,6 +191,133 @@ describe('SidebarNav in an area', () => {
         expect(within(nav).getByRole('link', { name: 'Users' })).toHaveAttribute('data-status', 'active');
         expect(within(nav).getByRole('link', { name: 'Themes' })).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'API keys' })).not.toBeInTheDocument();
+    });
+});
+
+describe('SidebarNav categories', () => {
+    beforeEach(() => window.localStorage.clear());
+
+    const categories = (name: string) =>
+        within(screen.getByRole('navigation', { name }))
+            .getAllByRole('group')
+            .map((group) => [
+                within(group).getByRole('button').textContent,
+                within(group)
+                    .queryAllByRole('link')
+                    .map((link) => link.textContent),
+            ]);
+
+    const serverModel = (allowed?: readonly string[]): AppLayoutModel => {
+        const model = fixture('serverArea');
+
+        if (model.area.kind !== 'server') {
+            return model;
+        }
+
+        const items = model.area.nav.items.filter((item) => !allowed || allowed.includes(item.id));
+
+        return { ...model, area: { ...model.area, nav: { items } } };
+    };
+
+    it('sorts the admin tabs into labelled categories', async () => {
+        await renderNav(fixture('adminArea'), '/panel/users');
+
+        expect(categories('Administration')).toEqual([
+            ['General', ['Overview', 'Activity', 'Announcements', 'Settings']],
+            ['Users & servers', ['Users', 'Servers']],
+            ['Infrastructure', ['Locations', 'Nodes', 'Live usage', 'Storage', 'Database Hosts', 'Mounts']],
+            ['Game config', ['Eggs', 'Tags']],
+            ['System', ['Extensions', 'Themes', 'API Keys']],
+        ]);
+    });
+
+    it('files extension screens it does not know under More', async () => {
+        const model = fixture('adminArea');
+        const area = model.area.kind === 'admin' ? model.area : null;
+        const shop = { ...area!.nav.items[4]!, id: 'shop', label: 'Shop', order: 50 };
+        const assistant = { ...area!.nav.items[4]!, id: 'assistant', label: 'AI Assistant', order: 51 };
+
+        await renderNav(
+            { ...model, area: { ...area!, nav: { items: [...area!.nav.items, shop, assistant] } } },
+            '/panel'
+        );
+
+        const labels = categories('Administration');
+
+        expect(labels).toContainEqual(['Billing', ['Shop']]);
+        expect(labels.at(-1)).toEqual(['More', ['AI Assistant']]);
+    });
+
+    it('groups the server pages for players', async () => {
+        await renderNav(serverModel(), '/server/a1b2c3d4');
+
+        expect(categories('Server')).toEqual([
+            ['Overview', ['Console', 'Activity']],
+            ['Files & data', ['Files', 'Databases', 'Backups']],
+            ['Automation', ['Schedules']],
+            ['Configuration', ['Network', 'Startup', 'Settings']],
+            ['Access', ['Users']],
+        ]);
+    });
+
+    it('hides the categories a subuser has no permission for', async () => {
+        await renderNav(serverModel(['', 'index', 'files', 'backups']), '/server/a1b2c3d4');
+
+        expect(categories('Server')).toEqual([
+            ['Overview', ['Console']],
+            ['Files & data', ['Files', 'Backups']],
+        ]);
+    });
+
+    it('folds a category from its label and remembers it', async () => {
+        await renderNav(fixture('adminArea'), '/panel/users');
+
+        const system = screen.getByRole('button', { name: 'System' });
+
+        expect(system).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(system);
+        expect(system).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('link', { name: 'Themes' })).not.toBeInTheDocument();
+        expect(window.localStorage.getItem('monoforge.sidebar.collapsed.admin')).toBe('system');
+
+        cleanup();
+        host?.dispose();
+        await renderNav(fixture('adminArea'), '/panel/users');
+
+        expect(screen.getByRole('button', { name: 'System' })).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(screen.getByRole('button', { name: 'System' }));
+        expect(screen.getByRole('link', { name: 'Themes' })).toBeInTheDocument();
+        expect(window.localStorage.getItem('monoforge.sidebar.collapsed.admin')).toBe('');
+    });
+
+    it('keeps the category of the current page open', async () => {
+        window.localStorage.setItem('monoforge.sidebar.collapsed.admin', 'users');
+        await renderNav(fixture('adminArea'), '/panel/users');
+
+        const people = screen.getByRole('button', { name: 'Users & servers' });
+
+        expect(people).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(people);
+        expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('data-status', 'active');
+    });
+
+    it('still draws every category when storage is unavailable', async () => {
+        const read = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+
+        try {
+            await renderNav(fixture('adminArea'), '/panel/users');
+            fireEvent.click(screen.getByRole('button', { name: 'System' }));
+            expect(screen.getByRole('button', { name: 'System' })).toHaveAttribute('aria-expanded', 'false');
+            expect(screen.getByRole('button', { name: 'General' })).toHaveAttribute('aria-expanded', 'true');
+        } finally {
+            read.mockRestore();
+            write.mockRestore();
+        }
     });
 });
 

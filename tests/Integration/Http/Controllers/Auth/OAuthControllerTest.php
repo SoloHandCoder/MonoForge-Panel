@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Http\Controllers\Auth\OAuthControllerTest;
 
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
@@ -173,6 +176,53 @@ test('an unlinked account creates a new user while registration is on', function
         ->and(UserOAuthAccount::query()->where('user_id', $user->id)->value('provider_user_id'))->toBe('80351110224678912');
 });
 
+test('creating accounts through a provider uses the sign-up limit of the IP', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+
+    // Two accounts were already made from this address this hour; the third one is the last allowed.
+    $key = md5('registration'.'ip:127.0.0.1');
+    RateLimiter::hit($key, 3600);
+    RateLimiter::hit($key, 3600);
+
+    fakeDiscord(['id' => '10003', 'username' => 'newcomer3', 'email' => 'newcomer3@example.com']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    expect(RateLimiter::attempts($key))->toBe(3);
+    $this->post('/auth/logout')->assertNoContent();
+    $this->flushSession();
+
+    Http::swap(new HttpFactory);
+    fakeDiscord(['id' => '10004', 'username' => 'newcomer4', 'email' => 'newcomer4@example.com']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")
+        ->assertRedirect('/auth/login')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'Too many accounts have been created from your network recently. Please try again later.');
+
+    $this->assertGuest();
+    expect(User::query()->where('email', 'newcomer4@example.com')->exists())->toBeFalse();
+
+    // Existing linked users still sign in once the limit is used up.
+    $user = User::factory()->create();
+    linkAccount($user, 'discord', '10005');
+    Http::swap(new HttpFactory);
+    fakeDiscord(['id' => '10005']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+});
+
+test('sign-ups of the form and of a provider share one budget', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    foreach (range(1, 3) as $ignored) {
+        RateLimiter::hit(md5('registration'.'ip:127.0.0.1'), 3600);
+    }
+
+    fakeDiscord();
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/auth/login');
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+});
+
 test('registration never takes over an existing email or uses an unverified one', function (array $profile, string $message): void {
     config()->set('monoforge.auth.registration.enabled', true);
     fakeDiscord($profile);
@@ -308,4 +358,27 @@ test('a link request is refused when someone else is signed in by the time it re
 
     expect(UserOAuthAccount::query()->count())->toBe(0);
     Http::assertNothingSent();
+});
+
+test('an API key cannot set the first password, unlink or start a link', function (): void {
+    $user = User::factory()->create();
+    $user->forceFill(['has_password' => false])->save();
+    linkAccount($user);
+    linkAccount($user, 'google', 'google-sub');
+    $key = ApiKey::factory()->create(['user_id' => $user->id, 'key_type' => ApiKey::TYPE_ACCOUNT]);
+    $this->app['auth']->forgetGuards();
+
+    $api = fn () => $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
+        ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token));
+
+    $api()->postJson('/api/client/account/oauth/password', ['password' => 'A-new-password-123', 'password_confirmation' => 'A-new-password-123'])
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', 'This action can only be performed from the panel in your browser, not with an API key.');
+    $api()->deleteJson('/api/client/account/oauth/google')->assertForbidden();
+    $api()->postJson('/api/client/account/oauth/discord/link')->assertForbidden();
+    // A spoofed panel Origin makes Sanctum start a session, but the request is still a key.
+    $api()->withHeader('Referer', 'http://localhost')->postJson('/api/client/account/oauth/discord/link')->assertForbidden();
+
+    expect(User::query()->whereKey($user->id)->value('has_password'))->toBeFalsy()
+        ->and(UserOAuthAccount::query()->where('user_id', $user->id)->count())->toBe(2);
 });

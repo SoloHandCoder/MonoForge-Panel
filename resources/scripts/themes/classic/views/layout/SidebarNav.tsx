@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useCallback, useId, useState, type ReactNode } from 'react';
 import {
     Activity,
     Archive,
     ArrowLeft,
     Blocks,
     CalendarClock,
+    ChevronDown,
     Database,
     Egg,
     ExternalLink,
@@ -17,6 +18,7 @@ import {
     LayoutDashboard,
     LogOut,
     MapPin,
+    Megaphone,
     MessageCircle,
     Network,
     Palette,
@@ -38,6 +40,7 @@ import {
     Navigation,
     NavigationLink,
     Slot,
+    useActiveNavItem,
     useNavigation,
     View,
     type AccountArea,
@@ -49,6 +52,14 @@ import {
 } from '@/sdk/theme';
 import MonoForgeMark from '../brand/MonoForgeMark';
 import { discordLinkProps } from '../brand/links';
+import {
+    ADMIN_NAV,
+    groupNavItems,
+    navItemCategory,
+    SERVER_NAV,
+    type NavCategoryScheme,
+    type NavSection,
+} from './navCategories';
 
 // The panel's own items render these directly, so they never wait for the icon catalog.
 const icons = new Map<string, LucideIcon>([
@@ -75,6 +86,7 @@ const icons = new Map<string, LucideIcon>([
     ['folder-tree', FolderTree],
     ['egg', Egg],
     ['tag', Tag],
+    ['megaphone', Megaphone],
     ['blocks', Blocks],
     ['palette', Palette],
     ['user-cog', ShieldCheck],
@@ -168,6 +180,139 @@ function MainSlot({ at }: { at: 'before' | 'after' }) {
         <div className={slotClass}>
             {at === 'before' ? <Slot name='nav.items.before' /> : <Slot name='nav.items.after' />}
         </div>
+    );
+}
+
+const collapsedKey = (area: string) => `monoforge.sidebar.collapsed.${area}`;
+
+function readCollapsed(area: string): string[] {
+    try {
+        // A comma-separated list of category keys.
+        return (window.localStorage.getItem(collapsedKey(area)) ?? '').split(',').filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+function writeCollapsed(area: string, keys: readonly string[]): void {
+    try {
+        window.localStorage.setItem(collapsedKey(area), keys.join(','));
+    } catch {
+        // Private windows and blocked storage only lose the remembered state.
+    }
+}
+
+/** Which of an area's categories the user folded away, remembered per area in this browser. */
+function useCollapsed(area: string) {
+    const [collapsed, setCollapsed] = useState<readonly string[]>(() => readCollapsed(area));
+
+    const toggle = useCallback(
+        (key: string) =>
+            setCollapsed((current) => {
+                const next = current.includes(key) ? current.filter((each) => each !== key) : [...current, key];
+
+                writeCollapsed(area, next);
+
+                return next;
+            }),
+        [area]
+    );
+
+    return { collapsed, toggle };
+}
+
+const categoryButtonClass = [
+    'group/category flex w-full items-center gap-2 rounded-md px-3 pt-4 pb-1 text-left',
+    'text-xs font-medium tracking-wide text-muted-foreground uppercase',
+    'transition-colors duration-150 hover:text-foreground',
+    'focus-visible:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+].join(' ');
+
+/** One labelled category; its label folds it, except while it holds the page the user is on. */
+function CategorySection({
+    section,
+    open,
+    locked,
+    onToggle,
+}: {
+    section: NavSection;
+    open: boolean;
+    locked: boolean;
+    onToggle: (key: string) => void;
+}) {
+    const id = useId();
+    const { category, items } = section;
+
+    return (
+        <div
+            role='group'
+            aria-labelledby={`${id}-label`}
+            data-category={category.key}
+            className='flex flex-col gap-0.5'
+        >
+            <button
+                type='button'
+                id={`${id}-label`}
+                aria-expanded={open}
+                aria-controls={`${id}-items`}
+                aria-disabled={locked || undefined}
+                title={locked ? undefined : `${open ? 'Collapse' : 'Expand'} ${category.label}`}
+                onClick={() => !locked && onToggle(category.key)}
+                className={categoryButtonClass}
+            >
+                <span className='min-w-0 flex-1 truncate'>{category.label}</span>
+                {!locked && (
+                    <Icon
+                        icon={ChevronDown}
+                        className={cn(
+                            'size-3.5 shrink-0 opacity-0 transition-[opacity,transform] duration-150',
+                            'group-hover/category:opacity-100 group-focus-visible/category:opacity-100',
+                            !open && '-rotate-90 opacity-100'
+                        )}
+                        aria-hidden
+                    />
+                )}
+            </button>
+            <div id={`${id}-items`} hidden={!open} className='flex flex-col gap-0.5'>
+                <Navigation items={items}>{(item, { badge }) => <ItemLink item={item} badge={badge} />}</Navigation>
+            </div>
+        </div>
+    );
+}
+
+/** An area's items under their category labels, with the area's extension slots around them. */
+function CategorizedItems({
+    area,
+    items,
+    scheme,
+}: {
+    area: ServerArea | AdminArea;
+    items: readonly NavItem[];
+    scheme: NavCategoryScheme;
+}) {
+    const sections = groupNavItems(items, scheme);
+    const active = useActiveNavItem(items);
+    const activeCategory = active ? navItemCategory(active, scheme) : null;
+    const { collapsed, toggle } = useCollapsed(area.kind);
+
+    return (
+        <>
+            <AreaSlot area={area} at='before' />
+            {sections.map((section) => {
+                const locked = section.category.key === activeCategory;
+
+                return (
+                    <CategorySection
+                        key={section.category.key}
+                        section={section}
+                        locked={locked}
+                        open={locked || !collapsed.includes(section.category.key)}
+                        onToggle={toggle}
+                    />
+                );
+            })}
+            <AreaSlot area={area} at='after' />
+        </>
     );
 }
 
@@ -266,9 +411,7 @@ function ServerNav({ area }: { area: ServerArea }) {
                         {area.state ? stateLabel[area.state] : 'Unknown'}
                     </Badge>
                 </p>
-                <AreaSlot area={area} at='before' />
-                <Navigation items={items}>{(item, { badge }) => <ItemLink item={item} badge={badge} />}</Navigation>
-                <AreaSlot area={area} at='after' />
+                <CategorizedItems area={area} items={items} scheme={SERVER_NAV} />
             </nav>
         </>
     );
@@ -283,12 +426,7 @@ function AdminNav({ area }: { area: AdminArea }) {
                 <MainSlot at='after' />
             </nav>
             <nav aria-label='Administration' className='flex flex-col gap-0.5'>
-                <p className={groupLabelClass}>Administration</p>
-                <AreaSlot area={area} at='before' />
-                <Navigation items={area.nav.items}>
-                    {(item, { badge }) => <ItemLink item={item} badge={badge} />}
-                </Navigation>
-                <AreaSlot area={area} at='after' />
+                <CategorizedItems area={area} items={area.nav.items} scheme={ADMIN_NAV} />
             </nav>
         </>
     );

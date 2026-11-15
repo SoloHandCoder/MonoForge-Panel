@@ -47,6 +47,7 @@ use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserSSHKey;
+use Pterodactyl\Services\Activity\InfrastructureIps;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
@@ -55,6 +56,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /** Three accounts an hour per IP; the Discord/Google sign-up counts against the same budget. */
+    public static function registrationIpLimit(Request $request): Limit
+    {
+        return Limit::perHour(3)->by('ip:'.$request->ip());
+    }
+
     /**
      * Bootstrap any application services.
      */
@@ -80,8 +87,10 @@ class AppServiceProvider extends ServiceProvider
         // mutation of a shared timestamp is never something we want.
         Date::use(CarbonImmutable::class);
 
-        View::share('appVersion', $this->versionData()['version']);
-        View::share('appIsGit', $this->versionData()['is_git']);
+        // Read once: every request boots through here, and each read is a cache store round trip.
+        $version = $this->versionData();
+        View::share('appVersion', $version['version']);
+        View::share('appIsGit', $version['is_git']);
 
         Paginator::useBootstrap();
 
@@ -133,6 +142,9 @@ class AppServiceProvider extends ServiceProvider
         // Keys registered through setEnvironmentKey() must survive to every consumer,
         // so the service is shared rather than rebuilt on each resolve.
         $this->app->singleton(EnvironmentService::class);
+
+        // Resolved node addresses are kept for the rest of the request (or queued job).
+        $this->app->scoped(InfrastructureIps::class);
 
         $this->app->extend('auth.password', fn (): PasswordBrokerManager => new PasswordBrokerManager($this->app));
 
@@ -213,7 +225,7 @@ class AppServiceProvider extends ServiceProvider
             $email = mb_strtolower(mb_trim($request->string('email')->toString()));
 
             return [
-                Limit::perHour(3)->by('ip:'.$request->ip())
+                self::registrationIpLimit($request)
                     ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY),
                 Limit::perHour(1)->by('email:'.$email)
                     ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY
@@ -224,6 +236,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api.client', fn (Request $request): Limit => $this->apiLimit($request, 'client'));
         RateLimiter::for('api.application', fn (Request $request): Limit => $this->apiLimit($request, 'application'));
         RateLimiter::for('api.admin', fn (Request $request): Limit => $this->apiLimit($request, 'admin'));
+
+        // "Check now" for MonoForge updates calls GitHub each time, so it is kept to 6 a minute.
+        RateLimiter::for('monoforge.update-check', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(6)->by($user instanceof User ? $user->uuid : (string) $request->ip());
+        });
 
         ResourceLimit::boot();
     }

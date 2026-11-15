@@ -72,6 +72,8 @@ export interface AdvancedSettingsValues {
     allocationsRangeEnd:
         | NonNullable<AdminAdvancedSettingsBody['pterodactyl:client_features:allocations:range_end']>
         | '';
+    // IPs or CIDR ranges, one per line, never shown in activity entries. Left out, the stored list is kept.
+    hiddenIps?: string;
 }
 
 const adminMailSettingsBody = (values: MailSettingsValues): AdminMailSettingsBody => {
@@ -115,8 +117,8 @@ export const updateAdminMailSettingsInput = (values: MailSettingsValues): Option
 
 export const updateAdminAdvancedSettingsInput = (
     values: AdvancedSettingsValues
-): Options<AdminUpdateAdvancedSettingsData> => ({
-    body: {
+): Options<AdminUpdateAdvancedSettingsData> => {
+    const body: AdminAdvancedSettingsBody = {
         'recaptcha:enabled': values.recaptchaEnabled ? 'true' : 'false',
         'recaptcha:secret_key': values.recaptchaSecretKey === '' ? null : values.recaptchaSecretKey,
         'recaptcha:website_key': values.recaptchaWebsiteKey,
@@ -127,8 +129,15 @@ export const updateAdminAdvancedSettingsInput = (
             values.allocationsRangeStart === '' ? null : values.allocationsRangeStart,
         'pterodactyl:client_features:allocations:range_end':
             values.allocationsRangeEnd === '' ? null : values.allocationsRangeEnd,
-    },
-});
+    };
+
+    // Left out, the stored list is kept; blank clears it.
+    if (values.hiddenIps !== undefined) {
+        body['monoforge:privacy:hidden_ips'] = values.hiddenIps.trim() === '' ? null : values.hiddenIps;
+    }
+
+    return { body };
+};
 
 export const testAdminMailInput = (): Options<AdminSendTestMailData> => ({});
 

@@ -22,7 +22,7 @@ class AdvancedController extends AdminApiController
     /**
      * Update advanced settings.
      */
-    #[Endpoint('Update advanced settings', 'Updates reCAPTCHA, HTTP client timeout, and client allocation feature settings.')]
+    #[Endpoint('Update advanced settings', 'Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings.')]
     #[ScribeResponse(status: 204, description: 'Advanced settings updated.')]
     public function __invoke(UpdateAdvancedSettingsRequest $request, Kernel $kernel): Response
     {

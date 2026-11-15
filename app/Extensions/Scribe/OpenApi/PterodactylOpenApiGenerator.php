@@ -2490,6 +2490,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
                         'pterodactyl:client_features:allocations:enabled',
                         'pterodactyl:client_features:allocations:range_start',
                         'pterodactyl:client_features:allocations:range_end',
+                        'monoforge:privacy:hidden_ips',
                     ],
                     'properties' => [
                         'recaptcha:enabled' => ['type' => 'boolean', 'example' => false],
@@ -2500,6 +2501,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
                         'pterodactyl:client_features:allocations:enabled' => ['type' => 'boolean', 'example' => false],
                         'pterodactyl:client_features:allocations:range_start' => ['type' => 'integer', 'nullable' => true, 'example' => null],
                         'pterodactyl:client_features:allocations:range_end' => ['type' => 'integer', 'nullable' => true, 'example' => null],
+                        'monoforge:privacy:hidden_ips' => ['type' => 'string', 'description' => 'IPs or CIDR ranges, one per line, never shown in activity entries.', 'example' => "203.0.113.7\n2001:db8::/32"],
                     ],
                 ],
                 'meta' => [

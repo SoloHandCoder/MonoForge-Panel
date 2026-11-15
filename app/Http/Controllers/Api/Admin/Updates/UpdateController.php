@@ -75,6 +75,16 @@ class UpdateController extends AdminApiController
         ],
     ];
 
+    private const array THROTTLED_EXAMPLE = [
+        'errors' => [
+            [
+                'code' => 'TooManyRequestsHttpException',
+                'status' => '429',
+                'detail' => 'Too Many Attempts.',
+            ],
+        ],
+    ];
+
     public function __construct(private readonly MonoForgeUpdateService $updates) {}
 
     /**
@@ -106,6 +116,43 @@ class UpdateController extends AdminApiController
     #[ResponseField('status.updated_at', 'string', nullable: true)]
     public function status(GetUpdateStatusRequest $request): JsonResponse
     {
+        return new JsonResponse($this->payload());
+    }
+
+    /**
+     * Ask GitHub for the latest MonoForge build now instead of waiting for the cached result.
+     */
+    #[Endpoint('Check for updates', 'Looks up the latest MonoForge build on GitHub right away, bypassing the 30 minute cache, and returns the same payload as the update status. Limited to 6 checks a minute.')]
+    #[ScribeResponse(self::STATUS_EXAMPLE, description: 'Update status returned after a fresh check.')]
+    #[ScribeResponse(self::THROTTLED_EXAMPLE, status: 429, description: 'Too many checks; try again in a minute.')]
+    #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
+    #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
+    #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
+    #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
+    #[ResponseField('status', 'object', 'The last requested or applied update.')]
+    #[ResponseField('current', 'object', 'The running build, or null when the panel has no version.json.', nullable: true)]
+    #[ResponseField('current.version', 'string')]
+    #[ResponseField('current.commit', 'string')]
+    #[ResponseField('latest.version', 'string')]
+    #[ResponseField('latest.commit', 'string')]
+    #[ResponseField('latest.tag', 'string')]
+    #[ResponseField('latest.url', 'string')]
+    #[ResponseField('current.built_at', 'string', nullable: true)]
+    #[ResponseField('latest', 'object', 'The latest build on GitHub, or null when it is unknown or update checks are off.', nullable: true)]
+    #[ResponseField('latest.built_at', 'string', nullable: true)]
+    #[ResponseField('status.state', 'string', 'idle, queued, running, success or failed.', enum: ['idle', 'queued', 'running', 'success', 'failed'])]
+    #[ResponseField('status.step', 'string', nullable: true)]
+    #[ResponseField('status.message', 'string', nullable: true)]
+    #[ResponseField('status.from', 'string', nullable: true)]
+    #[ResponseField('status.to', 'string', nullable: true)]
+    #[ResponseField('status.error', 'string', nullable: true)]
+    #[ResponseField('status.updated_at', 'string', nullable: true)]
+    public function check(GetUpdateStatusRequest $request): JsonResponse
+    {
+        if ($this->updates->mode() !== 'off') {
+            $this->updates->latest(fresh: true);
+        }
+
         return new JsonResponse($this->payload());
     }
 

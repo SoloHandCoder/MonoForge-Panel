@@ -9,12 +9,15 @@ import OverviewVersionCard from './OverviewVersionCard';
 const mocks = vi.hoisted(() => ({
     status: undefined as AdminUpdateStatus | undefined,
     mutateAsync: vi.fn(() => Promise.resolve()),
+    check: vi.fn(),
+    checking: false,
 }));
 
 vi.mock('@/api/admin/updates/queries', () => ({
     isUpdateInProgress: (state: string | undefined) => state === 'queued' || state === 'running',
     useAdminUpdateStatus: () => ({ data: mocks.status }),
     useApplyAdminUpdate: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
+    useCheckAdminUpdates: () => ({ mutate: mocks.check, isPending: mocks.checking }),
 }));
 
 afterEach(cleanup);
@@ -51,6 +54,43 @@ describe('OverviewVersionCard', () => {
     beforeEach(() => {
         mocks.status = undefined;
         mocks.mutateAsync.mockClear();
+        mocks.check.mockClear();
+        mocks.checking = false;
+    });
+
+    it('checks GitHub now from the up to date card', () => {
+        mocks.status = status({
+            check: 'current',
+            update_available: false,
+            latest: { ...build, tag: 'build-3f9c2ab', url: 'https://github.com/x' },
+        });
+        render(<OverviewVersionCard version={version} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Check now' }));
+        expect(mocks.check).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a busy check now button while checking', () => {
+        mocks.checking = true;
+        mocks.status = status();
+        render(<OverviewVersionCard version={version} />);
+
+        const button = screen.getByRole('button', { name: /Checking/ });
+
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('offers check now when the latest build is unknown but not while checks are off', () => {
+        mocks.status = status({ check: 'unknown', update_available: false, latest: null });
+        const { unmount } = render(<OverviewVersionCard version={version} />);
+
+        expect(screen.getByRole('button', { name: 'Check now' })).toBeInTheDocument();
+        unmount();
+
+        mocks.status = status({ mode: 'off', check: 'off', update_available: false, latest: null });
+        render(<OverviewVersionCard version={version} />);
+        expect(screen.queryByRole('button', { name: 'Check now' })).toBeNull();
     });
 
     it('shows the running build as up to date', () => {

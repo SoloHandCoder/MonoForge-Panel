@@ -3,6 +3,7 @@ import type { AdminVersion } from '@/api/admin/version/queries';
 import {
     isUpdateInProgress,
     useAdminUpdateStatus,
+    useCheckAdminUpdates,
     useApplyAdminUpdate,
     type AdminUpdateStatus,
 } from '@/api/admin/updates/queries';
@@ -18,7 +19,7 @@ const STEP_LABELS = {
     backing_up: 'Backing up the code and database',
     installing: 'Copying the new build into place',
     migrating: 'Running database migrations',
-    finishing: 'Clearing caches and restarting the queue',
+    finishing: 'Rebuilding caches and restarting the queue',
     restoring: 'Restoring the previous code',
 } as const;
 
@@ -37,6 +38,17 @@ const ExternalLink = ({ href, className, children }: { href: string; className: 
         {children}
     </a>
 );
+
+/** Looks up the latest build on GitHub now; the result is shown as a toast. */
+function CheckNowButton() {
+    const check = useCheckAdminUpdates();
+
+    return (
+        <Button size='small' isSecondary className='mt-3' isLoading={check.isPending} onClick={() => check.mutate({})}>
+            {check.isPending ? 'Checking…' : 'Check now'}
+        </Button>
+    );
+}
 
 function UpdateButton({ status }: { status: AdminUpdateStatus }) {
     const applyUpdate = useApplyAdminUpdate();
@@ -121,8 +133,9 @@ function AvailableAlert({
             </ExternalLink>
             .
             <LastFailure status={status} />
-            <div>
+            <div className='flex flex-wrap gap-2'>
                 <UpdateButton status={status} />
+                <CheckNowButton />
             </div>
         </Alert>
     );
@@ -149,6 +162,9 @@ function CurrentAlert({ status }: { status: AdminUpdateStatus }) {
                     ? `Build ${status.latest.version} is out, but GitHub could not confirm it is newer than this one, so it is not offered. It will be checked again shortly.`
                     : 'The latest build could not be fetched from GitHub. It will be checked again shortly.'}
                 <LastFailure status={status} />
+                <div>
+                    <CheckNowButton />
+                </div>
             </Alert>
         );
     }
@@ -159,6 +175,9 @@ function CurrentAlert({ status }: { status: AdminUpdateStatus }) {
                 ? 'New builds are installed automatically every hour.'
                 : 'The panel checks GitHub for new builds every day.'}
             <LastFailure status={status} />
+            <div>
+                <CheckNowButton />
+            </div>
         </Alert>
     );
 }

@@ -25,6 +25,12 @@ return [
      * how many proxies that client's request has
      * subsequently passed through.
      */
+    /*
+     * MonoForge: loopback (127.0.0.0/8, ::1) is always trusted, so cloudflared and nginx
+     * on the same host work without configuration. List extra proxies here (comma
+     * separated IPs or CIDRs) when one runs on another host. See
+     * Pterodactyl\Http\Middleware\TrustProxies.
+     */
     'proxies' => (function (): string|array {
         $value = (string) env('TRUSTED_PROXIES', '');
 
