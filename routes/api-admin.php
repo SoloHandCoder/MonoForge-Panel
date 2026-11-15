@@ -225,7 +225,8 @@ Route::prefix('/users')->name('api.admin.users')->group(function (): void {
 
     Route::post('/', [UserController::class, 'store'])->name('.store');
     Route::post('/{user:id}/disable-2fa', DisableTwoFactorController::class)->name('.disable-2fa');
-    Route::post('/{user:id}/tokens', [UserTokenController::class, 'store'])->name('.tokens.adjust');
+    // Tokens are money: a browser session only, never an API key.
+    Route::post('/{user:id}/tokens', [UserTokenController::class, 'store'])->middleware(RequireSessionAuthentication::class)->name('.tokens.adjust');
     Route::put('/{user:id}', [UserController::class, 'update'])->name('.update');
 
     Route::delete('/{user:id}', [UserController::class, 'destroy'])->name('.delete');

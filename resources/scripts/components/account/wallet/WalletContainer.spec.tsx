@@ -78,5 +78,8 @@ describe('parseTokenAdjustment', () => {
         expect(parseTokenAdjustment('0')).toBeNull();
         expect(parseTokenAdjustment('1.5')).toBeNull();
         expect(parseTokenAdjustment('abc')).toBeNull();
+        expect(parseTokenAdjustment('1000000')).toBe(1_000_000);
+        expect(parseTokenAdjustment('1000001')).toBeNull();
+        expect(parseTokenAdjustment('-1000001')).toBeNull();
     });
 });

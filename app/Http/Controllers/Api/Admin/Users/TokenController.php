@@ -42,7 +42,7 @@ class TokenController extends AdminApiController
     /**
      * Adjust user tokens.
      */
-    #[Endpoint('Adjust user tokens', "Adds (positive amount) or removes (negative amount) tokens from a user's balance with a reason, recorded as an admin_adjust ledger row. Removing more than the balance fails unless allow_negative is set.")]
+    #[Endpoint('Adjust user tokens', "Adds (positive amount) or removes (negative amount) up to 1,000,000 tokens from a user's balance with a reason, recorded as an admin_adjust ledger row. Removing more than the balance fails unless allow_negative is set. Root administrators only, from a panel session (API keys get 403), and never on your own wallet.")]
     #[ResponseFromResource(TokenTransactionResource::class, TokenTransaction::class, status: 201, description: 'Tokens adjusted.', resourceKey: 'token_transaction', meta: ['balance' => 1500])]
     public function store(AdjustUserTokensRequest $request, TokenWallet $wallet, User $user): JsonResponse
     {

@@ -9,7 +9,10 @@ import { formatTokens } from '@/api/account/wallet/queries';
 import { useAdjustUserTokens, useAdminUserTokens } from '@/api/admin/users/tokens';
 import TokenLedgerTable from '@/components/account/wallet/TokenLedgerTable';
 
-/** A whole, non-zero number of tokens such as "250" or "-50", or null. */
+/** The most tokens one adjustment can add or remove (the API refuses more). */
+export const MAX_TOKEN_ADJUSTMENT = 1_000_000;
+
+/** A whole, non-zero number of tokens such as "250" or "-50", at most MAX_TOKEN_ADJUSTMENT either way, or null. */
 export const parseTokenAdjustment = (value: string): number | null => {
     const trimmed = value.trim();
 
@@ -19,7 +22,7 @@ export const parseTokenAdjustment = (value: string): number | null => {
 
     const amount = Number(trimmed);
 
-    return amount === 0 ? null : amount;
+    return amount === 0 || Math.abs(amount) > MAX_TOKEN_ADJUSTMENT ? null : amount;
 };
 
 /** The user's token balance and ledger, and a form to add or remove tokens with a reason. */

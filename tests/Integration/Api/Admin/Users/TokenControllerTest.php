@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Admin\Users\TokenControllerTest;
 
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\TokenWallet;
@@ -72,5 +75,59 @@ test('non-admins cannot read or adjust tokens', function (): void {
 
     $this->getJson(route('api.admin.users.tokens', $user->id))->assertForbidden();
     $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 5, 'reason' => 'Sneaky'])->assertForbidden();
+    expect(resolve(TokenWallet::class)->balance($user))->toBe(0);
+});
+
+test('an adjustment is capped at a million tokens per call', function (): void {
+    $user = User::factory()->create();
+
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 1_000_001, 'reason' => 'Too much'])->assertUnprocessable();
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => -1_000_001, 'reason' => 'Too much', 'allow_negative' => true])->assertUnprocessable();
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 1_000_000, 'reason' => 'Big winner'])->assertCreated();
+
+    expect(resolve(TokenWallet::class)->balance($user))->toBe(1_000_000);
+});
+
+test('an administrator cannot adjust their own wallet', function (): void {
+    $admin = $this->getAdminUser();
+
+    $this->postJson(route('api.admin.users.tokens.adjust', $admin->id), ['amount' => 500, 'reason' => 'Myself'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'You cannot adjust your own token balance.');
+    expect(resolve(TokenWallet::class)->balance($admin))->toBe(0);
+});
+
+test('the reason is stored on the ledger row and logged', function (): void {
+    $user = User::factory()->create();
+
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 42, 'reason' => '  Support goodwill  '])->assertCreated();
+
+    $row = $user->tokenTransactions()->sole();
+    expect($row->description)->toBe('Support goodwill')
+        ->and($row->meta)->toBe(['admin_id' => $this->getAdminUser()->id]);
+    $this->assertActivityLogged('admin:user.adjust-tokens');
+});
+
+test('an API key cannot adjust tokens, even a root administrator account key', function (): void {
+    $user = User::factory()->create();
+    $admin = User::factory()->create(['root_admin' => true]);
+    $key = ApiKey::factory()->create(['user_id' => $admin->id, 'key_type' => ApiKey::TYPE_ACCOUNT]);
+    Auth::forgetGuards();
+    $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
+        ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token));
+
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 5, 'reason' => 'Through a key'])
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', 'This action can only be performed from an authenticated panel session, not with an API key.');
+    expect(resolve(TokenWallet::class)->balance($user))->toBe(0);
+});
+
+test('only root administrators can adjust tokens, whatever permissions a role grants', function (): void {
+    $staff = User::factory()->create(['root_admin' => false]);
+    Gate::before(fn (User $user): ?bool => $user->id === $staff->id ? true : null);
+    $this->actingAs($staff);
+    $user = User::factory()->create();
+
+    $this->postJson(route('api.admin.users.tokens.adjust', $user->id), ['amount' => 5, 'reason' => 'Support role'])->assertForbidden();
     expect(resolve(TokenWallet::class)->balance($user))->toBe(0);
 });
