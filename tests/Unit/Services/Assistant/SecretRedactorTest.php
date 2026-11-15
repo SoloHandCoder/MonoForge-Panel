@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Unit\Services\Assistant\SecretRedactorTest;
 
+use Pterodactyl\Exceptions\Assistant\ToolException;
 use Pterodactyl\Services\Assistant\Tools\OutputRedactor;
 use Pterodactyl\Services\Assistant\Tools\SecretRedactor;
+use Pterodactyl\Services\Assistant\Tools\Server\EditFileTool;
 
 const MASK = SecretRedactor::PLACEHOLDER;
 
@@ -63,82 +65,91 @@ test('secret-looking variable names are recognised', function (string $name, boo
     ['RCON_PORT', false],
 ]);
 
-test('masked values are restored from the original when the model writes the file back', function (): void {
-    $original = "motd=Old\nrcon.password=hunter2\ndb: mysql://root:pw1@db/mc\nmax-players=20";
-    $edited = str_replace(['motd=Old', 'max-players=20'], ['motd=New', 'max-players=50'], SecretRedactor::redact($original));
-
-    expect($edited)->toContain(MASK)
-        ->and(SecretRedactor::restore($edited, $original))->toBe("motd=New\nrcon.password=hunter2\ndb: mysql://root:pw1@db/mc\nmax-players=50");
-});
-
-test('repeated keys are restored in order, and a mask without an original is refused', function (): void {
-    $original = "a:\n  password: one\nb:\n  password: two";
-    $masked = SecretRedactor::redact($original);
-
-    expect(SecretRedactor::restore($masked, $original))->toBe($original)
-        // A mask moved to a key that had none, or one mask too many, cannot be restored.
-        ->and(SecretRedactor::restore('token: '.MASK, $original))->toBeNull()
-        ->and(SecretRedactor::restore($masked."\nc:\n  password: ".MASK, $original))->toBeNull()
-        ->and(SecretRedactor::restore('plain', $original))->toBe('plain');
-});
-
-test('address placeholders are still never written back', function (): void {
-    expect(OutputRedactor::containsPlaceholder('ip='.OutputRedactor::IP))->toBeTrue()
-        ->and(OutputRedactor::containsPlaceholder('password: '.MASK))->toBeFalse();
-});
-
-test('a value written back where the next read would not mask it is refused (round trip)', function (string $original, string $from, string $to): void {
-    $edited = str_replace($from, $to, SecretRedactor::redact($original));
-
-    expect($edited)->toContain(MASK)
-        ->and(SecretRedactor::restore($edited, $original))->toBeNull();
-})->with([
-    'URL credential with the @ moved' => ["url: jdbc:mysql://root:S3cretPw@db:3306/mc\n", MASK.'@db', MASK.'/@db'],
-    'URL credential pointed at another host' => ["url: jdbc:mysql://root:S3cretPw@db:3306/mc\n", '@db:3306', '@attacker.example:3306'],
-    'JSON closing quote moved' => ["{\n  \"password\": \"S3cretPw\"\n}\n", '"'.MASK.'"', '"'.MASK."\n\""],
-    'PHP closing quote moved' => ["<?php return [\n  'password' => 'S3cretPw',\n];\n", "'".MASK."',", "'".MASK."\n',"],
-]);
-
-test('a value never moves to another section with the same key', function (): void {
-    $original = "mysql:\n  host: db\n  password: MYSQLPW\nredis:\n  host: cache\n  password: REDISPW\n";
-    $masked = SecretRedactor::redact($original);
-
-    // The MySQL section is removed: the redis password stays the redis password.
-    $withoutMysql = "redis:\n  host: cache\n  password: ".MASK."\n";
-    expect(SecretRedactor::restore($withoutMysql, $original))->toBe("redis:\n  host: cache\n  password: REDISPW\n");
-
-    // Swapping the sections is fine too: each value follows its own key path.
-    $swapped = "redis:\n  host: cache\n  password: ".MASK."\nmysql:\n  host: db\n  password: ".MASK."\n";
-    expect(SecretRedactor::restore($swapped, $original))->toBe("redis:\n  host: cache\n  password: REDISPW\nmysql:\n  host: db\n  password: MYSQLPW\n");
-
-    // A mask under a section that had none, or twice under one, is refused.
-    expect(SecretRedactor::restore($masked."web:\n  password: ".MASK."\n", $original))->toBeNull()
-        ->and(SecretRedactor::restore("redis:\n  password: ".MASK."\n  password: ".MASK."\n", $original))->toBeNull();
-});
-
-test('a mask without a key is restored only on identical lines', function (): void {
-    $original = "motd: Hello\nkey: |\n  -----BEGIN RSA PRIVATE KEY-----\n  MIIEow\n  -----END RSA PRIVATE KEY-----\n";
-    $masked = SecretRedactor::redact($original);
-
-    expect($masked)->toBe("motd: Hello\nkey: |\n  ".MASK."\n")
-        // The block moved under the MOTD (public in the server list): refused.
-        ->and(SecretRedactor::restore("motd: |\n  ".MASK."\n", $original))->toBeNull()
-        // Left byte-identical while another line changes: restored.
-        ->and(SecretRedactor::restore(str_replace('Hello', 'Hi', $masked), $original))->toBe(str_replace('Hello', 'Hi', $original));
-});
-
-test('keys are found in JSON and PHP nesting', function (): void {
-    $original = '{"db": {"password": "A"}, "cache": {"password": "B"}}';
-    $masked = SecretRedactor::redact($original);
-    $swapped = '{"cache": {"password": "'.MASK.'"}, "db": {"password": "'.MASK.'"}}';
-
-    expect(SecretRedactor::restore($swapped, $original))->toBe('{"cache": {"password": "B"}, "db": {"password": "A"}}')
-        ->and(SecretRedactor::restore(str_replace('"db"', '"other"', $masked), $original))->toBeNull();
-});
-
 test('file keys named like a secret startup variable are masked, and log lines are masked mid-line', function (): void {
     expect(SecretRedactor::redact('STEAM_ACC=ABCDEF'))->toBe('STEAM_ACC='.MASK)
         ->and(SecretRedactor::redactLog('[12:00:01 INFO]: RCON password: hunter22'))->toBe('[12:00:01 INFO]: RCON password: '.MASK)
         ->and(SecretRedactor::redactLog('[Bot] token=MTAxabc rest'))->toBe('[Bot] token='.MASK.' rest')
         ->and(SecretRedactor::redactLog('[12:00:01 INFO]: Done (3.2s)! port: 25565'))->toBe('[12:00:01 INFO]: Done (3.2s)! port: 25565');
 });
+
+test('address placeholders are still never written back', function (): void {
+    expect(OutputRedactor::containsPlaceholder('ip='.OutputRedactor::IP))->toBeTrue()
+        ->and(OutputRedactor::containsPlaceholder('password: '.MASK))->toBeFalse()
+        ->and(SecretRedactor::containsPlaceholder('password: '.MASK))->toBeTrue()
+        ->and(SecretRedactor::containsPlaceholder(SecretRedactor::UNCHECKED))->toBeTrue();
+});
+
+test('masking stays linear: long values never switch it off', function (int $length): void {
+    $cases = [
+        '{"favicon": "'.str_repeat('A', $length).'", "password": "S3cretPw"}',
+        '{"password": "S3cretPw", "motd": "'.str_repeat('B', $length).'"}',
+        '{"desc": "'.str_repeat('a\\"', intdiv($length, 3)).'", "password": "S3cretPw"}',
+        "<?php return ['logo' => '".str_repeat('B', $length)."', 'db' => ['password' => 'S3cretPw']];",
+        "password=S3cretPw\nmotd=".str_repeat('x ', intdiv($length, 2)),
+        "a\n-----BEGIN RSA PRIVATE KEY-----\n".str_repeat("MIIEow-x\n", intdiv($length, 9))."-----END RSA PRIVATE KEY-----\npassword: S3cretPw\n",
+    ];
+
+    foreach ($cases as $text) {
+        $masked = SecretRedactor::redact($text);
+        expect($masked)->not->toContain('S3cretPw')->not->toBe(SecretRedactor::UNCHECKED);
+    }
+})->with([10_000, 200_000]);
+
+test('masking fails closed when PCRE reports an error', function (): void {
+    $limit = ini_get('pcre.backtrack_limit');
+    $jit = ini_get('pcre.jit');
+    ini_set('pcre.jit', '0');
+    ini_set('pcre.backtrack_limit', '1');
+
+    try {
+        $text = 'password: hunter2 and more text '.str_repeat('y ', 100);
+        expect(SecretRedactor::redact($text))->toBe(SecretRedactor::UNCHECKED)
+            ->and(SecretRedactor::redactLog($text))->toBe(SecretRedactor::UNCHECKED)
+            ->and(SecretRedactor::hidesSomething('motd=hi'))->toBeTrue()
+            ->and(SecretRedactor::hiddenValues($text))->toBeNull();
+    } finally {
+        ini_set('pcre.backtrack_limit', (string) $limit);
+        ini_set('pcre.jit', (string) $jit);
+    }
+});
+
+test('secrets in YAML list items are masked', function (): void {
+    expect(SecretRedactor::redact("tokens:\n  - token: abcdef123\n  - password: hunter2\n  - name: lobby\n"))
+        ->toBe("tokens:\n  - token: ".MASK."\n  - password: ".MASK."\n  - name: lobby\n");
+});
+
+test('a carriage return stays outside a masked value', function (): void {
+    expect(SecretRedactor::redact("password=hunter2\r\nmotd=hi\r\n"))->toBe('password='.MASK."\r\nmotd=hi\r\n");
+});
+
+test('the hidden values of a text are listed in order', function (): void {
+    expect(SecretRedactor::hiddenValues("motd=hi\nrcon.password=A1\ndb: mysql://root:B2@db/mc\n"))->toBe(['A1', 'B2'])
+        ->and(SecretRedactor::hiddenValues('motd=hi'))->toBe([])
+        // Too many to line up quickly: the file counts as unchecked, so it is not edited.
+        ->and(SecretRedactor::hiddenValues(str_repeat("password=x\n", SecretRedactor::MAX_HIDDEN_VALUES + 1)))->toBeNull();
+});
+
+const PROPERTIES = "motd=A Minecraft Server\nrcon.password=hunter22\nrcon.port=25575\nmax-players=20\n";
+
+test('edit_file changes the MOTD line of a file that holds rcon.password, leaving the password untouched', function (): void {
+    $edited = EditFileTool::apply(PROPERTIES, [
+        ['find' => 'motd=A Minecraft Server', 'replace' => 'motd=Welcome!'],
+        ['find' => 'max-players=20', 'replace' => 'max-players=50'],
+    ]);
+
+    expect($edited)->toBe("motd=Welcome!\nrcon.password=hunter22\nrcon.port=25575\nmax-players=50\n");
+});
+
+test('edit_file refuses edits that touch, move, copy or add a hidden value', function (string $original, array $edits, string $message): void {
+    expect(fn (): string => EditFileTool::apply($original, $edits))->toThrow(ToolException::class, $message);
+})->with([
+    'find on the rcon.password line' => [PROPERTIES, [['find' => 'rcon.password=', 'replace' => 'rcon.password=new']], 'touches a line with a hidden value'],
+    'find ending next to the secret line' => [PROPERTIES, [['find' => "Server\nrcon", 'replace' => "Server\n#rcon"]], 'touches a line with a hidden value'],
+    'moving the secret line down' => [PROPERTIES, [['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'touches a line with a hidden value'],
+    'a new secret' => [PROPERTIES, [['find' => 'max-players=20', 'replace' => "max-players=20\nquery.password=mine"]], 'moves, copies or changes a hidden value'],
+    'YAML key turned into a block scalar (I-B probe)' => ["mysql:\n  password: A1secret\nmotd: hi\n", [['find' => 'mysql:', 'replace' => 'motd: |']], 'moves, copies or changes a hidden value'],
+    'YAML key turned into an open quote (I-C probe)' => ["mysql:\n  password: A1secret\nmotd: hi\n", [['find' => 'mysql:', 'replace' => 'motd: "Welcome']], 'moves, copies or changes a hidden value'],
+    'a secret written into a JSON string (I-C probe)' => ["{\n  \"password\": \"A1secret\",\n  \"join message\": \"Welcome!\"\n}\n", [['find' => '"Welcome!"', 'replace' => "\"Welcome! 'password': 'x'\""]], 'moves, copies or changes a hidden value'],
+    'PHP heredoc' => ["<?php return [\n  'motd' => 'hi',\n  'password' => 'A1secret',\n];\n", [['find' => "'motd' => 'hi',", 'replace' => "'motd' => <<<EOT"]], 'moves, copies or changes a hidden value'],
+    'text that occurs twice' => ["a=1\na=1\npassword=x\n", [['find' => 'a=1', 'replace' => 'a=2']], 'exactly once'],
+]);

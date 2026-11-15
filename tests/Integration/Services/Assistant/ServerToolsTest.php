@@ -156,6 +156,7 @@ test('changing tools always need confirmation', function (string $class): void {
     expect(tool($class)->needsConfirmation([], context($user, $server)))->toBeTrue();
 })->with([
     Tools\WriteFileTool::class,
+    Tools\EditFileTool::class,
     Tools\DeleteFilesTool::class,
     Tools\RenameFileTool::class,
     Tools\SendCommandTool::class,
@@ -455,28 +456,103 @@ test('writing a new file needs file.create and an existing one file.update', fun
     $fakes['file']->assertContentPut('/new.txt', 'hello');
 });
 
-test('a masked file the model writes back keeps its secrets from the file on the server', function (): void {
+test('write_file refuses content with a mask, and refuses to overwrite a file that holds hidden values', function (string $original, string $content, string $message): void {
     [$user, $server] = $this->generateTestAccount();
     $fakes = wings();
-    $fakes['file']->directory = [['name' => 'server.properties', 'file' => true, 'symlink' => false, 'size' => 60]];
-    $fakes['file']->content = "motd=Old\nrcon.port=25575\nrcon.password=hunter2\n";
+    $fakes['file']->directory = [['name' => 'config.yml', 'file' => true, 'symlink' => false, 'size' => 60]];
+    $fakes['file']->content = $original;
     $tool = tool(Tools\WriteFileTool::class);
 
-    // What the model read, edited: the MOTD changes, the mask stays.
-    $edited = str_replace('motd=Old', 'motd=New', SecretRedactor::redact($fakes['file']->content));
-    expect($edited)->toContain('rcon.password='.SecretRedactor::PLACEHOLDER)
-        ->and($tool->callDetails(['path' => '/server.properties', 'content' => $edited], context($user, $server)))
-        ->toContain(['label' => 'Hidden values', 'value' => Tools\WriteFileTool::HIDDEN_VALUES_NOTE])
-        // The card lists the changed lines, compared on masked copies.
-        ->toContain(['label' => 'Changes', 'value' => "Lines 1-1 change: 1 removed, 1 added.\n- motd=Old\n+ motd=New"]);
+    expect(fn (): ToolResult => $tool->execute(['path' => '/config.yml', 'content' => $content], context($user, $server)))->toThrow(ToolException::class, $message)
+        ->and(fn (): array => $tool->prepareArguments(['path' => '/config.yml', 'content' => $content], context($user, $server)))->toThrow(ToolException::class, $message);
+    expect($fakes['file']->callsFor('putContent'))->toBeEmpty();
+})->with([
+    // The round-2 and round-3 probes: each one used to be written with the secret moved.
+    'URL credential with the @ moved' => ["url: jdbc:mysql://root:S3cretPw@db:3306/mc\n", 'url: jdbc:mysql://root:'.SecretRedactor::PLACEHOLDER."/@db:3306/mc\n", 'holds a hidden value'],
+    'JSON closing quote moved' => ["{\n  \"password\": \"S3cretPw\"\n}\n", "{\n  \"password\": \"".SecretRedactor::PLACEHOLDER."\n\"\n}\n", 'holds a hidden value'],
+    'a value moved into the MOTD (I-C)' => ["mysql:\n  password: A1secret\nmotd: hi\n", "motd: \"Welcome\nmysql:\n  password: ".SecretRedactor::PLACEHOLDER."\n  \"\n", 'holds a hidden value'],
+    'the mysql section removed' => ["mysql:\n  password: MYSQLPW\nredis:\n  password: REDISPW\n", "redis:\n  password: ".SecretRedactor::PLACEHOLDER."\n", 'holds a hidden value'],
+    // No mask at all, but the file on the server holds a secret: a full overwrite would lose or expose it.
+    'overwriting a file with a secret' => ["motd=hi\nrcon.password=hunter2\n", "motd=hi\n", Tools\WriteFileTool::HAS_HIDDEN_VALUES],
+]);
 
-    $tool->execute(['path' => '/server.properties', 'content' => $edited], context($user, $server));
-    $fakes['file']->assertContentPut('/server.properties', "motd=New\nrcon.port=25575\nrcon.password=hunter2\n");
+test('write_file still overwrites a file without secrets and creates new files', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'paper.yml', 'file' => true, 'symlink' => false, 'size' => 10]];
+    $fakes['file']->content = "view-distance: 8\n";
+    $tool = tool(Tools\WriteFileTool::class);
 
-    // A mask that matches no hidden value of the file is refused, and nothing is written.
-    expect(fn (): ToolResult => $tool->execute(['path' => '/server.properties', 'content' => "motd=New\nquery.password=".SecretRedactor::PLACEHOLDER], context($user, $server)))
-        ->toThrow(ToolException::class, 'moves or changes a hidden value');
-    expect($fakes['file']->callsFor('putContent'))->toHaveCount(1);
+    $tool->execute(['path' => '/paper.yml', 'content' => "view-distance: 10\n"], context($user, $server));
+    $fakes['file']->assertContentPut('/paper.yml', "view-distance: 10\n");
+
+    $tool->execute(['path' => '/new.yml', 'content' => 'a: 1'], context($user, $server));
+    $fakes['file']->assertContentPut('/new.yml', 'a: 1');
+    expect($fakes['file']->callsFor('putContent'))->toHaveCount(2);
+});
+
+test('the write card shows the changed lines only to a user who may read the file', function (): void {
+    [$owner, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'paper.yml', 'file' => true, 'symlink' => false, 'size' => 10]];
+    $fakes['file']->content = "view-distance: 8\nhost: 10.0.0.5\n";
+    $tool = tool(Tools\WriteFileTool::class);
+    $arguments = ['path' => '/paper.yml', 'content' => "view-distance: 10\nhost: 198.51.100.7\n"];
+
+    // The current lines have addresses taken out; the new lines are shown as written.
+    expect($tool->callDetails($arguments, context($owner, $server)))
+        ->toContain(['label' => 'Changes', 'value' => "Lines 1-2 change: 2 removed, 2 added.\n- view-distance: 8\n- host: [hidden-ip]\n+ view-distance: 10\n+ host: 198.51.100.7"]);
+
+    // A subuser who may write but not read the file sees no line of it (I-E).
+    [$subuser, $shared] = $this->generateTestAccount([Permissions::FileUpdate->value, Permissions::FileCreate->value]);
+    $details = $tool->callDetails($arguments, context($subuser, $shared));
+    expect($details)->toContain(['label' => 'Changes', 'value' => Tools\WriteFileTool::NOT_READABLE])
+        ->and(json_encode($details))->not->toContain('view-distance: 8');
+});
+
+test('edit_file changes the MOTD of server.properties and leaves rcon.password untouched', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->content = "motd=Old\nrcon.password=hunter22\nrcon.port=25575\n";
+    $tool = tool(Tools\EditFileTool::class);
+    $arguments = $tool->prepareArguments(['path' => 'server.properties', 'edits' => [['find' => 'motd=Old', 'replace' => 'motd=New']]], context($user, $server));
+
+    expect($tool->needsConfirmation($arguments, context($user, $server)))->toBeTrue()
+        ->and($tool->describeCall($arguments))->toBe('Edit /server.properties (1 change)')
+        ->and($tool->callDetails($arguments, context($user, $server)))->toBe([
+            ['label' => 'Path', 'value' => '/server.properties'],
+            ['label' => 'Edit 1 of 1', 'value' => "- motd=Old\n+ motd=New"],
+        ]);
+
+    $result = $tool->execute($arguments, context($user, $server));
+
+    $fakes['file']->assertContentPut('/server.properties', "motd=New\nrcon.password=hunter22\nrcon.port=25575\n");
+    expect($result->content)->toBe('Edited /server.properties (1 change).')->not->toContain('hunter22');
+});
+
+test('edit_file refuses an edit on the rcon.password line and a moved secret line, and writes nothing', function (array $edits, string $message): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->content = "motd=Old\nrcon.password=hunter22\nrcon.port=25575\n";
+
+    expect(fn (): ToolResult => tool(Tools\EditFileTool::class)->execute(['path' => '/server.properties', 'edits' => $edits], context($user, $server)))
+        ->toThrow(ToolException::class, $message);
+    expect($fakes['file']->callsFor('putContent'))->toBeEmpty();
+})->with([
+    'find touches the rcon.password line' => [[['find' => 'rcon.password=hunter', 'replace' => 'rcon.password=mine']], 'touches a line with a hidden value'],
+    'moving the secret line' => [[['find' => "rcon.password=hunter22\nrcon.port=25575", 'replace' => "rcon.port=25575\nrcon.password=hunter22"]], 'touches a line with a hidden value'],
+    'a mask in the replacement' => [[['find' => 'motd=Old', 'replace' => 'motd='.SecretRedactor::PLACEHOLDER]], 'hidden value or address placeholder'],
+]);
+
+test('the edit card shows only how many edits there are to a user who may not read the file', function (): void {
+    [$subuser, $server] = $this->generateTestAccount([Permissions::FileUpdate->value]);
+    $tool = tool(Tools\EditFileTool::class);
+    $arguments = $tool->prepareArguments(['path' => '/x.yml', 'edits' => [['find' => 'secret-ish text', 'replace' => 'b'], ['find' => 'c', 'replace' => 'd']]], context($subuser, $server));
+
+    $details = $tool->callDetails($arguments, context($subuser, $server));
+
+    expect($details[1]['value'])->toBe('2 edits. You cannot read this file, so the changed text is not shown.')
+        ->and(json_encode($details))->not->toContain('secret-ish text');
 });
 
 test('secrets printed on the console are masked for the model', function (): void {

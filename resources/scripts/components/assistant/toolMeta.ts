@@ -37,6 +37,7 @@ const icons = new Map<string, LucideIcon>([
     ['read_file', FileText],
     ['search_files', FileSearch],
     ['write_file', FilePen],
+    ['edit_file', FilePen],
     ['delete_files', Trash2],
     ['rename_file', PencilLine],
     ['power', Power],
@@ -68,6 +69,7 @@ export const toolIcon = (name: string): LucideIcon => icons.get(name) ?? (name.s
  */
 const destructiveTools = new Set([
     'write_file',
+    'edit_file',
     'delete_files',
     'rename_file',
     'send_command',
@@ -92,6 +94,8 @@ export function confirmationWarning(call: Pick<AssistantToolCall, 'name' | 'need
             return 'This permanently deletes files from the server. It cannot be undone.';
         case 'write_file':
             return 'This overwrites the file on the server.';
+        case 'edit_file':
+            return 'This changes the listed text in the file on the server. Lines with hidden values are never touched.';
         case 'rename_file':
             return 'This moves or renames files on the server.';
         case 'power':

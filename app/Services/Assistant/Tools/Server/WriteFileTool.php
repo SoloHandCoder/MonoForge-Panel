@@ -24,9 +24,10 @@ use Throwable;
  * Creates or overwrites a text file. Like the file manager, overwriting needs file.update
  * and creating needs file.create.
  *
- * The model only ever reads files with secret values masked. When it writes such a file back,
- * each mask is replaced by the value it hid, taken from the file on the server, so it can edit
- * the rest of a config without learning (or wiping) its passwords.
+ * The model only ever reads files with secret values masked, so a full overwrite could wipe
+ * or move them. write_file therefore refuses content holding a mask, and refuses to overwrite
+ * a file that holds values masking would hide: such files are changed line by line with
+ * edit_file instead.
  */
 final class WriteFileTool extends ServerTool
 {
@@ -38,7 +39,11 @@ final class WriteFileTool extends ServerTool
     /** How many changed lines the card lists. */
     public const int CHANGED_LINES = 40;
 
-    public const string HIDDEN_VALUES_NOTE = 'Each '.SecretRedactor::PLACEHOLDER.' is replaced by the value it hides in the current file on the server, at the same key. If a hidden value was moved or changed, the write is refused and nothing is written.';
+    public const string HAS_HIDDEN_VALUES = 'This file contains hidden values; use edit_file to change specific lines.';
+
+    public const string HOLDS_MASK = 'The content holds a hidden value ('.SecretRedactor::PLACEHOLDER.'), which would overwrite the real one. Use edit_file to change specific lines of a file with hidden values.';
+
+    public const string NOT_READABLE = 'You cannot read this file, so its changes are not shown.';
 
     public function __construct(
         private readonly WritesFileContents $writer,
@@ -92,13 +97,13 @@ final class WriteFileTool extends ServerTool
 
     public function description(): string
     {
-        return 'Create a text file or replace the whole contents of an existing one (at most 256 KB). The user is asked to confirm first. Always write the complete file, not only the changed part. Leave values shown as '.SecretRedactor::PLACEHOLDER.' as they are, on their own line: they keep their current value.';
+        return 'Create a text file or replace the whole contents of an existing one (at most 256 KB). The user is asked to confirm first. Always write the complete file, not only the changed part. A file that holds hidden values (shown to you as '.SecretRedactor::PLACEHOLDER.') cannot be overwritten: change its lines with edit_file.';
     }
 
     public function parameters(): array
     {
         return $this->schema([
-            'path' => ['type' => 'string', 'description' => 'The file to write, such as "/server.properties".'],
+            'path' => ['type' => 'string', 'description' => 'The file to write, such as "/config/paper-global.yml".'],
             'content' => ['type' => 'string', 'description' => 'The complete new contents of the file.'],
         ], ['path', 'content']);
     }
@@ -116,6 +121,20 @@ final class WriteFileTool extends ServerTool
         $content = $arguments['content'] ?? null;
         throw_unless(is_string($content), ToolException::class, 'The "content" argument must be a string.');
 
+        throw_if(SecretRedactor::containsPlaceholder($content), ToolException::class, self::HOLDS_MASK);
+
+        // Tell the model right away when the file holds hidden values; run() checks again.
+        $server = $context->server;
+        if ($server instanceof Server) {
+            try {
+                $current = $this->current($server, $path);
+            } catch (Throwable) {
+                $current = null;
+            }
+
+            throw_if($current !== null && SecretRedactor::hidesSomething($current), ToolException::class, self::HAS_HIDDEN_VALUES);
+        }
+
         return ['path' => $path, 'content' => $content];
     }
 
@@ -131,7 +150,6 @@ final class WriteFileTool extends ServerTool
             ['label' => 'Size', 'value' => sprintf('%s bytes', number_format($bytes))],
             ['label' => $rest > 0 ? sprintf('Content (first %s bytes)', number_format(mb_strlen($preview, '8bit'))) : 'Content', 'value' => $rest > 0 ? $preview.sprintf("\n… %s more bytes not shown", number_format($rest)) : $preview],
             ['label' => 'Changes', 'value' => $this->changes($arguments, $context)],
-            ...(SecretRedactor::containsPlaceholder($content) ? [['label' => 'Hidden values', 'value' => self::HIDDEN_VALUES_NOTE]] : []),
         ];
     }
 
@@ -155,18 +173,26 @@ final class WriteFileTool extends ServerTool
 
         throw_if(mb_strlen($content, '8bit') > self::MAX_BYTES, ToolException::class, 'The content is larger than 256 KB.');
 
-        // Addresses in tool output are replaced by placeholders; writing those back would
-        // overwrite the real values.
+        // Addresses and secrets in tool output are replaced by placeholders; writing those back
+        // would overwrite the real values.
         if (OutputRedactor::containsPlaceholder($content)) {
             throw new ToolException(sprintf('The content still holds the %s or %s placeholder from redacted output. Ask the user to edit those values in the file manager instead.', OutputRedactor::IP, OutputRedactor::HOST));
         }
+
+        throw_if(SecretRedactor::containsPlaceholder($content), ToolException::class, self::HOLDS_MASK);
 
         $server = $this->server($context);
         $exists = $this->exists($server, $path);
         $this->requirePermission($context, $exists ? Permissions::FileUpdate : Permissions::FileCreate);
 
-        if (SecretRedactor::containsPlaceholder($content)) {
-            $content = $this->restoreSecrets($server, $path, $content, $exists);
+        if ($exists) {
+            try {
+                $current = $this->reader->read($server, $path, self::MAX_BYTES);
+            } catch (FileSizeTooLargeException $fileSizeTooLargeException) {
+                throw new ToolException('The file on the server is larger than 256 KB, so it cannot be checked for hidden values or overwritten here.', 0, $fileSizeTooLargeException);
+            }
+
+            throw_if(SecretRedactor::hidesSomething($current), ToolException::class, self::HAS_HIDDEN_VALUES);
         }
 
         $this->writer->write($server, $path, $content);
@@ -177,28 +203,9 @@ final class WriteFileTool extends ServerTool
     }
 
     /**
-     * The content with each masked value put back from the file on the server.
-     *
-     * @throws ToolException when a mask has no value to restore
-     * @throws DaemonConnectionException
-     */
-    private function restoreSecrets(Server $server, string $path, string $content, bool $exists): string
-    {
-        $refuse = SecretRedactor::MOVED;
-        throw_unless($exists, ToolException::class, $refuse);
-
-        try {
-            $original = $this->reader->read($server, $path, self::MAX_BYTES);
-        } catch (FileSizeTooLargeException $fileSizeTooLargeException) {
-            throw new ToolException($refuse, 0, $fileSizeTooLargeException);
-        }
-
-        return SecretRedactor::restore($content, $original) ?? throw new ToolException(SecretRedactor::MOVED);
-    }
-
-    /**
-     * Which lines of the current file the write changes, compared on masked copies (so no
-     * secret reaches the card) with addresses taken out.
+     * Which lines of the current file the write changes, only for a user who may read the
+     * file. The current lines are masked and have addresses taken out; the new lines are the
+     * model's, shown as they are, so a changed host is visible.
      *
      * @param  array<string, mixed>  $arguments
      */
@@ -211,8 +218,12 @@ final class WriteFileTool extends ServerTool
             return 'Could not compare with the current file.';
         }
 
+        if (! $context->user->can(Permissions::FileReadContent->value, $server)) {
+            return self::NOT_READABLE;
+        }
+
         try {
-            $current = $this->exists($server, $path) ? $this->reader->read($server, $path, self::MAX_BYTES) : null;
+            $current = $this->current($server, $path);
         } catch (Throwable) {
             return 'Could not compare with the current file.';
         }
@@ -222,7 +233,20 @@ final class WriteFileTool extends ServerTool
             return sprintf('A new file with %s lines.', number_format(count($new)));
         }
 
-        return (new OutputRedactor)->redact(self::lineDiff(explode("\n", str_replace("\r\n", "\n", SecretRedactor::redact($current))), $new));
+        $old = explode("\n", (new OutputRedactor)->redact(str_replace("\r\n", "\n", SecretRedactor::redact($current))));
+
+        return self::lineDiff($old, $new);
+    }
+
+    /**
+     * The current contents of the file, or null when there is none.
+     *
+     * @throws DaemonConnectionException
+     * @throws FileSizeTooLargeException
+     */
+    private function current(Server $server, string $path): ?string
+    {
+        return $this->exists($server, $path) ? $this->reader->read($server, $path, self::MAX_BYTES) : null;
     }
 
     /**

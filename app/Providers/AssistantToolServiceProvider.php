@@ -21,6 +21,7 @@ use Pterodactyl\Services\Assistant\Tools\Admin\ShopOverviewTool;
 use Pterodactyl\Services\Assistant\Tools\Server;
 use Pterodactyl\Services\Assistant\Tools\Server\CreateBackupTool;
 use Pterodactyl\Services\Assistant\Tools\Server\DeleteFilesTool;
+use Pterodactyl\Services\Assistant\Tools\Server\EditFileTool;
 use Pterodactyl\Services\Assistant\Tools\Server\GetNetworkTool;
 use Pterodactyl\Services\Assistant\Tools\Server\GetStartupTool;
 use Pterodactyl\Services\Assistant\Tools\Server\ListBackupsTool;
@@ -55,6 +56,7 @@ class AssistantToolServiceProvider extends ServiceProvider
         RevealStartupVariableTool::class,
         GetNetworkTool::class,
         WriteFileTool::class,
+        EditFileTool::class,
         DeleteFilesTool::class,
         RenameFileTool::class,
         SendCommandTool::class,
