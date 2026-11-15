@@ -12,6 +12,7 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Pterodactyl\Contracts\Servers\ReadsServerStates;
 use Pterodactyl\Data\ServerState;
 use Pterodactyl\Data\ServerStateUnavailable;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
