@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Sleep;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -132,9 +134,8 @@ class ServerSleep implements WakesServers
         ServerSubscription::query()
             ->with(['server.node', 'server.egg', 'server.allocation', 'plan'])
             ->where('status', ServerSubscription::STATUS_ACTIVE)
-            ->where(fn ($query) => $query->where('auto_sleep', true)->orWhereNotNull('sleep_started_at')->orWhere('idle_checks', '>', 0))
-            ->chunkById(100, function ($subscriptions) use (&$counts): void {
-                /** @var iterable<ServerSubscription> $subscriptions */
+            ->where(fn (Builder $query): Builder => $query->where('auto_sleep', true)->orWhereNotNull('sleep_started_at')->orWhere('idle_checks', '>', 0))
+            ->chunkById(100, function (Collection $subscriptions) use (&$counts): void {
                 $servers = [];
                 foreach ($subscriptions as $subscription) {
                     $servers[] = $subscription->server;
@@ -230,7 +231,7 @@ class ServerSleep implements WakesServers
         $intervals = ServerSleepSession::query()
             ->where('server_id', $serverId)
             ->where('started_at', '<', $to)
-            ->where(fn ($query) => $query->whereNull('ended_at')->orWhere('ended_at', '>', $from))
+            ->where(fn (Builder $query): Builder => $query->whereNull('ended_at')->orWhere('ended_at', '>', $from))
             ->oldest('started_at')
             ->get()
             ->map(fn (ServerSleepSession $session): array => [
