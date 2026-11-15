@@ -138,6 +138,11 @@ return [
         ],
     ],
     'admin' => [
+        'announcement' => [
+            'create' => 'Created the :title announcement',
+            'update' => 'Updated the :title announcement',
+            'delete' => 'Deleted the :title announcement',
+        ],
         'api-key' => [
             'create' => 'Created application API key :identifier',
             'update' => 'Updated application API key :identifier',
