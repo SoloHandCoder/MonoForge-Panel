@@ -12,6 +12,7 @@ use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Notices\NoticeService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * Applies a verified Tebex payment webhook to the token ledger. Every event is recorded on the
@@ -87,6 +88,41 @@ readonly class TebexWebhookProcessor
     }
 
     /**
+     * An administrator's "Approve and credit" for a flagged (underpaid or unmatched) payment: it
+     * credits the tokens of its completed webhook through the normal credit path, so the
+     * payment's `tokens` are set and a later refund, dispute or chargeback takes them back.
+     * Approving a payment that is already credited changes nothing.
+     *
+     * @throws ConflictHttpException
+     */
+    public function approve(TebexPayment $payment, ?User $recipient = null): TebexPayment
+    {
+        return DB::transaction(function () use ($payment, $recipient): TebexPayment {
+            /** @var TebexPayment $locked */
+            $locked = TebexPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
+            if ($locked->processed_at !== null) {
+                return $locked;
+            }
+
+            throw_unless(in_array($locked->status, [TebexPayment::STATUS_UNDERPAID, TebexPayment::STATUS_UNMATCHED], true), ConflictHttpException::class, 'Only an underpaid or unmatched payment can be approved.');
+
+            $subject = $this->completedSubject($locked);
+            throw_if($subject === null, ConflictHttpException::class, 'The details of this payment were pruned; adjust the tokens by hand instead.');
+
+            $user = $recipient ?? $this->user($subject) ?? ($locked->user_id === null ? null : User::query()->find($locked->user_id));
+            [$tokens, $names] = $this->tokens($subject);
+            throw_unless($user instanceof User, ConflictHttpException::class, 'The payment matched no panel user. Choose the user to credit.');
+            throw_if($tokens < 1, ConflictHttpException::class, 'The payment matched no token pack, so there are no tokens to credit.');
+
+            $locked->user_id = $user->id;
+            $this->credit($locked, $user, $tokens, $names);
+            $locked->save();
+
+            return $locked;
+        });
+    }
+
+    /**
      * @param  array<array-key, mixed>  $subject
      */
     private function complete(TebexPayment $payment, array $subject): void
@@ -120,12 +156,38 @@ readonly class TebexWebhookProcessor
             Log::warning('A Tebex payment paid less than its package price; nothing was credited.', ['payment' => $payment->id, 'reason' => $underpaid]);
             $this->notifyAdmins(
                 'Tebex payment needs a look',
-                sprintf("Tebex payment %s was not credited: %s. Check it and adjust the player's tokens by hand if it is fine.", $payment->transaction_id, $underpaid),
+                sprintf('Tebex payment %s was not credited: %s. If it is fine, use "Approve and credit" on it in Shop > Token packs & Tebex, so a later refund or chargeback can take the tokens back.', $payment->transaction_id, $underpaid),
             );
 
             return;
         }
 
+        $this->credit($payment, $user, $tokens, $names);
+    }
+
+    /**
+     * The subject of the payment's stored completion webhook, unless it was pruned.
+     *
+     * @return array<array-key, mixed>|null
+     */
+    private function completedSubject(TebexPayment $payment): ?array
+    {
+        foreach (array_reverse($payment->raw) as $event) {
+            if (($event['type'] ?? null) === 'payment.completed' && is_array($event['subject'] ?? null)) {
+                return $event['subject'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Credits the payment's tokens once and marks it completed.
+     *
+     * @param  list<string>  $names
+     */
+    private function credit(TebexPayment $payment, User $user, int $tokens, array $names): void
+    {
         if (! $this->wallet->hasTransaction(TebexPayment::LEDGER_REFERENCE, $payment->transaction_id, 'purchase')) {
             $this->wallet->credit(
                 $user,
@@ -265,9 +327,14 @@ readonly class TebexWebhookProcessor
     }
 
     /**
-     * Why the payment does not cover its packages' price, or null when it does. Each product's
-     * paid price must be at least its base price (the package price on Tebex) in the payment's
-     * currency, and the payment's total must cover the products.
+     * Why the payment does not cover its packages' price, or null when it does.
+     *
+     * `base_price` is the package price for one unit. Whether a product's `paid_price` is per
+     * unit or the line total is not documented, so a line passes outright only when it covers
+     * `base_price × quantity` read as the line total, and fails outright when even the per-unit
+     * reading falls short. In between it is ambiguous, and the payment's own total
+     * (`price_paid`, the money taken) decides: it must always cover `base_price × quantity` of
+     * every product. Every amount must be in the payment's currency.
      *
      * @param  array<array-key, mixed>  $subject
      */
@@ -278,7 +345,8 @@ readonly class TebexWebhookProcessor
             return 'Tebex did not report the amount paid';
         }
 
-        $expected = 0.0;
+        $required = 0.0;
+        $ambiguous = false;
         foreach (is_array($subject['products'] ?? null) ? $subject['products'] : [] as $product) {
             if (! is_array($product)) {
                 continue;
@@ -286,23 +354,26 @@ readonly class TebexWebhookProcessor
 
             $base = $this->money($product['base_price'] ?? null);
             $productPaid = $this->money($product['paid_price'] ?? null);
-            if ($base === null || $productPaid === null) {
-                return 'Tebex did not report the package price';
+            $quantity = $product['quantity'] ?? 1;
+            if ($base === null || $productPaid === null || ! is_int($quantity) || $quantity < 1) {
+                return 'Tebex did not report the package price or quantity';
             }
 
             if ($productPaid[1] !== $base[1] || $paid[1] !== $base[1]) {
                 return sprintf('it was paid in %s, but the package is priced in %s', $paid[1] !== $base[1] ? $paid[1] : $productPaid[1], $base[1]);
             }
 
-            if ($base[0] > $productPaid[0] + self::CENT) {
-                return sprintf('%s %s was paid for a package priced %s %s', number_format($productPaid[0], 2), $productPaid[1], number_format($base[0], 2), $base[1]);
+            $line = $base[0] * $quantity;
+            if ($line > $productPaid[0] * $quantity + self::CENT) {
+                return sprintf('%s %s was paid for %d × a package priced %s %s', number_format($productPaid[0], 2), $productPaid[1], $quantity, number_format($base[0], 2), $base[1]);
             }
 
-            $expected += $productPaid[0];
+            $ambiguous = $ambiguous || $line > $productPaid[0] + self::CENT;
+            $required += $line;
         }
 
-        if ($expected > $paid[0] + self::CENT) {
-            return sprintf('%s %s was paid in total for packages priced %s %s', number_format($paid[0], 2), $paid[1], number_format($expected, 2), $paid[1]);
+        if ($required > $paid[0] + self::CENT) {
+            return sprintf('%s %s was paid in total for packages priced %s %s%s', number_format($paid[0], 2), $paid[1], number_format($required, 2), $paid[1], $ambiguous ? ' (whether the paid price is per package or per line is ambiguous)' : '');
         }
 
         return null;

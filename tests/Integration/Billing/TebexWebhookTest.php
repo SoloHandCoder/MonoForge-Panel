@@ -7,9 +7,12 @@ namespace Pterodactyl\Tests\Pest\Integration\Billing\TebexWebhookTest;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Pterodactyl\Console\Scheduler;
+use Pterodactyl\Models\ActivityLog;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
@@ -58,14 +61,14 @@ function paymentEvent(string $type, string $transactionId, int|string $packageId
         'subject' => [
             'transaction_id' => $transactionId,
             'status' => ['id' => $status, 'description' => 'Complete'],
-            'price_paid' => ['amount' => 4.99, 'currency' => 'EUR'],
+            'price_paid' => ['amount' => round(4.99 * $quantity, 2), 'currency' => 'EUR'],
             'customer' => ['email' => 'buyer@example.com'],
             'products' => [[
                 'id' => $packageId,
                 'name' => 'Pack',
                 'quantity' => $quantity,
                 'base_price' => ['amount' => 4.99, 'currency' => 'EUR'],
-                'paid_price' => ['amount' => 4.99, 'currency' => 'EUR'],
+                'paid_price' => ['amount' => round(4.99 * $quantity, 2), 'currency' => 'EUR'],
                 'custom' => $custom,
             ]],
         ],
@@ -345,4 +348,99 @@ test('the payload pruning runs daily', function (): void {
 
     expect($events)->toHaveCount(1)
         ->and($events[0]->expression)->toBe('0 0 * * *');
+});
+
+test('the price check counts the quantity, whether paid_price is per package or per line', function (array $prices, bool $credited): void {
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    $event = paymentEvent('payment.completed', 'tbx-qty', 100, ['user_id' => $user->id], quantity: 2);
+    $event['subject']['price_paid']['amount'] = $prices['total'];
+    $event['subject']['products'][0]['paid_price']['amount'] = $prices['line'];
+
+    sendWebhook($event)->assertOk();
+
+    expect(wallet()->balance($user))->toBe($credited ? 200 : 0)
+        ->and(TebexPayment::query()->where('transaction_id', 'tbx-qty')->value('status'))->toBe($credited ? TebexPayment::STATUS_COMPLETED : TebexPayment::STATUS_UNDERPAID);
+})->with([
+    'line total, full price' => [['total' => 9.98, 'line' => 9.98], true],
+    'per package, full price' => [['total' => 9.98, 'line' => 4.99], true],
+    'half off, ambiguous paid price' => [['total' => 4.99, 'line' => 4.99], false],
+    'below the price either way' => [['total' => 4.00, 'line' => 2.00], false],
+]);
+
+/**
+ * An underpaid payment of 100 tokens, flagged for the admin.
+ */
+function flaggedPayment(User $user, string $transactionId = 'tbx-flag'): TebexPayment
+{
+    TokenPack::query()->firstOrCreate(['tebex_package_id' => '100'], ['name' => 'Small', 'tokens' => 100]);
+    $event = paymentEvent('payment.completed', $transactionId, 100, ['user_id' => $user->id]);
+    $event['subject']['price_paid']['amount'] = 0.99;
+    $event['subject']['products'][0]['paid_price']['amount'] = 0.99;
+    sendWebhook($event)->assertOk();
+
+    return TebexPayment::query()->where('transaction_id', $transactionId)->sole();
+}
+
+test('an admin approves a flagged payment once, and a later refund takes the tokens back', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $user = User::factory()->create();
+    $payment = flaggedPayment($user);
+
+    expect($payment->status)->toBe(TebexPayment::STATUS_UNDERPAID)
+        ->and(UserNotice::query()->where('user_id', $admin->id)->value('body'))->toContain('Approve and credit');
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))
+        ->assertOk()
+        ->assertJsonPath('status', TebexPayment::STATUS_COMPLETED)
+        ->assertJsonPath('tokens', 100);
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))->assertOk();
+
+    expect(wallet()->balance($user))->toBe(100)
+        ->and(ActivityLog::query()->where('event', 'admin:tebex-payment.approve')->count())->toBe(1);
+
+    sendWebhook(paymentEvent('payment.refunded', 'tbx-flag', 100, ['user_id' => $user->id], status: 2))->assertOk();
+    expect(wallet()->balance($user))->toBe(0)
+        ->and($payment->fresh()->tokens_reversed)->toBe(100);
+});
+
+test('an unmatched payment is credited to the user the admin picks', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    sendWebhook(paymentEvent('payment.completed', 'tbx-nouser', 100, []))->assertOk();
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-nouser')->sole();
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))->assertStatus(409);
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['user_id' => $user->id])->assertOk();
+
+    expect(wallet()->balance($user))->toBe(100)
+        ->and($payment->fresh()->user_id)->toBe($user->id);
+});
+
+test('only flagged payments can be approved, only by root admins in a session', function (): void {
+    $user = User::factory()->create();
+    $payment = flaggedPayment($user);
+    $staff = User::factory()->create(['root_admin' => false]);
+
+    $this->actingAs($staff)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))->assertForbidden();
+
+    $admin = User::factory()->create(['root_admin' => true]);
+    $key = ApiKey::factory()->create(['user_id' => $admin->id, 'key_type' => ApiKey::TYPE_ACCOUNT]);
+    Auth::forgetGuards();
+    $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
+        ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token))
+        ->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))
+        ->assertForbidden();
+    expect(wallet()->balance($user))->toBe(0);
+});
+
+test('a payment that is not flagged for approval cannot be approved', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $refunded = flaggedPayment(User::factory()->create());
+    $refunded->forceFill(['status' => TebexPayment::STATUS_REFUNDED])->save();
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $refunded->id))
+        ->assertStatus(409)
+        ->assertJsonPath('errors.0.detail', 'Only an underpaid or unmatched payment can be approved.');
 });

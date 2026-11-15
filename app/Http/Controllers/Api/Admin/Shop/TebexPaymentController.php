@@ -11,9 +11,13 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Knuckles\Scribe\Attributes\UrlParam;
+use Pterodactyl\Facades\Activity;
 use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
+use Pterodactyl\Http\Requests\Api\Admin\Shop\ApproveTebexPaymentRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Shop\GetShopRequest;
 use Pterodactyl\Models\Billing\TebexPayment;
+use Pterodactyl\Services\Billing\Tebex\TebexWebhookProcessor;
 
 #[Group('Admin API', 'Root administrator endpoints for managing panel configuration and resources.')]
 #[Subgroup('Shop', 'Configure the token shop: Tebex, token packs and payments.')]
@@ -37,6 +41,21 @@ class TebexPaymentController extends AdminApiController
         'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 1],
     ];
 
+    private const array APPROVED_EXAMPLE = [
+        'id' => 1,
+        'transaction_id' => 'tbx-26929122a56954-ef3212',
+        'user' => ['id' => 1, 'username' => 'alex', 'email' => 'alex@example.com'],
+        'status' => 'completed',
+        'tokens' => 550,
+        'tokens_reversed' => 0,
+        'amount' => '0.99',
+        'currency' => 'EUR',
+        'events' => ['payment.completed'],
+        'flagged' => true,
+        'processed_at' => '2026-11-16T12:05:00+00:00',
+        'created_at' => '2026-11-16T12:00:00+00:00',
+    ];
+
     #[Endpoint('List Tebex payments', 'Returns Tebex payments, newest first. Flagged payments (refunds, disputes, payments that matched no user or pack) need a look.')]
     #[QueryParam('flagged', 'boolean', 'Only flagged payments.', required: false, example: false)]
     #[QueryParam('page', 'integer', 'Page number to return.', required: false, example: 1)]
@@ -54,5 +73,22 @@ class TebexPaymentController extends AdminApiController
             'data' => array_map(fn (TebexPayment $payment): array => $payment->toApiArray(), $payments->items()),
             'meta' => ['current_page' => $payments->currentPage(), 'last_page' => $payments->lastPage(), 'total' => $payments->total()],
         ]);
+    }
+
+    #[Endpoint('Approve and credit a Tebex payment', 'Credits a flagged (underpaid or unmatched) payment through the normal credit path, so a later refund or chargeback takes the tokens back. Pass user_id when the payment matched no panel user. Approving a payment that is already credited changes nothing. Root administrators only, from a panel session (API keys get 403).')]
+    #[UrlParam('tebex_payment', 'integer', 'The ID of the Tebex payment.', example: 1)]
+    #[ScribeResponse(self::APPROVED_EXAMPLE, description: 'Payment credited.')]
+    public function approve(ApproveTebexPaymentRequest $request, TebexWebhookProcessor $processor, TebexPayment $tebexPayment): JsonResponse
+    {
+        $alreadyCredited = $tebexPayment->processed_at !== null;
+        $payment = $processor->approve($tebexPayment, $request->recipient());
+
+        if (! $alreadyCredited) {
+            Activity::event('admin:tebex-payment.approve')
+                ->property(['transaction_id' => $payment->transaction_id, 'tokens' => $payment->tokens, 'user_id' => $payment->user_id])
+                ->log();
+        }
+
+        return new JsonResponse($payment->load('user')->toApiArray());
     }
 }

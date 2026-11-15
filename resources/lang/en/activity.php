@@ -284,6 +284,9 @@ return [
             'image' => 'Uploaded the :setting image of the :theme theme',
             'image-clear' => 'Removed the :setting image of the :theme theme',
         ],
+        'tebex-payment' => [
+            'approve' => 'Approved and credited Tebex payment :transaction_id (:tokens tokens)',
+        ],
         'token-pack' => [
             'create' => 'Created the ":name" token pack',
             'update' => 'Updated the ":name" token pack',

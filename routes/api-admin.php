@@ -154,6 +154,8 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::get('/tebex', [TebexSettingsController::class, 'index'])->name('.tebex');
     Route::put('/tebex', [TebexSettingsController::class, 'update'])->name('.tebex.update');
     Route::get('/tebex/payments', [TebexPaymentController::class, 'index'])->name('.tebex.payments');
+    // Crediting a flagged payment mints tokens: a browser session only, never an API key.
+    Route::post('/tebex/payments/{tebexPayment:id}/approve', [TebexPaymentController::class, 'approve'])->middleware(RequireSessionAuthentication::class)->name('.tebex.payments.approve');
 
     Route::get('/token-packs', [TokenPackController::class, 'index'])->name('.token-packs');
     Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');

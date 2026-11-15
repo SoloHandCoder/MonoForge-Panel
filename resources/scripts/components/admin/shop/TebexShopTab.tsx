@@ -2,7 +2,9 @@ import { getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-
 import { Coins } from 'lucide-react';
 import { useState } from 'react';
 import {
+    canApproveTebexPayment,
     useAdminTebexPayments,
+    useApproveTebexPayment,
     useAdminTebexSettings,
     useAdminTokenPacks,
     useDeleteAdminTokenPack,
@@ -19,6 +21,7 @@ import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
 import Code from '@/components/elements/Code';
 import CopyOnClick from '@/components/elements/CopyOnClick';
+import Label from '@/components/elements/Label';
 import { Dialog } from '@/components/elements/dialog';
 import { NewButton } from '@/components/elements/NewButton';
 import { ServerError } from '@/components/elements/ScreenBlock';
@@ -27,6 +30,7 @@ import TitledGreyBox from '@/components/elements/TitledGreyBox';
 import DataTable from '@/components/elements/table/DataTable';
 import { actionsColumn, DeleteAction, EditAction, RowActions } from '@/components/elements/table/RowActions';
 import { Form, useAppForm } from '@/components/form';
+import { TextInput } from '@/components/form/controls';
 import { formatDate } from '@/lib/dates';
 import type { UiTone } from '@/themes/primitives';
 
@@ -276,6 +280,55 @@ const statusTones = {
     underpaid: 'danger',
 } satisfies Record<TebexPaymentStatus, UiTone>;
 
+/** "Approve and credit" for a flagged payment, with the user to credit when it matched none. */
+function ApprovePaymentAction({ payment }: { payment: TebexPayment }) {
+    const approve = useApproveTebexPayment();
+    const [userId, setUserId] = useState('');
+    const parsedUserId = /^\d+$/.test(userId.trim()) ? Number(userId.trim()) : undefined;
+    const needsUser = payment.user === null;
+
+    return (
+        <Dialog.ConfirmTrigger
+            title='Approve and credit'
+            confirm='Approve and credit'
+            onConfirmed={async (_event, close) => {
+                if (needsUser && parsedUserId === undefined) {
+                    return;
+                }
+
+                try {
+                    await approve.mutateAsync({ id: payment.id, userId: parsedUserId });
+                    close();
+                } catch {
+                    // Error toast is handled by the mutation.
+                }
+            }}
+            trigger={({ onClick }) => (
+                <Button.Text type='button' size='xsmall' onClick={onClick}>
+                    Approve and credit
+                </Button.Text>
+            )}
+        >
+            <p className='text-sm leading-relaxed text-muted-foreground'>
+                This credits the tokens of payment{' '}
+                <strong className='font-mono text-foreground'>{payment.transaction_id}</strong> ({payment.amount}{' '}
+                {payment.currency}) as if it had passed the checks. A later refund or chargeback takes them back.
+            </p>
+            {needsUser && (
+                <div className='mt-4'>
+                    <Label htmlFor={`approve-user-${payment.id}`}>User ID to credit</Label>
+                    <TextInput
+                        id={`approve-user-${payment.id}`}
+                        inputMode='numeric'
+                        value={userId}
+                        onChange={(event) => setUserId(event.currentTarget.value)}
+                    />
+                </div>
+            )}
+        </Dialog.ConfirmTrigger>
+    );
+}
+
 function PaymentRow({ payment }: { payment: TebexPayment }) {
     return (
         <tr className='border-t border-border'>
@@ -299,6 +352,9 @@ function PaymentRow({ payment }: { payment: TebexPayment }) {
                 <Badge tone={statusTones[payment.status]} variant='soft' size='sm'>
                     {payment.status}
                 </Badge>
+            </td>
+            <td className='py-2 pl-3 text-right'>
+                {canApproveTebexPayment(payment) && <ApprovePaymentAction payment={payment} />}
             </td>
         </tr>
     );
@@ -329,6 +385,9 @@ function PaymentsBody({ page, flagged, onPage }: { page: number; flagged: boolea
                         <th className='pb-2 font-medium'>Paid</th>
                         <th className='pb-2 font-medium'>Tokens</th>
                         <th className='pb-2 font-medium'>Status</th>
+                        <th className='pb-2 font-medium'>
+                            <span className='sr-only'>Actions</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>

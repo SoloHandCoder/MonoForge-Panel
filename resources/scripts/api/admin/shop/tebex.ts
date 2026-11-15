@@ -151,6 +151,32 @@ export const useUpdateAdminTokenPack = () =>
         'Unable to update the token pack'
     );
 
+/** Whether "Approve and credit" applies: a flagged payment that was not credited. */
+export const canApproveTebexPayment = (payment: Pick<TebexPayment, 'status' | 'processed_at'>): boolean =>
+    payment.processed_at === null && (payment.status === 'underpaid' || payment.status === 'unmatched');
+
+/** Credits a flagged payment through the normal credit path; `userId` for a payment that matched no user. */
+export const useApproveTebexPayment = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, userId }: { id: number; userId?: number }): Promise<TebexPayment> =>
+            (
+                await http.post<TebexPayment>(
+                    `/api/admin/shop/tebex/payments/${id}/approve`,
+                    userId === undefined ? {} : { user_id: userId }
+                )
+            ).data,
+        onSuccess: async (payment) => {
+            await queryClient.invalidateQueries({ queryKey: paymentsKey });
+            toast.success('Payment credited', {
+                description: `${payment.tokens.toLocaleString()} tokens were added for ${payment.transaction_id}.`,
+            });
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to credit the payment'),
+    });
+};
+
 export const useDeleteAdminTokenPack = () =>
     usePackMutation(
         (id: number) => http.delete(`/api/admin/shop/token-packs/${id}`),
