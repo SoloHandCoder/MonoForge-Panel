@@ -3997,6 +3997,14 @@ export type AuthRegisterRequest = {
      */
     terms: boolean;
     /**
+     * The Terms of Service version the form showed. Must be the current one.
+     */
+    terms_version: number;
+    /**
+     * The Privacy Policy version the form showed. Must be the current one.
+     */
+    privacy_version: number;
+    /**
      * The password again.
      */
     password_confirmation: string;
@@ -15588,6 +15596,10 @@ export type ClientPurchaseServerErrors = {
      */
     403: ErrorEnvelope;
     /**
+     * The user has to accept the updated Terms of Service or Privacy Policy first.
+     */
+    409: ErrorEnvelope;
+    /**
      * The submitted data is invalid.
      */
     422: ValidationErrorEnvelope;
@@ -15643,6 +15655,10 @@ export type ClientBuyTokenPackErrors = {
      * The API key does not have permission to perform this action.
      */
     403: ErrorEnvelope;
+    /**
+     * The user has to accept the updated Terms of Service or Privacy Policy first.
+     */
+    409: ErrorEnvelope;
     /**
      * The submitted data is invalid.
      */
