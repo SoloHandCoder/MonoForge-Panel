@@ -13,9 +13,11 @@ use Pterodactyl\Http\Controllers\Api\Client\Assistant\AssistantController;
 use Pterodactyl\Http\Controllers\Api\Client\Assistant\ConversationController as AssistantConversationController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
+use Pterodactyl\Http\Controllers\Api\Client\FriendController;
 use Pterodactyl\Http\Controllers\Api\Client\LegalAcceptanceController;
 use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
 use Pterodactyl\Http\Controllers\Api\Client\OAuthAccountController;
+use Pterodactyl\Http\Controllers\Api\Client\PermissionTemplateController;
 use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\BackupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\CommandController;
@@ -110,6 +112,26 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
     Route::post('/api-keys', [ApiKeyController::class, 'store']);
     Route::delete('/api-keys/{identifier}', [ApiKeyController::class, 'delete']);
+
+    // Friends, whom a subuser invite can pick (phase 6 Task F). Requests never show whether a name exists.
+    Route::prefix('/friends')->group(function (): void {
+        Route::get('/', [FriendController::class, 'index'])->name('api:client.account.friends');
+        Route::post('/requests', [FriendController::class, 'store'])
+            ->middleware('throttle:friend.request')
+            ->name('api:client.account.friends.request');
+        Route::post('/requests/{friendRequest}/accept', [FriendController::class, 'accept'])->whereNumber('friendRequest')->name('api:client.account.friends.accept');
+        Route::post('/requests/{friendRequest}/decline', [FriendController::class, 'decline'])->whereNumber('friendRequest')->name('api:client.account.friends.decline');
+        Route::delete('/requests/{friendRequest}', [FriendController::class, 'cancel'])->whereNumber('friendRequest')->name('api:client.account.friends.cancel');
+        Route::delete('/{friend}', [FriendController::class, 'delete'])->whereUuid('friend')->name('api:client.account.friends.delete');
+    });
+
+    // Subuser permission templates: built-in, global and the user's own.
+    Route::prefix('/permission-templates')->group(function (): void {
+        Route::get('/', [PermissionTemplateController::class, 'index'])->name('api:client.account.permission-templates');
+        Route::post('/', [PermissionTemplateController::class, 'store'])->name('api:client.account.permission-templates.store');
+        Route::put('/{template}', [PermissionTemplateController::class, 'update'])->whereNumber('template')->name('api:client.account.permission-templates.update');
+        Route::delete('/{template}', [PermissionTemplateController::class, 'delete'])->whereNumber('template')->name('api:client.account.permission-templates.delete');
+    });
 
     Route::prefix('/ssh-keys')->group(function (): void {
         Route::get('/', [SSHKeyController::class, 'index']);

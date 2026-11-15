@@ -107,6 +107,11 @@ class PterodactylDocumentation
         'conversation_uuid' => ['string', 'The assistant conversation UUID.', '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
         'toolCall_id' => ['integer', 'The assistant tool call ID.', 2],
         'provider_id' => ['integer', 'The AI provider ID.', 1],
+        // Phase 6 Task F: friends and permission templates.
+        'friend' => ['string', "The friend's user UUID.", '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
+        'friendRequest' => ['integer', 'The ID of the friend request.', 2],
+        'template' => ['integer', 'The ID of the permission template.', 1],
+        'permissionTemplate_id' => ['integer', 'The ID of the global permission template.', 1],
     ];
 
     private const array FIELD_DESCRIPTIONS = [

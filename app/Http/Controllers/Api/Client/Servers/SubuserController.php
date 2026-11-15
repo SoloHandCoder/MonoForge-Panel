@@ -69,12 +69,12 @@ class SubuserController extends ClientApiController
      * @throws UserIsServerOwnerException
      * @throws Throwable
      */
-    #[Endpoint('Create server subuser', 'Assigns an existing or new user as a subuser on the server.')]
+    #[Endpoint('Create server subuser', 'Assigns an existing or new user as a subuser on the server, given by email or, as `friend`, by the UUID of a friend of the authenticated user.')]
     #[ResponseFromResource(SubuserResource::class, Subuser::class, description: 'Server subuser created.', resourceKey: 'server_subuser')]
     #[ScribeResponse(self::SUBUSER_EXISTS_ERROR, status: 400, description: 'The user is already assigned to the server or is the server owner.')]
     public function store(StoreSubuserRequest $request, CreatesSubusers $subusers, Server $server): SubuserResource
     {
-        $response = $subusers->create($server, $request->string('email')->toString(), $request->permissions());
+        $response = $subusers->create($server, $request->inviteeEmail(), $request->permissions());
 
         return SubuserResource::make($response);
     }
