@@ -31,9 +31,14 @@ use Pterodactyl\Enum\ResourceLimit;
 use Pterodactyl\Extensions\Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Pterodactyl\Extensions\Mail\ResendTransport;
 use Pterodactyl\Extensions\Scribe\Support\PathParameterNames;
+use Pterodactyl\Http\Controllers\Base\PublicStorePlansController;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Backup;
+use Pterodactyl\Models\Billing\ShopCategory;
+use Pterodactyl\Models\Billing\ShopMultiplier;
+use Pterodactyl\Models\Billing\ShopPeriod;
+use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Database;
 use Pterodactyl\Models\DatabaseHost;
 use Pterodactyl\Models\Egg;
@@ -43,6 +48,7 @@ use Pterodactyl\Models\Mount;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
@@ -74,6 +80,7 @@ class AppServiceProvider extends ServiceProvider
         Route::model('database', Database::class);
 
         $this->configureRateLimiting();
+        $this->forgetPublicPlansOnShopChanges();
 
         // Surface lazy loads, discarded fills, and missing-attribute reads as
         // exceptions everywhere except production, where a missed spot should log a
@@ -201,6 +208,18 @@ class AppServiceProvider extends ServiceProvider
                 'is_git' => false,
             ];
         });
+    }
+
+    /**
+     * The public homepage's plans are cached for a minute; an admin's change to the shop's settings,
+     * plans, periods, categories, multipliers, nodes or games drops that cache at once.
+     */
+    private function forgetPublicPlansOnShopChanges(): void
+    {
+        foreach ([ShopPlan::class, ShopPeriod::class, ShopCategory::class, ShopMultiplier::class, Node::class, Egg::class, Setting::class] as $model) {
+            $model::saved(PublicStorePlansController::forget(...));
+            $model::deleted(PublicStorePlansController::forget(...));
+        }
     }
 
     /**

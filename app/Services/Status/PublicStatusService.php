@@ -10,6 +10,7 @@ use Pterodactyl\Enum\NoticeLevel;
 use Pterodactyl\Models\Announcement;
 use Pterodactyl\Models\Status\StatusCheck;
 use Pterodactyl\Models\Status\StatusDay;
+use Pterodactyl\Support\LockedCache;
 
 /**
  * What the public status page shows, built from the recorded checks and cached for 30
@@ -38,7 +39,7 @@ final class PublicStatusService
     public function payload(): array
     {
         /** @var StatusPayload */
-        return Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, fn (): array => $this->build());
+        return LockedCache::remember(Cache::store(), self::CACHE_KEY, self::CACHE_SECONDS, fn (): array => $this->build());
     }
 
     /** @return StatusPayload */

@@ -13,6 +13,7 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
 use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\Announcement;
@@ -201,4 +202,24 @@ test('checks run every minute on one server without overlapping, and old rows ar
     Artisan::call('model:prune', ['--model' => [StatusCheck::class, StatusDay::class]]);
 
     expect(StatusCheck::query()->count())->toBe(1)->and(StatusDay::query()->count())->toBe(1);
+});
+
+test('the public status may be cached by browsers and the edge for 30 seconds, and is built by one request at a time', function (): void {
+    statusWorld();
+
+    $this->getJson('/api/public/status')->assertOk()->assertHeader('Cache-Control', 'max-age=30, public');
+
+    // While another request holds the build lock, a request waits and then reads what that one stored.
+    Cache::forget(PublicStatusService::CACHE_KEY);
+    $other = Cache::lock(PublicStatusService::CACHE_KEY.':build', 30);
+    expect($other->get())->toBeTrue();
+    Sleep::fake();
+    Sleep::whenFakingSleep(function () use ($other): void {
+        if (! Cache::has(PublicStatusService::CACHE_KEY)) {
+            Cache::put(PublicStatusService::CACHE_KEY, ['state' => 'built-elsewhere', 'checked_at' => null, 'panel' => [], 'nodes' => [], 'incidents' => []], 30);
+            $other->release();
+        }
+    });
+
+    expect($this->app->make(PublicStatusService::class)->payload()['state'])->toBe('built-elsewhere');
 });

@@ -133,6 +133,6 @@ class PublicStatusController extends Controller
     {
         throw_unless(StatusPageSettings::enabled(), NotFoundHttpException::class);
 
-        return new JsonResponse($status->payload());
+        return new JsonResponse($status->payload(), headers: ['Cache-Control' => 'public, max-age='.PublicStatusService::CACHE_SECONDS]);
     }
 }

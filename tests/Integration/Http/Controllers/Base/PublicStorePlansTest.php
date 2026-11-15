@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Http\Controllers\Base\PublicStorePlansTest;
 
+use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Testing\TestResponse;
 use Pterodactyl\Enum\ShopMultiplierScope;
 use Pterodactyl\Http\Controllers\Base\PublicStorePlansController;
 use Pterodactyl\Models\Billing\ShopCategory;
@@ -15,6 +17,7 @@ use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Node;
+use Pterodactyl\Services\Billing\ShopSettings;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
 
 uses(HttpTestCase::class);
@@ -157,9 +160,52 @@ test('the answer is cached for a minute and sets no cookie', function (): void {
         ->assertHeader('Cache-Control', 'max-age=60, public');
     expect($response->headers->getCookies())->toBe([]);
 
-    ($this->plan)(['name' => 'Added later', 'price_tokens' => 9000]);
-    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonCount(1, 'categories.0.plans');
+    // A write that bypasses the models (raw SQL, a migration) shows once the minute is up.
+    ShopPlan::query()->update(['name' => 'Renamed in SQL']);
+    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonPath('categories.0.plans.0.name', 'Stone');
 
     $this->travel(61)->seconds();
-    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonCount(2, 'categories.0.plans');
+    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonPath('categories.0.plans.0.name', 'Renamed in SQL');
 });
+
+test('an admin change to the shop shows on the homepage at once', function (Closure $change, Closure $expect): void {
+    ($this->plan)();
+    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonCount(1, 'categories.0.plans');
+    expect(Cache::has(PublicStorePlansController::CACHE_KEY))->toBeTrue();
+
+    $change->call($this);
+
+    $expect->call($this, $this->getJson(route('api.public.store.plans'))->assertOk());
+})->with([
+    'a new plan' => [
+        function (): void {
+            ($this->plan)(['name' => 'Added later', 'price_tokens' => 9000]);
+        },
+        fn (TestResponse $response): TestResponse => $response->assertJsonCount(2, 'categories.0.plans'),
+    ],
+    'a hidden plan' => [
+        function (): void {
+            ShopPlan::query()->firstOrFail()->update(['visible' => false]);
+        },
+        fn (TestResponse $response): TestResponse => $response->assertJsonCount(0, 'categories'),
+    ],
+    'a disabled period' => [
+        function (): void {
+            $this->quarterly->update(['enabled' => false]);
+        },
+        fn (TestResponse $response): TestResponse => $response->assertJsonCount(1, 'periods'),
+    ],
+    'a node taken out of the shop' => [
+        function (): void {
+            $this->cheap->forceFill(['shop_enabled' => false])->save();
+            $this->pro->forceFill(['shop_enabled' => false])->save();
+        },
+        fn (TestResponse $response): TestResponse => $response->assertJsonCount(0, 'categories'),
+    ],
+    'the store closed in its settings' => [
+        function (): void {
+            ShopSettings::store(['enabled' => false, 'grace_days' => 3, 'low_balance_days' => 3, 'limits' => ['memory' => 0, 'disk' => 0, 'cpu' => 0]]);
+        },
+        fn (TestResponse $response): TestResponse => $response->assertJsonPath('enabled', false),
+    ],
+]);
