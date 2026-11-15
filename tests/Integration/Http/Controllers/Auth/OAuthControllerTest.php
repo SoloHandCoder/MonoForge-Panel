@@ -226,3 +226,67 @@ test('accounts with a password can unlink and cannot use the first password endp
     $this->deleteJson('/api/client/account/oauth/discord')->assertNoContent();
     $this->deleteJson('/api/client/account/oauth/google')->assertNotFound();
 });
+
+test('a provider email the account rules refuse ends on the sign-in page instead of an error', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord(['email' => '-nelly@example.com']);
+
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")
+        ->assertRedirect('/auth/login')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'A MonoForge account could not be created from your Discord account. Please try again or contact support.');
+
+    $this->assertGuest();
+    expect(User::query()->where('email', '-nelly@example.com')->exists())->toBeFalse()
+        ->and(UserOAuthAccount::query()->count())->toBe(0);
+});
+
+test('new accounts never take a reserved username', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord(['username' => 'admin']);
+
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+
+    expect(User::query()->where('email', 'nelly@example.com')->value('username'))->not->toBe('admin')->toMatch('/^admin\d+$/');
+});
+
+test('a forged callback does not cancel the sign in that is in progress', function (): void {
+    fakeDiscord();
+    $user = User::factory()->create();
+    linkAccount($user);
+
+    $state = startFlow('discord');
+    $this->get('/auth/modules/discord/authenticate?code=abc&state=forged')->assertRedirect('/auth/login');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('a signed in user sent to the callback without a request of their own links nothing', function (): void {
+    fakeDiscord();
+    $victim = User::factory()->create();
+
+    $this->actingAs($victim)->get('/auth/modules/discord/authenticate?code=attacker-code&state=attacker-state')
+        ->assertRedirect('/account')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.status', 'error');
+
+    expect(UserOAuthAccount::query()->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+test('a link request is refused when someone else is signed in by the time it returns', function (): void {
+    fakeDiscord();
+    $starter = User::factory()->create();
+    $other = User::factory()->create();
+
+    $url = $this->actingAs($starter)->withHeader('Referer', 'http://localhost')->postJson('/api/client/account/oauth/discord/link')->json('url');
+    parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
+
+    $this->actingAs($other)->get('/auth/modules/discord/authenticate?code=abc&state='.$query['state'])
+        ->assertRedirect('/account')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'Your session changed before Discord finished. Please try linking again.');
+
+    expect(UserOAuthAccount::query()->count())->toBe(0);
+    Http::assertNothingSent();
+});

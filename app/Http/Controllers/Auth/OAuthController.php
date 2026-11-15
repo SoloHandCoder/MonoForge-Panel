@@ -65,16 +65,17 @@ class OAuthController extends Controller
             return $this->fail($pending->isLink(), "{$label} sign in was cancelled.");
         }
 
+        // A link only goes to the user who started it, checked before the code is exchanged.
+        $linkUser = $request->user();
+        if ($pending->isLink() && (! $linkUser instanceof User || $linkUser->id !== $pending->userId)) {
+            return $this->fail(true, "Your session changed before {$label} finished. Please try linking again.");
+        }
+
         try {
             $identity = $this->client->identity($pending, $code);
 
-            if ($pending->isLink()) {
-                $user = $request->user();
-                if (! $user instanceof User || $user->id !== $pending->userId) {
-                    return $this->fail(true, "Your session changed before {$label} finished. Please try linking again.");
-                }
-
-                $this->accounts->link($user, $identity);
+            if ($pending->isLink() && $linkUser instanceof User) {
+                $this->accounts->link($linkUser, $identity);
 
                 return $this->succeed("Your {$label} account is now linked.");
             }

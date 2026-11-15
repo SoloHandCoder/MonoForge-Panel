@@ -8,12 +8,9 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Pterodactyl\Enum\OAuthProvider;
-use Pterodactyl\Models\User;
-use Pterodactyl\Models\UserOAuthAccount;
+use Pterodactyl\Services\Migration\M12LabsOAuthLinkImporter;
 use RuntimeException;
 use Throwable;
 
@@ -49,67 +46,12 @@ class ImportM12LabsOAuthLinksCommand extends Command
         }
 
         $dryRun = (bool) $this->option('dry-run');
-        $counts = ['imported' => 0, 'already linked' => 0, 'missing user' => 0, 'conflict' => 0, 'invalid' => 0];
-
-        foreach ($source->table('user_oauth_accounts')->orderBy('id')->cursor() as $row) {
-            $outcome = $this->importRow((array) $row, $dryRun);
-            $counts[$outcome]++;
-        }
+        $counts = (new M12LabsOAuthLinkImporter)->import($source->table('user_oauth_accounts')->orderBy('id')->cursor(), $dryRun);
 
         $this->info($dryRun ? 'Dry run finished. Nothing was written.' : 'Import finished.');
         $this->table(['Outcome', 'Links'], array_map(fn (string $outcome, int $count): array => [$outcome, $count], array_keys($counts), $counts));
 
         return self::SUCCESS;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $row
-     * @return 'imported'|'already linked'|'missing user'|'conflict'|'invalid'
-     */
-    private function importRow(array $row, bool $dryRun): string
-    {
-        $provider = OAuthProvider::tryFrom(is_string($row['provider'] ?? null) ? $row['provider'] : '');
-        $userId = filter_var($row['user_id'] ?? null, FILTER_VALIDATE_INT);
-        $providerUserId = $row['provider_user_id'] ?? null;
-        if (! $provider instanceof OAuthProvider || $userId === false || ! is_scalar($providerUserId) || (string) $providerUserId === '') {
-            return 'invalid';
-        }
-
-        $providerUserId = (string) $providerUserId;
-        $existing = UserOAuthAccount::query()
-            ->where('provider', $provider->value)
-            ->where(fn (Builder $query): Builder => $query->where('provider_user_id', $providerUserId)->orWhere('user_id', $userId))
-            ->get();
-
-        if ($existing->contains(fn (UserOAuthAccount $account): bool => $account->user_id === $userId && $account->provider_user_id === $providerUserId)) {
-            return 'already linked';
-        }
-
-        if ($existing->isNotEmpty()) {
-            return 'conflict';
-        }
-
-        if (! User::query()->whereKey($userId)->exists()) {
-            return 'missing user';
-        }
-
-        if (! $dryRun) {
-            UserOAuthAccount::query()->create([
-                'user_id' => $userId,
-                'provider' => $provider,
-                'provider_user_id' => $providerUserId,
-                'provider_username' => $this->nullableString($row['provider_username'] ?? null, 191),
-                'provider_email' => $this->nullableString($row['provider_email'] ?? null, 191),
-                'provider_avatar' => $this->nullableString($row['provider_avatar'] ?? null, 255),
-            ]);
-        }
-
-        return 'imported';
-    }
-
-    private function nullableString(mixed $value, int $limit): ?string
-    {
-        return is_string($value) && $value !== '' ? mb_substr($value, 0, $limit) : null;
     }
 
     private function connectToSource(): Connection

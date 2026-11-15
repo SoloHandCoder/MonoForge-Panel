@@ -7,6 +7,7 @@ namespace Pterodactyl\Services\Auth\OAuth;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Facades\Activity;
@@ -20,6 +21,9 @@ use Pterodactyl\Rules\Username;
  */
 final readonly class OAuthAccountService
 {
+    /** Names a new account may not take as they are; they get a numeric suffix instead. */
+    private const array RESERVED_USERNAMES = ['admin', 'administrator', 'support', 'staff', 'monoforge', 'root', 'system', 'moderator'];
+
     public function __construct(private CreatesUsers $users) {}
 
     public function find(OAuthIdentity $identity): ?UserOAuthAccount
@@ -95,19 +99,26 @@ final readonly class OAuthAccountService
 
         [$first, $last] = $this->names($identity);
 
-        return DB::transaction(function () use ($identity, $first, $last): User {
-            $user = $this->users->create([
-                'email' => $identity->email,
-                'username' => $this->username($identity),
-                'name_first' => $first,
-                'name_last' => $last,
-            ]);
+        try {
+            // The welcome email is queued after commit, so a rolled back registration sends nothing.
+            return DB::transaction(function () use ($identity, $first, $last): User {
+                $user = $this->users->create([
+                    'email' => $identity->email,
+                    'username' => $this->username($identity),
+                    'name_first' => $first,
+                    'name_last' => $last,
+                ]);
 
-            $user->forceFill(['has_password' => false])->save();
-            $this->link($user, $identity);
+                $user->forceFill(['has_password' => false])->save();
+                $this->link($user, $identity);
 
-            return $user;
-        });
+                return $user;
+            });
+        } catch (ValidationException|UniqueConstraintViolationException) {
+            // The provider's email or name failed the account rules, or another sign up took the
+            // same email or username at the same moment. Never shown in detail.
+            throw new OAuthException("A MonoForge account could not be created from your {$label} account. Please try again or contact support.");
+        }
     }
 
     /**
@@ -144,7 +155,7 @@ final readonly class OAuthAccountService
         ];
     }
 
-    /** A valid, unused username based on the provider's name. */
+    /** A valid, unused, unreserved username based on the provider's name. */
     private function username(OAuthIdentity $identity): string
     {
         $base = mb_strtolower($identity->username ?? $identity->displayName ?? '');
@@ -156,16 +167,30 @@ final readonly class OAuthAccountService
             $base = $identity->provider === OAuthProvider::Discord ? 'discord-user' : 'google-user';
         }
 
-        $candidate = $base;
+        $candidate = in_array($base, self::RESERVED_USERNAMES, true) ? $base.random_int(1000, 99999) : $base;
         for ($attempt = 0; $attempt < 20; $attempt++) {
-            if (preg_match(Username::VALIDATION_REGEX, $candidate) === 1 && ! User::query()->where('username', $candidate)->exists()) {
+            if ($this->usernameAvailable($candidate)) {
                 return $candidate;
             }
 
             $candidate = $base.random_int(1000, 99999);
         }
 
-        return $base.'-'.mb_strtolower(Str::random(8));
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $candidate = $base.'-'.mb_strtolower(Str::random(8));
+            if ($this->usernameAvailable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        throw new OAuthException('A username could not be chosen for your new account. Please try again.');
+    }
+
+    private function usernameAvailable(string $candidate): bool
+    {
+        return preg_match(Username::VALIDATION_REGEX, $candidate) === 1
+            && ! in_array($candidate, self::RESERVED_USERNAMES, true)
+            && ! User::query()->where('username', $candidate)->exists();
     }
 
     /**

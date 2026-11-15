@@ -59,22 +59,25 @@ final readonly class OAuthClient
     }
 
     /**
-     * Take the waiting request out of the session and return it only when it was issued
-     * for this provider, is unexpired and its state matches the one sent back.
+     * Return the waiting request only when it was issued for this provider, its state matches
+     * the one sent back and it is unexpired. It is used up only when the state matches, so a
+     * forged callback cannot cancel a sign in that is still in progress.
      */
     public function pull(OAuthProvider $provider, mixed $state): ?OAuthPending
     {
-        $pending = Session::pull(self::SESSION_KEY);
+        $pending = Session::get(self::SESSION_KEY);
 
         if (! $pending instanceof OAuthPending || ! is_string($state) || $state === '') {
             return null;
         }
 
-        if ($pending->provider !== $provider || $pending->expiresAt < now()->getTimestamp()) {
+        if ($pending->provider !== $provider || ! hash_equals($pending->state, $state)) {
             return null;
         }
 
-        return hash_equals($pending->state, $state) ? $pending : null;
+        Session::forget(self::SESSION_KEY);
+
+        return $pending->expiresAt < now()->getTimestamp() ? null : $pending;
     }
 
     /**
