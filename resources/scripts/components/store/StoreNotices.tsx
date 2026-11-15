@@ -3,7 +3,7 @@ import Icon from '@/components/elements/Icon';
 import { cn } from '@/lib/cn';
 
 /** The owner's words for a sold-out shop; the purchase endpoint refuses with the same text. */
-export const CAPACITY_MESSAGE = "We can't provide new servers right now — we've hit our limit!";
+export const CAPACITY_MESSAGE = "The server currently can't provide servers, we hit our limit!";
 
 export function CapacityNotice({ className }: { className?: string }) {
     return (

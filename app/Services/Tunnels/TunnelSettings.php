@@ -63,19 +63,43 @@ final class TunnelSettings
         Setting::put(self::BLOCKLIST, json_encode($names, JSON_THROW_ON_ERROR));
     }
 
+    /** A requested subdomain as it is checked and stored: trimmed and lowercased. */
+    public static function normalize(string $subdomain): string
+    {
+        return mb_strtolower(mb_trim($subdomain));
+    }
+
     /**
      * Why a requested subdomain cannot be used, or null when it can. For the checkout (Task S).
+     *
+     * Only ASCII letters, digits and hyphens pass, punycode (`xn--`, the encoding of look-alike
+     * Unicode names) is refused, and a name is reserved when it contains a blocked word anywhere
+     * (`admin` also blocks `my-admin1`). A name is taken while another tunnel holds it; deleting
+     * the tunnel or the server releases it.
      */
     public static function subdomainProblem(string $subdomain): ?string
     {
-        $name = mb_strtolower(mb_trim($subdomain));
+        $name = self::normalize($subdomain);
 
         return match (true) {
             ! self::subdomainsEnabled() => 'Custom subdomains are not available.',
             preg_match(self::SUBDOMAIN_PATTERN, $name) !== 1 => 'Use 1 to 63 lowercase letters, digits or hyphens, not starting or ending with a hyphen.',
-            in_array($name, self::blocklist(), true) => 'That name is reserved.',
+            str_contains($name, 'xn--') => 'Use plain letters, digits and hyphens; encoded (xn--) names are not allowed.',
+            self::containsBlockedWord($name) => 'That name is reserved.',
             ServerTunnel::query()->where('subdomain', $name)->exists() => 'That name is already taken.',
             default => null,
         };
+    }
+
+    private static function containsBlockedWord(string $name): bool
+    {
+        foreach (self::blocklist() as $word) {
+            $word = self::normalize($word);
+            if ($word !== '' && str_contains($name, $word)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

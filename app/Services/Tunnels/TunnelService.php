@@ -77,7 +77,8 @@ class TunnelService
             $tunnel->refresh();
             $this->queueRemoteDelete($server->node_id, $tunnel->playit_tunnel_id);
 
-            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'last_error' => null])->save();
+            // The custom subdomain is released with the tunnel, so the name can be picked again.
+            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'subdomain' => null, 'last_error' => null])->save();
         };
 
         try {

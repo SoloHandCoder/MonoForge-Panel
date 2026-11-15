@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -42,6 +43,12 @@ class StorePurchaseService
 {
     /** The reference type of the charge and of its refund in the token ledger. */
     public const string REFERENCE_TYPE = 'store_purchase';
+
+    /** The store-wide lock around the capacity check and the server creation. */
+    public const string CAPACITY_LOCK = 'monoforge:store:capacity';
+
+    /** How long the capacity lock is held at most (a stuck Wings call must not block the store). */
+    private const int CAPACITY_LOCK_SECONDS = 60;
 
     /** How many free allocations are tried when another purchase takes the chosen one first. */
     private const int ALLOCATION_ATTEMPTS = 3;
@@ -117,6 +124,12 @@ class StorePurchaseService
         $candidates = $this->candidateNodes($plan, $egg, $order);
         throw_if($candidates->isEmpty(), StorePurchaseException::noNode());
 
+        // A custom subdomain needs a playit tunnel: refuse it rather than drop it after the charge.
+        if ($subdomain !== null) {
+            $candidates = $candidates->filter(fn (Node $node): bool => $node->hasPlayitAgent())->values();
+            throw_if($candidates->isEmpty(), StorePurchaseException::unavailable('Custom subdomains are not available on that location. Leave the subdomain empty or pick another location.'));
+        }
+
         // Resources do not depend on the node, only the price does, so any candidate sizes the order.
         $quote = $this->sellableQuote($plan, $period, $candidates->firstOrFail(), $addons);
         $node = $this->chooseNode($candidates, $quote);
@@ -125,7 +138,50 @@ class StorePurchaseService
         }
 
         throw_if($order->expectedTotal !== null && $order->expectedTotal !== $quote->totalPerPeriod, StorePurchaseException::priceChanged($quote->totalPerPeriod));
+
+        // One purchase at a time from the capacity check to the created server, so concurrent
+        // buyers cannot all pass the check and oversell the limits (or take the same subdomain).
+        return $this->underCapacityLock(fn (): StorePurchaseResult => $this->charge($user, $order, $plan, $period, $egg, $image, $node, $quote, $addons, $subdomain, $reference));
+    }
+
+    /**
+     * Runs the callback while holding the store-wide capacity lock, waiting a few seconds for it.
+     *
+     * @param  callable(): StorePurchaseResult  $callback
+     *
+     * @throws StorePurchaseException
+     */
+    private function underCapacityLock(callable $callback): StorePurchaseResult
+    {
+        $lock = Cache::lock(self::CAPACITY_LOCK, self::CAPACITY_LOCK_SECONDS);
+
+        try {
+            $lock->block(max(0, (int) config('monoforge.shop.capacity_lock_wait', 5)));
+        } catch (LockTimeoutException) {
+            throw StorePurchaseException::busy();
+        }
+
+        try {
+            return $callback();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Checks capacity and the subdomain again, charges the first period, creates the server and
+     * starts its subscription and tunnel. Called under the capacity lock.
+     *
+     * @param  array<string, int>  $addons
+     *
+     * @throws StorePurchaseException
+     */
+    private function charge(User $user, StorePurchaseOrder $order, ShopPlan $plan, ShopPeriod $period, Egg $egg, string $image, Node $node, Quote $quote, array $addons, ?string $subdomain, string $reference): StorePurchaseResult
+    {
         throw_unless($this->capacity->canProvision($quote->resources), StorePurchaseException::capacity());
+        // Taken by a purchase that held the lock before this one.
+        $problem = $subdomain === null ? null : TunnelSettings::subdomainProblem($subdomain);
+        throw_if($problem !== null, StorePurchaseException::unavailable((string) $problem));
 
         try {
             $this->wallet->debit(
@@ -212,7 +268,7 @@ class StorePurchaseService
      */
     private function subdomain(?string $subdomain): ?string
     {
-        $subdomain = $subdomain === null ? '' : mb_strtolower(mb_trim($subdomain));
+        $subdomain = $subdomain === null ? '' : TunnelSettings::normalize($subdomain);
         if ($subdomain === '') {
             return null;
         }

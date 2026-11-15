@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Store\StorePurchaseControllerTest;
 
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
 use Pterodactyl\Models\Allocation;
@@ -24,6 +26,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\StorePurchaseService;
 use Pterodactyl\Services\Billing\TokenWallet;
+use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use RuntimeException;
@@ -212,4 +215,79 @@ test('a plan in a hidden category is not for sale', function (): void {
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertStatus(422);
 
     expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
+});
+
+test("the capacity message is the owner's wording", function (): void {
+    expect(StorePurchaseException::CAPACITY_MESSAGE)->toBe("The server currently can't provide servers, we hit our limit!");
+});
+
+test('purchases are serialised from the capacity check to the created server', function (): void {
+    config(['monoforge.shop.capacity_lock_wait' => 0]);
+    // Another purchase is between its capacity check and its server.
+    $other = Cache::lock(StorePurchaseService::CAPACITY_LOCK, 60);
+    expect($other->get())->toBeTrue();
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())
+        ->assertStatus(409)
+        ->assertJsonPath('errors.0.detail', 'The store is busy with other orders. Nothing was charged; please try again in a moment.');
+    expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
+
+    $other->release();
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+    expect(balance())->toBe(500);
+});
+
+test('the capacity check sees the server the previous purchase created', function (): void {
+    // Room for exactly one 2 GiB server.
+    config(['monoforge.shop.limits.memory_mb' => 3000]);
+    $this->app->make(TokenWallet::class)->credit($this->user, 1000, 'admin_adjust', 'More balance');
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['idempotency_key' => 'key-'.str_repeat('z', 20)]))
+        ->assertStatus(409)
+        ->assertJsonPath('errors.0.detail', StorePurchaseException::CAPACITY_MESSAGE);
+
+    expect(balance())->toBe(1500);
+});
+
+test('a subdomain on a location without playit is refused, not dropped after the charge', function (): void {
+    TunnelSettings::save(true, 'monoforge.net', []);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'survival']))
+        ->assertStatus(422)
+        ->assertJsonPath('errors.0.detail', 'Custom subdomains are not available on that location. Leave the subdomain empty or pick another location.');
+
+    expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
+});
+
+test('subdomains are lowercase ASCII, punycode and names containing a blocked word are refused, and a released name is free again', function (): void {
+    Bus::fake();
+    $this->node->forceFill(['playit_agent_id' => '00000000-0000-4000-8000-000000000001', 'playit_secret' => 'agent-secret'])->save();
+    TunnelSettings::save(true, 'monoforge.net', ['Admin']);
+
+    expect(TunnelSettings::subdomainProblem('xn--dmin-9ra'))->toBe('Use plain letters, digits and hyphens; encoded (xn--) names are not allowed.')
+        ->and(TunnelSettings::subdomainProblem('my-ADMIN1'))->toBe('That name is reserved.')
+        ->and(TunnelSettings::subdomainProblem('ädmin'))->not->toBeNull()
+        ->and(TunnelSettings::subdomainProblem('bad_name'))->not->toBeNull()
+        ->and(TunnelSettings::subdomainProblem(' Survival '))->toBeNull();
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'xn--srvival-xya']))->assertStatus(422);
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'superadmin', 'idempotency_key' => 'key-'.str_repeat('d', 20)]))->assertStatus(422);
+    expect(balance())->toBe(1000);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => ' Survival ', 'idempotency_key' => 'key-'.str_repeat('e', 20)]))->assertCreated();
+    $server = Server::query()->where('owner_id', $this->user->id)->sole();
+    expect(TunnelSettings::subdomainProblem('survival'))->toBe('That name is already taken.');
+
+    resolve(TunnelService::class)->release($server);
+    expect(ServerTunnel::query()->where('server_id', $server->id)->value('subdomain'))->toBeNull()
+        ->and(TunnelSettings::subdomainProblem('survival'))->toBeNull();
+});
+
+test('the database refuses a second tunnel with the same subdomain', function (): void {
+    [$first, $second] = [$this->createServerModel(), $this->createServerModel()];
+    ServerTunnel::query()->forceCreate(['server_id' => $first->id, 'subdomain' => 'survival']);
+
+    expect(fn () => ServerTunnel::query()->forceCreate(['server_id' => $second->id, 'subdomain' => 'survival']))
+        ->toThrow(UniqueConstraintViolationException::class);
 });

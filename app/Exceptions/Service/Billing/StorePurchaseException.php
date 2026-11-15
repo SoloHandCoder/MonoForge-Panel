@@ -14,7 +14,7 @@ use Throwable;
 class StorePurchaseException extends HttpException
 {
     /** The checkout text the owner asked for when the shop has sold out its capacity. */
-    public const string CAPACITY_MESSAGE = "We can't provide new servers right now — we've hit our limit!";
+    public const string CAPACITY_MESSAGE = "The server currently can't provide servers, we hit our limit!";
 
     public static function disabled(): self
     {
@@ -29,6 +29,12 @@ class StorePurchaseException extends HttpException
     public static function capacity(): self
     {
         return new self(409, self::CAPACITY_MESSAGE);
+    }
+
+    /** Another purchase holds the capacity lock for longer than the wait. */
+    public static function busy(): self
+    {
+        return new self(409, 'The store is busy with other orders. Nothing was charged; please try again in a moment.');
     }
 
     public static function noNode(): self
