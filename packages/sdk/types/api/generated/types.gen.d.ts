@@ -644,6 +644,7 @@ export type AdminServerTunnelAttributes = {
     subdomain: string | null;
     status: string;
     last_error: string | null;
+    imported_at: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -2041,6 +2042,12 @@ export type AdminUpdatePriceMultiplierRequest = {
      */
     label?: string | null;
 };
+export type AdminUpdateShopNodeRequest = {
+    /**
+     * The shop enabled.
+     */
+    shop_enabled: boolean;
+};
 export type AdminCreateShopAddOnRequest = {
     /**
      * The key. Must match the regex /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/. Must not be greater than 64 characters.
@@ -2325,7 +2332,7 @@ export type AdminUpdateNodePlayitGgAgentRequest = {
      */
     agent_id?: string | null;
     /**
-     * The secret. Must not be greater than 512 characters.
+     * The secret. Must match the regex /^[A-Za-z0-9_-]{16,512}$/.
      */
     secret?: string | null;
 };
@@ -2334,6 +2341,12 @@ export type AdminCreateTunnelRequest = {
      * The server id. Must match an existing stored value.
      */
     server_id: number;
+};
+export type AdminImportExistingTunnelsRequest = {
+    /**
+     * The node. Must match an existing stored value.
+     */
+    node?: number;
 };
 export type AdminUpdateTunnelSettingsRequest = {
     /**
@@ -4506,6 +4519,7 @@ export type AdminGetShopEditorOptionsResponseBody = {
         location_id?: number;
         public?: boolean;
         maintenance?: boolean;
+        shop_enabled?: boolean;
     }>;
     locations?: Array<{
         id?: number;
@@ -4676,6 +4690,34 @@ export type AdminUpdatePriceMultiplierResponseBody = {
     scope_id?: number;
     multiplier?: number;
     label?: string;
+};
+export type AdminListShopNodesResponseBody = {
+    data?: Array<{
+        id?: number;
+        name?: string;
+        location?: {
+            id?: number;
+            short?: string;
+            long?: string;
+        };
+        public?: boolean;
+        maintenance?: boolean;
+        shop_enabled?: boolean;
+        shop_servers?: number;
+    }>;
+};
+export type AdminUpdateShopNodeResponseBody = {
+    id?: number;
+    name?: string;
+    location?: {
+        id?: number;
+        short?: string;
+        long?: string;
+    };
+    public?: boolean;
+    maintenance?: boolean;
+    shop_enabled?: boolean;
+    shop_servers?: number;
 };
 export type AdminListShopAddOnsResponseBody = {
     data?: Array<{
@@ -4968,6 +5010,23 @@ export type AdminTestNodePlayitGgAgentResponseBody = {
     success?: boolean;
     message?: string;
     tunnel_count?: number;
+};
+export type AdminImportExistingTunnelsResponseBody = {
+    imported?: number;
+    skipped?: number;
+    errors?: Array<unknown>;
+    results?: Array<{
+        node_id?: number;
+        node_name?: string;
+        playit_tunnel_id?: string;
+        name?: string;
+        local_ip?: string;
+        local_port?: number;
+        address?: string;
+        result?: string;
+        reason?: string;
+        server_ids?: Array<number>;
+    }>;
 };
 export type AdminGetTunnelSettingsResponseBody = {
     subdomains_enabled?: boolean;
@@ -5691,6 +5750,7 @@ export type AdminUpdateShopCategoryCategoryIdPathParameter = number;
 export type AdminGetShopPlanPlanIdPathParameter = number;
 export type AdminUpdateBillingPeriodPeriodIdPathParameter = number;
 export type AdminUpdatePriceMultiplierMultiplierIdPathParameter = number;
+export type AdminUpdateShopNodeIdPathParameter = number;
 export type AdminUpdateShopAddOnAddonIdPathParameter = number;
 /**
  * Only flagged payments.
@@ -5784,6 +5844,10 @@ export type AdminListTunnelsPageQueryParameter = number;
  * Results to return per page.
  */
 export type AdminListTunnelsPerPageQueryParameter = number;
+/**
+ * Only import the tunnels of this node.
+ */
+export type AdminImportExistingTunnelsNodeQueryParameter = number;
 export type AdminRetryTunnelTunnelIdPathParameter = number;
 export type AdminRecreateTunnelTunnelIdPathParameter = number;
 export type AdminListServerMountsServerAdminIdentifierPathParameter = string;
@@ -7572,6 +7636,67 @@ export type AdminUpdatePriceMultiplierResponses = {
     200: AdminUpdatePriceMultiplierResponseBody;
 };
 export type AdminUpdatePriceMultiplierResponse = AdminUpdatePriceMultiplierResponses[keyof AdminUpdatePriceMultiplierResponses];
+export type AdminListShopNodesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/nodes';
+};
+export type AdminListShopNodesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListShopNodesError = AdminListShopNodesErrors[keyof AdminListShopNodesErrors];
+export type AdminListShopNodesResponses = {
+    /**
+     * Nodes returned.
+     */
+    200: AdminListShopNodesResponseBody;
+};
+export type AdminListShopNodesResponse = AdminListShopNodesResponses[keyof AdminListShopNodesResponses];
+export type AdminUpdateShopNodeData = {
+    body: AdminUpdateShopNodeRequest;
+    path: {
+        /**
+         * The resource ID.
+         */
+        id: AdminUpdateShopNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/nodes/{id}';
+};
+export type AdminUpdateShopNodeErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateShopNodeError = AdminUpdateShopNodeErrors[keyof AdminUpdateShopNodeErrors];
+export type AdminUpdateShopNodeResponses = {
+    /**
+     * Node updated.
+     */
+    200: AdminUpdateShopNodeResponseBody;
+};
+export type AdminUpdateShopNodeResponse = AdminUpdateShopNodeResponses[keyof AdminUpdateShopNodeResponses];
 export type AdminListShopAddOnsData = {
     body?: never;
     path?: never;
@@ -9189,6 +9314,39 @@ export type AdminCreateTunnelResponses = {
     201: AdminServerTunnelResource;
 };
 export type AdminCreateTunnelResponse = AdminCreateTunnelResponses[keyof AdminCreateTunnelResponses];
+export type AdminImportExistingTunnelsData = {
+    body?: AdminImportExistingTunnelsRequest;
+    path?: never;
+    query?: {
+        /**
+         * Only import the tunnels of this node.
+         */
+        node?: AdminImportExistingTunnelsNodeQueryParameter;
+    };
+    url: '/api/admin/tunnels/import';
+};
+export type AdminImportExistingTunnelsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminImportExistingTunnelsError = AdminImportExistingTunnelsErrors[keyof AdminImportExistingTunnelsErrors];
+export type AdminImportExistingTunnelsResponses = {
+    /**
+     * Import summary returned.
+     */
+    200: AdminImportExistingTunnelsResponseBody;
+};
+export type AdminImportExistingTunnelsResponse = AdminImportExistingTunnelsResponses[keyof AdminImportExistingTunnelsResponses];
 export type AdminGetTunnelSettingsData = {
     body?: never;
     path?: never;
