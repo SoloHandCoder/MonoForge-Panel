@@ -8,12 +8,20 @@ use Pterodactyl\Contracts\Servers\SendsServerPower;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Sleep\ServerSleep;
 
 final readonly class SendServerPower implements SendsServerPower
 {
+    public function __construct(private ServerSleep $sleep) {}
+
     public function send(Server $server, string $signal): void
     {
         Daemon::server($server)->power($signal);
+
+        // Starting a sleeping server wakes it, whoever does it (pay-as-you-play).
+        if (in_array($signal, ['start', 'restart'], true)) {
+            $this->sleep->markAwake($server);
+        }
 
         Activity::event(mb_strtolower("server:power.{$signal}"))->subject($server)->log();
     }

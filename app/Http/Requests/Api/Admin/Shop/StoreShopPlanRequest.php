@@ -6,6 +6,7 @@ namespace Pterodactyl\Http\Requests\Api\Admin\Shop;
 
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Http\Requests\Api\Admin\AdminApiRequest;
+use Pterodactyl\Models\Billing\ShopPlan;
 
 class StoreShopPlanRequest extends AdminApiRequest
 {
@@ -17,6 +18,10 @@ class StoreShopPlanRequest extends AdminApiRequest
     /**
      * Resource fields use the units of a server's build: MB for memory, swap and disk,
      * percent of one thread for cpu. An empty node list allows every deployable node.
+     *
+     * Pay-as-you-play: with `sleep_allowed`, owners may let the server sleep after
+     * `sleep_idle_minutes` without players, and the time it slept is discounted by
+     * `sleep_discount_percent` at the renewal.
      *
      * @return ValidationRules
      */
@@ -41,6 +46,9 @@ class StoreShopPlanRequest extends AdminApiRequest
             'egg_ids.*' => ['integer', 'distinct', 'exists:eggs,id'],
             'node_ids' => ['nullable', 'array', 'max:500'],
             'node_ids.*' => ['integer', 'distinct', 'exists:nodes,id'],
+            'sleep_allowed' => ['sometimes', 'boolean'],
+            'sleep_discount_percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'sleep_idle_minutes' => ['sometimes', 'integer', 'min:5', 'max:1440'],
         ];
     }
 
@@ -52,6 +60,8 @@ class StoreShopPlanRequest extends AdminApiRequest
             'price_tokens' => 'Price',
             'egg_ids' => 'Eggs',
             'node_ids' => 'Nodes',
+            'sleep_discount_percent' => 'Sleep discount',
+            'sleep_idle_minutes' => 'Idle minutes',
         ];
     }
 
@@ -79,6 +89,9 @@ class StoreShopPlanRequest extends AdminApiRequest
             'allocations' => $this->integer('allocations'),
             'egg_ids' => array_values(array_map(static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0, (array) $this->input('egg_ids'))),
             'node_ids' => $nodeIds === [] ? null : $nodeIds,
+            'sleep_allowed' => $this->boolean('sleep_allowed'),
+            'sleep_discount_percent' => $this->integer('sleep_discount_percent'),
+            'sleep_idle_minutes' => $this->integer('sleep_idle_minutes', ShopPlan::DEFAULT_SLEEP_IDLE_MINUTES),
         ];
     }
 }

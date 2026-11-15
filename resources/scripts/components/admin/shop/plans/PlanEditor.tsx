@@ -48,7 +48,14 @@ interface PlanFormValues {
     egg_ids: number[];
     restrict_nodes: boolean;
     node_ids: number[];
+    sleep_allowed: boolean;
+    sleep_discount_percent: number | null;
+    sleep_idle_minutes: number | null;
 }
+
+/** New plans do not sleep; these are the starting values once the admin turns it on. */
+const DEFAULT_SLEEP_DISCOUNT = 50;
+const DEFAULT_SLEEP_IDLE_MINUTES = 15;
 
 const newPlanResources: ShopResources = {
     memory: 2048,
@@ -73,6 +80,9 @@ const formValues = (plan: ShopPlan | undefined, categoryId: number | null): Plan
             egg_ids: [],
             restrict_nodes: false,
             node_ids: [],
+            sleep_allowed: false,
+            sleep_discount_percent: DEFAULT_SLEEP_DISCOUNT,
+            sleep_idle_minutes: DEFAULT_SLEEP_IDLE_MINUTES,
         };
     }
 
@@ -86,6 +96,9 @@ const formValues = (plan: ShopPlan | undefined, categoryId: number | null): Plan
         egg_ids: plan.egg_ids,
         restrict_nodes: plan.node_ids !== null,
         node_ids: plan.node_ids ?? [],
+        sleep_allowed: plan.sleep_allowed,
+        sleep_discount_percent: plan.sleep_discount_percent,
+        sleep_idle_minutes: plan.sleep_idle_minutes,
     };
 };
 
@@ -111,7 +124,21 @@ const toInput = (values: PlanFormValues, sort: number): ShopPlanInput => ({
     price_tokens: values.price_tokens ?? 0,
     egg_ids: values.egg_ids,
     node_ids: values.restrict_nodes ? values.node_ids : [],
+    sleep_allowed: values.sleep_allowed,
+    sleep_discount_percent: values.sleep_discount_percent ?? 0,
+    sleep_idle_minutes: values.sleep_idle_minutes ?? DEFAULT_SLEEP_IDLE_MINUTES,
 });
+
+/** A whole number between min and max, or the message saying so. */
+const numberBetween =
+    (label: string, min: number, max: number) =>
+    ({ value }: { value: number | null }) => {
+        if (value === null) {
+            return `${label} is required.`;
+        }
+
+        return value < min || value > max ? `${label} must be between ${min} and ${max}.` : undefined;
+    };
 
 const numberRequired =
     (label: string, min: number) =>
@@ -387,6 +414,51 @@ function PlanEditorForm({ plan, categories, periods, multipliers, options, initi
                                     />
                                 )}
                             </form.AppField>
+                        </div>
+                    </Card>
+
+                    <Card title='Pay-as-you-play'>
+                        <div className='grid gap-5 sm:grid-cols-2'>
+                            <div className='sm:col-span-2'>
+                                <form.AppField name='sleep_allowed'>
+                                    {(field) => (
+                                        <field.SwitchField
+                                            label='Auto-sleep'
+                                            description='Owners may let the server sleep while nobody plays (Minecraft Java for now). Sleeping time is discounted at the renewal.'
+                                        />
+                                    )}
+                                </form.AppField>
+                            </div>
+                            {values.sleep_allowed && (
+                                <>
+                                    <form.AppField
+                                        name='sleep_discount_percent'
+                                        validators={{ onChange: numberBetween('Sleep discount', 0, 100) }}
+                                    >
+                                        {(field) => (
+                                            <field.NumberField
+                                                label='Sleep discount (%)'
+                                                description='How much less an hour asleep costs than an hour awake.'
+                                                min={0}
+                                                max={100}
+                                            />
+                                        )}
+                                    </form.AppField>
+                                    <form.AppField
+                                        name='sleep_idle_minutes'
+                                        validators={{ onChange: numberBetween('Idle minutes', 5, 1440) }}
+                                    >
+                                        {(field) => (
+                                            <field.NumberField
+                                                label='Idle minutes'
+                                                description='Minutes without players before the server sleeps.'
+                                                min={5}
+                                                max={1440}
+                                            />
+                                        )}
+                                    </form.AppField>
+                                </>
+                            )}
                         </div>
                     </Card>
 

@@ -11,6 +11,7 @@ export default function SettingsPage({ className }: ViewProps<'page.server.setti
                 </div>
                 <div className='w-full mt-6 md:flex-1 md:mt-0'>
                     <View name='server.rename' className='mb-6 md:mb-10' />
+                    <View name='server.autoSleep' className='mb-6 md:mb-10' />
                     <View name='server.reinstall' />
                 </div>
             </div>

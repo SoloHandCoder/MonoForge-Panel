@@ -27,6 +27,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Knuckles\Scribe\Scribe;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
+use Pterodactyl\Contracts\Servers\WakesServers;
 use Pterodactyl\Enum\ResourceLimit;
 use Pterodactyl\Extensions\Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Pterodactyl\Extensions\Mail\ResendTransport;
@@ -56,7 +57,10 @@ use Pterodactyl\Models\UserSSHKey;
 use Pterodactyl\Services\Activity\InfrastructureIps;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
+use Pterodactyl\Services\Query\QueryConnector;
+use Pterodactyl\Services\Query\StreamQueryConnector;
 use Pterodactyl\Services\Servers\EnvironmentService;
+use Pterodactyl\Services\Sleep\ServerSleep;
 use ReflectionFunctionAbstract;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -145,6 +149,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DaemonManager::class);
 
         $this->app->bind(VerifiesCaptcha::class, HttpCaptchaVerifier::class);
+
+        // Game queries (player counts) and auto-sleep (phase 6).
+        $this->app->bind(QueryConnector::class, StreamQueryConnector::class);
+        $this->app->bind(WakesServers::class, ServerSleep::class);
 
         // Keys registered through setEnvironmentKey() must survive to every consumer,
         // so the service is shared rather than rebuilt on each resolve.

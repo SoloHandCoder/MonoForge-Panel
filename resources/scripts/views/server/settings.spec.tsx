@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type { ReactNode } from 'react';
 import type { AxiosAdapter } from 'axios';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ServerSubscription } from '@/api/billing/subscriptions';
 import http from '@/api/http';
 import { serverQueryOptions } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
@@ -12,14 +13,57 @@ import { View } from '@/views/View';
 
 let host: ExtensionTestHost | undefined;
 let requests: { method: string; url: string; body: unknown }[];
+/** What GET /api/client/subscriptions answers: the shop billing the viewer pays for. */
+let subscriptions: { object: string; attributes: ServerSubscription }[];
 const adapter = http.defaults.adapter;
+
+const sleepySubscription = (sleep: Partial<ServerSubscription['sleep']> = {}) => ({
+    object: 'server_subscription',
+    attributes: {
+        server_identifier: 'a1b2c3d4',
+        server_name: 'Survival',
+        status: 'active',
+        price_tokens: 500,
+        period_days: 30,
+        addons: [],
+        auto_renew: true,
+        next_renewal_at: '2026-12-15T12:00:00+00:00',
+        suspended_at: null,
+        delete_at: null,
+        can_renew_now: false,
+        sleep: {
+            allowed: true,
+            supported: true,
+            enabled: true,
+            sleeping: false,
+            sleep_started_at: null,
+            idle_minutes: 15,
+            discount_percent: 50,
+            slept_seconds_this_period: 0,
+            saved_this_period: 0,
+            last_saved_tokens: 120,
+            ...sleep,
+        },
+    },
+});
 
 beforeEach(() => {
     requests = [];
+    subscriptions = [];
     http.defaults.adapter = (async (config) => {
         const body: unknown = config.data ? JSON.parse(String(config.data)) : undefined;
 
         requests.push({ method: config.method ?? 'get', url: config.url ?? '', body });
+
+        if (config.url === '/api/client/subscriptions') {
+            return {
+                data: { object: 'list', data: subscriptions },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config,
+            };
+        }
 
         return { data: '', status: 204, statusText: 'No Content', headers: {}, config };
     }) satisfies AxiosAdapter;
@@ -116,6 +160,52 @@ describe('server settings', () => {
             url: `/api/client/servers/${server.attributes.uuid}/settings/reinstall`,
             body: undefined,
         });
+    });
+});
+
+describe('server.autoSleep', () => {
+    it('offers the switch to the payer of a plan that includes auto-sleep', async () => {
+        subscriptions = [sleepySubscription()];
+        await renderInServer(<View name='server.autoSleep' />);
+
+        expect(await screen.findByText('Auto-sleep', { selector: 'h2, h3, p, span, div' })).toBeVisible();
+        expect(screen.getByText('You saved 120 tokens by sleeping at the last renewal.')).toBeVisible();
+        expect(screen.getByText(/costs 50% less/)).toBeVisible();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('switch'));
+        });
+
+        await waitFor(() =>
+            expect(requests).toContainEqual({
+                method: 'patch',
+                url: '/api/client/subscriptions/a1b2c3d4',
+                body: { auto_sleep: false },
+            })
+        );
+    });
+
+    it('says when the game is not supported yet', async () => {
+        subscriptions = [sleepySubscription({ supported: false, enabled: false })];
+        await renderInServer(<View name='server.autoSleep' />);
+
+        expect(await screen.findByText(/not supported for this game yet/)).toBeVisible();
+        expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    });
+
+    it('renders nothing without a plan that includes it, or for someone who does not pay', async () => {
+        subscriptions = [sleepySubscription({ allowed: false })];
+        await renderInServer(<View name='server.autoSleep' />);
+        await waitFor(() => expect(requests.some((request) => request.url === '/api/client/subscriptions')).toBe(true));
+
+        expect(screen.queryByText(/sleeps until anyone starts it/)).not.toBeInTheDocument();
+        cleanup();
+        host?.dispose();
+
+        subscriptions = [];
+        await renderInServer(<View name='server.autoSleep' />, {}, ['control.start']);
+
+        expect(screen.queryByText(/sleeps until anyone starts it/)).not.toBeInTheDocument();
     });
 });
 

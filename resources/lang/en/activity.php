@@ -54,6 +54,11 @@ return [
         'subscription' => [
             'renew' => 'Renewed the server subscription for :price_tokens tokens',
             'auto-renew' => 'Turned automatic renewal :auto_renew',
+            'auto-sleep' => 'Turned auto-sleep :auto_sleep',
+        ],
+        'sleep' => [
+            'asleep' => 'Auto-sleep stopped the server after :minutes minutes without players',
+            'wake' => 'Woke the sleeping server',
         ],
         'console' => [
             'command' => 'Executed ":command" on the server',

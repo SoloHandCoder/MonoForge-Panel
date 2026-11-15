@@ -7,6 +7,7 @@ namespace Pterodactyl\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
+use Pterodactyl\Console\Commands\Billing\AutoSleepCommand;
 use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
@@ -46,6 +47,9 @@ final class Scheduler
         // Shop billing: renewals, suspensions, warnings and deletions after the grace period. Every
         // step is safe to repeat, so a missed or overlapping run only delays it.
         $schedule->command(ProcessSubscriptionsCommand::class)->everyFiveMinutes()->withoutOverlapping(30)->onOneServer();
+        // Pay-as-you-play: one batched Wings read and one player query per running auto-sleep
+        // server a minute; idle servers are stopped and sleeping ones that were started noticed.
+        $schedule->command(AutoSleepCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
 
         // Tebex webhook bodies carry the buyer's personal details; keep them 90 days.
         $schedule->command(PruneTebexPayloadsCommand::class)->daily()->withoutOverlapping()->onOneServer();

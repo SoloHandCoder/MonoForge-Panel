@@ -30,6 +30,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleTaskController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ServerController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SettingsController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\SleepController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\StartupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SubuserController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\WebsocketController;
@@ -158,6 +159,9 @@ Route::group([
 
     Route::post('/command', [CommandController::class, 'index']);
     Route::post('/power', [PowerController::class, 'index']);
+    // Pay-as-you-play: whether auto-sleep stopped the server, and waking it.
+    Route::get('/sleep', [SleepController::class, 'show'])->name('api:client:server.sleep');
+    Route::post('/sleep/wake', [SleepController::class, 'wake'])->middleware('throttle:6,1')->name('api:client:server.sleep.wake');
 
     Route::group(['prefix' => '/databases'], function (): void {
         Route::get('/', [DatabaseController::class, 'index']);

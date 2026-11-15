@@ -77,6 +77,18 @@ it('shows the deletion countdown of a suspended shop server on its card', async 
         suspended_at: new Date().toISOString(),
         delete_at: new Date(Date.now() + (6 * 86_400 + 23 * 3600 + 120) * 1000).toISOString(),
         can_renew_now: true,
+        sleep: {
+            allowed: false,
+            supported: true,
+            enabled: false,
+            sleeping: false,
+            sleep_started_at: null,
+            idle_minutes: 15,
+            discount_percent: 0,
+            slept_seconds_this_period: 0,
+            saved_this_period: 0,
+            last_saved_tokens: 0,
+        },
     });
 
     await renderInApp(<View name='dashboard.serverCard' server={server} />);

@@ -33,6 +33,9 @@ class ShopPlanController extends AdminApiController
         'resources' => ['memory' => 2048, 'swap' => 0, 'disk' => 10240, 'io' => 500, 'cpu' => 100, 'databases' => 1, 'backups' => 2, 'allocations' => 0],
         'egg_ids' => [1, 2],
         'node_ids' => null,
+        'sleep_allowed' => true,
+        'sleep_discount_percent' => 50,
+        'sleep_idle_minutes' => 15,
     ];
 
     #[Endpoint('List shop plans', 'Returns every plan, cheapest first, as the store sorts them.')]

@@ -67,6 +67,47 @@ test('creates, lists cheapest first, updates and deletes plans', function (): vo
     expect(ShopPlan::query()->whereKey($stone)->exists())->toBeFalse();
 });
 
+test('stores the pay-as-you-play options of a plan', function (): void {
+    $category = shopCategory();
+
+    // New plans do not sleep; the idle time defaults to 15 minutes.
+    $this->postJson(route('api.admin.shop.plans.store'), planBody($category->id))
+        ->assertCreated()
+        ->assertJsonPath('sleep_allowed', false)
+        ->assertJsonPath('sleep_discount_percent', 0)
+        ->assertJsonPath('sleep_idle_minutes', 15);
+
+    $id = $this->postJson(route('api.admin.shop.plans.store'), planBody($category->id, ['sleep_allowed' => true, 'sleep_discount_percent' => 60, 'sleep_idle_minutes' => 30]))
+        ->assertCreated()
+        ->assertJsonPath('sleep_allowed', true)
+        ->assertJsonPath('sleep_discount_percent', 60)
+        ->assertJsonPath('sleep_idle_minutes', 30)
+        ->json('id');
+
+    expect(ShopPlan::query()->findOrFail($id))
+        ->sleep_allowed->toBeTrue()
+        ->sleep_discount_percent->toBe(60)
+        ->sleep_idle_minutes->toBe(30);
+
+    $this->putJson(route('api.admin.shop.plans.update', ['plan' => $id]), planBody($category->id, ['sleep_allowed' => false, 'sleep_discount_percent' => 100, 'sleep_idle_minutes' => 5]))
+        ->assertOk()
+        ->assertJsonPath('sleep_allowed', false)
+        ->assertJsonPath('sleep_discount_percent', 100)
+        ->assertJsonPath('sleep_idle_minutes', 5);
+});
+
+test('rejects sleep discounts outside 0-100 and idle times outside 5-1440 minutes', function (array $overrides, string $field): void {
+    $this->postJson(route('api.admin.shop.plans.store'), planBody(shopCategory()->id, $overrides))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.meta.source_field', $field);
+})->with([
+    [['sleep_discount_percent' => 101], 'sleep_discount_percent'],
+    [['sleep_discount_percent' => -1], 'sleep_discount_percent'],
+    [['sleep_idle_minutes' => 4], 'sleep_idle_minutes'],
+    [['sleep_idle_minutes' => 1441], 'sleep_idle_minutes'],
+    [['sleep_allowed' => 'sometimes'], 'sleep_allowed'],
+]);
+
 test('rejects a plan without eggs or with unknown eggs', function (): void {
     $category = shopCategory();
 

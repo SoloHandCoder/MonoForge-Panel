@@ -1558,6 +1558,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | `dashboard.serverCard.metrics` | app | `ServerCardModel` | `model: ServerCardModel`, `server: Server` |  |  |
 | `dashboard.serverList` | app | `ServerListModel` |  | `dashboard.before` `dashboard.after` `dashboard.serverRow.before` `dashboard.serverRow.metrics.after` `dashboard.serverRow.after` | servers, empty, loading |
 | `server.allocations` | server | `ServerAllocationsModel` |  |  | allocations, playit, full, unmanaged, readOnly, empty, loading |
+| `server.autoSleep` | server | `ServerAutoSleepModel` |  |  | default, off, sleeping, unsupported, denied |
 | `server.backups` | server | `BackupListModel` |  |  | backups, empty, full, noLimit, paged, pastEnd, readOnly |
 | `server.conflict` | server | `ServerConflictModel` |  |  | installing, suspended, maintenance, transferring, restoring |
 | `server.databases` | server | `ServerDatabasesModel` |  |  | databases, full, empty, noLimit, readOnly, loading |

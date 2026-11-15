@@ -725,6 +725,22 @@
             "export": "default"
         }
     },
+    "server.autoSleep": {
+        "kind": "block",
+        "context": "server",
+        "slots": [],
+        "fixtures": [
+            "default",
+            "off",
+            "sleeping",
+            "unsupported",
+            "denied"
+        ],
+        "classic": {
+            "file": "views/server/settings/ServerAutoSleep.tsx",
+            "export": "default"
+        }
+    },
     "server.backups": {
         "kind": "block",
         "context": "server",

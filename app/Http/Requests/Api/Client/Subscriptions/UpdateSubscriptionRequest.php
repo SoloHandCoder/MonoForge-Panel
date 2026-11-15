@@ -14,7 +14,8 @@ class UpdateSubscriptionRequest extends ClientApiRequest
     public function rules(): array
     {
         return [
-            'auto_renew' => ['required', 'boolean'],
+            'auto_renew' => ['required_without:auto_sleep', 'boolean'],
+            'auto_sleep' => ['required_without:auto_renew', 'boolean'],
         ];
     }
 }
