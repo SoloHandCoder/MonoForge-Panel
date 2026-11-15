@@ -29,11 +29,14 @@ class IndexController extends Controller
      */
     private function homeSeo(): array
     {
+        // From the configured address, never the request's Host header, which a client chooses.
+        $root = mb_rtrim(config()->string('app.url'), '/');
+
         return [
             'title' => 'MonoForge | Game server hosting for Minecraft and Terraria',
             'description' => 'Spin up a Minecraft Java or Terraria server in seconds with MonoForge: pay with tokens, play through a ready-made address, and manage everything from the browser with a file editor, backups and Discord support.',
-            'url' => url('/'),
-            'image' => url('/favicons/android-chrome-512x512.png'),
+            'url' => $root.'/',
+            'image' => $root.'/favicons/android-chrome-512x512.png',
         ];
     }
 }

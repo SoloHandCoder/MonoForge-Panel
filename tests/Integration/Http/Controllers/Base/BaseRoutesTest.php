@@ -32,8 +32,8 @@ test('the homepage carries its title, description and open graph tags for guests
         ->toContain('<meta name="robots" content="index, follow">')
         ->toContain('<meta name="description" content="Spin up a Minecraft Java or Terraria server')
         ->toContain('<meta property="og:title" content="MonoForge | Game server hosting')
-        ->toContain('<meta property="og:image" content="'.url('/favicons/android-chrome-512x512.png').'">')
-        ->toContain('<link rel="canonical" href="'.url('/').'">')
+        ->toContain('<meta property="og:image" content="'.mb_rtrim(config()->string('app.url'), '/').'/favicons/android-chrome-512x512.png">')
+        ->toContain('<link rel="canonical" href="'.mb_rtrim(config()->string('app.url'), '/').'/">')
         ->not->toContain('content="noindex"');
 });
 test('the panel is never indexed: signed-in pages and every other path stay noindex', function (): void {
@@ -58,4 +58,14 @@ test('the page bootstrap tells the editor the largest file the panel serves for 
 
     config(['pterodactyl.files.max_edit_size' => 1024 * 1024]);
     $this->get('/auth/login')->assertViewHas('siteConfiguration', fn (array $config): bool => $config['files']['maxEditSize'] === 1024 * 1024);
+});
+test('the homepage canonical and open graph addresses come from the configured app url, not the Host header', function (): void {
+    config(['app.url' => 'https://panel.example.test']);
+
+    $html = (string) $this->get('http://attacker.example/', ['Host' => 'attacker.example'])->assertOk()->getContent();
+
+    expect($html)->toContain('<link rel="canonical" href="https://panel.example.test/">')
+        ->toContain('<meta property="og:url" content="https://panel.example.test/">')
+        ->toContain('content="https://panel.example.test/favicons/android-chrome-512x512.png"')
+        ->not->toContain('attacker.example');
 });
