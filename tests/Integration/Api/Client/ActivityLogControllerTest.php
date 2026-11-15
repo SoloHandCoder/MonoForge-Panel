@@ -72,15 +72,15 @@ test('the reserved ip property is hidden from other viewers while other addresse
     expect($properties['ip'])->toBe('[hidden]');
     expect($properties['address'])->toBe('10.0.0.1');
 });
-test('a failed log in reveals the attempt address to the account it targeted', function (): void {
+test('a failed log in without a user actor never reveals its address, even to the account it targeted', function (): void {
     $user = User::factory()->create(['root_admin' => false]);
     Activity::event('auth:fail')->anonymous()->subject($user)->withRequestMetadata()->log();
 
     $row = $this->actingAs($user)->getJson('/api/client/account/activity')->assertOk()->json('data.0.attributes');
 
     expect($row['event'])->toBe('auth:fail');
-    expect($row['ip'])->toBe('203.0.113.50');
-    expect($row['properties']['ip'])->toBe('203.0.113.50');
+    expect($row['ip'])->toBeNull();
+    expect($row['properties']['ip'])->toBe('[hidden]');
 });
 test('an entry with an actor never reveals that actor address to its subject', function (): void {
     $owner = User::factory()->create(['root_admin' => false]);

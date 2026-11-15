@@ -132,5 +132,6 @@ test('activity entries hide infrastructure addresses even from failed logins on 
         ->and($log('::1')->visibleIp())->toBeNull()
         ->and($log('fdba::7')->visibleIp())->toBeNull()
         ->and($log('203.0.113.9')->visibleIp())->toBeNull()
-        ->and($log('198.51.100.9')->visibleIp())->toBe('198.51.100.9');
+        // A system entry (no user actor) hides even an external address.
+        ->and($log('198.51.100.9')->visibleIp())->toBeNull();
 });
