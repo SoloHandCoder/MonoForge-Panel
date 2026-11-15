@@ -1,5 +1,6 @@
 import { appendChartPoint, chartValue, type ServerGraphs } from '@/components/server/console/chart';
 import type { ServerStatsPayload } from '@/components/server/console/stats';
+import type { ServerPlayers } from '@/components/server/console/consoleGame';
 import type { ServerSet } from '@/state/server/types';
 
 /** The latest resource usage Wings reported; every value is 0 until the first report. */
@@ -19,12 +20,16 @@ export interface ServerStatsStore {
     graphs: ServerGraphs;
     /** Network totals of the previous report, which traffic per sample is measured from; -1 before one. */
     totals: { tx: number; rx: number };
+    /** Players as the console last reported them; null until it does. */
+    players: ServerPlayers | null;
+    setPlayers: (players: ServerPlayers | null) => void;
     push: (payload: ServerStatsPayload, t: number) => void;
+    /** Drops the graph samples and the player count, as when the server stops. */
     clearGraphs: () => void;
 }
 
 export const emptyStatsSample: ServerStatsSample = { cpu: 0, memory: 0, disk: 0, rx: 0, tx: 0, uptime: 0 };
-export const emptyGraphs: ServerGraphs = { cpu: [], memory: [], network: [] };
+export const emptyGraphs: ServerGraphs = { cpu: [], memory: [], disk: [], network: [] };
 
 const delta = (total: number, previous: number) => (previous < 0 ? 0 : Math.max(0, total - previous));
 
@@ -32,6 +37,8 @@ export const createStats = (set: ServerSet): ServerStatsStore => ({
     current: emptyStatsSample,
     graphs: emptyGraphs,
     totals: { tx: -1, rx: -1 },
+    players: null,
+    setPlayers: (players) => set(({ stats }) => (stats.players === players ? {} : { stats: { ...stats, players } })),
     push: (payload, t) =>
         set(({ stats }) => ({
             stats: {
@@ -50,6 +57,10 @@ export const createStats = (set: ServerSet): ServerStatsStore => ({
                         t,
                         value: chartValue(Math.floor(payload.memory_bytes / 1024 / 1024)),
                     }),
+                    disk: appendChartPoint(stats.graphs.disk, {
+                        t,
+                        value: chartValue(Math.floor(payload.disk_bytes / 1024 / 1024)),
+                    }),
                     network: appendChartPoint(stats.graphs.network, {
                         t,
                         tx: chartValue(delta(payload.network.tx_bytes, stats.totals.tx)),
@@ -59,5 +70,5 @@ export const createStats = (set: ServerSet): ServerStatsStore => ({
                 totals: { tx: payload.network.tx_bytes, rx: payload.network.rx_bytes },
             },
         })),
-    clearGraphs: () => set(({ stats }) => ({ stats: { ...stats, graphs: emptyGraphs } })),
+    clearGraphs: () => set(({ stats }) => ({ stats: { ...stats, graphs: emptyGraphs, players: null } })),
 });

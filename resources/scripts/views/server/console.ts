@@ -4,13 +4,25 @@ import { relationshipData } from '@/api/relationships';
 import { CHART_WINDOW_MS, type ServerGraphPoint, type ServerNetworkPoint } from '@/components/server/console/chart';
 import type { PowerAction } from '@/components/server/console/types';
 import { TERMINAL_PRELUDE } from '@/components/server/console/prelude';
-import { createSampleTerminal, useServerTerminal } from '@/components/server/console/useServerTerminal';
+import type { ServerPlayers } from '@/components/server/console/consoleGame';
+import type {
+    ConsoleLine,
+    ConsoleLineLevel,
+    ConsoleOutput,
+    ConsoleSegment,
+} from '@/components/server/console/consoleOutput';
+import {
+    createSampleOutput,
+    createSampleTerminal,
+    useServerTerminal,
+} from '@/components/server/console/useServerTerminal';
 import { SocketRequest } from '@/components/server/events';
 import { ip, mbToBytes } from '@/lib/formatters';
 import { playitAddress } from '@/lib/playit';
 import { usePermissions } from '@/plugins/usePermissions';
 import {
     useServerGraphs,
+    useServerPlayers,
     useServerStats,
     useServerStatus,
     useSocketConnected,
@@ -23,7 +35,17 @@ import { statMetric as metric, type ServerRunState, type ServerStatMetric } from
 // The console page places the feature prompts, so they are implemented with it.
 import { featureViews, type ServerFeatureView } from './features';
 
-export type { ServerGraphPoint, ServerNetworkPoint, ServerRunState, ServerStatMetric };
+export type {
+    ConsoleLine,
+    ConsoleLineLevel,
+    ConsoleOutput,
+    ConsoleSegment,
+    ServerGraphPoint,
+    ServerNetworkPoint,
+    ServerPlayers,
+    ServerRunState,
+    ServerStatMetric,
+};
 
 export interface ServerConsoleModel {
     readonly name: string;
@@ -47,6 +69,11 @@ export interface ServerConsoleCommand {
     readonly value: string;
     /** Sent commands, newest first. */
     readonly history: readonly string[];
+    /**
+     * Common commands of the server's game that complete the value, a word at a time ("g" offers
+     * "gamemode" and "give"); empty for an empty value or a game the panel does not know.
+     */
+    readonly suggestions: readonly string[];
     readonly setValue: (value: string) => void;
     /** Puts the previous command of the history into the value. */
     readonly previous: () => void;
@@ -58,6 +85,14 @@ export interface ServerConsoleCommand {
 export interface ServerTerminalModel {
     /** The terminal canvas, drawn with the `--terminal-*` tokens; give it a sized box. */
     readonly Terminal: ComponentType<TerminalCanvasProps>;
+    /**
+     * The output as parsed lines, for a theme that draws the console itself instead of the canvas.
+     * Read it with `useSyncExternalStore(output.subscribe, output.getSnapshot)`; every run is plain
+     * text and every link a checked https URL, so render them as text and anchors, never as HTML.
+     */
+    readonly output: ConsoleOutput;
+    /** The websocket is connected, so output streams and commands can be sent. */
+    readonly connected: boolean;
     /** The terminal or its connection is still starting. */
     readonly loading: boolean;
     /** The terminal could not be loaded; `retry` loads it again. */
@@ -94,8 +129,12 @@ export interface ServerPowerModel {
 
 export interface ServerStatsModel {
     readonly state: ServerRunState | null;
-    /** The primary allocation as "host:port". */
+    /** The playit.gg address when the server has a live tunnel, otherwise the primary allocation as "host:port". */
     readonly address: string | null;
+    /** `address` is the playit.gg tunnel address. */
+    readonly tunnel: boolean;
+    /** Players online as the console reports them (Minecraft and Terraria); null when unknown or not running. */
+    readonly players: ServerPlayers | null;
     /** Milliseconds since the server started; 0 while it is not running. */
     readonly uptime: number;
     /** Percent of one core. */
@@ -118,6 +157,8 @@ export interface ServerGraphsModel {
     readonly cpu: { readonly points: readonly ServerGraphPoint[]; readonly limit: number };
     /** Memory in MiB; `limit` is 0 when unlimited. */
     readonly memory: { readonly points: readonly ServerGraphPoint[]; readonly limit: number };
+    /** Disk usage in MiB; `limit` is 0 when unlimited. */
+    readonly disk: { readonly points: readonly ServerGraphPoint[]; readonly limit: number };
     /** Bytes received and sent between samples. */
     readonly network: { readonly points: readonly ServerNetworkPoint[] };
 }
@@ -208,6 +249,7 @@ function useServerStatsModel(): ServerStatsModel {
     const server = useLoadedServer();
     const state = useServerStatus();
     const stats = useServerStats();
+    const players = useServerPlayers();
 
     return useMemo(() => {
         const { limits } = server.attributes;
@@ -215,17 +257,19 @@ function useServerStatsModel(): ServerStatsModel {
         return {
             state,
             address: primaryAddress(server),
+            tunnel: playitAddress(server.attributes) !== null,
+            players: state === 'running' ? players : null,
             uptime: stats.uptime,
             cpu: metric(stats.cpu, limits.cpu),
             memory: metric(stats.memory, mbToBytes(limits.memory)),
             disk: metric(stats.disk, mbToBytes(limits.disk)),
             network: { rx: stats.rx, tx: stats.tx },
         };
-    }, [server, state, stats]);
+    }, [server, state, stats, players]);
 }
 
 function useServerGraphsModel(): ServerGraphsModel {
-    const { cpu, memory } = useLoadedServer().attributes.limits;
+    const { cpu, memory, disk } = useLoadedServer().attributes.limits;
     const state = useServerStatus();
     const graphs = useServerGraphs();
 
@@ -235,9 +279,10 @@ function useServerGraphsModel(): ServerGraphsModel {
             windowMs: CHART_WINDOW_MS,
             cpu: { points: graphs.cpu, limit: cpu },
             memory: { points: graphs.memory, limit: memory },
+            disk: { points: graphs.disk, limit: disk },
             network: { points: graphs.network },
         }),
-        [state, graphs, cpu, memory]
+        [state, graphs, cpu, memory, disk]
     );
 }
 
@@ -245,21 +290,26 @@ const noop = () => {};
 
 const PRELUDE = TERMINAL_PRELUDE;
 
-const RunningTerminal = createSampleTerminal([
+const RUNNING_LINES = [
     `${PRELUDE}Server marked as starting...`,
     '[12:00:01 INFO]: Starting minecraft server version 1.21.4',
     '[12:00:02 INFO]: Loading properties',
+    '[12:00:03 WARN]: \u001b[33mThe server is running in offline mode\u001b[0m',
     '[12:00:04 INFO]: Preparing level "world"',
-    '[12:00:09 INFO]: Done (7.412s)! For help, type "help"',
+    '[12:00:05 ERROR]: Could not load plugin \u001b[1mExample.jar\u001b[0m, see https://docs.papermc.io/paper',
+    '[12:00:09 INFO]: \u001b[32mDone (7.412s)! For help, type "help"\u001b[0m',
     `${PRELUDE}Server marked as running...`,
-]);
-const OfflineTerminal = createSampleTerminal([`${PRELUDE}Server marked as offline...`]);
+];
+const OFFLINE_LINES = [`${PRELUDE}Server marked as offline...`];
+const RunningTerminal = createSampleTerminal(RUNNING_LINES);
+const OfflineTerminal = createSampleTerminal(OFFLINE_LINES);
 
 const command = (options: Partial<ServerConsoleCommand> = {}): ServerConsoleCommand => ({
     allowed: true,
     disabled: false,
     value: '',
     history: ['say Hello', 'list'],
+    suggestions: [],
     setValue: noop,
     previous: noop,
     next: noop,
@@ -269,6 +319,8 @@ const command = (options: Partial<ServerConsoleCommand> = {}): ServerConsoleComm
 
 const terminalFixture = (options: Partial<ServerTerminalModel> = {}): ServerTerminalModel => ({
     Terminal: RunningTerminal,
+    output: createSampleOutput(RUNNING_LINES),
+    connected: true,
     loading: false,
     failed: false,
     retry: noop,
@@ -301,7 +353,9 @@ const GiB = 1024 ** 3;
 
 const statsFixture = (state: ServerRunState | null, options: Partial<ServerStatsModel> = {}): ServerStatsModel => ({
     state,
-    address: '203.0.113.10:25565',
+    address: 'example.joinmc.link',
+    tunnel: true,
+    players: state === 'running' ? { online: 3, max: 20 } : null,
     uptime: state === 'running' ? 93_784_000 : 0,
     cpu: metric(state === 'running' ? 37.52 : 0, 100),
     memory: metric(state === 'running' ? 1.4 * GiB : 0, 2 * GiB),
@@ -313,13 +367,14 @@ const statsFixture = (state: ServerRunState | null, options: Partial<ServerStats
 /** Samples a second apart ending now, so a fixture's graphs sit where live ones would. */
 function graphsFixture(live: boolean): ServerGraphsModel {
     const now = performance.now();
-    const times = Array.from({ length: live ? 20 : 0 }, (_, index) => now - (19 - index) * 1000);
+    const times = Array.from({ length: live ? 60 : 0 }, (_, index) => now - (59 - index) * 1000);
 
     return {
         live,
         windowMs: CHART_WINDOW_MS,
         cpu: { points: times.map((t, index) => ({ t, value: 30 + 12 * Math.sin(index / 3) })), limit: 100 },
         memory: { points: times.map((t, index) => ({ t, value: 1300 + index * 6 })), limit: 2048 },
+        disk: { points: times.map((t) => ({ t, value: 3277 })), limit: 10240 },
         network: {
             points: times.map((t, index) => ({
                 t,
@@ -363,8 +418,16 @@ implementViews({
         fixtures: {
             running: () => terminalFixture(),
             connecting: () =>
-                terminalFixture({ Terminal: OfflineTerminal, loading: true, command: command({ disabled: true }) }),
-            failed: () => terminalFixture({ Terminal: OfflineTerminal, failed: true }),
+                terminalFixture({
+                    Terminal: OfflineTerminal,
+                    output: createSampleOutput(OFFLINE_LINES),
+                    connected: false,
+                    loading: true,
+                    command: command({ disabled: true }),
+                }),
+            failed: () =>
+                terminalFixture({ Terminal: OfflineTerminal, output: createSampleOutput(OFFLINE_LINES), failed: true }),
+            suggestions: () => terminalFixture({ command: command({ value: 'g', suggestions: ['gamemode', 'give'] }) }),
             scrolledUp: () => terminalFixture({ scrolledUp: true }),
             readOnly: () => terminalFixture({ command: command({ allowed: false }) }),
         },
@@ -399,6 +462,8 @@ implementViews({
             unlimited: () =>
                 statsFixture('running', {
                     address: null,
+                    tunnel: false,
+                    players: null,
                     cpu: metric(137.5, 0),
                     memory: metric(3 * GiB, 0),
                     disk: metric(12 * GiB, 0),

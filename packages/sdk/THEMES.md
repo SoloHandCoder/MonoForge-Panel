@@ -1592,7 +1592,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | `server.stats` | server | `ServerStatsModel` |  |  | running, offline, starting, alarms, unlimited |
 | `server.subuserForm` | server | `SubuserFormModel` | `subuser?: SubuserSummary`, `onClose?: () => void` | `server.users.permissions.before` | create, edit, restricted, viewOnly, loading |
 | `server.subusers` | server | `SubuserListModel` |  |  | subusers, empty, readOnly |
-| `server.terminal` | server | `ServerTerminalModel` |  |  | running, connecting, failed, scrolledUp, readOnly |
+| `server.terminal` | server | `ServerTerminalModel` |  |  | running, connecting, failed, suggestions, scrolledUp, readOnly |
 <!-- /generated:views -->
 
 ### The full example

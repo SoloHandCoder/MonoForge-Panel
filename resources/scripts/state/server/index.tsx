@@ -70,6 +70,7 @@ const createServerStore = () =>
                     current: emptyStatsSample,
                     graphs: emptyGraphs,
                     totals: { tx: -1, rx: -1 },
+                    players: null,
                 },
             }));
         },
@@ -117,6 +118,7 @@ export const useSelectedFiles = () => {
 export const useServerStatus = () => useServerStore((state) => state.status.value);
 export const useServerStats = () => useServerStore((state) => state.stats.current);
 export const useServerGraphs = () => useServerStore((state) => state.stats.graphs);
+export const useServerPlayers = () => useServerStore((state) => state.stats.players);
 export const useSocketConnected = () => useServerStore((state) => state.socket.connected);
 export const useSocketInstance = () => useServerStore((state) => state.socket.instance);
 export const useFileUploadActions = () => {

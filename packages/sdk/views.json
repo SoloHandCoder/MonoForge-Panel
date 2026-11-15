@@ -1205,6 +1205,7 @@
             "running",
             "connecting",
             "failed",
+            "suggestions",
             "scrolledUp",
             "readOnly"
         ],
