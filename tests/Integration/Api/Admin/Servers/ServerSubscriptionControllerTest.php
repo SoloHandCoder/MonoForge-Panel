@@ -25,6 +25,9 @@ beforeEach(function (): void {
         'status' => ServerSubscription::STATUS_SUSPENDED,
         'next_renewal_at' => CarbonImmutable::now()->subDay(),
         'suspended_at' => CarbonImmutable::now()->subDay(),
+        // Billing made this suspension (the server was running before).
+        'server_suspended_at' => CarbonImmutable::now()->subDay(),
+        'suspended_by_billing' => true,
         'delete_at' => CarbonImmutable::now()->addDays(6),
     ]);
 });
