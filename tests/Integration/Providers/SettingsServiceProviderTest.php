@@ -151,3 +151,45 @@ test('every MonoForge setting key is loaded in environment-only mode', function 
     expect($provider->loaded(true))->toBe($monoforge)
         ->and($monoforge)->toContain('monoforge:shop:enabled', 'monoforge:ai:enabled', 'monoforge:auth:discord:client_secret', 'monoforge:captcha:provider', 'monoforge:privacy:hidden_ips');
 });
+
+test('in environment-only mode a MonoForge setting whose variable is set in the environment wins over a stale stored value', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('monoforge.settings.set_in_env', ['monoforge:update:mode', 'monoforge:auth:discord:enabled']);
+    config()->set('monoforge.update.mode', 'notify');
+    config()->set('monoforge.auth.discord.enabled', false);
+    config()->set('monoforge.auth.google.enabled', false);
+
+    bootSettings([
+        'monoforge:update:mode' => 'auto',
+        'monoforge:auth:discord:enabled' => 'true',
+        'monoforge:auth:google:enabled' => 'true',
+    ]);
+
+    expect(config('monoforge.update.mode'))->toBe('notify')
+        ->and(config('monoforge.auth.discord.enabled'))->toBeFalse()
+        // Its variable is unset, so the panel's value applies.
+        ->and(config('monoforge.auth.google.enabled'))->toBeTrue();
+});
+
+test('outside environment-only mode stored values still win over the environment', function (): void {
+    config()->set('monoforge.settings.set_in_env', ['monoforge:update:mode']);
+    config()->set('monoforge.update.mode', 'notify');
+
+    bootSettings(['monoforge:update:mode' => 'auto']);
+
+    expect(config('monoforge.update.mode'))->toBe('auto');
+});
+
+test('the configuration records which MonoForge variables are set in the environment', function (): void {
+    putenv('MONOFORGE_UPDATE_MODE=off');
+
+    try {
+        $config = require config_path('monoforge.php');
+    } finally {
+        putenv('MONOFORGE_UPDATE_MODE');
+    }
+
+    expect($config['settings']['set_in_env'])->toContain('monoforge:update:mode')
+        ->not->toContain('monoforge:auth:google:enabled')
+        ->and($config['settings']['environment_variables']['monoforge:auth:discord:client_secret'])->toBe('DISCORD_CLIENT_SECRET');
+});

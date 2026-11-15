@@ -12,6 +12,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface as Log;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Services\Settings\EnvironmentSettings;
 
 class SettingsServiceProvider extends ServiceProvider
 {
@@ -134,9 +135,9 @@ class SettingsServiceProvider extends ServiceProvider
 
     /**
      * Boot the service provider. With `APP_ENVIRONMENT_ONLY` (pterodactyl.load_environment_only)
-     * the upstream settings come from the environment only, but MonoForge's own settings
-     * (`monoforge:*`: shop, AI, privacy, sign-up, OAuth, captcha...) can only be set in the
-     * panel, so they are always loaded from the database.
+     * the upstream settings come from the environment only. MonoForge's own settings
+     * (`monoforge:*`: shop, AI, privacy, sign-up, OAuth, captcha...) are loaded from the
+     * database unless their environment variable is set, in which case the variable wins.
      */
     public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log): void
     {
@@ -196,14 +197,20 @@ class SettingsServiceProvider extends ServiceProvider
 
     /**
      * The keys to load from the database: all of them, with the mail keys of the SMTP or
-     * Resend driver, or in environment-only mode just MonoForge's own.
+     * Resend driver, or in environment-only mode just MonoForge's own, minus those whose
+     * environment variable is set (the variable wins).
      *
      * @return list<string>
      */
     protected function keysToLoad(bool $environmentOnly, mixed $mailDriver = null): array
     {
         if ($environmentOnly) {
-            return array_values(array_filter($this->keys, fn (string $key): bool => str_starts_with($key, 'monoforge:')));
+            $setInEnvironment = EnvironmentSettings::setInEnvironment();
+
+            return array_values(array_filter(
+                $this->keys,
+                fn (string $key): bool => str_starts_with($key, 'monoforge:') && ! in_array($key, $setInEnvironment, true),
+            ));
         }
 
         // Only set the email driver settings from the database if we

@@ -18,6 +18,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\GetSettingsRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\UpdateLoginProvidersRequest;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Services\Settings\EnvironmentSettings;
 
 /**
  * The Discord and Google apps used for "Continue with Discord/Google". Client secrets are
@@ -33,16 +34,18 @@ class LoginProvidersController extends AdminApiController
             'client_id' => '123456789012345678',
             'client_secret_set' => true,
             'callback_url' => 'https://panel.example.com/auth/modules/discord/authenticate',
+            'set_in_env' => ['enabled' => false, 'client_id' => false, 'client_secret' => false],
         ],
         'google' => [
             'enabled' => false,
             'client_id' => '',
             'client_secret_set' => false,
             'callback_url' => 'https://panel.example.com/auth/modules/google/authenticate',
+            'set_in_env' => ['enabled' => false, 'client_id' => false, 'client_secret' => false],
         ],
     ];
 
-    #[Endpoint('Get login providers', 'Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned.')]
+    #[Endpoint('Get login providers', 'Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned. set_in_env says which fields come from .env in a panel that reads its settings from the environment only; those cannot be changed here.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Login provider settings returned.')]
     public function index(GetSettingsRequest $request): JsonResponse
     {
@@ -53,13 +56,18 @@ class LoginProvidersController extends AdminApiController
                 'client_id' => $provider->clientId(),
                 'client_secret_set' => $provider->clientSecret() !== '',
                 'callback_url' => $provider->callbackUrl(),
+                'set_in_env' => [
+                    'enabled' => EnvironmentSettings::locked($provider->settingPrefix().':enabled'),
+                    'client_id' => EnvironmentSettings::locked($provider->settingPrefix().':client_id'),
+                    'client_secret' => EnvironmentSettings::locked($provider->settingPrefix().':client_secret'),
+                ],
             ];
         }
 
         return new JsonResponse($providers);
     }
 
-    #[Endpoint('Update login providers', 'Updates the Discord and Google login settings. A blank client secret keeps the stored one.')]
+    #[Endpoint('Update login providers', 'Updates the Discord and Google login settings. A blank client secret keeps the stored one. Fields set in .env (see set_in_env) are left as they are.')]
     #[BodyParam('discord.enabled', 'boolean', 'Whether users can sign in with Discord.', required: true, example: true)]
     #[BodyParam('discord.client_id', 'string', 'The Discord application client ID.', required: false, example: '123456789012345678', nullable: true)]
     #[BodyParam('discord.client_secret', 'string', 'A new Discord client secret, or blank to keep the stored one.', required: false, example: null, nullable: true)]
@@ -74,23 +82,33 @@ class LoginProvidersController extends AdminApiController
 
         foreach (OAuthProvider::cases() as $provider) {
             $key = $provider->value;
-            $enabled = $request->boolean($key.'.enabled');
-            $clientId = mb_trim($request->string($key.'.client_id')->toString());
-            $secret = mb_trim($request->string($key.'.client_secret')->toString());
+            $prefix = $provider->settingPrefix();
+            $locked = fn (string $field): bool => EnvironmentSettings::locked($prefix.':'.$field);
+
+            // A field set in .env keeps the environment's value, which is what applies.
+            $enabled = $locked('enabled') ? filter_var(config('monoforge.auth.'.$key.'.enabled'), FILTER_VALIDATE_BOOL) : $request->boolean($key.'.enabled');
+            $clientId = $locked('client_id') ? $provider->clientId() : mb_trim($request->string($key.'.client_id')->toString());
+            $secret = $locked('client_secret') ? '' : mb_trim($request->string($key.'.client_secret')->toString());
 
             if ($enabled && $clientId === '') {
                 $errors[$key.'.client_id'] = "A client ID is required to enable {$provider->label()} login.";
             }
 
-            $secretStored = $provider->clientSecret() !== '' || (string) Setting::fetch('settings::'.$provider->settingPrefix().':client_secret') !== '';
+            $secretStored = $provider->clientSecret() !== '' || (string) Setting::fetch('settings::'.$prefix.':client_secret') !== '';
             if ($enabled && $secret === '' && ! $secretStored) {
                 $errors[$key.'.client_secret'] = "A client secret is required to enable {$provider->label()} login.";
             }
 
-            $writes[$provider->settingPrefix().':enabled'] = $enabled ? 'true' : 'false';
-            $writes[$provider->settingPrefix().':client_id'] = $clientId;
+            if (! $locked('enabled')) {
+                $writes[$prefix.':enabled'] = $enabled ? 'true' : 'false';
+            }
+
+            if (! $locked('client_id')) {
+                $writes[$prefix.':client_id'] = $clientId;
+            }
+
             if ($secret !== '') {
-                $writes[$provider->settingPrefix().':client_secret'] = Crypt::encrypt($secret);
+                $writes[$prefix.':client_secret'] = Crypt::encrypt($secret);
             }
         }
 

@@ -40,7 +40,7 @@ function UpdateModeForm({ mode, readOnly }: { mode: AdminUpdateMode; readOnly: b
                         label='MonoForge Updates'
                         options={modeOptions}
                         disabled={readOnly}
-                        description='New MonoForge builds come from the GitHub releases of SoloHandCoder/MonoForge-Panel. Automatic installs briefly put the panel into maintenance, back up the code and database, and run migrations.'
+                        description={`${readOnly ? 'Set in .env (MONOFORGE_UPDATE_MODE). Change it there. ' : ''}New MonoForge builds come from the GitHub releases of SoloHandCoder/MonoForge-Panel. Automatic installs briefly put the panel into maintenance, back up the code and database, and run migrations.`}
                     />
                 )}
             </form.AppField>
@@ -53,13 +53,20 @@ function UpdateModeForm({ mode, readOnly }: { mode: AdminUpdateMode; readOnly: b
     );
 }
 
-/** The MonoForge self-update mode, saved as the monoforge:update:mode setting. */
-export default function UpdateSettingsForm({ readOnly }: { readOnly: boolean }) {
+/**
+ * The MonoForge self-update mode, saved as the monoforge:update:mode setting. It is read-only only
+ * when MONOFORGE_UPDATE_MODE is set in .env on a panel that reads its settings from the environment.
+ */
+export default function UpdateSettingsForm() {
     const { data: status } = useAdminUpdateStatus();
 
     return (
         <TitledGreyBox title='Updates' className='mt-6'>
-            {status ? <UpdateModeForm mode={status.mode} readOnly={readOnly} /> : <Spinner size='small' centered />}
+            {status ? (
+                <UpdateModeForm mode={status.mode} readOnly={status.mode_set_in_env} />
+            ) : (
+                <Spinner size='small' centered />
+            )}
         </TitledGreyBox>
     );
 }

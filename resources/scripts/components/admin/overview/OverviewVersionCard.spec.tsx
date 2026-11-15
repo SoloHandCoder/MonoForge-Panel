@@ -35,6 +35,7 @@ const build = { version: '3f9c2ab', commit: '3f9c2ab1d4e5f60718293a4b5c6d7e8f90a
 
 const status = (overrides: Partial<AdminUpdateStatus> = {}): AdminUpdateStatus => ({
     mode: 'notify',
+    mode_set_in_env: false,
     current_version: '3f9c2ab',
     current: build,
     latest: {

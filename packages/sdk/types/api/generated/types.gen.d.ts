@@ -5708,12 +5708,22 @@ export type AdminGetLoginProvidersResponseBody = {
         client_id?: string;
         client_secret_set?: boolean;
         callback_url?: string;
+        set_in_env?: {
+            enabled?: boolean;
+            client_id?: boolean;
+            client_secret?: boolean;
+        };
     };
     google?: {
         enabled?: boolean;
         client_id?: string;
         client_secret_set?: boolean;
         callback_url?: string;
+        set_in_env?: {
+            enabled?: boolean;
+            client_id?: boolean;
+            client_secret?: boolean;
+        };
     };
 };
 export type AdminGetRegistrationSettingsResponseBody = {
@@ -5728,6 +5738,10 @@ export type AdminGetUpdateStatusResponseBody = {
      * off, notify or auto.
      */
     mode: 'off' | 'notify' | 'auto';
+    /**
+     * Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.
+     */
+    mode_set_in_env: boolean;
     /**
      * The running build, or the app version when it is unknown.
      */
@@ -5780,6 +5794,10 @@ export type AdminCheckForUpdatesResponseBody = {
      */
     mode: 'off' | 'notify' | 'auto';
     /**
+     * Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.
+     */
+    mode_set_in_env: boolean;
+    /**
      * The running build, or the app version when it is unknown.
      */
     current_version: string;
@@ -5830,6 +5848,10 @@ export type AdminApplyUpdateResponseBody = {
      * off, notify or auto.
      */
     mode: 'off' | 'notify' | 'auto';
+    /**
+     * Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.
+     */
+    mode_set_in_env: boolean;
     /**
      * The running build, or the app version when it is unknown.
      */
@@ -14474,7 +14496,7 @@ export type AdminUpdateUpdateSettingsData = {
 };
 export type AdminUpdateUpdateSettingsErrors = {
     /**
-     * The panel reads its settings from the environment only.
+     * MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only.
      */
     400: ErrorEnvelope;
     /**

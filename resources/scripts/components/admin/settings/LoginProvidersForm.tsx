@@ -18,12 +18,34 @@ const PROVIDERS: { id: OAuthProviderId; title: string; console: string }[] = [
     { id: 'google', title: 'Google', console: 'Google Cloud Console (Credentials → Authorized redirect URIs)' },
 ];
 
+const ENV_VARIABLES = {
+    discord: {
+        enabled: 'DISCORD_LOGIN_ENABLED',
+        client_id: 'DISCORD_CLIENT_ID',
+        client_secret: 'DISCORD_CLIENT_SECRET',
+    },
+    google: { enabled: 'GOOGLE_LOGIN_ENABLED', client_id: 'GOOGLE_CLIENT_ID', client_secret: 'GOOGLE_CLIENT_SECRET' },
+} satisfies Record<OAuthProviderId, Record<keyof LoginProvidersSettings[OAuthProviderId]['set_in_env'], string>>;
+
+/** The note under a field that .env sets, so the panel cannot change it. */
+const setInEnv = (variable: string) => `Set in .env (${variable}). Change it there.`;
+
 const formValues = (settings: LoginProvidersSettings): LoginProvidersInput => ({
     discord: { enabled: settings.discord.enabled, client_id: settings.discord.client_id, client_secret: '' },
     google: { enabled: settings.google.enabled, client_id: settings.google.client_id, client_secret: '' },
 });
 
-function LoginProvidersFields({ settings, readOnly }: { settings: LoginProvidersSettings; readOnly: boolean }) {
+function secretDescription(settings: LoginProvidersSettings[OAuthProviderId], variable: string): string {
+    if (settings.set_in_env.client_secret) {
+        return setInEnv(variable);
+    }
+
+    return settings.client_secret_set ? 'A secret is stored. Leave blank to keep it.' : 'No secret is stored yet.';
+}
+
+function LoginProvidersFields({ settings }: { settings: LoginProvidersSettings }) {
+    const locked = (id: OAuthProviderId) => settings[id].set_in_env;
+    const readOnly = PROVIDERS.every(({ id }) => Object.values(locked(id)).every(Boolean));
     const update = useUpdateAdminLoginProviders();
     const form = useAppForm({
         defaultValues: formValues(settings),
@@ -52,8 +74,12 @@ function LoginProvidersFields({ settings, readOnly }: { settings: LoginProviders
                         {(field) => (
                             <field.SwitchField
                                 label={`Continue with ${provider.title}`}
-                                description={`Let users sign in with ${provider.title} and link it from their account page.`}
-                                disabled={readOnly}
+                                description={
+                                    locked(provider.id).enabled
+                                        ? setInEnv(ENV_VARIABLES[provider.id].enabled)
+                                        : `Let users sign in with ${provider.title} and link it from their account page.`
+                                }
+                                disabled={locked(provider.id).enabled}
                             />
                         )}
                     </form.AppField>
@@ -64,7 +90,12 @@ function LoginProvidersFields({ settings, readOnly }: { settings: LoginProviders
                                     type='text'
                                     id={`${provider.id}_client_id`}
                                     label='Client ID'
-                                    disabled={readOnly}
+                                    description={
+                                        locked(provider.id).client_id
+                                            ? setInEnv(ENV_VARIABLES[provider.id].client_id)
+                                            : undefined
+                                    }
+                                    disabled={locked(provider.id).client_id}
                                 />
                             )}
                         </form.AppField>
@@ -76,12 +107,11 @@ function LoginProvidersFields({ settings, readOnly }: { settings: LoginProviders
                                     type='password'
                                     id={`${provider.id}_client_secret`}
                                     label='Client Secret'
-                                    description={
-                                        settings[provider.id].client_secret_set
-                                            ? 'A secret is stored. Leave blank to keep it.'
-                                            : 'No secret is stored yet.'
-                                    }
-                                    disabled={readOnly}
+                                    description={secretDescription(
+                                        settings[provider.id],
+                                        ENV_VARIABLES[provider.id].client_secret
+                                    )}
+                                    disabled={locked(provider.id).client_secret}
                                 />
                             )}
                         </form.AppField>
@@ -106,12 +136,12 @@ function LoginProvidersFields({ settings, readOnly }: { settings: LoginProviders
 }
 
 /** The "Login providers" settings tab: the Discord and Google apps used for social sign in. */
-export default function LoginProvidersForm({ readOnly }: { readOnly: boolean }) {
+export default function LoginProvidersForm() {
     const { data, error, refetch } = useAdminLoginProviders();
 
     if (error && !data) {
         return <ServerError message={httpErrorToHuman(error)} onRetry={() => void refetch()} />;
     }
 
-    return data ? <LoginProvidersFields settings={data} readOnly={readOnly} /> : <Spinner size='large' centered />;
+    return data ? <LoginProvidersFields settings={data} /> : <Spinner size='large' centered />;
 }

@@ -81,7 +81,8 @@ export default function SettingsContainer() {
                 <Alert type='danger' className='mb-6 text-sm'>
                     <span>
                         This Panel reads settings from the environment only. Set <code>APP_ENVIRONMENT_ONLY=false</code>{' '}
-                        in your environment file to load settings dynamically.
+                        in your environment file to load settings dynamically. MonoForge settings whose variable is not
+                        set in the environment can still be changed here.
                     </span>
                 </Alert>
             )}
@@ -107,12 +108,12 @@ export default function SettingsContainer() {
                     {tab === 'general' && (
                         <>
                             <GeneralSettingsForm settings={settings} />
-                            <UpdateSettingsForm readOnly={settings.meta.load_environment_only} />
+                            <UpdateSettingsForm />
                         </>
                     )}
                     {tab === 'mail' && <MailSettingsForm settings={settings} />}
                     {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
-                    {tab === 'login-providers' && <LoginProvidersForm readOnly={settings.meta.load_environment_only} />}
+                    {tab === 'login-providers' && <LoginProvidersForm />}
                     {tab === 'registration' && <RegistrationSettings />}
                 </div>
             ) : (

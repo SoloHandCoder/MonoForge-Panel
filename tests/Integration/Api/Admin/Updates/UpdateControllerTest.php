@@ -97,11 +97,20 @@ test('saves the update mode, and turning updates off cancels a queued update', f
     $this->putJson(route('api.admin.updates.settings'), ['mode' => 'sometimes'])->assertUnprocessable();
 });
 
-test('refuses to save the mode when settings come from the environment only', function (): void {
-    config(['pterodactyl.load_environment_only' => true]);
+test('refuses to save the mode when MONOFORGE_UPDATE_MODE is set in the environment-only environment', function (): void {
+    config(['pterodactyl.load_environment_only' => true, 'monoforge.settings.set_in_env' => ['monoforge:update:mode']]);
 
+    $this->getJson(route('api.admin.updates.status'))->assertOk()->assertJsonPath('mode_set_in_env', true);
     $this->putJson(route('api.admin.updates.settings'), ['mode' => 'auto'])->assertStatus(Response::HTTP_BAD_REQUEST);
     expect(Setting::fetch('settings::monoforge:update:mode'))->toBeNull();
+});
+
+test('saves the mode in environment-only mode when MONOFORGE_UPDATE_MODE is unset', function (): void {
+    config(['pterodactyl.load_environment_only' => true, 'monoforge.settings.set_in_env' => []]);
+
+    $this->getJson(route('api.admin.updates.status'))->assertOk()->assertJsonPath('mode_set_in_env', false);
+    $this->putJson(route('api.admin.updates.settings'), ['mode' => 'off'])->assertNoContent();
+    expect(Setting::fetch('settings::monoforge:update:mode'))->toBe('off');
 });
 
 test('an administrator who may only read versions cannot apply updates or change the mode', function (): void {

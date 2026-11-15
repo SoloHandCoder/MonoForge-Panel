@@ -2634,7 +2634,7 @@ export const adminUpdateAdvancedSettings = <ThrowOnError extends boolean = true>
 /**
  * Get login providers
  *
- * Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned.
+ * Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned. set_in_env says which fields come from .env in a panel that reads its settings from the environment only; those cannot be changed here.
  */
 export const adminGetLoginProviders = <ThrowOnError extends boolean = true>(options?: Options<AdminGetLoginProvidersData, ThrowOnError>): RequestResult<AdminGetLoginProvidersResponses, AdminGetLoginProvidersErrors, ThrowOnError> => (options?.client ?? client).get<AdminGetLoginProvidersResponses, AdminGetLoginProvidersErrors, ThrowOnError>({
     responseType: 'json',
@@ -2646,7 +2646,7 @@ export const adminGetLoginProviders = <ThrowOnError extends boolean = true>(opti
 /**
  * Update login providers
  *
- * Updates the Discord and Google login settings. A blank client secret keeps the stored one.
+ * Updates the Discord and Google login settings. A blank client secret keeps the stored one. Fields set in .env (see set_in_env) are left as they are.
  */
 export const adminUpdateLoginProviders = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateLoginProvidersData, ThrowOnError>): RequestResult<AdminUpdateLoginProvidersResponses, AdminUpdateLoginProvidersErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateLoginProvidersResponses, AdminUpdateLoginProvidersErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

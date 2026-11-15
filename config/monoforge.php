@@ -2,7 +2,42 @@
 
 declare(strict_types=1);
 
+/*
+ * The settings that can also come from the environment, by setting key. With
+ * APP_ENVIRONMENT_ONLY=true a variable that is set wins over the value stored in the
+ * panel; a key whose variable is unset is still loaded from the database and stays
+ * editable there.
+ */
+$environmentVariables = [
+    'monoforge:update:mode' => 'MONOFORGE_UPDATE_MODE',
+    'monoforge:auth:registration:enabled' => 'MONOFORGE_REGISTRATION_ENABLED',
+    'monoforge:auth:discord:enabled' => 'DISCORD_LOGIN_ENABLED',
+    'monoforge:auth:discord:client_id' => 'DISCORD_CLIENT_ID',
+    'monoforge:auth:discord:client_secret' => 'DISCORD_CLIENT_SECRET',
+    'monoforge:auth:google:enabled' => 'GOOGLE_LOGIN_ENABLED',
+    'monoforge:auth:google:client_id' => 'GOOGLE_CLIENT_ID',
+    'monoforge:auth:google:client_secret' => 'GOOGLE_CLIENT_SECRET',
+    'monoforge:captcha:provider' => 'MONOFORGE_CAPTCHA_PROVIDER',
+    'monoforge:captcha:turnstile:site_key' => 'TURNSTILE_SITE_KEY',
+    'monoforge:captcha:turnstile:secret_key' => 'TURNSTILE_SECRET_KEY',
+    'monoforge:privacy:hidden_ips' => 'MONOFORGE_HIDDEN_IPS',
+];
+
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Settings Backed By The Environment
+    |--------------------------------------------------------------------------
+    |
+    | set_in_env is worked out when the configuration loads (and is cached with
+    | it), so it stays right after "php artisan config:cache".
+    |
+    */
+    'settings' => [
+        'environment_variables' => $environmentVariables,
+        'set_in_env' => array_keys(array_filter($environmentVariables, fn (string $name): bool => env($name) !== null)),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | MonoForge Self-Update

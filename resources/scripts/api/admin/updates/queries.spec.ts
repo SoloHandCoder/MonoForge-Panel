@@ -6,6 +6,7 @@ const latest = { ...build, version: '9e8d7c6', tag: 'build-9e8d7c6', url: 'https
 
 const status = (overrides: Partial<AdminUpdateStatus>): AdminUpdateStatus => ({
     mode: 'notify',
+    mode_set_in_env: false,
     current_version: '3f9c2ab',
     current: build,
     latest,

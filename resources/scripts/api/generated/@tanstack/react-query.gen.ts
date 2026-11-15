@@ -4478,7 +4478,7 @@ export const adminGetLoginProvidersQueryKey = (options?: Options<AdminGetLoginPr
 /**
  * Get login providers
  *
- * Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned.
+ * Returns the Discord and Google login settings and the callback URL to register with each provider. Client secrets are never returned. set_in_env says which fields come from .env in a panel that reads its settings from the environment only; those cannot be changed here.
  */
 export const adminGetLoginProvidersOptions = (options?: Options<AdminGetLoginProvidersData>) => queryOptions<AdminGetLoginProvidersResponse, AxiosError<AdminGetLoginProvidersError>, AdminGetLoginProvidersResponse, ReturnType<typeof adminGetLoginProvidersQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -4498,7 +4498,7 @@ export const adminUpdateLoginProvidersMutationKey = (options?: Partial<Options<A
 /**
  * Update login providers
  *
- * Updates the Discord and Google login settings. A blank client secret keeps the stored one.
+ * Updates the Discord and Google login settings. A blank client secret keeps the stored one. Fields set in .env (see set_in_env) are left as they are.
  */
 export const adminUpdateLoginProvidersMutation = (options?: Partial<Options<AdminUpdateLoginProvidersData>>): UseMutationOptions<AdminUpdateLoginProvidersResponse, AxiosError<AdminUpdateLoginProvidersError>, Options<AdminUpdateLoginProvidersData>> => {
     const mutationOptions: UseMutationOptions<AdminUpdateLoginProvidersResponse, AxiosError<AdminUpdateLoginProvidersError>, Options<AdminUpdateLoginProvidersData>> = {

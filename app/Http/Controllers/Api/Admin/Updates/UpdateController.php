@@ -20,11 +20,14 @@ use Pterodactyl\Http\Requests\Api\Admin\Updates\UpdateUpdateSettingsRequest;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Services\MonoForge\MonoForgeRelease;
 use Pterodactyl\Services\MonoForge\MonoForgeUpdateService;
+use Pterodactyl\Services\Settings\EnvironmentSettings;
 
 #[Group('Admin API', 'Root administrator endpoints for managing panel configuration and resources.')]
 #[Subgroup('Updates', 'Check for and install MonoForge Panel builds.')]
 class UpdateController extends AdminApiController
 {
+    private const string MODE_SETTING = 'monoforge:update:mode';
+
     private const array BUILD_EXAMPLE = [
         'version' => '3f9c2ab',
         'commit' => '3f9c2ab1d4e5f60718293a4b5c6d7e8f90a1b2c3',
@@ -33,6 +36,7 @@ class UpdateController extends AdminApiController
 
     private const array STATUS_EXAMPLE = [
         'mode' => 'notify',
+        'mode_set_in_env' => false,
         'current_version' => '3f9c2ab',
         'current' => self::BUILD_EXAMPLE,
         'latest' => [
@@ -70,7 +74,7 @@ class UpdateController extends AdminApiController
             [
                 'code' => 'DisplayException',
                 'status' => '400',
-                'detail' => 'This panel reads its settings from the environment only; set MONOFORGE_UPDATE_MODE in .env instead.',
+                'detail' => 'MONOFORGE_UPDATE_MODE is set in .env, which this panel reads its settings from; change it there instead.',
             ],
         ],
     ];
@@ -93,6 +97,7 @@ class UpdateController extends AdminApiController
     #[Endpoint('Get update status', 'Returns the update mode, the running and latest MonoForge builds and the progress of the last requested update.')]
     #[ScribeResponse(self::STATUS_EXAMPLE, description: 'Update status returned.')]
     #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
+    #[ResponseField('mode_set_in_env', 'boolean', 'Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.')]
     #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
     #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
     #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
@@ -126,6 +131,7 @@ class UpdateController extends AdminApiController
     #[ScribeResponse(self::STATUS_EXAMPLE, description: 'Update status returned after a fresh check.')]
     #[ScribeResponse(self::THROTTLED_EXAMPLE, status: 429, description: 'Too many checks; try again in a minute.')]
     #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
+    #[ResponseField('mode_set_in_env', 'boolean', 'Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.')]
     #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
     #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
     #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
@@ -163,6 +169,7 @@ class UpdateController extends AdminApiController
     #[ScribeResponse(self::STATUS_EXAMPLE, status: 202, description: 'Update queued.')]
     #[ScribeResponse(self::ERROR_EXAMPLE, status: 400, description: 'Updates are off, one is already running or there is nothing newer to install.')]
     #[ResponseField('mode', 'string', 'off, notify or auto.', enum: MonoForgeUpdateService::MODES)]
+    #[ResponseField('mode_set_in_env', 'boolean', 'Whether MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only; the mode can then only be changed there.')]
     #[ResponseField('current_version', 'string', 'The running build, or the app version when it is unknown.')]
     #[ResponseField('check', 'string', 'off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).', enum: ['off', 'available', 'current', 'unknown'])]
     #[ResponseField('update_available', 'boolean', 'Whether the latest build should replace the running one.')]
@@ -200,13 +207,13 @@ class UpdateController extends AdminApiController
      */
     #[Endpoint('Update update settings', 'Sets the update mode: off, notify (check daily) or auto (check hourly and install new builds).')]
     #[ScribeResponse(status: 204, description: 'Update mode saved.')]
-    #[ScribeResponse(self::ENVIRONMENT_ONLY_EXAMPLE, status: 400, description: 'The panel reads its settings from the environment only.')]
+    #[ScribeResponse(self::ENVIRONMENT_ONLY_EXAMPLE, status: 400, description: 'MONOFORGE_UPDATE_MODE is set in the environment of a panel that reads its settings from the environment only.')]
     public function settings(UpdateUpdateSettingsRequest $request): Response
     {
-        throw_if(config('pterodactyl.load_environment_only'), DisplayException::class, 'This panel reads its settings from the environment only; set MONOFORGE_UPDATE_MODE in .env instead.');
+        throw_if(EnvironmentSettings::locked(self::MODE_SETTING), DisplayException::class, 'MONOFORGE_UPDATE_MODE is set in .env, which this panel reads its settings from; change it there instead.');
 
         $mode = $request->string('mode')->toString();
-        Setting::put('settings::monoforge:update:mode', $mode);
+        Setting::put('settings::'.self::MODE_SETTING, $mode);
         config(['monoforge.update.mode' => $mode]);
 
         if ($mode === 'off') {
@@ -226,6 +233,7 @@ class UpdateController extends AdminApiController
 
         return [
             'mode' => $mode,
+            'mode_set_in_env' => EnvironmentSettings::locked(self::MODE_SETTING),
             'current_version' => $this->updates->currentVersion(),
             'current' => $this->updates->current()?->toArray(),
             'latest' => $latest instanceof MonoForgeRelease

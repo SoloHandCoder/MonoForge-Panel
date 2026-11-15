@@ -58,3 +58,30 @@ test('non-admins cannot read or change login providers', function (): void {
     $this->getJson('/api/admin/settings/login-providers')->assertForbidden();
     $this->putJson('/api/admin/settings/login-providers', loginProvidersPayload())->assertForbidden();
 });
+
+test('in environment-only mode only the fields whose variable is unset can be changed', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('monoforge.settings.set_in_env', ['monoforge:auth:discord:enabled', 'monoforge:auth:discord:client_secret']);
+    config()->set('monoforge.auth.discord.enabled', false);
+    config()->set('monoforge.auth.discord.client_secret', 'env-secret');
+
+    $this->getJson('/api/admin/settings/login-providers')->assertOk()
+        ->assertJsonPath('discord.set_in_env', ['enabled' => true, 'client_id' => false, 'client_secret' => true])
+        ->assertJsonPath('google.set_in_env', ['enabled' => false, 'client_id' => false, 'client_secret' => false]);
+
+    $this->putJson('/api/admin/settings/login-providers', loginProvidersPayload('panel-secret'))->assertNoContent();
+
+    // The environment's values are left alone; the rest is saved.
+    expect(Setting::fetch('settings::monoforge:auth:discord:enabled'))->toBeNull()
+        ->and(Setting::fetch('settings::monoforge:auth:discord:client_secret'))->toBeNull()
+        ->and(Setting::fetch('settings::monoforge:auth:discord:client_id'))->toBe('1234')
+        ->and(Setting::fetch('settings::monoforge:auth:google:enabled'))->toBe('false');
+});
+
+test('outside environment-only mode nothing is reported as set in the environment', function (): void {
+    config()->set('pterodactyl.load_environment_only', false);
+    config()->set('monoforge.settings.set_in_env', ['monoforge:auth:discord:enabled']);
+
+    $this->getJson('/api/admin/settings/login-providers')->assertOk()
+        ->assertJsonPath('discord.set_in_env.enabled', false);
+});

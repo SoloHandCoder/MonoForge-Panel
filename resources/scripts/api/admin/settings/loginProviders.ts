@@ -12,6 +12,8 @@ export interface LoginProviderSettings {
     client_id: string;
     client_secret_set: boolean;
     callback_url: string;
+    /** Fields set in .env on a panel that reads its settings from the environment only; they cannot be changed here. */
+    set_in_env: { enabled: boolean; client_id: boolean; client_secret: boolean };
 }
 
 export type LoginProvidersSettings = Record<OAuthProviderId, LoginProviderSettings>;
