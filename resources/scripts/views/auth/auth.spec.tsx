@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     requestReset: vi.fn(),
     reset: vi.fn(),
     register: vi.fn(),
+    startOAuth: vi.fn(),
     execute: vi.fn<() => Promise<string | null>>(),
 }));
 
@@ -33,6 +34,11 @@ vi.mock('@/api/auth/queries', () => ({
     useRequestPasswordResetEmail: () => ({ mutateAsync: mocks.requestReset, isPending: false }),
     usePerformPasswordReset: () => ({ mutateAsync: mocks.reset, isPending: false }),
     useRegister: () => ({ mutateAsync: mocks.register, isPending: false }),
+}));
+
+vi.mock('@/api/account/oauth', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/api/account/oauth')>()),
+    useStartOAuthLogin: () => ({ mutate: mocks.startOAuth, isPending: false, variables: undefined }),
 }));
 
 vi.mock('@/components/elements/InvisibleRecaptcha', () => ({
@@ -230,6 +236,21 @@ describe('page.auth.login', () => {
         expect(mocks.login).toHaveBeenCalledWith({
             body: { user: 'alex', password: 'secret', 'g-recaptcha-response': 'captcha-token' },
         });
+    });
+    it('sends the login Turnstile token when continuing with Discord', async () => {
+        mocks.execute.mockResolvedValue('turnstile-token');
+        await renderAuth('/auth/login', false, {
+            captcha: { provider: 'turnstile', siteKey: 'site-key' },
+            oauth: { providers: { discord: true }, result: null },
+        });
+
+        // The start endpoint verifies with the "login" action, like the password form.
+        expect(screen.getByTestId('turnstile')).toHaveAttribute('data-action', 'login');
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Continue with Discord' }));
+        });
+
+        expect(mocks.startOAuth).toHaveBeenCalledWith({ provider: 'discord', captcha: 'turnstile-token' });
     });
 });
 

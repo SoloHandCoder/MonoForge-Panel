@@ -57,7 +57,7 @@ Route::middleware(['throttle:authentication'])->group(function (): void {
     // they link an account from their account page.
     Route::post('/modules/{provider}', [OAuthController::class, 'start'])
         ->whereIn('provider', ['discord', 'google'])
-        ->middleware('recaptcha')
+        ->middleware('captcha:login')
         ->name('auth.modules.start');
     Route::get('/modules/{provider}/authenticate', [OAuthController::class, 'callback'])
         ->whereIn('provider', ['discord', 'google'])

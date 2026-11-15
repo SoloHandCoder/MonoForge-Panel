@@ -7,6 +7,7 @@ namespace Pterodactyl\Tests\Pest\Integration\Http\Controllers\Auth\OAuthControll
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
@@ -69,6 +70,24 @@ test('a disabled provider cannot be started', function (): void {
     config()->set('monoforge.auth.discord.enabled', false);
 
     $this->postJson('/auth/modules/discord')->assertNotFound();
+});
+
+test('the start endpoint requires a turnstile token solved on the login form', function (): void {
+    config()->set('monoforge.captcha.provider', 'turnstile');
+    $this->app->instance(VerifiesCaptcha::class, new class implements VerifiesCaptcha
+    {
+        public function verify(string $provider, string $token, ?string $ip): array
+        {
+            return str_starts_with($token, 'good:')
+                ? ['success' => true, 'hostname' => 'localhost', 'action' => mb_substr($token, 5)]
+                : ['success' => false, 'hostname' => null, 'action' => null];
+        }
+    });
+
+    $this->postJson('/auth/modules/discord')->assertBadRequest();
+    $this->postJson('/auth/modules/discord', ['g-recaptcha-response' => 'bad'])->assertBadRequest();
+    $this->postJson('/auth/modules/discord', ['g-recaptcha-response' => 'good:register'])->assertBadRequest();
+    $this->postJson('/auth/modules/discord', ['g-recaptcha-response' => 'good:login'])->assertOk();
 });
 
 test('a callback whose state does not match is rejected', function (): void {
