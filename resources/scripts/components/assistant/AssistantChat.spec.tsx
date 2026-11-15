@@ -20,12 +20,21 @@ vi.mock('@/api/http', async (importOriginal) => ({ ...(await importOriginal<type
 const base = '/api/client/servers/srv-uuid/assistant/conversations';
 
 const list: AssistantConversationList = {
-    data: [{ uuid: 'c1', title: 'Why did it crash?', status: 'running', updated_at: '2026-11-15T12:00:00+00:00' }],
+    data: [
+        {
+            uuid: 'c1',
+            title: 'Why did it crash?',
+            mode: 'chat',
+            status: 'running',
+            updated_at: '2026-11-15T12:00:00+00:00',
+        },
+    ],
 };
 
 const conversation = (status: AssistantConversation['status']): AssistantConversation => ({
     uuid: 'c1',
     title: 'Why did it crash?',
+    mode: 'chat',
     status,
     error: null,
     usage: { free_used: 100, free_limit: 50000, charged_this_month: 0 },
@@ -74,6 +83,22 @@ afterEach(() => {
 beforeEach(() => vi.resetAllMocks());
 
 describe('AssistantChat', () => {
+    it('opens the initial conversation, such as a crash diagnosis, and labels it', async () => {
+        http.get.mockImplementation((url: string) =>
+            Promise.resolve({
+                data:
+                    url === base
+                        ? { data: [{ ...list.data[0], mode: 'crash_doctor', status: 'idle' }] }
+                        : { ...conversation('idle'), mode: 'crash_doctor' },
+            })
+        );
+
+        render(<AssistantChat scope={serverAssistantScope('srv-uuid')} initialConversation='c1' />, { wrapper });
+
+        expect(await screen.findByText(/Crash doctor ·/)).toBeInTheDocument();
+        await waitFor(() => expect(conversationFetches()).toBe(1));
+    });
+
     it('polls a running conversation and stops once it is idle', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const replies = [conversation('running'), conversation('idle')];

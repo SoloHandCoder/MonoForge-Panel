@@ -74,6 +74,14 @@ function SettingsForm({
                             <field.SwitchField label='Admin assistant' description='The Chat tab for root admins.' />
                         )}
                     </form.AppField>
+                    <form.AppField name='crash_doctor_enabled'>
+                        {(field) => (
+                            <field.SwitchField
+                                label='Crash doctor'
+                                description='When a server crashes or fails to start, its page offers an AI diagnosis. Needs the server assistant; billed like any conversation.'
+                            />
+                        )}
+                    </form.AppField>
                     <form.AppField name='default_provider_id'>
                         {(field) => (
                             <field.SelectField

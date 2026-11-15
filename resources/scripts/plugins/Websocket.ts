@@ -11,6 +11,9 @@ const SUSPENDED_CLOSE_CODES = new Set([4400, 4409]);
 const SOCKET_OPEN_STATE = 1;
 const AUTH_SUCCESS_EVENT = 'auth success';
 
+/** Emitted locally after every message this socket sent, with its event and arguments. */
+export const SOCKET_SENT = 'SOCKET_SENT';
+
 export const RECONNECT_BASE_DELAY_MS = 1_000;
 export const RECONNECT_MAX_DELAY_MS = 30_000;
 export const MAX_RECONNECT_ATTEMPTS = 10;
@@ -147,7 +150,11 @@ export class Websocket extends EventEmitter {
             return false;
         }
 
-        this.socket.send(JSON.stringify({ event, args: Array.isArray(payload) ? payload : [payload] }));
+        const args = Array.isArray(payload) ? payload : [payload];
+
+        this.socket.send(JSON.stringify({ event, args }));
+        // Local listeners learn what this tab asked for, e.g. the crash doctor sees a stop was requested.
+        this.emit(SOCKET_SENT, event, ...args);
 
         return true;
     }

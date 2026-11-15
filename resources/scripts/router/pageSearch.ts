@@ -10,6 +10,7 @@ export type DashboardSearch = PageSearch & {
 };
 
 export interface RawSearch {
+    conversation?: string | number | boolean | null;
     dir?: string | number | boolean | null;
     email?: string | number | boolean | null;
     event?: string | number | boolean | null;
@@ -82,6 +83,17 @@ export const useActivitySearch = () => {
 
     return { page, event, user };
 };
+
+/** The server assistant opens this conversation, such as the crash doctor's diagnosis. */
+export type AssistantSearch = { conversation?: string };
+
+export const parseAssistantSearch = (search: RawSearch): AssistantSearch => {
+    const conversation = searchText(search.conversation);
+
+    return conversation ? { conversation } : {};
+};
+
+export const useAssistantSearch = (): AssistantSearch => parseAssistantSearch(useSearch({ strict: false }));
 
 export const parseEmailSearch = (search: RawSearch): { email?: string } => {
     const email = searchText(search.email);

@@ -14,6 +14,7 @@ import { parsePageSearch, searchText, type PageSearch, type RawSearch } from '@/
 export {
     getPageSearch,
     parseActivitySearch,
+    parseAssistantSearch,
     parseDashboardSearch,
     parseEmailSearch,
     parsePageSearch,

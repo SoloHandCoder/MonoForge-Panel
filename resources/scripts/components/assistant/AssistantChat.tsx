@@ -37,6 +37,8 @@ export interface AssistantChatProps {
     blockedReason?: string | null;
     /** Shown below the conversation list, such as the usage meter. */
     sidebar?: ReactNode;
+    /** The conversation to open first, such as the crash doctor's diagnosis. */
+    initialConversation?: string | null;
 }
 
 const statusDots = {
@@ -101,6 +103,7 @@ function ConversationList({
                                     </span>
                                     <span className='block truncate text-xs text-muted-foreground'>
                                         <span className='sr-only'>{statusNames[conversation.status]}, </span>
+                                        {conversation.mode === 'crash_doctor' && 'Crash doctor · '}
                                         {conversation.updated_at ? fromNow(conversation.updated_at) : ''}
                                     </span>
                                 </span>
@@ -518,8 +521,9 @@ export default function AssistantChat({
     suggestions = noSuggestions,
     blockedReason = null,
     sidebar,
+    initialConversation = null,
 }: AssistantChatProps) {
-    const [active, setActive] = useState<string | null>(null);
+    const [active, setActive] = useState<string | null>(initialConversation);
     const list = useAssistantConversations(scope);
     const conversation = useAssistantConversation(scope, active);
 

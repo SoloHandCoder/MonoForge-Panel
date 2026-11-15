@@ -6,6 +6,7 @@ import { Alert } from '@/components/elements/alert';
 import PageHeading from '@/components/elements/PageHeading';
 import ServerContentBlock from '@/components/elements/ServerContentBlock';
 import Spinner from '@/components/elements/Spinner';
+import { useAssistantSearch } from '@/router/pageSearch';
 
 const suggestions = [
     'Why did my server crash?',
@@ -31,6 +32,7 @@ export const assistantBlockedReason = (status: AssistantStatus | undefined): str
 export default function ServerAssistantContainer() {
     const uuid = useCurrentServerUuid();
     const status = useAssistantStatus();
+    const { conversation } = useAssistantSearch();
 
     return (
         <ServerContentBlock title='Assistant'>
@@ -47,6 +49,8 @@ export default function ServerAssistantContainer() {
                 <AssistantWarningBanner warning={status.data?.warning ?? null} />
                 {uuid ? (
                     <AssistantChat
+                        key={conversation ?? 'new'}
+                        initialConversation={conversation ?? null}
                         scope={serverAssistantScope(uuid)}
                         suggestions={suggestions}
                         blockedReason={assistantBlockedReason(status.data)}

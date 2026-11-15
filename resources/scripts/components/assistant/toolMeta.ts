@@ -47,6 +47,7 @@ const icons = new Map<string, LucideIcon>([
     ['get_startup', Rocket],
     ['reveal_startup_variable', KeyRound],
     ['update_startup_variable', Rocket],
+    ['set_docker_image', Rocket],
     ['get_network', Network],
     ['list_servers', Server],
     ['server_overview', Server],
@@ -75,6 +76,7 @@ const destructiveTools = new Set([
     'send_command',
     'power',
     'update_startup_variable',
+    'set_docker_image',
     'suspend_server',
     'adjust_tokens',
 ]);
@@ -104,6 +106,8 @@ export function confirmationWarning(call: Pick<AssistantToolCall, 'name' | 'need
             return 'This runs a command in the server console.';
         case 'update_startup_variable':
             return 'This changes how the server starts.';
+        case 'set_docker_image':
+            return 'This changes the Docker image (such as the Java version) the server starts with.';
         case 'suspend_server':
             return 'This suspends the server: its owner loses access until it is unsuspended.';
         case 'adjust_tokens':

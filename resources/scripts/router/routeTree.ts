@@ -90,6 +90,7 @@ import { componentRoute, layoutRoute, pageRoute, requireServerPermission } from 
 import { preloadView } from '@/views/View';
 import {
     parseActivitySearch,
+    parseAssistantSearch,
     parseAdminListSearch,
     parseApiKeyListSearch,
     parseDashboardSearch,
@@ -495,6 +496,7 @@ const serverChildren = [
                 feature: 'assistant',
             },
         },
+        validateSearch: parseAssistantSearch,
         beforeLoad: requireServerPermission('assistant.use'),
         component: componentRoute(() => import('@/components/server/assistant/ServerAssistantContainer')),
     }),
