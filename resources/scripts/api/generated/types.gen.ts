@@ -2552,6 +2552,10 @@ export type AdminUpdateAiAssistantSettingsRequest = {
      */
     admin_enabled: boolean;
     /**
+     * Whether the AI crash doctor is offered when a server crashes or fails to start.
+     */
+    crash_doctor_enabled?: boolean;
+    /**
      * The default provider id. Must match an existing stored value.
      */
     default_provider_id?: number | null;
@@ -5002,6 +5006,20 @@ export type ClientSendAnAssistantMessageRequest = {
     message: string;
 };
 
+export type ClientReportACrashFromTheConsoleRequest = {
+    /**
+     * What the console saw: crashed (the server went offline without stopping first) or start_failed (it went offline while starting).
+     */
+    kind: 'crashed' | 'start_failed';
+};
+
+export type ClientDiagnoseWithTheCrashDoctorRequest = {
+    /**
+     * The crash to diagnose, from the crash doctor status; null for a check without a crash. Must be at least 1.
+     */
+    crash_id?: number | null;
+};
+
 export type ClientRenameServerRequest = {
     /**
      * The display name. Must be at least 1 character. Must not be greater than 191 characters.
@@ -5478,6 +5496,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -5486,6 +5505,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
 export type AdminStartAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5539,6 +5559,7 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
 export type AdminGetAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5592,6 +5613,7 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
 export type AdminSendAnAdminAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5645,6 +5667,7 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
 export type AdminAllowAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5698,6 +5721,7 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
 export type AdminDenyAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5825,6 +5849,7 @@ export type AdminGetAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -5838,6 +5863,7 @@ export type AdminUpdateAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -6645,6 +6671,7 @@ export type ClientGetExtensionJobProgressResponseBody = {
 export type ClientGetAssistantStatusResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     free_limit?: number;
     free_used?: number;
     ratio?: number;
@@ -6910,6 +6937,7 @@ export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -6918,6 +6946,7 @@ export type ClientListAssistantConversationsResponseBody = {
 export type ClientStartAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6971,6 +7000,7 @@ export type ClientStartAnAssistantConversationResponseBody = {
 export type ClientGetAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7024,6 +7054,7 @@ export type ClientGetAnAssistantConversationResponseBody = {
 export type ClientSendAnAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7077,6 +7108,7 @@ export type ClientSendAnAssistantMessageResponseBody = {
 export type ClientAllowAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7130,6 +7162,104 @@ export type ClientAllowAnAssistantActionResponseBody = {
 export type ClientDenyAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+
+export type ClientGetCrashDoctorStatusResponseBody = {
+    /**
+     * Whether the crash doctor can be used. When false, crash is always null.
+     */
+    enabled: boolean;
+    /**
+     * The newest crash of the last 24 hours that was not dismissed, or null.
+     */
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
+};
+
+export type ClientReportACrashFromTheConsoleResponseBody = {
+    /**
+     * Whether the crash doctor can be used.
+     */
+    enabled: boolean;
+    /**
+     * The newest crash of the last 24 hours that was not dismissed, or null.
+     */
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
+};
+
+export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation mode: crash_doctor.
+     */
+    mode: 'chat' | 'crash_doctor';
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -8787,6 +8917,16 @@ export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
+
+export type ClientGetCrashDoctorStatusServerUuidPathParameter = string;
+
+export type ClientReportACrashFromTheConsoleServerUuidPathParameter = string;
+
+export type ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter = string;
+
+export type ClientDismissACrashServerUuidPathParameter = string;
+
+export type ClientDismissACrashCrashIdPathParameter = number;
 
 export type ClientRenameServerServerUuidPathParameter = string;
 
@@ -23285,6 +23425,178 @@ export type ClientDenyAnAssistantActionResponses = {
 };
 
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
+
+export type ClientGetCrashDoctorStatusData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetCrashDoctorStatusServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor';
+};
+
+export type ClientGetCrashDoctorStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientGetCrashDoctorStatusError = ClientGetCrashDoctorStatusErrors[keyof ClientGetCrashDoctorStatusErrors];
+
+export type ClientGetCrashDoctorStatusResponses = {
+    /**
+     * Crash doctor status returned.
+     */
+    200: ClientGetCrashDoctorStatusResponseBody;
+};
+
+export type ClientGetCrashDoctorStatusResponse = ClientGetCrashDoctorStatusResponses[keyof ClientGetCrashDoctorStatusResponses];
+
+export type ClientReportACrashFromTheConsoleData = {
+    body: ClientReportACrashFromTheConsoleRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientReportACrashFromTheConsoleServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/report';
+};
+
+export type ClientReportACrashFromTheConsoleErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The crash doctor or the assistant is turned off.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientReportACrashFromTheConsoleError = ClientReportACrashFromTheConsoleErrors[keyof ClientReportACrashFromTheConsoleErrors];
+
+export type ClientReportACrashFromTheConsoleResponses = {
+    /**
+     * Crash recorded, or already known; status returned.
+     */
+    200: ClientReportACrashFromTheConsoleResponseBody;
+};
+
+export type ClientReportACrashFromTheConsoleResponse = ClientReportACrashFromTheConsoleResponses[keyof ClientReportACrashFromTheConsoleResponses];
+
+export type ClientDiagnoseWithTheCrashDoctorData = {
+    body?: ClientDiagnoseWithTheCrashDoctorRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/diagnose';
+};
+
+export type ClientDiagnoseWithTheCrashDoctorErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No free AI tokens and no token balance left.
+     */
+    402: ErrorEnvelope;
+    /**
+     * The crash doctor or the assistant is turned off.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The assistant is already working on another of your conversations.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientDiagnoseWithTheCrashDoctorError = ClientDiagnoseWithTheCrashDoctorErrors[keyof ClientDiagnoseWithTheCrashDoctorErrors];
+
+export type ClientDiagnoseWithTheCrashDoctorResponses = {
+    /**
+     * Diagnosis started.
+     */
+    200: ClientDiagnoseWithTheCrashDoctorResponseBody;
+};
+
+export type ClientDiagnoseWithTheCrashDoctorResponse = ClientDiagnoseWithTheCrashDoctorResponses[keyof ClientDiagnoseWithTheCrashDoctorResponses];
+
+export type ClientDismissACrashData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDismissACrashServerUuidPathParameter;
+        /**
+         * The server crash ID.
+         */
+        crash_id: ClientDismissACrashCrashIdPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/crashes/{crash_id}/dismiss';
+};
+
+export type ClientDismissACrashErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientDismissACrashError = ClientDismissACrashErrors[keyof ClientDismissACrashErrors];
+
+export type ClientDismissACrashResponses = {
+    /**
+     * Crash dismissed.
+     */
+    204: void;
+};
+
+export type ClientDismissACrashResponse = ClientDismissACrashResponses[keyof ClientDismissACrashResponses];
 
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
