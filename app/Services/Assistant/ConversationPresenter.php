@@ -63,6 +63,40 @@ class ConversationPresenter
         'usage' => ['free_used' => 12000, 'free_limit' => 50000, 'charged_this_month' => 0],
     ];
 
+    /** The OpenAPI schema of `messages`, which an example alone cannot express (nullable fields, enums). */
+    public const array MESSAGES_SCHEMA = [
+        'type' => 'array',
+        'items' => [
+            'type' => 'object',
+            'required' => ['id', 'role', 'content', 'created_at', 'tool_calls'],
+            'properties' => [
+                'id' => ['type' => 'integer', 'example' => 2],
+                'role' => ['type' => 'string', 'enum' => ['user', 'assistant'], 'example' => 'assistant'],
+                'content' => ['type' => 'string', 'nullable' => true, 'example' => 'Let me look at the console first.'],
+                'created_at' => ['type' => 'string', 'nullable' => true, 'example' => '2026-11-18T12:00:03+00:00'],
+                'tool_calls' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'required' => ['id', 'name', 'label', 'arguments', 'needs_confirmation', 'status', 'result_preview', 'display'],
+                        'properties' => [
+                            'id' => ['type' => 'integer', 'example' => 2],
+                            'name' => ['type' => 'string', 'example' => 'write_file'],
+                            'label' => ['type' => 'string', 'example' => 'Write plugins/Example/config.yml'],
+                            'arguments' => ['type' => 'object', 'additionalProperties' => true, 'example' => ['path' => 'plugins/Example/config.yml']],
+                            'needs_confirmation' => ['type' => 'boolean', 'example' => true],
+                            'status' => ['type' => 'string', 'enum' => ['pending', 'approved', 'denied', 'running', 'done', 'failed'], 'example' => 'pending'],
+                            'result_preview' => ['type' => 'string', 'nullable' => true, 'example' => null],
+                            'display' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'example' => null],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    public const array STATUS_SCHEMA = ['type' => 'string', 'enum' => ['idle', 'running', 'awaiting_approval', 'error'], 'example' => 'awaiting_approval'];
+
     public const array LIST_EXAMPLE = [
         'data' => [[
             'uuid' => '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93',

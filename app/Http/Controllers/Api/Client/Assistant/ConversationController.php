@@ -11,6 +11,7 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Knuckles\Scribe\Attributes\UrlParam;
+use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Assistant\AssistantRequest;
@@ -73,6 +74,8 @@ class ConversationController extends ClientApiController
 
     #[Endpoint('Start an assistant conversation', "Starts a conversation with the message and queues the assistant's answer. Poll the conversation while its status is running. Refused with 402 when this month's free AI tokens are used up and the token balance is empty.")]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Conversation started.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     #[ScribeResponse(self::NO_BALANCE_ERROR, status: 402, description: 'No free AI tokens and no token balance left.')]
     public function store(SendAssistantMessageRequest $request, Server $server): JsonResponse
     {
@@ -82,8 +85,10 @@ class ConversationController extends ClientApiController
     }
 
     #[Endpoint('Get an assistant conversation', "Returns the conversation with its messages, each assistant message's tool calls (label, arguments, status, a preview of the result) and this month's AI usage. Status is idle, running, awaiting_approval (a tool call needs Allow or Deny) or error.")]
-    #[UrlParam('conversation', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Conversation returned.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     public function show(AssistantRequest $request, Server $server, AiConversation $conversation): JsonResponse
     {
         $conversation->recoverIfStale();
@@ -92,8 +97,10 @@ class ConversationController extends ClientApiController
     }
 
     #[Endpoint('Send an assistant message', "Adds a message to the conversation and queues the assistant's answer. Refused with 409 while the assistant is still working or waiting for a decision.")]
-    #[UrlParam('conversation', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Message sent.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     #[ScribeResponse(self::NO_BALANCE_ERROR, status: 402, description: 'No free AI tokens and no token balance left.')]
     #[ScribeResponse(self::BUSY_ERROR, status: 409, description: 'The assistant is still working on this conversation.')]
     public function message(SendAssistantMessageRequest $request, Server $server, AiConversation $conversation): JsonResponse
@@ -102,9 +109,11 @@ class ConversationController extends ClientApiController
     }
 
     #[Endpoint('Allow an assistant action', 'Allows a tool call that is waiting for confirmation: it runs now with your permissions, and the assistant continues. From a panel session only (API keys get 403).')]
-    #[UrlParam('conversation', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
-    #[UrlParam('toolCall', 'integer', 'The tool call ID.', example: 2)]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[UrlParam('toolCall_id', 'integer', 'The tool call ID.', example: 2)]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Action allowed.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     #[ScribeResponse(self::NOT_WAITING_ERROR, status: 409, description: 'The tool call is not waiting for a decision.')]
     public function approve(DecideToolCallRequest $request, Server $server, AiConversation $conversation, AiToolCall $toolCall): JsonResponse
     {
@@ -119,9 +128,11 @@ class ConversationController extends ClientApiController
     }
 
     #[Endpoint('Deny an assistant action', 'Denies a tool call that is waiting for confirmation: it does not run, the assistant is told so and continues. From a panel session only (API keys get 403).')]
-    #[UrlParam('conversation', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
-    #[UrlParam('toolCall', 'integer', 'The tool call ID.', example: 2)]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[UrlParam('toolCall_id', 'integer', 'The tool call ID.', example: 2)]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Action denied.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     #[ScribeResponse(self::NOT_WAITING_ERROR, status: 409, description: 'The tool call is not waiting for a decision.')]
     public function deny(DecideToolCallRequest $request, Server $server, AiConversation $conversation, AiToolCall $toolCall): JsonResponse
     {
@@ -136,7 +147,7 @@ class ConversationController extends ClientApiController
     }
 
     #[Endpoint('Delete an assistant conversation', 'Deletes the conversation and its messages. Usage already recorded stays on the usage report.')]
-    #[UrlParam('conversation', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[ScribeResponse(status: 204, description: 'Conversation deleted.')]
     public function destroy(AssistantRequest $request, Server $server, AiConversation $conversation): Response
     {
