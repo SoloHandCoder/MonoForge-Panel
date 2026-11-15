@@ -126,6 +126,17 @@ class ActivityLogService
     }
 
     /**
+     * Records the event without the request's IP address (an anonymous public visitor).
+     */
+    public function withoutIp(): self
+    {
+        // The column is required; an empty value means "not recorded".
+        $this->getActivity()->ip = '';
+
+        return $this;
+    }
+
+    /**
      * Attaches the instance request metadata to the activity log event.
      */
     public function withRequestMetadata(): self

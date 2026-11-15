@@ -23,9 +23,11 @@ use Pterodactyl\Models\Server;
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable|null $ended_at
  * @property int $discount_percent the plan's sleep discount when the sleep started (locked in)
+ * @property int $confirmed_offline_minutes minutes the per-minute check saw the server offline
+ * @property CarbonImmutable|null $last_confirmed_offline_at
  * @property-read Server $server
  */
-#[Fillable(['server_id', 'started_at', 'ended_at', 'discount_percent'])]
+#[Fillable(['server_id', 'started_at', 'ended_at', 'discount_percent', 'confirmed_offline_minutes', 'last_confirmed_offline_at'])]
 #[RouteKey('id')]
 #[Table(name: 'server_sleep_sessions')]
 #[WithoutTimestamps]
@@ -41,6 +43,8 @@ class ServerSleepSession extends Model
             'started_at' => 'immutable_datetime',
             'ended_at' => 'immutable_datetime',
             'discount_percent' => 'int',
+            'confirmed_offline_minutes' => 'int',
+            'last_confirmed_offline_at' => 'immutable_datetime',
         ];
     }
 

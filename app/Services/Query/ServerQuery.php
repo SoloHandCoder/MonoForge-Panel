@@ -24,6 +24,11 @@ class ServerQuery
 {
     public const int CACHE_SECONDS = 30;
 
+    /** After this many timed-out pings in a row a game is skipped for UNRESPONSIVE_SECONDS. */
+    public const int UNRESPONSIVE_AFTER = 3;
+
+    public const int UNRESPONSIVE_SECONDS = 900;
+
     public function __construct(private readonly MinecraftJavaPing $minecraftJava) {}
 
     /** Whether the server's game can be asked for its players. */
@@ -35,6 +40,14 @@ class ServerQuery
     public static function cacheKey(Server $server): string
     {
         return "server-query:{$server->uuid}";
+    }
+
+    /** Whether the game's last pings kept timing out (it is left alone for a while). */
+    public function isUnresponsive(Server $server): bool
+    {
+        $timeouts = Cache::get(self::timeoutsKey($server), 0);
+
+        return is_int($timeouts) && $timeouts >= self::UNRESPONSIVE_AFTER;
     }
 
     /** The server's status, or null when the game does not answer or is not supported. */
@@ -62,6 +75,11 @@ class ServerQuery
         return $status === null ? null : new QueryStatus($status['online'], $status['max'], $status['motd'], $status['version'], $status['players']);
     }
 
+    private static function timeoutsKey(Server $server): string
+    {
+        return "server-query:timeouts:{$server->uuid}";
+    }
+
     private function ask(Server $server): ?QueryStatus
     {
         $allocation = $server->allocation;
@@ -69,7 +87,18 @@ class ServerQuery
             return null;
         }
 
-        return $this->minecraftJava->ping($this->host($server, $allocation), $allocation->port);
+        $started = microtime(true);
+        $status = $this->minecraftJava->ping($this->host($server, $allocation), $allocation->port);
+
+        if ($status instanceof QueryStatus) {
+            Cache::forget(self::timeoutsKey($server));
+        } elseif (microtime(true) - $started >= MinecraftJavaPing::TIMEOUT_SECONDS * 0.9) {
+            // It used the whole timeout: count it, so a game that stalls is skipped for a while.
+            $timeouts = Cache::get(self::timeoutsKey($server), 0);
+            Cache::put(self::timeoutsKey($server), (is_int($timeouts) ? $timeouts : 0) + 1, self::UNRESPONSIVE_SECONDS);
+        }
+
+        return $status;
     }
 
     /**

@@ -26,6 +26,7 @@ use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
 use Pterodactyl\Services\Billing\SubscriptionService;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Query\QueryConnector;
@@ -118,12 +119,28 @@ function tick(object $test): array
     return $test->sleep->check();
 }
 
-/** A recorded sleep, at the discount given or (like a real sleep) the server's plan's discount now. */
-function session(Server $server, string $from, ?string $to, ?int $discount = null): void
+/**
+ * A recorded sleep, at the discount given or (like a real sleep) the server's plan's discount now,
+ * that the per-minute check confirmed offline the whole time (unless $confirmedMinutes says less).
+ */
+function session(Server $server, string $from, ?string $to, ?int $discount = null, ?int $confirmedMinutes = null): void
 {
     $discount ??= ServerSubscription::query()->where('server_id', $server->id)->first()?->plan?->sleepDiscountPercent() ?? 0;
+    $start = CarbonImmutable::parse($from);
+    $end = $to === null ? null : CarbonImmutable::parse($to);
+    $confirmedMinutes ??= intdiv(max(0, ($end ?? CarbonImmutable::now())->getTimestamp() - $start->getTimestamp()), 60);
 
-    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => CarbonImmutable::parse($from), 'ended_at' => $to === null ? null : CarbonImmutable::parse($to), 'discount_percent' => $discount]);
+    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => $start, 'ended_at' => $end, 'discount_percent' => $discount, 'confirmed_offline_minutes' => $confirmedMinutes]);
+}
+
+/** The minutes after a sleep: Wings reports it offline and the scheduler runs once a minute. */
+function sleepOfflineFor(object $test, int $minutes): void
+{
+    $test->daemon->details['state'] = 'offline';
+    for ($i = 0; $i < $minutes; $i++) {
+        $test->travel(1)->minutes();
+        tick($test);
+    }
 }
 
 // ServerQuery
@@ -285,8 +302,8 @@ test('a sleeping server somebody started from the console is awake again', funct
     tick($this);
     expect($subscription->fresh()->isSleeping())->toBeTrue();
 
-    // Still "running" while it saves and stops: not a start.
-    $this->travel(1)->minutes();
+    // Still "running" while it saves and stops: not a start within the settle time.
+    $this->travel(30)->seconds();
     expect(tick($this))->toBe(['asleep' => 0, 'awake' => 0]);
 
     // "starting" is always somebody starting it.
@@ -303,6 +320,76 @@ test('a sleeping server still running after the settle time counts as started', 
     $this->travel(ServerSleep::SETTLE_SECONDS + 1)->seconds();
     expect(tick($this))->toBe(['asleep' => 0, 'awake' => 1])
         ->and($subscription->fresh()->isSleeping())->toBeFalse();
+});
+
+test('a server that ignores the stop ends its sleep after the settle time, whatever Wings says', function (string $state): void {
+    [, $server, $subscription] = sleepyServer($this, attributes: ['idle_checks' => 2]);
+    tick($this);
+    $this->daemon->details['state'] = $state;
+
+    // Within the settle time a slow graceful stop is allowed...
+    $this->travel(ServerSleep::SETTLE_SECONDS - 10)->seconds();
+    expect(tick($this))->toBe(['asleep' => 0, 'awake' => 0]);
+
+    // ...after it, any state but offline ends the sleep, and none of that time is discounted.
+    $this->travel(20)->seconds();
+    expect(tick($this))->toBe(['asleep' => 0, 'awake' => 1])
+        ->and($subscription->fresh()->isSleeping())->toBeFalse()
+        ->and(ServerSleepSession::query()->where('server_id', $server->id)->sole()->confirmed_offline_minutes)->toBe(0)
+        ->and($this->sleep->sleptSeconds($server->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()))->toBe(0);
+})->with(['stopping', 'running']);
+
+test('only minutes Wings confirmed offline are discounted, one per minute', function (): void {
+    [, $server] = sleepyServer($this, attributes: ['idle_checks' => 2]);
+    tick($this);
+    sleepOfflineFor($this, 5);
+
+    // A second pass in the same minute confirms nothing more.
+    Cache::flush();
+    $this->sleep->check();
+    $session = ServerSleepSession::query()->where('server_id', $server->id)->sole();
+    expect($session->confirmed_offline_minutes)->toBe(5);
+
+    // An hour nobody observed: the server is still asleep but earns nothing for it.
+    $this->travel(1)->hours();
+    expect($this->sleep->sleptSeconds($server->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()))->toBe(5 * 60);
+});
+
+test('the sleep is closed when the subscription is suspended or cancelled', function (string $how): void {
+    [, $server, $subscription] = sleepyServer($this, attributes: ['idle_checks' => 2, 'next_renewal_at' => CarbonImmutable::now()]);
+    tick($this);
+    expect($subscription->fresh()->isSleeping())->toBeTrue();
+
+    match ($how) {
+        'suspend' => $this->subscriptions->suspend($subscription->fresh()),
+        'cancel' => $this->subscriptions->cancel($subscription->fresh()),
+    };
+
+    expect(ServerSleepSession::query()->where('server_id', $server->id)->whereNull('ended_at')->exists())->toBeFalse()
+        ->and($subscription->fresh()->sleep_started_at)->toBeNull();
+})->with(['suspend', 'cancel']);
+
+test('the auto-sleep stop and wake are not taken for crashes', function (): void {
+    [, $server] = sleepyServer($this, attributes: ['idle_checks' => 2]);
+    tick($this);
+    expect(resolve(CrashRecorder::class)->stopRequestedSince($server, CarbonImmutable::now()->subMinute()))->toBeTrue();
+});
+
+test('a game that keeps timing out is skipped, and the pings stop at the pass budget', function (): void {
+    [, $server, $subscription] = sleepyServer($this);
+    Cache::put('server-query:timeouts:'.$server->uuid, ServerQuery::UNRESPONSIVE_AFTER, 60);
+    $this->sleep->check();
+    expect($subscription->fresh()->idle_checks)->toBe(0)
+        ->and($this->minecraft->connections)->toBe([]);
+});
+
+test('a public wake never stores the visitor address', function (): void {
+    [, $server] = sleepyServer($this, attributes: ['idle_checks' => 2]);
+    tick($this);
+    Cache::flush();
+
+    expect($this->sleep->wake($server, public: true))->toBeTrue()
+        ->and(ActivityLog::query()->where('event', 'server:sleep.wake')->sole()->ip)->toBe('');
 });
 
 test('starting the server through the panel or a schedule wakes it', function (): void {
@@ -333,6 +420,8 @@ test('a schedule that starts the server wakes it, unless Wings refused the start
 test('wake starts a sleeping server once and ends its sleep', function (): void {
     [, $server, $subscription] = sleepyServer($this, attributes: ['idle_checks' => 2]);
     tick($this);
+    sleepOfflineFor($this, 3);
+    // Two hours nobody checked (the scheduler was down): not confirmed, so not discounted.
     $this->travel(2)->hours();
 
     $wakes = resolve(WakesServers::class);
@@ -343,7 +432,7 @@ test('wake starts a sleeping server once and ends its sleep', function (): void 
     $this->power->assertSentTo('start', $server->uuid);
     expect($wakes->isSleeping($server))->toBeFalse()
         ->and($subscription->fresh()->sleep_started_at)->toBeNull()
-        ->and($this->sleep->sleptSeconds($server->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()))->toBe(7200)
+        ->and($this->sleep->sleptSeconds($server->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()))->toBe(180)
         ->and(ActivityLog::query()->where('event', 'server:sleep.wake')->exists())->toBeTrue();
 
     // Awake now: another wake sends nothing.
@@ -426,6 +515,7 @@ test('each sleep keeps the discount it started with, whatever the plan says at t
     tick($this);
     expect(ServerSleepSession::query()->where('server_id', $server->id)->sole()->discount_percent)->toBe(50);
     $this->travelTo(CarbonImmutable::now()->addDays(6));
+    ServerSleepSession::query()->where('server_id', $server->id)->update(['confirmed_offline_minutes' => 6 * 1440]);
     expect($this->sleep->markAwake($server))->toBeTrue();
 
     // The admin lowers the discount to 10%: the next sleep (3 days) is recorded at 10%.
@@ -435,8 +525,10 @@ test('each sleep keeps the discount it started with, whatever the plan says at t
     tick($this);
     tick($this);
     tick($this);
-    expect(ServerSleepSession::query()->where('server_id', $server->id)->latest('id')->firstOrFail()->discount_percent)->toBe(10);
+    $second = ServerSleepSession::query()->where('server_id', $server->id)->latest('id')->firstOrFail();
+    expect($second->discount_percent)->toBe(10);
     $this->travelTo(CarbonImmutable::now()->addDays(3));
+    $second->forceFill(['confirmed_offline_minutes' => 3 * 1440])->save();
     $this->sleep->markAwake($server);
 
     // The admin then turns the discount off entirely before the renewal.

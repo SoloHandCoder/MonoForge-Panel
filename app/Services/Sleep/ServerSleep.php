@@ -20,6 +20,7 @@ use Pterodactyl\Models\Billing\ServerSleepSession;
 use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
 use Pterodactyl\Services\Query\QueryStatus;
 use Pterodactyl\Services\Query\ServerQuery;
 use Throwable;
@@ -37,13 +38,22 @@ use Throwable;
 class ServerSleep implements WakesServers
 {
     /**
-     * Right after the graceful stop Wings may still report "running" while the game saves. Only
-     * after this long does "running" mean somebody started the server again ("starting" always does).
+     * Right after the graceful stop Wings may still report "running" or "stopping" while the game
+     * saves. After this long any state other than "offline" ends the sleep ("starting" always does).
      */
-    public const int SETTLE_SECONDS = 180;
+    public const int SETTLE_SECONDS = 60;
+
+    /** The player pings of one pass stop after this long; the rest wait for the next minute. */
+    public const int PING_BUDGET_SECONDS = 40;
+
+    /** Two offline readings closer than this count as one confirmed minute. */
+    private const int CONFIRM_SPACING_SECONDS = 50;
 
     /** Two wake requests close together (the button pressed twice) send one start. */
     private const int WAKE_LOCK_SECONDS = 30;
+
+    /** Set during check(): when the pass stops pinging. */
+    private ?float $pingDeadline = null;
 
     public function __construct(
         private readonly ReadsServerStates $states,
@@ -55,7 +65,7 @@ class ServerSleep implements WakesServers
         return $this->subscriptionOf($server)?->isSleeping() ?? false;
     }
 
-    public function wake(Server $server): bool
+    public function wake(Server $server, bool $public = false): bool
     {
         if (! $this->isSleeping($server) || ! $this->canStart($server)) {
             return false;
@@ -68,6 +78,7 @@ class ServerSleep implements WakesServers
         }
 
         try {
+            CrashRecorder::expectPowerChange($server, 'start');
             Daemon::server($server)->power('start');
         } catch (DaemonConnectionException $daemonConnectionException) {
             $lock->release();
@@ -77,7 +88,13 @@ class ServerSleep implements WakesServers
         }
 
         $this->markAwake($server);
-        Activity::event('server:sleep.wake')->subject($server)->log();
+        $activity = Activity::event('server:sleep.wake')->subject($server);
+        // A visitor on the public page: their address is never stored.
+        if ($public) {
+            $activity->withoutIp();
+        }
+
+        $activity->log();
 
         return true;
     }
@@ -131,6 +148,7 @@ class ServerSleep implements WakesServers
     public function check(): array
     {
         $counts = ['asleep' => 0, 'awake' => 0];
+        $this->pingDeadline = microtime(true) + self::PING_BUDGET_SECONDS;
 
         ServerSubscription::query()
             ->with(['server.node', 'server.egg', 'server.allocation', 'plan'])
@@ -179,6 +197,8 @@ class ServerSleep implements WakesServers
         }
 
         try {
+            // Our own stop: the crash doctor must not report it as a crash.
+            CrashRecorder::expectPowerChange($server, 'stop');
             Daemon::server($server)->power('stop');
         } catch (DaemonConnectionException $daemonConnectionException) {
             Log::warning('Could not put an idle server to sleep.', ['server' => $server->uuid, 'exception' => $daemonConnectionException->getMessage()]);
@@ -228,7 +248,8 @@ class ServerSleep implements WakesServers
 
     /**
      * The seconds slept between the two moments, keyed by the discount percent each sleep
-     * recorded when it started. Overlaps are counted once, for the sleep that started first.
+     * recorded when it started. Overlaps are counted once, for the sleep that started first. Only
+     * the share of each sleep that the per-minute check confirmed offline counts.
      *
      * @return array<int, int>
      */
@@ -253,6 +274,8 @@ class ServerSleep implements WakesServers
                 max($from->getTimestamp(), $session->started_at->getTimestamp()),
                 min($to->getTimestamp(), ($session->ended_at ?? $now)->getTimestamp()),
                 max(0, min(100, $session->discount_percent)),
+                max(0, ($session->ended_at ?? $now)->getTimestamp() - $session->started_at->getTimestamp()),
+                $session->confirmed_offline_minutes * 60,
             ])
             ->filter(fn (array $interval): bool => $interval[1] > $interval[0])
             ->sortBy(fn (array $interval): int => $interval[0])
@@ -261,13 +284,18 @@ class ServerSleep implements WakesServers
 
         $totals = [];
         $end = null;
-        foreach ($intervals as [$start, $stop, $discount]) {
+        foreach ($intervals as [$start, $stop, $discount, $duration, $confirmed]) {
             if ($end !== null && $start < $end) {
                 $start = $end;
             }
 
             if ($stop > $start) {
-                $totals[$discount] = ($totals[$discount] ?? 0) + $stop - $start;
+                // Only the share of the sleep Wings confirmed offline counts.
+                $part = $duration > 0 ? intdiv(($stop - $start) * min($confirmed, $duration), $duration) : 0;
+                if ($part > 0) {
+                    $totals[$discount] = ($totals[$discount] ?? 0) + $part;
+                }
+
                 $end = $stop;
             }
         }
@@ -319,12 +347,28 @@ class ServerSleep implements WakesServers
         $server = $subscription->server;
 
         if ($subscription->sleep_started_at !== null) {
-            return $state instanceof ServerState && $this->startedAgain($subscription->sleep_started_at, $state) && $this->markAwake($server) ? 'awake' : null;
+            if (! $state instanceof ServerState) {
+                // Not observed this minute: nothing is credited, nothing changes.
+                return null;
+            }
+
+            if ($state->state === 'offline') {
+                $this->confirmOffline($server);
+
+                return null;
+            }
+
+            return $this->startedAgain($subscription->sleep_started_at, $state) && $this->markAwake($server) ? 'awake' : null;
         }
 
         if (! $state instanceof ServerState || $state->state !== 'running' || ! $subscription->auto_sleep || ! $this->available($subscription) || ! $this->canStart($server)) {
             $this->resetIdle($subscription);
 
+            return null;
+        }
+
+        // Out of time this pass, or a game that keeps timing out: no ping, and no change.
+        if (($this->pingDeadline !== null && microtime(true) > $this->pingDeadline) || $this->query->isUnresponsive($server)) {
             return null;
         }
 
@@ -345,10 +389,29 @@ class ServerSleep implements WakesServers
         return null;
     }
 
+    /**
+     * Any state but "offline" ends the sleep: "starting" at once, anything else ("running",
+     * "stopping" from a stop the game ignores) once the settle time after the stop has passed.
+     */
     private function startedAgain(CarbonImmutable $sleepStartedAt, ServerState $state): bool
     {
         return $state->state === 'starting'
-            || ($state->state === 'running' && $sleepStartedAt->lessThanOrEqualTo(CarbonImmutable::now()->subSeconds(self::SETTLE_SECONDS)));
+            || $sleepStartedAt->lessThanOrEqualTo(CarbonImmutable::now()->subSeconds(self::SETTLE_SECONDS));
+    }
+
+    /** One more minute Wings confirmed the sleeping server offline (at most one a minute). */
+    private function confirmOffline(Server $server): void
+    {
+        $now = CarbonImmutable::now();
+
+        ServerSleepSession::query()
+            ->where('server_id', $server->id)
+            ->whereNull('ended_at')
+            ->where(fn (Builder $query): Builder => $query->whereNull('last_confirmed_offline_at')->orWhere('last_confirmed_offline_at', '<=', $now->subSeconds(self::CONFIRM_SPACING_SECONDS)))
+            ->update([
+                'confirmed_offline_minutes' => DB::raw('confirmed_offline_minutes + 1'),
+                'last_confirmed_offline_at' => $now,
+            ]);
     }
 
     private function resetIdle(ServerSubscription $subscription): void

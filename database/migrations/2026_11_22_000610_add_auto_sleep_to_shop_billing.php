@@ -39,6 +39,10 @@ return new class extends Migration
             // The plan's discount when the sleep started: a renewal uses it, so a later change to
             // the plan never alters the price of sleep that already happened.
             $table->unsignedTinyInteger('discount_percent')->default(0);
+            // Minutes the per-minute check saw the server offline. Only these are discounted, so
+            // a server that ignores the stop (or time nobody observed) earns nothing.
+            $table->unsignedInteger('confirmed_offline_minutes')->default(0);
+            $table->dateTime('last_confirmed_offline_at')->nullable();
 
             $table->foreign('server_id')->references('id')->on('servers')->cascadeOnDelete();
             $table->index(['server_id', 'started_at']);

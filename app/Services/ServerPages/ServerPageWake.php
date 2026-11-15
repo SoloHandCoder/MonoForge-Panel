@@ -50,7 +50,7 @@ final readonly class ServerPageWake
         $this->limiter->hit($serverKey, self::SERVER_DECAY_SECONDS);
         $this->limiter->hit($visitorKey, self::VISITOR_DECAY_SECONDS);
 
-        $woken = $this->sleep->wake($server);
+        $woken = $this->sleep->wake($server, public: true);
 
         return ['woken' => $woken, 'sleeping' => ! $woken, 'retry_after' => null];
     }

@@ -58,7 +58,7 @@ final class FakeSleep implements WakesServers
     /** @param list<int> $sleeping */
     public function __construct(public array $sleeping = []) {}
 
-    public function wake(Server $server): bool
+    public function wake(Server $server, bool $public = false): bool
     {
         $this->woken[] = $server->id;
         $this->sleeping = array_values(array_diff($this->sleeping, [$server->id]));

@@ -220,6 +220,7 @@ class SubscriptionService
         });
 
         if ($cancelled) {
+            $this->sleep->markAwake($s->server);
             $this->restoreServer($s);
             $this->notifier->clear($s);
         }
@@ -544,6 +545,9 @@ class SubscriptionService
      */
     private function afterSuspension(ServerSubscription $s, int $grace): void
     {
+        // A suspended subscription is not checked by auto-sleep any more: close its sleep now.
+        $this->sleep->markAwake($s->server);
+
         if ($grace === 0) {
             $this->deleteOne($s);
 

@@ -86,7 +86,7 @@ function subuserOf(Server $server, array $permissions): User
 test('the owner turns auto-sleep on and off, and the billing shows the sleep', function (): void {
     [$user, $server, $subscription] = shopServer($this);
     // 5 of the 30 days slept so far: 500 × 5/30 × 40% = 33.3 → 33 saved.
-    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => CarbonImmutable::parse('2026-11-01 00:00:00'), 'ended_at' => CarbonImmutable::parse('2026-11-06 00:00:00'), 'discount_percent' => 40]);
+    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => CarbonImmutable::parse('2026-11-01 00:00:00'), 'ended_at' => CarbonImmutable::parse('2026-11-06 00:00:00'), 'discount_percent' => 40, 'confirmed_offline_minutes' => 5 * 1440]);
     $subscription->forceFill(['last_sleep_saved_tokens' => 120])->save();
 
     $this->actingAs($user)->patchJson("/api/client/subscriptions/{$server->uuidShort}", ['auto_sleep' => true])
