@@ -68,7 +68,12 @@ class ShopNodeController extends AdminApiController
                 'shop_limit_cpu_percent' => $limits['cpu'],
             ])->save();
 
-            Activity::event('admin:shop.node.limits')->property(['name' => $node->name, ...$limits])->log();
+            Activity::event('admin:shop.node.limits')->property([
+                'name' => $node->name,
+                'memory' => $limits['memory'],
+                'disk' => $limits['disk'],
+                'cpu' => $limits['cpu'],
+            ])->log();
         }
 
         return new JsonResponse($this->present($this->nodes()->findOrFail($node->id), [$node->id => $this->capacity->usedOn($node->id)]));
