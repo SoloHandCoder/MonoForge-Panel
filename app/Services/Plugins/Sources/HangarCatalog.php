@@ -107,18 +107,19 @@ final readonly class HangarCatalog implements MarketplaceCatalog
         });
     }
 
-    public function version(string $project, string $version, MarketplaceProjectType $type): ?MarketplaceVersion
+    public function version(string $project, string $version, MarketplaceProjectType $type, ?ServerPlatform $platform = null): ?MarketplaceVersion
     {
         $data = $this->http->json($this->source(), 'GET', self::BASE_URL.'/projects/'.rawurlencode($project).'/versions/'.rawurlencode($version), nullOn404: true);
         if ($data === null) {
             return null;
         }
 
-        // The platform the version was asked for is not known here: take the first with a file.
+        // The server's platform first, then any platform the version has a file for.
         $downloads = Payload::array($data, 'downloads');
-        foreach (self::PLATFORMS as $platform) {
-            if (is_array($downloads[$platform] ?? null)) {
-                return $this->mapVersion($data, $project, $platform);
+        $preferred = $platform?->hangarPlatform();
+        foreach (array_unique(array_filter([$preferred, ...self::PLATFORMS])) as $name) {
+            if (is_array($downloads[$name] ?? null)) {
+                return $this->mapVersion($data, $project, $name);
             }
         }
 

@@ -124,7 +124,7 @@ final readonly class ModrinthCatalog implements MarketplaceCatalog
         });
     }
 
-    public function version(string $project, string $version, MarketplaceProjectType $type): ?MarketplaceVersion
+    public function version(string $project, string $version, MarketplaceProjectType $type, ?ServerPlatform $platform = null): ?MarketplaceVersion
     {
         $data = $this->http->json($this->source(), 'GET', self::BASE_URL.'/version/'.rawurlencode($version), nullOn404: true);
         if ($data === null) {

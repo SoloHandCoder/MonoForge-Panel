@@ -10,6 +10,8 @@ use Pterodactyl\Enum\MarketplaceSource;
 
 class SearchPluginsRequest extends ReadPluginsRequest
 {
+    public const int MAX_PAGE = 50;
+
     /**
      * @return ValidationRules
      */
@@ -20,7 +22,7 @@ class SearchPluginsRequest extends ReadPluginsRequest
             'source' => ['required', 'string', Rule::in(MarketplaceSource::values())],
             'type' => ['sometimes', 'nullable', 'string', Rule::in(MarketplaceProjectType::values())],
             'query' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
             'sort' => ['sometimes', 'string', Rule::in(['relevance', 'downloads', 'updated', 'newest'])],
         ];
     }

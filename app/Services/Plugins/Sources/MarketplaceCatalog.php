@@ -38,9 +38,10 @@ interface MarketplaceCatalog
 
     /**
      * One version of the project, fetched from the catalog (never from the user), or null
-     * when it does not exist or belongs to another project.
+     * when it does not exist or belongs to another project. A catalog with a file per platform
+     * (Hangar) picks the file for the given platform.
      *
      * @throws MarketplaceException
      */
-    public function version(string $project, string $version, MarketplaceProjectType $type): ?MarketplaceVersion;
+    public function version(string $project, string $version, MarketplaceProjectType $type, ?ServerPlatform $platform = null): ?MarketplaceVersion;
 }

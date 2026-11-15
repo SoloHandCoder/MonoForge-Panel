@@ -135,7 +135,7 @@ final readonly class CurseForgeCatalog implements MarketplaceCatalog
         });
     }
 
-    public function version(string $project, string $version, MarketplaceProjectType $type): ?MarketplaceVersion
+    public function version(string $project, string $version, MarketplaceProjectType $type, ?ServerPlatform $platform = null): ?MarketplaceVersion
     {
         $data = $this->http->json($this->source(), 'GET', self::BASE_URL.'/mods/'.rawurlencode($project).'/files/'.rawurlencode($version), headers: $this->headers(), nullOn404: true);
         $file = Payload::array($data, 'data');

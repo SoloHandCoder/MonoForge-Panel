@@ -316,7 +316,8 @@ class PluginController extends ClientApiController
                 'count' => count($result->projects),
                 'per_page' => $result->perPage,
                 'current_page' => $result->page,
-                'total_pages' => max(1, (int) ceil($result->total / $result->perPage)),
+                // Catalogs page deep results slowly; the panel offers the first 50 pages.
+                'total_pages' => min(SearchPluginsRequest::MAX_PAGE, max(1, (int) ceil($result->total / $result->perPage))),
             ]],
         ];
     }
@@ -374,7 +375,7 @@ class PluginController extends ClientApiController
         $source = MarketplaceSource::from($request->string('source')->toString());
         $catalog = $this->catalogs->for($source, $type, $platform);
 
-        $version = $catalog->version($request->string('project')->toString(), $request->string('version')->toString(), $type);
+        $version = $catalog->version($request->string('project')->toString(), $request->string('version')->toString(), $type, $platform);
         throw_unless($version instanceof MarketplaceVersion, MarketplaceException::class, 'That version was not found in the catalog.');
 
         throw_if(! $version->file instanceof MarketplaceFile, MarketplaceException::class, 'This version cannot be installed from the panel: its author does not allow downloads from other apps, or it has no jar.');
