@@ -8,12 +8,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\Service\Auth\OAuthException;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
+use Pterodactyl\Providers\AppServiceProvider;
 use Pterodactyl\Services\Auth\OAuth\OAuthAccountService;
 use Pterodactyl\Services\Auth\OAuth\OAuthClient;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
@@ -89,7 +91,13 @@ class OAuthController extends Controller
                 $this->accounts->refresh($account, $identity);
                 $user = $account->user;
             } elseif (filter_var(config('monoforge.auth.registration.enabled'), FILTER_VALIDATE_BOOL)) {
+                $limit = $this->registrationLimit($request);
+                if (RateLimiter::tooManyAttempts($limit['key'], $limit['max'])) {
+                    return $this->fail(false, 'Too many accounts have been created from your network recently. Please try again later.');
+                }
+
                 $user = $this->accounts->register($identity);
+                RateLimiter::hit($limit['key'], $limit['decay']);
             } else {
                 return $this->fail(false, "No MonoForge account is linked to this {$label} account.");
             }
@@ -106,6 +114,20 @@ class OAuthController extends Controller
         $request->session()->flash(self::RESULT_KEY, ['status' => 'checkpoint', 'token' => $result->confirmationToken]);
 
         return new RedirectResponse('/auth/login');
+    }
+
+    /**
+     * The per-IP allowance of the `registration` limiter, so accounts made through a provider
+     * count against the same hourly budget as the sign-up form. The key matches the one the
+     * throttle middleware builds for it.
+     *
+     * @return array{key: string, max: int, decay: int}
+     */
+    private function registrationLimit(Request $request): array
+    {
+        $limit = AppServiceProvider::registrationIpLimit($request);
+
+        return ['key' => md5('registration'.'ip:'.$request->ip()), 'max' => $limit->maxAttempts, 'decay' => $limit->decaySeconds];
     }
 
     private function enabledProvider(string $provider): OAuthProvider

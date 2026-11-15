@@ -55,6 +55,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /** Three accounts an hour per IP; the Discord/Google sign-up counts against the same budget. */
+    public static function registrationIpLimit(Request $request): Limit
+    {
+        return Limit::perHour(3)->by('ip:'.$request->ip());
+    }
+
     /**
      * Bootstrap any application services.
      */
@@ -213,7 +219,7 @@ class AppServiceProvider extends ServiceProvider
             $email = mb_strtolower(mb_trim($request->string('email')->toString()));
 
             return [
-                Limit::perHour(3)->by('ip:'.$request->ip())
+                self::registrationIpLimit($request)
                     ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY),
                 Limit::perHour(1)->by('email:'.$email)
                     ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY

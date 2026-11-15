@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Http\Controllers\Auth\OAuthControllerTest;
 
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
 use Pterodactyl\Models\ApiKey;
@@ -172,6 +174,53 @@ test('an unlinked account creates a new user while registration is on', function
     expect($user->username)->not->toBe('nelly')->toStartWith('nelly')
         ->and(User::query()->whereKey($user->id)->value('has_password'))->toBeFalsy()
         ->and(UserOAuthAccount::query()->where('user_id', $user->id)->value('provider_user_id'))->toBe('80351110224678912');
+});
+
+test('creating accounts through a provider uses the sign-up limit of the IP', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+
+    // Two accounts were already made from this address this hour; the third one is the last allowed.
+    $key = md5('registration'.'ip:127.0.0.1');
+    RateLimiter::hit($key, 3600);
+    RateLimiter::hit($key, 3600);
+
+    fakeDiscord(['id' => '10003', 'username' => 'newcomer3', 'email' => 'newcomer3@example.com']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    expect(RateLimiter::attempts($key))->toBe(3);
+    $this->post('/auth/logout')->assertNoContent();
+    $this->flushSession();
+
+    Http::swap(new HttpFactory);
+    fakeDiscord(['id' => '10004', 'username' => 'newcomer4', 'email' => 'newcomer4@example.com']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")
+        ->assertRedirect('/auth/login')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'Too many accounts have been created from your network recently. Please try again later.');
+
+    $this->assertGuest();
+    expect(User::query()->where('email', 'newcomer4@example.com')->exists())->toBeFalse();
+
+    // Existing linked users still sign in once the limit is used up.
+    $user = User::factory()->create();
+    linkAccount($user, 'discord', '10005');
+    Http::swap(new HttpFactory);
+    fakeDiscord(['id' => '10005']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+});
+
+test('sign-ups of the form and of a provider share one budget', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    foreach (range(1, 3) as $ignored) {
+        RateLimiter::hit(md5('registration'.'ip:127.0.0.1'), 3600);
+    }
+
+    fakeDiscord();
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/auth/login');
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
 });
 
 test('registration never takes over an existing email or uses an unverified one', function (array $profile, string $message): void {
