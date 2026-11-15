@@ -6757,6 +6757,51 @@ export type ClientDenyAnAssistantActionResponseBody = {
         charged_this_month?: number;
     };
 };
+export type ApiListThePublicStorePlansResponseBody = {
+    /**
+     * Whether the store is open. When it is closed the lists are empty.
+     */
+    enabled: boolean;
+    /**
+     * Whether the AI assistant is offered on the panel.
+     */
+    assistant_enabled: boolean;
+    /**
+     * The enabled billing periods, in the store order.
+     */
+    periods: Array<{
+        id?: number;
+        name?: string;
+        days?: number;
+    }>;
+    /**
+     * The visible categories that have a plan on sale, each with its plans cheapest first.
+     */
+    categories: Array<{
+        name?: string;
+        slug?: string;
+        description?: string;
+        plans?: Array<{
+            id?: number;
+            name?: string;
+            description?: string;
+            resources?: {
+                memory?: number;
+                disk?: number;
+                cpu?: number;
+                databases?: number;
+                backups?: number;
+            };
+            games?: Array<string>;
+            available?: boolean;
+            prices?: Array<{
+                period_id?: number;
+                days?: number;
+                tokens?: number;
+            }>;
+        }>;
+    }>;
+};
 export type ApiGetPublicStatusResponseBody = {
     /**
      * The overall state: the panel down or every node down is a major outage, some nodes down a partial one.
@@ -20721,6 +20766,26 @@ export type AuthGetCsrfCookieResponses = {
     204: void;
 };
 export type AuthGetCsrfCookieResponse = AuthGetCsrfCookieResponses[keyof AuthGetCsrfCookieResponses];
+export type ApiListThePublicStorePlansData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/public/store/plans';
+};
+export type ApiListThePublicStorePlansErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+};
+export type ApiListThePublicStorePlansError = ApiListThePublicStorePlansErrors[keyof ApiListThePublicStorePlansErrors];
+export type ApiListThePublicStorePlansResponses = {
+    /**
+     * Plans returned.
+     */
+    200: ApiListThePublicStorePlansResponseBody;
+};
+export type ApiListThePublicStorePlansResponse = ApiListThePublicStorePlansResponses[keyof ApiListThePublicStorePlansResponses];
 export type ApiGetPublicStatusData = {
     body?: never;
     path?: never;
