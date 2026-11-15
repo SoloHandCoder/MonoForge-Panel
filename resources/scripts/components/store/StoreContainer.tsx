@@ -26,7 +26,7 @@ export function BalanceChip({ balance }: { balance: number | null }) {
     return (
         <PanelLink
             destination={{ to: '/account/wallet' }}
-            className='inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm text-foreground no-underline transition-colors duration-150 hover:border-primary/50 hover:bg-(--hover-row)'
+            className='inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm whitespace-nowrap text-foreground no-underline transition-colors duration-150 hover:border-primary/50 hover:bg-(--hover-row)'
         >
             <Icon icon={Coins} className='size-4 text-(--accent-soft)' aria-hidden />
             {balance === null ? 'Wallet' : <span className='tabular-nums'>{tokens(balance)}</span>}
