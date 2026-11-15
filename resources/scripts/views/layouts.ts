@@ -478,6 +478,7 @@ const adminNav = (extension = false) =>
         ['usage', 'Live usage', 'activity'],
         ['storage', 'Storage', 'hard-drive'],
         ['servers', 'Servers', 'server'],
+        ['shop', 'Shop', 'store'],
         ['databases', 'Database Hosts', 'database'],
         ['mounts', 'Mounts', 'folder-tree'],
         ['eggs', 'Eggs', 'egg'],

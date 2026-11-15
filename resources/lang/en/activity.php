@@ -229,6 +229,37 @@ return [
             'delete' => 'Deleted the :name database',
             'rotate-password' => 'Rotated the password for the :name database',
         ],
+        'shop' => [
+            'category' => [
+                'create' => 'Created the ":name" shop category',
+                'update' => 'Updated the ":name" shop category',
+                'delete' => 'Deleted the ":name" shop category',
+                'reorder' => 'Reordered the shop categories',
+            ],
+            'plan' => [
+                'create' => 'Created the ":name" shop plan',
+                'update' => 'Updated the ":name" shop plan',
+                'delete' => 'Deleted the ":name" shop plan',
+            ],
+            'period' => [
+                'create' => 'Created the ":name" billing period',
+                'update' => 'Updated the ":name" billing period',
+                'delete' => 'Deleted the ":name" billing period',
+            ],
+            'multiplier' => [
+                'create' => 'Set a :multiplier× :scope price multiplier',
+                'update' => 'Changed a :scope price multiplier to :multiplier×',
+                'delete' => 'Removed a :multiplier× :scope price multiplier',
+            ],
+            'addon' => [
+                'create' => 'Created the ":name" shop add-on',
+                'update' => 'Updated the ":name" shop add-on',
+                'delete' => 'Deleted the ":name" shop add-on',
+            ],
+            'settings' => [
+                'update' => 'Updated the shop settings',
+            ],
+        ],
         'tag' => [
             'create' => 'Created the :slug tag',
             'update' => 'Updated the :slug tag',
