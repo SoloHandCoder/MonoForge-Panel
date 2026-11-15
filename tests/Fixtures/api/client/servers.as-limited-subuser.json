@@ -51,6 +51,7 @@
                         "is_installing": false,
                         "is_transferring": false,
                         "skip_scripts": false,
+                        "playit_address": null,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -140,6 +141,7 @@
                         "is_installing": false,
                         "is_transferring": false,
                         "skip_scripts": false,
+                        "playit_address": null,
                         "relationships": {
                             "allocations": {
                                 "object": "list",
@@ -237,6 +239,7 @@
                 "is_installing": false,
                 "is_transferring": false,
                 "skip_scripts": false,
+                "playit_address": null,
                 "relationships": {
                     "allocations": {
                         "object": "list",
@@ -325,6 +328,7 @@
                 "is_installing": false,
                 "is_transferring": false,
                 "skip_scripts": false,
+                "playit_address": null,
                 "relationships": {
                     "allocations": {
                         "object": "list",

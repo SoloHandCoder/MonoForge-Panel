@@ -35,6 +35,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Nodes\ConfigurationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeleteAllocationBlockController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeployTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\NodeController;
+use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\SystemInformationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UniqueIpsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UtilizationController;
@@ -63,6 +64,8 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
+use Pterodactyl\Http\Controllers\Api\Admin\Tunnels\TunnelController;
+use Pterodactyl\Http\Controllers\Api\Admin\Tunnels\TunnelSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\DisableTwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\ExternalController as UserExternalController;
@@ -175,6 +178,27 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/system-information', SystemInformationController::class)->name('.system-information');
     Route::post('/deploy-token', DeployTokenController::class)->middleware(RequireSessionAuthentication::class)->name('.deploy-token');
     Route::get('/utilization', UtilizationController::class)->name('.utilization');
+    Route::get('/playit', [PlayitController::class, 'show'])->name('.playit');
+    Route::put('/playit', [PlayitController::class, 'update'])->name('.playit.update');
+    Route::post('/playit/test', [PlayitController::class, 'test'])->name('.playit.test');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Tunnel Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/tunnels
+|
+*/
+Route::prefix('/tunnels')->name('api.admin.tunnels')->group(function (): void {
+    Route::get('/', [TunnelController::class, 'index']);
+    Route::post('/', [TunnelController::class, 'store'])->name('.store');
+    // `/settings` before `/{tunnel}` so the literal is not bound as a tunnel.
+    Route::get('/settings', [TunnelSettingsController::class, 'show'])->name('.settings');
+    Route::put('/settings', [TunnelSettingsController::class, 'update'])->name('.settings.update');
+    Route::post('/{tunnel:id}/retry', [TunnelController::class, 'retry'])->name('.retry');
+    Route::post('/{tunnel:id}/recreate', [TunnelController::class, 'recreate'])->name('.recreate');
 });
 
 /*
