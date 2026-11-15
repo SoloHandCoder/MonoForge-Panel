@@ -33,9 +33,9 @@ If you sign up with Discord or Google, those services confirm who you are; their
 
 Servers are paid for with **tokens**. Tokens are a prepaid credit for use inside the panel only:
 
-- tokens have **no cash value** and cannot be exchanged for money, except where our [Refund Policy](/legal/refunds) or the law says otherwise;
+- token purchases are **final**: tokens have **no cash value** and are **not refunded**, except where the law requires it (see our [Refund Policy](/legal/refunds));
 - tokens are **non-transferable**: they belong to the account that bought them and cannot be sold or given to another account;
-- tokens **do not expire** while your account exists.
+- tokens **never expire**: they stay in your wallet for as long as your account exists.
 
 You buy tokens through our payment partner Tebex, who sells them to you as the merchant of record. Their terms apply to the payment.
 
@@ -69,7 +69,7 @@ MonoForge is provided "as is". As far as the law allows, we are not liable for l
 
 ## 11. Changes to these terms
 
-We may change these terms, for example when we add features or when the law changes. When we make important changes, the panel asks you to accept the new version before you continue. If you do not agree, you can stop using the service and ask for a refund of unused tokens as described in the [Refund Policy](/legal/refunds).
+We may change these terms, for example when we add features or when the law changes. When we make important changes, the panel asks you to accept the new version before you continue. If you do not agree, you can stop using the service. Tokens you already bought stay in your account and are not refunded, as described in the [Refund Policy](/legal/refunds).
 
 ## 12. Law and contact
 
