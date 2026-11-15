@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+    capRawLine,
     ConsoleOutputStore,
     linkify,
+    MAX_CONSOLE_LINES,
     MAX_LINE_LENGTH,
+    MAX_RAW_LINE_LENGTH,
     paletteColor,
     parseAnsi,
     parseConsoleLine,
@@ -94,6 +97,35 @@ describe('links', () => {
         );
     });
 
+    it('trims sentence punctuation off a link and skips candidates too long to link', () => {
+        const trimmed = linkify(parseAnsi('see https://example.com/a?b=c).;!'));
+        const long = linkify(parseAnsi(`https://a${'.'.repeat(4_000)}x`));
+
+        expect(trimmed.filter((segment) => segment.href).map((segment) => segment.text)).toEqual([
+            'https://example.com/a?b=c',
+        ]);
+        expect(long.some((segment) => segment.href)).toBe(false);
+        expect(long.map((segment) => segment.text).join('')).toBe(`https://a${'.'.repeat(4_000)}x`);
+    });
+
+    it('parses 2000 lines of 8 KB of punctuation in well under a second', () => {
+        const lines = [
+            `https://a${'.'.repeat(8_180)}x`,
+            `https://example.com/${'.'.repeat(8_150)}`,
+            '.,;:!?)]}*'.repeat(819),
+        ];
+        const store = new ConsoleOutputStore();
+        const started = performance.now();
+
+        for (let index = 0; index < 2_000; index++) {
+            store.writeln(lines[index % lines.length]);
+        }
+
+        store.flush();
+        expect(performance.now() - started).toBeLessThan(1_000);
+        expect(store.getSnapshot()).toHaveLength(2_000);
+    });
+
     it('never links a javascript URL hidden after https', () => {
         const segments = linkify(parseAnsi('https://"onmouseover="alert(1) https://x.example/"><img>'));
 
@@ -143,6 +175,34 @@ describe('ConsoleOutputStore', () => {
         store.flush();
         expect(store.getSnapshot()).toEqual([]);
         expect(changes).toHaveBeenLastCalledWith({ kind: 'clear' });
+    });
+
+    it('caps each line as written before keeping or mirroring it, and keeps 2000 lines by default', () => {
+        const store = new ConsoleOutputStore();
+        const appended: string[] = [];
+        const huge = `${ESC}[31m${'x'.repeat(MAX_RAW_LINE_LENGTH * 4)}`;
+
+        store.onChange((change) => {
+            if (change.kind === 'append') {
+                appended.push(change.raw);
+            }
+        });
+        store.writeln(huge);
+        for (let index = 0; index < MAX_CONSOLE_LINES + 150; index++) {
+            store.writeln(`line ${index}`);
+        }
+
+        store.flush();
+        expect(appended[0]).toHaveLength(MAX_RAW_LINE_LENGTH);
+        expect(appended[0].endsWith('…')).toBe(true);
+        expect(store.rawLines()).toHaveLength(MAX_CONSOLE_LINES);
+        expect(store.getSnapshot()).toHaveLength(MAX_CONSOLE_LINES);
+        expect(store.rawLines().at(-1)).toBe(`line ${MAX_CONSOLE_LINES + 149}`);
+        expect(capRawLine('short')).toBe('short');
+        // An emoji is never split in half at the cut.
+        const emoji = capRawLine(`${'a'.repeat(MAX_RAW_LINE_LENGTH - 2)}😀${'b'.repeat(10)}`);
+
+        expect(emoji).toBe(`${'a'.repeat(MAX_RAW_LINE_LENGTH - 2)}…`);
     });
 
     it('keeps the newest lines up to its limit', () => {

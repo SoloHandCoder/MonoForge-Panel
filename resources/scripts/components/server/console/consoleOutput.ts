@@ -52,6 +52,12 @@ export const MAX_LINE_LENGTH = 8_192;
 
 const MAX_URL_LENGTH = 2_048;
 
+/** A line as written is cut to this many characters, with an ellipsis, before it is kept or mirrored. */
+export const MAX_RAW_LINE_LENGTH = 16_384;
+
+/** The lines a console keeps, as parsed and as written. */
+export const MAX_CONSOLE_LINES = 2_000;
+
 const ANSI_NAMES = [
     'black',
     'red',
@@ -339,7 +345,35 @@ export function parseAnsi(raw: string): ConsoleSegment[] {
 
 // Characters a URL in a log line ends at; quotes and brackets around it are not part of it.
 const URL_PATTERN = /https?:\/\/[^\s<>"'`{}|\\^]+/gi;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]}*]+$/;
+// Trimmed off the end of a URL with a loop, not a regex: an anchored character run backtracks quadratically.
+const TRAILING_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', ')', ']', '}', '*']);
+
+/** `candidate` without the punctuation that ends the sentence around it. */
+function trimTrailingPunctuation(candidate: string): string {
+    let end = candidate.length;
+
+    while (end > 0 && TRAILING_PUNCTUATION.has(candidate.charAt(end - 1))) {
+        end--;
+    }
+
+    return candidate.slice(0, end);
+}
+
+/** `raw` cut to MAX_RAW_LINE_LENGTH characters, never inside a surrogate pair. */
+export function capRawLine(raw: string): string {
+    if (raw.length <= MAX_RAW_LINE_LENGTH) {
+        return raw;
+    }
+
+    let end = MAX_RAW_LINE_LENGTH - 1;
+    const last = raw.charCodeAt(end - 1);
+
+    if (last >= 0xd8_00 && last <= 0xdb_ff) {
+        end--;
+    }
+
+    return `${raw.slice(0, end)}…`;
+}
 
 /** The URL to link `candidate` to, or null unless it is a plain https URL. */
 export function safeLink(candidate: string): string | null {
@@ -368,7 +402,12 @@ export function linkify(segments: readonly ConsoleSegment[]): ConsoleSegment[] {
         let cursor = 0;
 
         for (const match of segment.text.matchAll(URL_PATTERN)) {
-            const candidate = match[0].replace(TRAILING_PUNCTUATION, '');
+            // Too long to link however it is trimmed: skipped before any work on it.
+            if (match[0].length > MAX_URL_LENGTH) {
+                continue;
+            }
+
+            const candidate = trimTrailingPunctuation(match[0]);
             const href = safeLink(candidate);
 
             if (href === null) {
@@ -479,7 +518,7 @@ export class ConsoleOutputStore {
     private readonly changeListeners = new Set<(change: ConsoleOutputChange) => void>();
     private timer: ReturnType<typeof setTimeout> | null = null;
 
-    constructor(private readonly limit = 2_000) {}
+    constructor(private readonly limit = MAX_CONSOLE_LINES) {}
 
     readonly subscribe = (listener: () => void): (() => void) => {
         this.listeners.add(listener);
@@ -500,7 +539,9 @@ export class ConsoleOutputStore {
         };
     }
 
-    writeln(raw: string): void {
+    writeln(written: string): void {
+        // Capped first, so a runaway line is neither kept in full nor mirrored to a terminal.
+        const raw = capRawLine(written);
         const line = parseConsoleLine(raw, this.nextId++);
 
         this.lines.push(line);
