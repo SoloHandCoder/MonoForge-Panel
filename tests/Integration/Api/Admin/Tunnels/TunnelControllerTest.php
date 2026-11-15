@@ -7,7 +7,7 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Admin\Tunnels\TunnelControllerT
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Pterodactyl\Enum\TunnelStatus;
-use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
+use Pterodactyl\Exceptions\Tunnels\PlayitException;
 use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
@@ -61,7 +61,7 @@ test('test connection reports a rejected key', function (): void {
     $this->postJson(route('api.admin.nodes.playit.test', $node->id))
         ->assertOk()
         ->assertJson(['success' => false])
-        ->assertJsonPath('message', PlayitController::INVALID_KEY_MESSAGE);
+        ->assertJsonPath('message', PlayitException::INVALID_AGENT_KEY_MESSAGE);
 });
 
 test('other playit errors are shown as they are', function (): void {

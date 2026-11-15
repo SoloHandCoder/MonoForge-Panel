@@ -32,12 +32,19 @@ class TunnelListener implements SubscribesToEvents
         });
     }
 
+    /**
+     * The server is gone, so its tunnel goes too, including one made by hand on playit and
+     * imported: left behind it would point at a port the next server on it gets.
+     */
     public function deleting(Deleting $event): void
     {
-        $this->safely(fn () => $this->tunnels->release($event->server));
+        $this->safely(fn () => $this->tunnels->release($event->server, deleteImported: true));
     }
 
-    /** A new primary port needs a new tunnel pointing at it. */
+    /**
+     * A new primary port needs a new tunnel pointing at it. An imported tunnel is left on
+     * playit (it may serve something the owner set up by hand); the server gets a new one.
+     */
     public function updated(Updated $event): void
     {
         if (! $event->server->wasChanged('allocation_id')) {
