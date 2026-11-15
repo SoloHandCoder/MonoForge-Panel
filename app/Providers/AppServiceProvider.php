@@ -248,6 +248,14 @@ class AppServiceProvider extends ServiceProvider
         // TrustProxies), so a flood from one address cannot use up Tebex's own deliveries.
         RateLimiter::for('tebex.webhook', fn (Request $request): Limit => Limit::perMinute(120)->by('tebex:'.$request->ip()));
 
+        // Store purchases: 3 attempts a minute per player, so one player retrying against a hung
+        // node cannot keep the store-wide capacity lock busy for everyone else.
+        RateLimiter::for('store.purchase', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(3)->by('store-purchase:'.($user instanceof User ? $user->id : (string) $request->ip()));
+        });
+
         ResourceLimit::boot();
     }
 

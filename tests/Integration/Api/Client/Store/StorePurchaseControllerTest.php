@@ -24,11 +24,14 @@ use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Objects\DeploymentObject;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Models\UserNotice;
+use Pterodactyl\Services\Billing\CapacityService;
 use Pterodactyl\Services\Billing\StorePurchaseService;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use ReflectionClassConstant;
 use RuntimeException;
 use Throwable;
 
@@ -203,6 +206,8 @@ test('refuses a price the player did not confirm, an egg the plan does not offer
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['egg_id' => $this->egg->id + 1000]))->assertStatus(422);
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['name' => '', 'idempotency_key' => 'short']))->assertUnprocessable();
 
+    // Past the three-a-minute purchase limit.
+    $this->travel(61)->seconds();
     config(['monoforge.shop.enabled' => false]);
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertForbidden();
 
@@ -290,4 +295,50 @@ test('the database refuses a second tunnel with the same subdomain', function ()
 
     expect(fn () => ServerTunnel::query()->forceCreate(['server_id' => $second->id, 'subdomain' => 'survival']))
         ->toThrow(UniqueConstraintViolationException::class);
+});
+
+test('a server sold past the limits after all is kept and the root admins are told', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    config(['monoforge.shop.limits.memory_mb' => 1024]);
+    // The capacity check under the lock says yes (a stale view, say), the server is created anyway.
+    $this->app->instance(CapacityService::class, new class extends CapacityService
+    {
+        public function canProvision(array $resources): bool
+        {
+            return true;
+        }
+    });
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+
+    expect(Server::query()->where('owner_id', $this->user->id)->exists())->toBeTrue()
+        ->and(UserNotice::query()->where('user_id', $admin->id)->where('title', 'Store over capacity')->count())->toBe(1)
+        ->and(UserNotice::query()->where('user_id', $this->user->id)->where('title', 'Store over capacity')->exists())->toBeFalse();
+});
+
+test('a server within the limits does not warn anyone', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    config(['monoforge.shop.limits.memory_mb' => 4096]);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+
+    expect(UserNotice::query()->where('user_id', $admin->id)->exists())->toBeFalse();
+});
+
+test('purchase attempts are limited to three a minute per player', function (): void {
+    foreach (['a', 'b', 'c'] as $key) {
+        $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['expected_total' => 1, 'idempotency_key' => 'key-'.str_repeat($key, 20)]))->assertStatus(409);
+    }
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['idempotency_key' => 'key-'.str_repeat('d', 20)]))->assertTooManyRequests();
+    expect(balance())->toBe(1000);
+
+    // Another player is not affected.
+    $other = User::factory()->create();
+    $this->actingAs($other)->postJson('/api/client/store/purchase', order(['expected_total' => 1, 'idempotency_key' => 'key-'.str_repeat('e', 20)]))->assertStatus(409);
+});
+
+test('the store-wide lock outlives a slow purchase', function (): void {
+    expect((new ReflectionClassConstant(StorePurchaseService::class, 'CAPACITY_LOCK_SECONDS'))->getValue())->toBe(180)
+        ->and(config('monoforge.shop.capacity_lock_wait', 5))->toBeLessThanOrEqual(5);
 });

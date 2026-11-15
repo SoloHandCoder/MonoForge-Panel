@@ -60,7 +60,7 @@ Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereN
 // The store: catalog, quotes and buying a server.
 Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');
 Route::post('/store/quote', [StoreController::class, 'quote'])->name('api:client.store.quote');
-Route::post('/store/purchase', [StorePurchaseController::class, 'store'])->middleware('throttle:6,1')->name('api:client.store.purchase');
+Route::post('/store/purchase', [StorePurchaseController::class, 'store'])->middleware('throttle:store.purchase')->name('api:client.store.purchase');
 // Buying tokens through Tebex.
 Route::get('/store/tokens/packs', [TokenPackController::class, 'index'])->name('api:client.store.tokens.packs');
 Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])

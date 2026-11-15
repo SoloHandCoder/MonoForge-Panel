@@ -8,6 +8,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Contracts\Servers\DeletesServers;
@@ -29,6 +30,7 @@ use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Notices\NoticeService;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Throwable;
@@ -47,8 +49,13 @@ class StorePurchaseService
     /** The store-wide lock around the capacity check and the server creation. */
     public const string CAPACITY_LOCK = 'monoforge:store:capacity';
 
-    /** How long the capacity lock is held at most (a stuck Wings call must not block the store). */
-    private const int CAPACITY_LOCK_SECONDS = 60;
+    /**
+     * How long the capacity lock is held at most: longer than the worst case of a purchase
+     * (three allocation attempts against a slow Wings plus the clean-up delete), so the lock
+     * never expires while a server row is still being written. Waiting buyers give up after
+     * `monoforge.shop.capacity_lock_wait` seconds instead.
+     */
+    private const int CAPACITY_LOCK_SECONDS = 180;
 
     /** How many free allocations are tried when another purchase takes the chosen one first. */
     private const int ALLOCATION_ATTEMPTS = 3;
@@ -61,6 +68,7 @@ class StorePurchaseService
         private readonly CreatesServers $creation,
         private readonly DeletesServers $deletion,
         private readonly TunnelService $tunnels,
+        private readonly NoticeService $notices,
     ) {}
 
     /**
@@ -141,7 +149,44 @@ class StorePurchaseService
 
         // One purchase at a time from the capacity check to the created server, so concurrent
         // buyers cannot all pass the check and oversell the limits (or take the same subdomain).
-        return $this->underCapacityLock(fn (): StorePurchaseResult => $this->charge($user, $order, $plan, $period, $egg, $image, $node, $quote, $addons, $subdomain, $reference));
+        $result = $this->underCapacityLock(fn (): StorePurchaseResult => $this->charge($user, $order, $plan, $period, $egg, $image, $node, $quote, $addons, $subdomain, $reference));
+        $this->warnIfOversold($result);
+
+        return $result;
+    }
+
+    /**
+     * A safety net behind the lock: once the server is committed, the shop servers must still
+     * fit the limits. If they do not (a lock that expired, a limit lowered meanwhile), the
+     * server is kept and root administrators are told, so they can raise the limit or move it.
+     */
+    private function warnIfOversold(StorePurchaseResult $result): void
+    {
+        try {
+            $limits = ShopSettings::limits();
+            $used = $this->capacity->used();
+            if (CapacityService::fits($limits, $used, [])) {
+                return;
+            }
+
+            Log::warning('The store sold past its capacity limits.', ['server' => $result->server->uuid, 'used' => $used, 'limits' => $limits]);
+            $body = sprintf(
+                'The store sold server "%s" past its limits: %s MB memory, %s MB disk and %s%% CPU are in use (limits %s, %s, %s; 0 = none). The server was kept; raise the limits in Shop > Limits or move servers.',
+                $result->server->name,
+                number_format($used['memory']),
+                number_format($used['disk']),
+                number_format($used['cpu']),
+                number_format($limits['memory']),
+                number_format($limits['disk']),
+                number_format($limits['cpu']),
+            );
+            User::query()->where('root_admin', true)->each(function (User $admin) use ($body): void {
+                $this->notices->notify($admin, 'warning', 'Store over capacity', $body, null, 'Open shop limits', '/panel/shop/limits');
+            });
+        } catch (Throwable $throwable) {
+            // The purchase itself succeeded; a failed warning must not turn it into an error.
+            report($throwable);
+        }
     }
 
     /**
