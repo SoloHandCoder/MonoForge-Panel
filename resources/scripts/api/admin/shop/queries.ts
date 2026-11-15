@@ -143,6 +143,10 @@ export interface ShopNode {
     shop_enabled: boolean;
     /** Servers on the node that were bought in the shop. */
     shop_servers: number;
+    /** The most the shop sells on this node; 0 is no limit. The shop-wide limits apply too. */
+    limits: ShopCapacity;
+    /** What the active and suspended shop servers on this node use. */
+    used: ShopCapacity;
 }
 
 export type ShopSettingsInput = Pick<ShopSettings, 'enabled' | 'grace_days' | 'low_balance_days' | 'limits'>;
@@ -274,6 +278,24 @@ export const useSetShopNodeEnabled = () => {
         onSettled: async () => {
             await queryClient.invalidateQueries({ queryKey: shopKey });
         },
+    });
+};
+
+/** Sets how much the shop may sell on a node (0 = no limit), next to the shop-wide limits. */
+export const useSetShopNodeLimits = () => {
+    const queryClient = useQueryClient();
+    const key = adminShopNodesQueryOptions().queryKey;
+
+    return useMutation({
+        mutationFn: async ({ id, limits }: { id: number; limits: ShopCapacity }): Promise<ShopNode> =>
+            (await http.put<ShopNode>(`${base}/nodes/${id}`, { limits })).data,
+        onSuccess: (node) => {
+            queryClient.setQueryData<ShopNode[]>(key, (nodes) =>
+                nodes?.map((each) => (each.id === node.id ? node : each))
+            );
+            toast.success(`Shop limits of ${node.name} saved`);
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to save the node limits'),
     });
 };
 

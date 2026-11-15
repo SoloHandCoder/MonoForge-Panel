@@ -25,18 +25,28 @@ const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, Math.max(0, ms)));
 
-/** Locations with at least one node the plan may use; every location when the plan allows any node. */
+/**
+ * Locations with at least one node the plan may use (every location when the plan allows any node).
+ * Nodes at their shop limits for this plan, and locations made only of those, are unavailable.
+ */
 export function planLocations(plan: StorePlan, locations: StoreLocation[]): StoreLocation[] {
     const allowed = plan.nodeIds;
-
-    if (!allowed) {
-        return locations;
-    }
+    const full = plan.fullNodeIds;
 
     return locations
-        .map((location) => ({ ...location, nodes: location.nodes.filter((node) => allowed.includes(node.id)) }))
+        .map((location) => {
+            const nodes = location.nodes
+                .filter((node) => !allowed || allowed.includes(node.id))
+                .map(({ id, name, multiplier }) => ({ id, name, multiplier, available: !full.includes(id) }));
+
+            return { ...location, nodes, available: nodes.some((node) => node.available) };
+        })
         .filter((location) => location.nodes.length > 0);
 }
+
+/** The first location that still has room for the plan, else the first one. */
+export const firstLocation = (locations: StoreLocation[]): StoreLocation | undefined =>
+    locations.find((location) => location.available) ?? locations[0];
 
 export function validateName(name: string): string | null {
     const trimmed = name.trim();
@@ -124,14 +134,35 @@ function estimateFor(catalog: StoreCatalog, plan: StorePlan, choices: CheckoutCh
     };
 }
 
+/** Whether the catalog already says the plan, or the picked location or node, is sold out. */
+function soldOutInCatalog(
+    plan: StorePlan,
+    locations: StoreLocation[],
+    { locationId, nodeId }: CheckoutChoices
+): boolean {
+    if (!plan.canProvision) {
+        return true;
+    }
+
+    const location = locations.find((each) => each.id === locationId);
+
+    if (!location) {
+        return false;
+    }
+
+    return !location.available || location.nodes.some((node) => node.id === nodeId && !node.available);
+}
+
 /** The live price of the current choices: the server's quote once it matches, a local estimate until then. */
 export function useCheckoutPrice(
     catalog: StoreCatalog,
     plan: StorePlan,
     choices: CheckoutChoices,
-    hasLocations: boolean
+    locations: StoreLocation[]
 ) {
     const { units } = choices;
+    const hasLocations = locations.length > 0;
+    const catalogSoldOut = soldOutInCatalog(plan, locations, choices);
     const addons = useMemo(() => Object.fromEntries(Object.entries(units).filter(([, count]) => count > 0)), [units]);
     const selection = selectionFor(plan, choices, addons, hasLocations);
     const key = JSON.stringify(selection);
@@ -152,7 +183,7 @@ export function useCheckoutPrice(
         updating: data === null && quote.fetchStatus === 'fetching',
         balance,
         short: balance !== null && balance < total,
-        soldOut: !plan.canProvision || data?.canProvision === false,
+        soldOut: catalogSoldOut || data?.canProvision === false,
     };
 }
 

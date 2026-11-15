@@ -29,6 +29,8 @@ export interface RawStoreNode {
     id: number;
     name: string;
     multiplier: number | string;
+    /** False when the plan no longer fits within the node's own shop limits. */
+    can_provision?: boolean;
 }
 
 /** A location the plan may run in, with only the plan's allowed nodes, cheapest first. */
@@ -37,6 +39,8 @@ export interface RawStoreLocation {
     short: string;
     long: string | null;
     multiplier: number | string;
+    /** False when no node of the location has room for the plan within its own shop limits. */
+    can_provision?: boolean;
     nodes: RawStoreNode[];
 }
 
@@ -123,12 +127,16 @@ export interface StoreNode {
     id: number;
     name: string;
     multiplier: number;
+    /** False when the node is at its shop limits for the plan being bought (see planLocations). */
+    available: boolean;
 }
 
 export interface StoreLocation {
     id: number;
     name: string;
     multiplier: number;
+    /** False when every node of the location is at its shop limits for the plan being bought. */
+    available: boolean;
     nodes: StoreNode[];
 }
 
@@ -153,6 +161,8 @@ export interface StorePlan {
     sort: number;
     /** False when the plan no longer fits within the capacity the store sells. */
     canProvision: boolean;
+    /** The nodes that are at their own shop limits for this plan. */
+    fullNodeIds: number[];
 }
 
 export interface StoreCategory {
@@ -231,7 +241,13 @@ const mapLocation = (location: RawStoreLocation): StoreLocation => ({
     id: location.id,
     name: location.long || location.short || `Location ${location.id}`,
     multiplier: multiplierOf(location.multiplier),
-    nodes: location.nodes.map((node) => ({ id: node.id, name: node.name, multiplier: multiplierOf(node.multiplier) })),
+    available: true,
+    nodes: location.nodes.map((node) => ({
+        id: node.id,
+        name: node.name,
+        multiplier: multiplierOf(node.multiplier),
+        available: true,
+    })),
 });
 
 const mapPlan = (plan: RawStorePlan, categoryId: number, sort: number): StorePlan => ({
@@ -256,6 +272,9 @@ const mapPlan = (plan: RawStorePlan, categoryId: number, sort: number): StorePla
     nodeIds: plan.locations.flatMap((location) => location.nodes.map((node) => node.id)),
     sort,
     canProvision: plan.can_provision,
+    fullNodeIds: plan.locations.flatMap((location) =>
+        location.nodes.filter((node) => node.can_provision === false).map((node) => node.id)
+    ),
 });
 
 /** The plans' locations merged into one list, each with every node some plan may use there. */

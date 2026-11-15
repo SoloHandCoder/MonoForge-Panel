@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { mapCatalog, type RawStoreCatalog, type StoreLocation, type StorePlan } from '@/api/store/types';
 import { cpu, estimate, fromPerMonth, megabytes, periodNote, sortPlans } from '@/components/store/storeFormat';
-import { planLocations, validateName, validateSubdomain, withAddons } from '@/components/store/useCheckout';
+import {
+    firstLocation,
+    planLocations,
+    validateName,
+    validateSubdomain,
+    withAddons,
+} from '@/components/store/useCheckout';
 
 const plan = (overrides: Partial<StorePlan> = {}): StorePlan => ({
     id: 1,
@@ -20,12 +26,25 @@ const plan = (overrides: Partial<StorePlan> = {}): StorePlan => ({
     nodeIds: null,
     sort: 0,
     canProvision: true,
+    fullNodeIds: [],
     ...overrides,
 });
 
 const locations: StoreLocation[] = [
-    { id: 1, name: 'Home', multiplier: 1, nodes: [{ id: 10, name: 'home-1', multiplier: 1 }] },
-    { id: 2, name: 'Pro', multiplier: 1.5, nodes: [{ id: 20, name: 'pro-1', multiplier: 1 }] },
+    {
+        id: 1,
+        name: 'Home',
+        multiplier: 1,
+        available: true,
+        nodes: [{ id: 10, name: 'home-1', multiplier: 1, available: true }],
+    },
+    {
+        id: 2,
+        name: 'Pro',
+        multiplier: 1.5,
+        available: true,
+        nodes: [{ id: 20, name: 'pro-1', multiplier: 1, available: true }],
+    },
 ];
 
 describe('store pricing', () => {
@@ -84,6 +103,31 @@ describe('store formatting and checks', () => {
         expect(planLocations(plan({ nodeIds: [20] }), locations).map((each) => each.id)).toEqual([2]);
     });
 
+    it('marks the nodes at their shop limits, and a location made only of those, unavailable', () => {
+        const pro: StoreLocation = {
+            id: 2,
+            name: 'Pro',
+            multiplier: 1.5,
+            available: true,
+            nodes: [
+                { id: 20, name: 'pro-1', multiplier: 1, available: true },
+                { id: 21, name: 'pro-2', multiplier: 1, available: true },
+            ],
+        };
+        const [home, mixed] = planLocations(plan({ fullNodeIds: [10, 20] }), [locations[0], pro]);
+
+        expect(home).toMatchObject({ available: false, nodes: [{ id: 10, available: false }] });
+        expect(mixed).toMatchObject({
+            available: true,
+            nodes: [
+                { id: 20, available: false },
+                { id: 21, available: true },
+            ],
+        });
+        expect(firstLocation([home, mixed])?.id).toBe(2);
+        expect(firstLocation([home])?.id).toBe(1);
+    });
+
     it('reads the catalog the store endpoint returns', () => {
         const resources = {
             memory: 2048,
@@ -95,7 +139,7 @@ describe('store formatting and checks', () => {
             backups: 1,
             allocations: 0,
         };
-        const eu = (nodes: { id: number; name: string; multiplier: number }[]) => ({
+        const eu = (nodes: { id: number; name: string; multiplier: number; can_provision?: boolean }[]) => ({
             id: 2,
             short: 'eu',
             long: null,
@@ -125,7 +169,7 @@ describe('store formatting and checks', () => {
                             resources,
                             can_provision: false,
                             eggs: [{ id: 7, name: 'Paper', description: null, image: null }],
-                            locations: [eu([{ id: 20, name: 'eu-1', multiplier: 1.5 }])],
+                            locations: [eu([{ id: 20, name: 'eu-1', multiplier: 1.5, can_provision: false }])],
                         },
                         {
                             id: 5,
@@ -148,20 +192,31 @@ describe('store formatting and checks', () => {
         const catalog = mapCatalog(raw);
         const [starter, big] = catalog.categories[0].plans;
 
-        expect(starter).toMatchObject({ priceTokens: 500, memory: 2048, nodeIds: [20], sort: 0, canProvision: false });
-        expect(big).toMatchObject({ memory: 8192, nodeIds: [21], sort: 1 });
+        expect(starter).toMatchObject({
+            priceTokens: 500,
+            memory: 2048,
+            nodeIds: [20],
+            sort: 0,
+            canProvision: false,
+            fullNodeIds: [20],
+        });
+        expect(big).toMatchObject({ memory: 8192, nodeIds: [21], sort: 1, fullNodeIds: [] });
         expect(catalog.locations).toEqual([
             {
                 id: 2,
                 name: 'eu',
                 multiplier: 1.5,
+                available: true,
                 nodes: [
-                    { id: 20, name: 'eu-1', multiplier: 1.5 },
-                    { id: 21, name: 'eu-2', multiplier: 1.5 },
+                    { id: 20, name: 'eu-1', multiplier: 1.5, available: true },
+                    { id: 21, name: 'eu-2', multiplier: 1.5, available: true },
                 ],
             },
         ]);
-        expect(planLocations(starter, catalog.locations)[0].nodes.map((node) => node.id)).toEqual([20]);
+        expect(planLocations(starter, catalog.locations)[0]).toMatchObject({
+            available: false,
+            nodes: [{ id: 20, available: false }],
+        });
         expect(catalog).toMatchObject({
             canProvision: false,
             subdomainsEnabled: true,

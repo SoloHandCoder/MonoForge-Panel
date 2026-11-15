@@ -13,6 +13,7 @@ import OrderSummary, { ConfirmPurchaseDialog } from '@/components/store/OrderSum
 import { EggAvatars } from '@/components/store/PlanCard';
 import PurchaseOverlay from '@/components/store/PurchaseOverlay';
 import {
+    firstLocation,
     planLocations,
     useCheckoutPrice,
     usePurchaseFlow,
@@ -45,7 +46,7 @@ function isBuyable(price: ReturnType<typeof useCheckoutPrice>, formValid: boolea
 /** The player's picks, starting on the first game, location and period. */
 function useCheckoutChoices(catalog: StoreCatalog, plan: StorePlan, locations: StoreLocation[]) {
     const [eggId, setEggId] = useState<number | null>(plan.eggs[0]?.id ?? null);
-    const [locationId, setLocationId] = useState<number | null>(locations[0]?.id ?? null);
+    const [locationId, setLocationId] = useState<number | null>(firstLocation(locations)?.id ?? null);
     const [nodeId, setNodeId] = useState<number | null>(null);
     const [periodId, setPeriodId] = useState<number | null>(catalog.periods[0]?.id ?? null);
     const [units, setUnits] = useState<Record<string, number>>({});
@@ -96,7 +97,7 @@ function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan })
 
     const name = useServerName(egg ? `${egg.name} server` : '');
     const subdomainError = catalog.subdomainsEnabled ? validateSubdomain(subdomain) : null;
-    const price = useCheckoutPrice(catalog, plan, choices, locations.length > 0);
+    const price = useCheckoutPrice(catalog, plan, choices, locations);
     const flow = usePurchaseFlow();
     const steps = locations.length > 0 ? 2 : 1;
     const canBuy = isBuyable(price, name.valid && subdomainError === null && !flow.working);

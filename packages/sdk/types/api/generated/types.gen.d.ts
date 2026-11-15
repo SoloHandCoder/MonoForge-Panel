@@ -2048,9 +2048,26 @@ export type AdminUpdatePriceMultiplierRequest = {
 };
 export type AdminUpdateShopNodeRequest = {
     /**
-     * The shop enabled.
+     * The shop enabled. This field is required when <code>limits</code> is not present.
      */
-    shop_enabled: boolean;
+    shop_enabled?: boolean;
+    /**
+     * The limits. This field is required when <code>shop_enabled</code> is not present.
+     */
+    limits?: {
+        /**
+         * The limits memory. This field is required when <code>limits</code> is present. Must be at least 0. Must not be greater than 1000000000.
+         */
+        memory?: number;
+        /**
+         * The limits disk. This field is required when <code>limits</code> is present. Must be at least 0. Must not be greater than 1000000000.
+         */
+        disk?: number;
+        /**
+         * The limits cpu. This field is required when <code>limits</code> is present. Must be at least 0. Must not be greater than 10000000.
+         */
+        cpu?: number;
+    };
 };
 export type AdminCreateShopAddOnRequest = {
     /**
@@ -4886,6 +4903,22 @@ export type AdminListShopNodesResponseBody = {
         maintenance?: boolean;
         shop_enabled?: boolean;
         shop_servers?: number;
+        /**
+         * The most the shop sells on this node, in MB of memory and disk and percent of CPU; 0 is no limit. The shop-wide limits apply as well.
+         */
+        limits: {
+            memory?: number;
+            disk?: number;
+            cpu?: number;
+        };
+        /**
+         * What the active and suspended shop servers on this node use.
+         */
+        used: {
+            memory?: number;
+            disk?: number;
+            cpu?: number;
+        };
     }>;
 };
 export type AdminUpdateShopNodeResponseBody = {
@@ -4900,6 +4933,22 @@ export type AdminUpdateShopNodeResponseBody = {
     maintenance?: boolean;
     shop_enabled?: boolean;
     shop_servers?: number;
+    /**
+     * The most the shop sells on this node, in MB of memory and disk and percent of CPU; 0 is no limit.
+     */
+    limits: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+    /**
+     * What the active and suspended shop servers on this node use.
+     */
+    used: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
 };
 export type AdminListShopAddOnsResponseBody = {
     data?: Array<{
@@ -6186,10 +6235,12 @@ export type ClientGetTheStoreCatalogResponseBody = {
                 short?: string;
                 long?: string;
                 multiplier?: number;
+                can_provision?: boolean;
                 nodes?: Array<{
                     id?: number;
                     name?: string;
                     multiplier?: number;
+                    can_provision?: boolean;
                 }>;
             }>;
         }>;
@@ -8586,7 +8637,7 @@ export type AdminListShopNodesResponses = {
 };
 export type AdminListShopNodesResponse = AdminListShopNodesResponses[keyof AdminListShopNodesResponses];
 export type AdminUpdateShopNodeData = {
-    body: AdminUpdateShopNodeRequest;
+    body?: AdminUpdateShopNodeRequest;
     path: {
         /**
          * The resource ID.

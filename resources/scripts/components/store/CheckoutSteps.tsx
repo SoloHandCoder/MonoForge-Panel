@@ -3,6 +3,7 @@ import { Check, MapPin, Minus, Plus } from 'lucide-react';
 import type { StoreAddon, StoreEgg, StoreLocation, StorePeriod } from '@/api/store/types';
 import Icon from '@/components/elements/Icon';
 import { TextInput } from '@/components/form/controls';
+import { CAPACITY_MESSAGE } from '@/components/store/StoreNotices';
 import { everyDays, multiplierNote, periodNote, resourceLabel, tokens } from '@/components/store/storeFormat';
 import { NAME_MAX } from '@/components/store/useCheckout';
 import { cn } from '@/lib/cn';
@@ -53,24 +54,35 @@ function Choice({
     name,
     checked,
     onSelect,
+    disabled = false,
     children,
 }: {
     name: string;
     checked: boolean;
     onSelect: () => void;
+    disabled?: boolean;
     children: ReactNode;
 }) {
     return (
         <label
             className={cn(
-                'relative flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition-[border-color,background-color,box-shadow] duration-150',
+                'relative flex items-center gap-3 rounded-xl border px-4 py-3 transition-[border-color,background-color,box-shadow] duration-150',
                 'has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring',
-                checked
-                    ? 'border-primary bg-(--active-item) shadow-lg shadow-primary/20'
-                    : 'border-border hover:border-primary/50 hover:bg-(--hover-row)'
+                disabled && 'cursor-not-allowed border-border opacity-60',
+                !disabled &&
+                    (checked
+                        ? 'cursor-pointer border-primary bg-(--active-item) shadow-lg shadow-primary/20'
+                        : 'cursor-pointer border-border hover:border-primary/50 hover:bg-(--hover-row)')
             )}
         >
-            <input type='radio' name={name} checked={checked} onChange={onSelect} className='sr-only' />
+            <input
+                type='radio'
+                name={name}
+                checked={checked}
+                disabled={disabled}
+                onChange={onSelect}
+                className='sr-only'
+            />
             {children}
             <span
                 aria-hidden
@@ -162,8 +174,13 @@ function NodePicker({
                             type='button'
                             role='radio'
                             aria-checked={node.id === nodeId}
+                            disabled={!node.available}
+                            title={node.available ? undefined : CAPACITY_MESSAGE}
                             onClick={() => onChange(node.id)}
-                            className={pillClass(node.id === nodeId)}
+                            className={cn(
+                                pillClass(node.id === nodeId),
+                                !node.available && 'cursor-not-allowed line-through opacity-50'
+                            )}
                         >
                             {node.name}
                             {note && <span className='ml-1.5 text-xs opacity-75'>{note}</span>}
@@ -171,6 +188,9 @@ function NodePicker({
                     );
                 })}
             </div>
+            {location.available && location.nodes.some((node) => !node.available) && (
+                <p className='mt-2 text-xs font-medium text-destructive'>{CAPACITY_MESSAGE}</p>
+            )}
         </div>
     );
 }
@@ -198,14 +218,19 @@ export function LocationStep({
                         key={each.id}
                         name='location'
                         checked={each.id === locationId}
+                        disabled={!each.available}
                         onSelect={() => onLocation(each.id)}
                     >
                         <Icon icon={MapPin} className='size-4 shrink-0 text-(--accent-soft)' aria-hidden />
                         <span className='min-w-0'>
                             <span className='block truncate text-sm font-medium text-foreground'>{each.name}</span>
-                            <span className='block text-xs text-muted-foreground'>
-                                {multiplierNote(each.multiplier) ?? 'Standard price'}
-                            </span>
+                            {each.available ? (
+                                <span className='block text-xs text-muted-foreground'>
+                                    {multiplierNote(each.multiplier) ?? 'Standard price'}
+                                </span>
+                            ) : (
+                                <span className='block text-xs font-medium text-destructive'>{CAPACITY_MESSAGE}</span>
+                            )}
                         </span>
                     </Choice>
                 ))}

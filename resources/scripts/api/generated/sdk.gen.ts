@@ -412,7 +412,7 @@ export const adminUpdatePriceMultiplier = <ThrowOnError extends boolean = true>(
 /**
  * List shop nodes
  *
- * Returns every node with whether the store may sell new servers on it, its location, and how many servers bought in the store it runs. The store offers a node only when it is available in the shop and public.
+ * Returns every node with whether the store may sell new servers on it, its location, how many servers bought in the store it runs, its own shop limits and what the shop servers on it use. The store offers a node only when it is available in the shop and public.
  */
 export const adminListShopNodes = <ThrowOnError extends boolean = true>(options?: Options<AdminListShopNodesData, ThrowOnError>): RequestResult<AdminListShopNodesResponses, AdminListShopNodesErrors, ThrowOnError> => (options?.client ?? client).get<AdminListShopNodesResponses, AdminListShopNodesErrors, ThrowOnError>({
     responseType: 'json',
@@ -424,7 +424,7 @@ export const adminListShopNodes = <ThrowOnError extends boolean = true>(options?
 /**
  * Update shop node
  *
- * Makes a node available in the shop, or takes it out. Taking a node out stops new sales on it; servers already sold there keep running and renewing. Nodes are out of the shop until an administrator makes them available.
+ * Makes a node available in the shop, or takes it out, and sets how much the shop may sell on it. Taking a node out stops new sales on it; servers already sold there keep running and renewing. Nodes are out of the shop until an administrator makes them available. A node at its limits shows as full in the store. The node's own memory and disk allocation does not limit the shop.
  */
 export const adminUpdateShopNode = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateShopNodeData, ThrowOnError>): RequestResult<AdminUpdateShopNodeResponses, AdminUpdateShopNodeErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateShopNodeResponses, AdminUpdateShopNodeErrors, ThrowOnError>({
     responseType: 'json',
@@ -3698,7 +3698,7 @@ export const clientMarkNoticeRead = <ThrowOnError extends boolean = true>(option
 /**
  * Get the store catalog
  *
- * Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells.
+ * Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells. A node or location at its own shop limits stays listed with can_provision false.
  */
 export const clientGetTheStoreCatalog = <ThrowOnError extends boolean = true>(options?: Options<ClientGetTheStoreCatalogData, ThrowOnError>): RequestResult<ClientGetTheStoreCatalogResponses, ClientGetTheStoreCatalogErrors, ThrowOnError> => (options?.client ?? client).get<ClientGetTheStoreCatalogResponses, ClientGetTheStoreCatalogErrors, ThrowOnError>({
     responseType: 'json',
@@ -3710,7 +3710,7 @@ export const clientGetTheStoreCatalog = <ThrowOnError extends boolean = true>(op
 /**
  * Quote a server
  *
- * Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it.
+ * Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it within the shop-wide limits and within the limits of the node itself. In a location, the cheapest node with room is quoted.
  */
 export const clientQuoteAServer = <ThrowOnError extends boolean = true>(options: Options<ClientQuoteAServerData, ThrowOnError>): RequestResult<ClientQuoteAServerResponses, ClientQuoteAServerErrors, ThrowOnError> => (options.client ?? client).post<ClientQuoteAServerResponses, ClientQuoteAServerErrors, ThrowOnError>({
     responseType: 'json',
