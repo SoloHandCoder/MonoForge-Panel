@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Pterodactyl\Contracts\Servers\UpdatesServerDetails;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Jobs\RevokeSftpAccessJob;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Services\Extensions\ExtensionFields;
 use Pterodactyl\Services\Extensions\ValidatedExtensionValues;
@@ -53,6 +54,9 @@ final readonly class UpdateServerDetails implements UpdatesServerDetails
 
             // Revoke the previous owner's Wings SFTP token after an ownership change.
             if ($server->owner_id !== $original->id) {
+                // A shop server's renewals are billed to its new owner from now on.
+                ServerSubscription::query()->where('server_id', $server->id)->update(['user_id' => $server->owner_id]);
+
                 $job = new RevokeSftpAccessJob($original->uuid, $server);
                 DB::afterCommit(fn (): PendingDispatch => dispatch($job));
             }

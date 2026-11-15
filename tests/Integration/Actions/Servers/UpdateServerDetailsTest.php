@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Pterodactyl\Contracts\Servers\UpdatesServerDetails;
 use Pterodactyl\Jobs\RevokeSftpAccessJob;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
@@ -120,4 +121,21 @@ test('extension values must come from a request that validated them', function (
         ->toThrow(InvalidArgumentException::class, 'must come from a request that validated them');
 
     expect($server->fresh()->getAttributes())->toBe($before);
+});
+
+test('an ownership change moves a shop subscription to the new owner', function (): void {
+    Bus::fake();
+    $server = $this->createServerModel()->refresh();
+    $subscription = ServerSubscription::query()->create([
+        'server_id' => $server->id,
+        'user_id' => $server->owner_id,
+        'period_days' => 30,
+        'price_tokens' => 500,
+        'next_renewal_at' => now()->addDays(30),
+    ]);
+    $newOwner = User::factory()->create();
+
+    $this->app->make(UpdatesServerDetails::class)->update($server, details($server, ['owner_id' => $newOwner->id]));
+
+    expect($subscription->fresh()->user_id)->toBe($newOwner->id);
 });
