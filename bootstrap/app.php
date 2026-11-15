@@ -77,7 +77,9 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
             ->name('api.notices.public');
 
         // Tebex payment webhooks: no session, no CSRF, checked by source address and signature instead.
-        Route::middleware('throttle:120,1')
+        // The address is $request->ip(): CF-Connecting-IP when the peer is the local tunnel (see
+        // TrustProxies). Never add 127.0.0.1 to the allowlist: every tunnelled request comes from it.
+        Route::middleware('throttle:tebex.webhook')
             ->post('/api/webhooks/tebex', TebexWebhookController::class)
             ->name('api.webhooks.tebex');
 

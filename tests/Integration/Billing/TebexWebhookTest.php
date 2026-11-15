@@ -194,3 +194,48 @@ test('reads the user from the basket custom data on the payment when the product
 
     expect(wallet()->balance($user))->toBe(100);
 });
+
+/**
+ * @param  array<string, string>  $server  extra server variables (headers as HTTP_*)
+ * @return TestResponse<Response>
+ */
+function sendValidationFrom(string $peer, array $server = []): TestResponse
+{
+    $body = json_encode(['id' => 'abc-123', 'type' => 'validation.webhook', 'date' => now()->toAtomString(), 'subject' => []], JSON_THROW_ON_ERROR);
+
+    return test()->call('POST', '/api/webhooks/tebex', server: [
+        'REMOTE_ADDR' => $peer,
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_ACCEPT' => 'application/json',
+        'HTTP_X_SIGNATURE' => hash_hmac('sha256', hash('sha256', $body), SECRET),
+        ...$server,
+    ], content: $body);
+}
+
+test('behind the Cloudflare tunnel the allowlist checks CF-Connecting-IP, never the loopback peer', function (): void {
+    // cloudflared on the same host: the peer is loopback and Cloudflare names the client.
+    sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3'])->assertOk();
+    // Loopback without the header is not Tebex.
+    sendValidationFrom('127.0.0.1')->assertNotFound();
+    // An outside peer cannot claim to be Tebex with the header.
+    sendValidationFrom('203.0.113.9', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3'])->assertNotFound();
+    sendValidationFrom('203.0.113.9', ['HTTP_X_FORWARDED_FOR' => '18.209.80.3'])->assertNotFound();
+});
+
+test('the webhook throttle is per client address', function (): void {
+    resolve(TebexSettings::class)->save('abcd-public', null, null, ['18.209.80.3', '54.87.231.232']);
+
+    for ($i = 0; $i < 120; $i++) {
+        sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '203.0.113.'.($i % 2 === 0 ? '9' : '10')]);
+    }
+
+    // Another address flooding through the same tunnel does not use up Tebex's allowance.
+    sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3'])->assertOk();
+
+    for ($i = 0; $i < 119; $i++) {
+        sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3']);
+    }
+
+    sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3'])->assertTooManyRequests();
+    sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '54.87.231.232'])->assertOk();
+});

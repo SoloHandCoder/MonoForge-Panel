@@ -244,6 +244,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($user instanceof User ? $user->uuid : (string) $request->ip());
         });
 
+        // Tebex webhooks: 120 a minute per client address (CF-Connecting-IP behind the tunnel, see
+        // TrustProxies), so a flood from one address cannot use up Tebex's own deliveries.
+        RateLimiter::for('tebex.webhook', fn (Request $request): Limit => Limit::perMinute(120)->by('tebex:'.$request->ip()));
+
         ResourceLimit::boot();
     }
 
