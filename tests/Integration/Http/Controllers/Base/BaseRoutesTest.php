@@ -53,3 +53,9 @@ test('robots.txt lets crawlers reach the homepage only', function (): void {
 
     expect($rules)->toContain('Allow: /$')->toContain('Disallow: /')->not->toContain('Allow: /auth');
 });
+test('the page bootstrap tells the editor the largest file the panel serves for editing', function (): void {
+    $this->get('/auth/login')->assertViewHas('siteConfiguration', fn (array $config): bool => $config['files']['maxEditSize'] === 4 * 1024 * 1024);
+
+    config(['pterodactyl.files.max_edit_size' => 1024 * 1024]);
+    $this->get('/auth/login')->assertViewHas('siteConfiguration', fn (array $config): bool => $config['files']['maxEditSize'] === 1024 * 1024);
+});

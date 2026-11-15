@@ -44,6 +44,7 @@ const listings = new Map<string, ReturnType<typeof entry>[]>([
     ['/', [entry('config', false), entry('server.properties'), entry('world.zip', true, 900, 'application/zip')]],
     ['/config', [entry('app.yml'), entry('huge.log', true, 6 * 1024 * 1024), entry('rules.json')]],
     ['/plugins/Essentials', [entry('config.yml')]],
+    ['/logs', [entry('big.log', true, 4.5 * 1024 * 1024)]],
 ]);
 
 const searchResult = {
@@ -124,6 +125,7 @@ beforeEach(async () => {
 }, 20000);
 
 afterEach(() => {
+    delete (window as { SiteConfiguration?: unknown }).SiteConfiguration;
     cleanup();
     host?.dispose();
     host = undefined;
@@ -242,13 +244,65 @@ it('keeps every file read-only without the update permission', async () => {
     expect(writes()).toEqual([]);
 });
 
-it('refuses files over 5 MB and files that are not text, without fetching them', async () => {
+it('refuses files over the panel max edit size and files that are not text, without fetching them', async () => {
     open('?path=%2Fconfig%2Fhuge.log');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('the editor opens files up to 5 MiB');
+    expect(await screen.findByRole('alert')).toHaveTextContent('the editor opens files up to 4 MiB');
     fireEvent.click(screen.getByRole('button', { name: 'world.zip' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This file is not text'));
     expect(contentFetches()).toEqual([]);
+});
+
+it('takes the size limit from the panel settings, falling back to the default of 4 MiB', async () => {
+    open('?path=%2Flogs%2Fbig.log');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+        'This file is 4.5 MiB; the editor opens files up to 4 MiB'
+    );
+    expect(contentFetches()).toEqual([]);
+    cleanup();
+    host?.dispose();
+
+    (window as { SiteConfiguration?: unknown }).SiteConfiguration = {
+        name: 'Panel',
+        locale: 'en',
+        recaptcha: { enabled: false, siteKey: '' },
+        files: { maxEditSize: 8 * 1024 * 1024 },
+    };
+    open('?path=%2Flogs%2Fbig.log');
+
+    expect(await screen.findByLabelText('Editor /logs/big.log')).toHaveValue('contents of /logs/big.log');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+it('saves once more when Ctrl+S is pressed again while the same file is still saving', async () => {
+    let release = () => {};
+
+    open('?path=%2Fconfig%2Fapp.yml');
+
+    const buffer = await screen.findByLabelText('Editor /config/app.yml');
+
+    fireEvent.change(buffer, { target: { value: 'first' } });
+    holdWrites = new Promise((resolve) => {
+        release = resolve;
+    });
+    press('s');
+    await waitFor(() => expect(writes()).toHaveLength(1));
+
+    fireEvent.change(buffer, { target: { value: 'second' } });
+    press('s');
+    press('s');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(writes()).toHaveLength(1);
+
+    holdWrites = null;
+    await act(async () => release());
+
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes().map((write) => write.body)).toEqual(['first', 'second']);
+    await waitFor(() => expect(screen.queryByTestId('unsaved-dot')).not.toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(writes()).toHaveLength(2);
 });
 
 it('asks before closing a tab with unsaved changes, and closes the others on request', async () => {

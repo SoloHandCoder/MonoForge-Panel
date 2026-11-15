@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { basename, dirname } from 'pathe';
 import { httpErrorToHuman } from '@/api/http';
+import type { SiteSettings } from '@/api/settings/types';
 import {
     isFileObjectEditable,
     serverFileContentQueryOptions,
@@ -10,12 +11,20 @@ import {
     writeFileContentsInput,
     type FileObject,
 } from '@/api/server/files/queries';
+import { getBootstrapSiteSettings } from '@/bootstrap';
 import { bytesToString } from '@/lib/formatters';
 import { useDebouncedCallback } from '@/plugins/useDebouncedCallback';
 import { detectLanguage, type EditorLanguage } from './languages';
 
-/** Files above this size are not opened: the buffer would make the editor sluggish. */
-export const LARGE_FILE_BYTES = 5 * 1024 * 1024;
+/** The panel's default `pterodactyl.files.max_edit_size`, for a page whose settings do not say. */
+export const DEFAULT_MAX_EDIT_BYTES = 4 * 1024 * 1024;
+
+/** The largest file the panel serves for editing: files above it are not opened. */
+export function maxEditBytes(settings: SiteSettings | undefined = getBootstrapSiteSettings()): number {
+    const size = settings?.files?.maxEditSize;
+
+    return size !== undefined && Number.isFinite(size) && size > 0 ? size : DEFAULT_MAX_EDIT_BYTES;
+}
 
 export interface EditorTab {
     readonly path: string;
@@ -39,6 +48,8 @@ export interface EditorTabsOptions {
     readonly canReadContent: boolean;
     /** May not write files: every tab is read-only and never dirty. */
     readonly readOnly: boolean;
+    /** Files above this many bytes are refused; defaults to the panel's max edit size. */
+    readonly maxBytes?: number;
 }
 
 export interface EditorTabs {
@@ -53,7 +64,10 @@ export interface EditorTabs {
     readonly closeOthers: (path: string) => void;
     /** Reports the full buffer of a file after an edit. */
     readonly change: (path: string, value: string) => void;
-    /** Writes the buffer of exactly this file, whichever tab is shown. Resolves whether it was saved. */
+    /**
+     * Writes the buffer of exactly this file, whichever tab is shown. Resolves whether it was saved.
+     * Asked again while that file is saving, it writes once more after the current save finishes.
+     */
     readonly save: (path: string) => Promise<boolean>;
     readonly hasUnsavedChanges: () => boolean;
 }
@@ -73,7 +87,7 @@ const loadingTab = (path: string): EditorTab => ({
 });
 
 /** Why a listed entry cannot be opened, or null when it can. */
-function refusal(file: FileObject): string | null {
+function refusal(file: FileObject, maxBytes: number): string | null {
     if (!file.attributes.is_file) {
         return 'This is a folder, not a file.';
     }
@@ -84,8 +98,8 @@ function refusal(file: FileObject): string | null {
 
     const size = file.attributes.size ?? 0;
 
-    return size > LARGE_FILE_BYTES
-        ? `This file is ${bytesToString(size)}; the editor opens files up to ${bytesToString(LARGE_FILE_BYTES)}. Download it from the file manager instead.`
+    return size > maxBytes
+        ? `This file is ${bytesToString(size)}; the editor opens files up to ${bytesToString(maxBytes)}. Download it from the file manager instead.`
         : null;
 }
 
@@ -93,7 +107,13 @@ function refusal(file: FileObject): string | null {
  * The editor's open files. Buffers live in refs, so typing re-renders nothing until a tab's dirty
  * flag flips; a save writes the buffer of the path it was given, read when the save starts.
  */
-export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: EditorTabsOptions): EditorTabs {
+export function useEditorTabs({
+    uuid,
+    canList,
+    canReadContent,
+    readOnly,
+    maxBytes = maxEditBytes(),
+}: EditorTabsOptions): EditorTabs {
     const queryClient = useQueryClient();
     const { mutateAsync: writeFile } = useSaveFileContent();
     const [tabs, setTabs] = useState<readonly EditorTab[]>([]);
@@ -103,7 +123,8 @@ export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: Edito
     const buffers = useRef(new Map<string, string>());
     const saved = useRef(new Map<string, string>());
     const dirty = useRef(new Set<string>());
-    const saving = useRef(new Set<string>());
+    const saving = useRef(new Map<string, Promise<boolean>>());
+    const queuedSaves = useRef(new Map<string, Promise<boolean>>());
     const resized = useRef(new Set<string>());
 
     useEffect(() => {
@@ -174,7 +195,7 @@ export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: Edito
                     }
                 }
 
-                const refused = entry ? refusal(entry) : null;
+                const refused = entry ? refusal(entry, maxBytes) : null;
 
                 if (refused) {
                     fail(refused);
@@ -195,7 +216,7 @@ export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: Edito
                 fail(httpErrorToHuman(error));
             }
         },
-        [queryClient, uuid, canList, canReadContent, update]
+        [queryClient, uuid, canList, canReadContent, maxBytes, update]
     );
 
     const forget = useCallback((path: string) => {
@@ -251,18 +272,11 @@ export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: Edito
         [readOnly, markDirty, flushSizes]
     );
 
-    const save = useCallback(
-        async (path: string): Promise<boolean> => {
-            const base = saved.current.get(path);
-
-            if (readOnly || base === undefined || saving.current.has(path)) {
-                return false;
-            }
-
+    const write = useCallback(
+        async (path: string, base: string): Promise<boolean> => {
             // Read now: the user may switch tabs or keep typing while the write is in flight.
             const value = buffers.current.get(path) ?? base;
 
-            saving.current.add(path);
             update(path, { saving: true });
             try {
                 await writeFile(writeFileContentsInput(uuid, path, value));
@@ -283,7 +297,47 @@ export function useEditorTabs({ uuid, canList, canReadContent, readOnly }: Edito
 
             return true;
         },
-        [readOnly, uuid, writeFile, update, markDirty]
+        [uuid, writeFile, update, markDirty]
+    );
+
+    const save = useCallback(
+        (path: string): Promise<boolean> => {
+            const base = saved.current.get(path);
+
+            if (readOnly || base === undefined) {
+                return Promise.resolve(false);
+            }
+
+            const running = saving.current.get(path);
+
+            if (running) {
+                // Saved again mid-write: one more write follows, however often the key is pressed.
+                const queued =
+                    queuedSaves.current.get(path) ??
+                    running.then(() => {
+                        queuedSaves.current.delete(path);
+                        const latest = saved.current.get(path);
+
+                        if (!opened.current.has(path) || latest === undefined) {
+                            return false;
+                        }
+
+                        // Nothing typed since the last write finished: that write already saved it.
+                        return buffers.current.get(path) === latest ? true : save(path);
+                    });
+
+                queuedSaves.current.set(path, queued);
+
+                return queued;
+            }
+
+            const started = write(path, base);
+
+            saving.current.set(path, started);
+
+            return started;
+        },
+        [readOnly, write]
     );
 
     const hasUnsavedChanges = useCallback(() => dirty.current.size > 0, []);

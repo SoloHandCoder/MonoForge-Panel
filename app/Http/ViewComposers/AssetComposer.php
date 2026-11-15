@@ -63,6 +63,10 @@ class AssetComposer
             'registration' => [
                 'enabled' => config()->boolean('monoforge.auth.registration.enabled'),
             ],
+            // The largest file the panel serves for editing, so the editor refuses bigger ones up front.
+            'files' => [
+                'maxEditSize' => config()->integer('pterodactyl.files.max_edit_size'),
+            ],
             // The legal documents, and those the signed-in user has to accept again.
             'legal' => $this->legalPayload(),
             // Safe mode loads no extension bundles at all.
