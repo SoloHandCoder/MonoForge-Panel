@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Contracts\Assistant;
 
 use Pterodactyl\Exceptions\Assistant\ToolException;
+use Pterodactyl\Services\Assistant\ToolContext;
+use Pterodactyl\Services\Assistant\ToolResult;
 
 /**
  * Something the assistant can do, such as reading a file or listing servers. A tool runs

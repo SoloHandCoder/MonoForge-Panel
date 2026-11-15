@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Admin\Assistant\AdminAssistantApiTest;
 
 use Illuminate\Support\Facades\Http;
-use Pterodactyl\Contracts\Assistant\ToolContext;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiProvider;
@@ -13,6 +12,7 @@ use Pterodactyl\Models\Assistant\AiToolCall;
 use Pterodactyl\Models\Assistant\AiUsage;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 use Pterodactyl\Tests\Support\Assistant\FakeAi;
 

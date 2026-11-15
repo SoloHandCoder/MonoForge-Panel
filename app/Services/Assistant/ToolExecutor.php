@@ -6,7 +6,6 @@ namespace Pterodactyl\Services\Assistant;
 
 use Carbon\CarbonImmutable;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
-use Pterodactyl\Contracts\Assistant\ToolContext;
 use Pterodactyl\Exceptions\Assistant\ToolException;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;

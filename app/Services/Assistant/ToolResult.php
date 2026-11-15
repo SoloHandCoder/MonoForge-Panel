@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pterodactyl\Contracts\Assistant;
+namespace Pterodactyl\Services\Assistant;
 
 /**
  * What a tool call returned: the text the model reads, and a small structured summary

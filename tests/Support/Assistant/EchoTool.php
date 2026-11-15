@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Support\Assistant;
 
 use Pterodactyl\Contracts\Assistant\AssistantTool;
-use Pterodactyl\Contracts\Assistant\ToolContext;
-use Pterodactyl\Contracts\Assistant\ToolResult;
+use Pterodactyl\Services\Assistant\ToolContext;
+use Pterodactyl\Services\Assistant\ToolResult;
 
 /** A harmless read tool for the loop tests: runs without confirmation and echoes its text. */
 final class EchoTool implements AssistantTool

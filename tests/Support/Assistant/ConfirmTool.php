@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Support\Assistant;
 
 use Pterodactyl\Contracts\Assistant\AssistantTool;
-use Pterodactyl\Contracts\Assistant\RestrictedTool;
-use Pterodactyl\Contracts\Assistant\ToolContext;
-use Pterodactyl\Contracts\Assistant\ToolResult;
+use Pterodactyl\Contracts\Assistant\AuthorizesAssistantTool;
 use Pterodactyl\Exceptions\Assistant\ToolException;
+use Pterodactyl\Services\Assistant\ToolContext;
+use Pterodactyl\Services\Assistant\ToolResult;
 
 /**
  * A harmless "sensitive" tool for the loop tests: always needs the user's confirmation,
  * and only records that it ran. allowedFor limits it to some users, like a permission.
  */
-final class ConfirmTool implements AssistantTool, RestrictedTool
+final class ConfirmTool implements AssistantTool, AuthorizesAssistantTool
 {
     /** @var list<array<string, mixed>> */
     public array $calls = [];

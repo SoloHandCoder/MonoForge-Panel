@@ -6,8 +6,7 @@ namespace Pterodactyl\Services\Assistant;
 
 use InvalidArgumentException;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
-use Pterodactyl\Contracts\Assistant\RestrictedTool;
-use Pterodactyl\Contracts\Assistant\ToolContext;
+use Pterodactyl\Contracts\Assistant\AuthorizesAssistantTool;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Models\Server;
 use Throwable;
@@ -59,7 +58,7 @@ class ToolRegistry
     /**
      * The tools the context's user may use right now: none in the admin assistant for a
      * non-root user or in the server assistant without `assistant.use` on the server, and
-     * never a RestrictedTool whose allowed() says no.
+     * never a AuthorizesAssistantTool whose allowed() says no.
      *
      * @return list<AssistantTool>
      */
@@ -71,7 +70,7 @@ class ToolRegistry
 
         $tools = [];
         foreach ($this->tools[$scope] ?? [] as $tool) {
-            if ($tool instanceof RestrictedTool) {
+            if ($tool instanceof AuthorizesAssistantTool) {
                 try {
                     if (! $tool->allowed($ctx)) {
                         continue;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pterodactyl\Contracts\Assistant;
+namespace Pterodactyl\Services\Assistant;
 
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;

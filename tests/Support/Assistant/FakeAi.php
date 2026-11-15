@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Support\Assistant;
 
-use Pterodactyl\Contracts\Assistant\ToolContext;
 use Pterodactyl\Enum\AiProviderPreset;
 use Pterodactyl\Models\Assistant\AiProvider;
+use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Services\Assistant\ToolRegistry;
 
 /** Builders for the assistant tests: a provider, OpenAI-shaped answers and the example tools. */
