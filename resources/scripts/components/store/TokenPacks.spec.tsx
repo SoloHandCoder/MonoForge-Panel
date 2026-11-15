@@ -4,12 +4,12 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as TokenPackQueries from '@/api/store/tokenPacks';
-import { isTebexCheckoutUrl, type TokenPackList } from '@/api/store/tokenPacks';
+import { isTebexCheckoutUrl, type TokenPackCheckout, type TokenPackList } from '@/api/store/tokenPacks';
 import TokenPacks from './TokenPacks';
 
 const state = vi.hoisted(() => ({
     packs: { enabled: true, data: [] } as TokenPackList,
-    checkout: vi.fn<(packId: number) => Promise<string>>(),
+    checkout: vi.fn<(packId: number) => Promise<TokenPackCheckout>>(),
 }));
 
 vi.mock('@/api/store/tokenPacks', async (importOriginal) => ({
@@ -22,10 +22,12 @@ vi.mock('@/api/store/tokenPacks', async (importOriginal) => ({
 vi.mock('@/api/settings/queries', () => ({ useSiteSettings: () => null }));
 
 const assign = vi.fn();
+const REF = '0b8f6c2e-5d4a-4e7b-9c1f-3a2d6e8b7f10';
 
 afterEach(cleanup);
 beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     vi.stubGlobal('location', { ...window.location, search: '', assign });
 });
 
@@ -38,7 +40,7 @@ describe('token packs', () => {
                 { id: 2, name: 'Big', tokens: 2000, bonus_tokens: 0 },
             ],
         };
-        state.checkout.mockResolvedValue('https://pay.tebex.io/abc');
+        state.checkout.mockResolvedValue({ url: 'https://pay.tebex.io/abc', checkout: REF });
 
         render(<TokenPacks />);
 
@@ -50,17 +52,20 @@ describe('token packs', () => {
 
         expect(state.checkout).toHaveBeenCalledWith(1);
         expect(assign).toHaveBeenCalledWith('https://pay.tebex.io/abc');
+        // Remembered in case Tebex drops the return URL's query.
+        expect(window.sessionStorage.getItem('monoforge:tebex-checkout')).toBe(REF);
     });
 
     it('never follows a checkout link off Tebex', async () => {
         state.packs = { enabled: true, data: [{ id: 1, name: 'Starter', tokens: 500, bonus_tokens: 0 }] };
-        state.checkout.mockResolvedValue('https://evil.example.com/pay');
+        state.checkout.mockResolvedValue({ url: 'https://evil.example.com/pay', checkout: REF });
 
         render(<TokenPacks />);
         await userEvent.click(screen.getByRole('button', { name: 'Buy Starter' }));
 
         expect(assign).not.toHaveBeenCalled();
         expect(screen.getByRole('alert')).toHaveTextContent('unexpected checkout link');
+        expect(window.sessionStorage.getItem('monoforge:tebex-checkout')).toBeNull();
     });
 
     it('renders nothing while no Tebex store is connected', () => {

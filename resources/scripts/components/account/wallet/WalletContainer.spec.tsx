@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({ getWallet: vi.fn() }));
 
 vi.mock('@/api/generated', () => ({ clientGetWallet: mocks.getWallet }));
 vi.mock('@/components/store/TokenPacks', () => ({ default: () => <p>Token packs</p> }));
+vi.mock('@/components/store/TokenPurchaseReturn', () => ({ default: () => null }));
 
 afterEach(() => {
     cleanup();

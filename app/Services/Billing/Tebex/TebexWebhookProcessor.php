@@ -6,7 +6,9 @@ namespace Pterodactyl\Services\Billing\Tebex;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Pterodactyl\Facades\Activity;
+use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\Billing\TokenTransaction;
@@ -86,6 +88,7 @@ readonly class TebexWebhookProcessor
             };
 
             $payment->save();
+            $this->linkCheckout($payment, $subject);
         });
     }
 
@@ -486,11 +489,38 @@ readonly class TebexWebhookProcessor
     }
 
     /**
-     * The panel user from the basket's custom data, on the products or on the payment itself.
+     * Links the payment to the panel checkout named in the basket's custom data, so the
+     * player's return page can follow it. Only a checkout of the user the custom data names,
+     * and not yet linked to another payment, is linked.
      *
      * @param  array<array-key, mixed>  $subject
      */
-    private function user(array $subject): ?User
+    private function linkCheckout(TebexPayment $payment, array $subject): void
+    {
+        foreach ($this->customs($subject) as $custom) {
+            $reference = $custom[TebexCheckout::CUSTOM_KEY] ?? null;
+            $userId = $custom['user_id'] ?? null;
+            if (! is_string($reference) || ! Str::isUuid($reference) || ! is_int($userId) && (! is_string($userId) || ! ctype_digit($userId))) {
+                continue;
+            }
+
+            TebexCheckout::query()
+                ->where('uuid', $reference)
+                ->where('user_id', (int) $userId)
+                ->whereNull('tebex_payment_id')
+                ->update(['tebex_payment_id' => $payment->id, 'updated_at' => now()]);
+
+            return;
+        }
+    }
+
+    /**
+     * The basket's custom data, from the products first, then from the payment itself.
+     *
+     * @param  array<array-key, mixed>  $subject
+     * @return list<array<array-key, mixed>>
+     */
+    private function customs(array $subject): array
     {
         $customs = [];
         foreach (is_array($subject['products'] ?? null) ? $subject['products'] : [] as $product) {
@@ -503,7 +533,17 @@ readonly class TebexWebhookProcessor
             $customs[] = $subject['custom'];
         }
 
-        foreach ($customs as $custom) {
+        return $customs;
+    }
+
+    /**
+     * The panel user from the basket's custom data, on the products or on the payment itself.
+     *
+     * @param  array<array-key, mixed>  $subject
+     */
+    private function user(array $subject): ?User
+    {
+        foreach ($this->customs($subject) as $custom) {
             $id = $custom['user_id'] ?? null;
             if (is_int($id) || (is_string($id) && ctype_digit($id))) {
                 return User::query()->find((int) $id);

@@ -26,7 +26,14 @@ export const tokenPacksQueryOptions = () =>
 
 export const useTokenPacks = () => useQuery(tokenPacksQueryOptions());
 
-/** Starts a Tebex checkout for one pack; resolves to the Tebex page to send the player to. */
+export interface TokenPackCheckout {
+    /** The Tebex page to send the player to. */
+    url: string;
+    /** The panel's reference for the checkout, to follow the payment on return. */
+    checkout: string;
+}
+
+/** Starts a Tebex checkout for one pack; resolves to the Tebex page and the checkout reference. */
 export const useTokenPackCheckout = () => {
     const mutation = useMutation({
         ...clientBuyTokenPackMutation(),
@@ -35,8 +42,11 @@ export const useTokenPackCheckout = () => {
 
     return {
         ...mutation,
-        mutateAsync: async (packId: number): Promise<string> =>
-            (await mutation.mutateAsync({ body: { pack_id: packId } })).url ?? '',
+        mutateAsync: async (packId: number): Promise<TokenPackCheckout> => {
+            const { url, checkout } = await mutation.mutateAsync({ body: { pack_id: packId } });
+
+            return { url, checkout };
+        },
     };
 };
 

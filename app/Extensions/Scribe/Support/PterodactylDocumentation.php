@@ -57,6 +57,7 @@ class PterodactylDocumentation
         'allocation' => ['integer', 'The allocation ID.', 1],
         'backup' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
         'backup_uuid' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
+        'checkout' => ['string', 'The token pack checkout reference returned when the checkout was started.', '0b8f6c2e-5d4a-4e7b-9c1f-3a2d6e8b7f10'],
         'database' => ['string', 'The database ID.', 'Lk3jx4pQ'],
         'database_id' => ['string', 'The database ID.', 'Lk3jx4pQ'],
         'database_host' => ['integer', 'The database host ID.', 1],

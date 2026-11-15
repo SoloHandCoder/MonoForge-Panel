@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace Pterodactyl\Http\Controllers\Api\Client\Store;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
+use Knuckles\Scribe\Attributes\ResponseField;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Pterodactyl\Exceptions\Billing\TebexCheckoutException;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 use Pterodactyl\Http\Requests\Api\Client\Store\CheckoutTokenPackRequest;
+use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Services\Billing\Tebex\TebexClient;
 use Pterodactyl\Services\Billing\Tebex\TebexSettings;
@@ -49,7 +53,9 @@ class TokenPackController extends ClientApiController
 
     #[Endpoint('Buy token pack', 'Creates a Tebex basket for a token pack and returns the Tebex checkout URL to send the user to. Tokens are credited when Tebex confirms the payment.')]
     #[BodyParam('pack_id', 'integer', 'The token pack to buy.', required: true, example: 1)]
-    #[ScribeResponse(['url' => 'https://pay.tebex.io/abcdef-1234567890'], description: 'Checkout started.')]
+    #[ScribeResponse(['url' => 'https://pay.tebex.io/abcdef-1234567890', 'checkout' => '0b8f6c2e-5d4a-4e7b-9c1f-3a2d6e8b7f10'], description: 'Checkout started.')]
+    #[ResponseField('url', 'string', 'The Tebex checkout page to send the user to.')]
+    #[ResponseField('checkout', 'string', 'The checkout reference, to follow the payment with Get token purchase.')]
     #[ScribeResponse(status: 409, description: 'The user has to accept the updated Terms of Service or Privacy Policy first.')]
     public function checkout(CheckoutTokenPackRequest $request): JsonResponse
     {
@@ -60,14 +66,30 @@ class TokenPackController extends ClientApiController
         $pack = TokenPack::query()->where('visible', true)->find($request->integer('pack_id'));
         throw_unless($pack instanceof TokenPack, DisplayException::class, 'That token pack is not on sale.');
 
-        $url = $this->tebex->checkout(
-            $pack->tebex_package_id,
-            ['user_id' => $request->user()->id, 'pack_id' => $pack->id],
-            $this->settings->walletUrl('complete'),
-            $this->settings->walletUrl('cancelled'),
-            $request->ip(),
-        );
+        // The checkout is recorded first so its reference can travel in the return URL and the
+        // basket's custom data; the payment webhook links the payment back to it.
+        $checkout = TebexCheckout::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $request->user()->id,
+            'token_pack_id' => $pack->id,
+        ]);
 
-        return new JsonResponse(['url' => $url]);
+        try {
+            $basket = $this->tebex->checkout(
+                $pack->tebex_package_id,
+                ['user_id' => $request->user()->id, 'pack_id' => $pack->id, TebexCheckout::CUSTOM_KEY => $checkout->uuid],
+                $this->settings->walletUrl('complete', $checkout->uuid),
+                $this->settings->walletUrl('cancelled', $checkout->uuid),
+                $request->ip(),
+            );
+        } catch (TebexCheckoutException $tebexCheckoutException) {
+            $checkout->delete();
+
+            throw $tebexCheckoutException;
+        }
+
+        $checkout->update(['basket_ident' => mb_substr($basket['ident'], 0, 191)]);
+
+        return new JsonResponse(['url' => $basket['url'], 'checkout' => $checkout->uuid]);
     }
 }

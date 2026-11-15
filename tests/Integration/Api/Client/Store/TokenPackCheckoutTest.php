@@ -7,6 +7,7 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Store\TokenPackCheckoutT
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Pterodactyl\Enum\LegalDocument;
+use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\Tebex\TebexSettings;
@@ -45,15 +46,24 @@ test('creates a basket for the pack and returns the Tebex checkout link', functi
         'headless.tebex.io/api/baskets/bkt-1/packages' => Http::response(['data' => ['ident' => 'bkt-1', 'links' => ['checkout' => 'https://pay.tebex.io/bkt-1']]]),
     ]);
 
-    $this->actingAs($user)->postJson('/api/client/store/tokens/checkout', ['pack_id' => $pack->id, 'tokens' => 999999])
+    $response = $this->actingAs($user)->postJson('/api/client/store/tokens/checkout', ['pack_id' => $pack->id, 'tokens' => 999999])
         ->assertOk()
-        ->assertExactJson(['url' => 'https://pay.tebex.io/bkt-1']);
+        ->assertJsonPath('url', 'https://pay.tebex.io/bkt-1');
+
+    // The checkout is recorded for the user, with the basket Tebex created for it.
+    $checkout = TebexCheckout::query()->sole();
+    expect($response->json('checkout'))->toBe($checkout->uuid)
+        ->and($checkout->user_id)->toBe($user->id)
+        ->and($checkout->token_pack_id)->toBe($pack->id)
+        ->and($checkout->basket_ident)->toBe('bkt-1')
+        ->and($checkout->tebex_payment_id)->toBeNull();
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/accounts/abcd-public/baskets')
-        && $request['custom'] === ['user_id' => $user->id, 'pack_id' => $pack->id]
+        && $request['custom'] === ['user_id' => $user->id, 'pack_id' => $pack->id, 'checkout' => $checkout->uuid]
         && $request['complete_auto_redirect'] === true
         && is_string($request['ip_address'])
-        && str_ends_with((string) $request['complete_url'], '/account/wallet?tebex=complete'));
+        && str_ends_with((string) $request['complete_url'], '/account/wallet?tebex=complete&checkout='.$checkout->uuid)
+        && str_ends_with((string) $request['cancel_url'], '/account/wallet?tebex=cancelled&checkout='.$checkout->uuid));
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://headless.tebex.io/api/baskets/bkt-1/packages'
         && $request['package_id'] === '6012345'
         && $request['quantity'] === 1);
@@ -83,7 +93,9 @@ test('a Tebex error is reported without leaking details', function (): void {
     $response = $this->actingAs(User::factory()->create())->postJson('/api/client/store/tokens/checkout', ['pack_id' => $pack->id])
         ->assertBadRequest();
 
-    expect($response->getContent())->not->toContain('abcd-public')->not->toContain('Invalid webstore');
+    expect($response->getContent())->not->toContain('abcd-public')->not->toContain('Invalid webstore')
+        // A checkout that never reached Tebex is not kept.
+        ->and(TebexCheckout::query()->count())->toBe(0);
 });
 
 test('a user with updated terms to accept cannot start a checkout', function (): void {

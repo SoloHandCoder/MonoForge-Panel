@@ -37,13 +37,15 @@ readonly class TebexClient
     }
 
     /**
-     * Create a basket for one package and return the Tebex checkout URL to send the player to.
+     * Create a basket for one package and return its ident and the Tebex checkout URL to send
+     * the player to.
      *
      * @param  array<string, int|string>  $custom  echoed back by Tebex in the payment webhooks
+     * @return array{ident: string, url: string}
      *
      * @throws TebexCheckoutException
      */
-    public function checkout(string $packageId, array $custom, string $completeUrl, string $cancelUrl, ?string $ipAddress): string
+    public function checkout(string $packageId, array $custom, string $completeUrl, string $cancelUrl, ?string $ipAddress): array
     {
         $token = $this->settings->publicToken();
         throw_if($token === '', TebexCheckoutException::class, 'The token store is not set up yet.');
@@ -65,7 +67,7 @@ readonly class TebexClient
         $url = is_array($links) ? ($links['checkout'] ?? null) : null;
         throw_unless(is_string($url) && self::isCheckoutUrl($url), TebexCheckoutException::class, self::FAILED);
 
-        return $url;
+        return ['ident' => $ident, 'url' => $url];
     }
 
     /**
