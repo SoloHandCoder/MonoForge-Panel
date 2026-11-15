@@ -73,6 +73,40 @@ final readonly class NodeUsageService
     }
 
     /**
+     * Whether each node's Wings answers its system information, for the status page. A
+     * reading the insights page took in the last few seconds is reused; the other nodes are
+     * asked at once with the same short timeouts, and only for /api/system, never for their
+     * servers.
+     *
+     * @param  list<Node>  $nodes
+     * @return array<int, bool> by node id
+     */
+    public function reachability(array $nodes): array
+    {
+        $reachable = array_map(fn (array $reading): bool => $reading['online'], $this->cached($nodes));
+
+        /** @var array<int, array{url: string, token: string}> $clients */
+        $clients = [];
+        foreach ($nodes as $node) {
+            if (isset($reachable[$node->id])) {
+                continue;
+            }
+
+            try {
+                $clients[$node->id] = ['url' => $node->getConnectionAddress(), 'token' => $node->getDecryptedKey()];
+            } catch (Throwable) {
+                $reachable[$node->id] = false;
+            }
+        }
+
+        foreach ($this->pool(array_map(fn (array $client): array => [$client, '/api/system'], $clients)) as $id => $system) {
+            $reachable[$id] = is_array($system);
+        }
+
+        return $reachable;
+    }
+
+    /**
      * @param  list<Server>  $servers
      * @param  LiveReading  $live
      * @return NodeUsage

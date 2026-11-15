@@ -13,10 +13,13 @@ use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
+use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
 use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Models\Status\StatusCheck;
+use Pterodactyl\Models\Status\StatusDay;
 use Ramsey\Uuid\Uuid;
 
 final class Scheduler
@@ -48,6 +51,11 @@ final class Scheduler
 
         // Retry failed playit.gg tunnels and pick up addresses for pending ones.
         $schedule->command(SyncTunnelsCommand::class)->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
+
+        // The public status page: one cheap reachability check of the panel and each shown node
+        // a minute, and the checks and their daily sums dropped after 90 days.
+        $schedule->command(CheckStatusCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
+        $schedule->command(PruneCommand::class, ['--model' => [StatusCheck::class, StatusDay::class]])->daily()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

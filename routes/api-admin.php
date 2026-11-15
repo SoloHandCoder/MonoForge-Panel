@@ -68,6 +68,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\StatusPageController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopAddonController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopCategoryController;
@@ -619,6 +620,10 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     Route::put('/legal/{document}', [LegalController::class, 'update'])
         ->whereIn('document', LegalDocument::values())
         ->name('.legal.update');
+
+    // The public status page and the nodes it shows.
+    Route::get('/status', [StatusPageController::class, 'index'])->name('.status');
+    Route::put('/status', [StatusPageController::class, 'update'])->name('.status.update');
 });
 
 /*

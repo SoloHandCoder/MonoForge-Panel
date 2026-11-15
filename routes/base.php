@@ -27,6 +27,11 @@ Route::get('/legal/{document}', LegalPageController::class)
     ->whereIn('document', LegalDocument::values())
     ->name('legal');
 
+// The public status page, readable without signing in.
+Route::get('/status', [IndexController::class, 'index'])
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('status');
+
 // Files uploaded through extension `file` settings. Public and stateless: no
 // session, no cookies, so the immutable cache headers are safe behind a proxy.
 Route::get('/'.ExtensionSettingFiles::ROUTE_PREFIX.'/{extension}/{file}', ExtensionFileController::class)
