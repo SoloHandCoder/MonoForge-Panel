@@ -67,6 +67,9 @@ use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopMultiplierController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPeriodController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPlanController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexPaymentController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
@@ -104,13 +107,12 @@ Route::prefix('/announcements')->name('api.admin.announcements')->group(function
 
 /*
 |--------------------------------------------------------------------------
-| Shop Routes (phase 3 Task R)
+| Shop Routes (phase 3)
 |--------------------------------------------------------------------------
 |
 | Endpoint: /api/admin/shop
 |
-| Task P (token packs, Tebex) and Task V (tunnels) add their own groups under
-| /api/admin/shop next to these.
+| Catalog, pricing and limits, plus Tebex settings, token packs and payments.
 |
 */
 Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
@@ -144,6 +146,15 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/addons', [ShopAddonController::class, 'store'])->name('.addons.store');
     Route::put('/addons/{addon:id}', [ShopAddonController::class, 'update'])->name('.addons.update');
     Route::delete('/addons/{addon:id}', [ShopAddonController::class, 'destroy'])->name('.addons.delete');
+
+    Route::get('/tebex', [TebexSettingsController::class, 'index'])->name('.tebex');
+    Route::put('/tebex', [TebexSettingsController::class, 'update'])->name('.tebex.update');
+    Route::get('/tebex/payments', [TebexPaymentController::class, 'index'])->name('.tebex.payments');
+
+    Route::get('/token-packs', [TokenPackController::class, 'index'])->name('.token-packs');
+    Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
+    Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
+    Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
 });
 
 /*
