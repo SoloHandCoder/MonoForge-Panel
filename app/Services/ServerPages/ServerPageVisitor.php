@@ -74,13 +74,13 @@ final class ServerPageVisitor
             return $address;
         }
 
-        if (mb_strlen($packed) === 16) {
-            return bin2hex(mb_substr($packed, 0, $ipv6Bytes)).'::/'.($ipv6Bytes * 8);
+        if (mb_strlen($packed, '8bit') === 16) {
+            return bin2hex(mb_substr($packed, 0, $ipv6Bytes, '8bit')).'::/'.($ipv6Bytes * 8);
         }
 
         $bytes = intdiv($ipv4Bits, 8);
 
-        return bin2hex(mb_substr($packed, 0, $bytes)).'/'.$ipv4Bits;
+        return bin2hex(mb_substr($packed, 0, $bytes, '8bit')).'/'.$ipv4Bits;
     }
 
     private function hash(string $kind, string $purpose, string $scope, string $value): string

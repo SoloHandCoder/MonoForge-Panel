@@ -150,7 +150,7 @@ class ServerPageBanners
     /** Whether a JPEG carries an EXIF block (camera, time, often GPS). */
     private function hasExif(string $bytes): bool
     {
-        return preg_match('/\xFF\xE1..Exif\x00\x00/s', mb_substr($bytes, 0, 65_536)) === 1;
+        return preg_match('/\xFF\xE1..Exif\x00\x00/s', mb_substr($bytes, 0, 65_536, '8bit')) === 1;
     }
 
     /** Decodes and encodes the image again when GD can, so only its pixels are kept. */
