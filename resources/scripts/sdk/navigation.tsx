@@ -22,6 +22,7 @@ export type CorePanelPath =
     | `/account${'' | '/api' | '/ssh' | '/activity' | '/wallet'}`
     | `/server/$id${'' | '/files' | '/databases' | '/schedules' | '/users' | '/users/new' | '/backups' | '/network' | '/startup' | '/settings' | '/activity'}`
     | '/server/$id/files/$action'
+    | '/server/$id/editor'
     | '/server/$id/schedules/$scheduleId'
     | `/panel${'' | '/users' | '/locations' | '/nodes' | '/servers' | '/databases' | '/mounts' | '/eggs' | '/tags' | '/extensions' | '/api' | '/activity' | '/settings' | '/settings/mail' | '/settings/advanced' | '/settings/registration'}`
     | `/panel/${'users' | 'locations' | 'nodes' | 'servers' | 'databases' | 'mounts'}/$id`

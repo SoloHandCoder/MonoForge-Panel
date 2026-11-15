@@ -324,3 +324,28 @@ it('shows the listing error with a retry in place of the page', async () => {
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'New file' })).not.toBeInTheDocument();
 });
+
+it('links the full-screen editor from the toolbar and from the row menu of a text file', async () => {
+    open();
+
+    expect(await screen.findByRole('link', { name: 'Open editor' })).toHaveAttribute(
+        'href',
+        '/server/test-server/editor?dir=%2Fconfig'
+    );
+    await checkboxOf('b.txt');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open file options' }).at(-1)!);
+    expect(await screen.findByRole('menuitem', { name: /Open in editor/ })).toHaveAttribute(
+        'href',
+        '/server/test-server/editor?path=%2Fconfig%2Fb.txt'
+    );
+});
+
+it('offers the editor to a user who may only read, but not for a folder', async () => {
+    open(['file.read', 'file.read-content']);
+
+    expect(await screen.findByRole('link', { name: 'Open editor' })).toBeVisible();
+    await checkboxOf('plugins');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open file options' })[0]);
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Open in editor/ })).not.toBeInTheDocument();
+});

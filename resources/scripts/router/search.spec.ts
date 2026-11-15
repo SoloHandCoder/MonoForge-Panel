@@ -4,6 +4,7 @@ import { adminServerListQueryParams } from '@/api/admin/servers/queries';
 import {
     parseActivitySearch,
     parseDashboardSearch,
+    parseEditorSearch,
     parseEmailSearch,
     parseNodeListSearch,
     parsePageSearch,
@@ -85,5 +86,16 @@ describe('parseNodeListSearch', () => {
             filters: { name: 'edge' },
             sorts: { disk: 'asc' },
         });
+    });
+});
+
+describe('parseEditorSearch', () => {
+    it('keeps absolute server paths and drops anything else', () => {
+        expect(parseEditorSearch({ path: '/config/app.yml', dir: '/plugins' })).toEqual({
+            path: '/config/app.yml',
+            dir: '/plugins',
+        });
+        expect(parseEditorSearch({ path: 'relative.yml', dir: 42 })).toEqual({});
+        expect(parseEditorSearch({ path: `/${'a'.repeat(2048)}` })).toEqual({});
     });
 });

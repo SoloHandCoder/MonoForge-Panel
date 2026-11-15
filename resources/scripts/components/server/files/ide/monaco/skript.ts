@@ -1,0 +1,87 @@
+import type * as Monaco from 'monaco-editor/editor/editor.api.js';
+
+/** A small highlighter for Skript (.sk), the Minecraft scripting plugin, which Monaco does not ship. */
+export function registerSkript(monaco: typeof Monaco): void {
+    monaco.languages.register({ id: 'skript', extensions: ['.sk'], aliases: ['Skript', 'sk'] });
+    monaco.languages.setLanguageConfiguration('skript', {
+        comments: { lineComment: '#' },
+        brackets: [
+            ['{', '}'],
+            ['[', ']'],
+            ['(', ')'],
+        ],
+        autoClosingPairs: [
+            { open: '{', close: '}' },
+            { open: '[', close: ']' },
+            { open: '(', close: ')' },
+            { open: '"', close: '"', notIn: ['string'] },
+            { open: '%', close: '%', notIn: ['string'] },
+        ],
+        indentationRules: { increaseIndentPattern: /:\s*(#.*)?$/, decreaseIndentPattern: /^\s*else\b/ },
+        folding: { offSide: true },
+    });
+    monaco.languages.setMonarchTokensProvider('skript', {
+        ignoreCase: true,
+        keywords: [
+            'on',
+            'command',
+            'function',
+            'trigger',
+            'if',
+            'else',
+            'loop',
+            'while',
+            'return',
+            'stop',
+            'set',
+            'add',
+            'remove',
+            'delete',
+            'clear',
+            'send',
+            'broadcast',
+            'message',
+            'wait',
+            'cancel',
+            'event',
+            'options',
+            'variables',
+            'aliases',
+            'permission',
+            'usage',
+            'cooldown',
+            'executable',
+            'by',
+            'to',
+            'from',
+            'of',
+            'is',
+            'are',
+            'not',
+            'and',
+            'or',
+            'true',
+            'false',
+            'every',
+            'parse',
+            'exit',
+        ],
+        tokenizer: {
+            root: [
+                [/#.*$/, 'comment'],
+                [/\{[^}]*\}/, 'variable'],
+                [/"/, { token: 'string.quote', next: '@string' }],
+                [/\d+(\.\d+)?/, 'number'],
+                [/[a-z_][\w-]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+                [/[{}()[\]:]/, 'delimiter'],
+            ],
+            string: [
+                [/%[^%"]*%/, 'variable'],
+                [/""/, 'string.escape'],
+                [/[^"%]+/, 'string'],
+                [/"/, { token: 'string.quote', next: '@pop' }],
+                [/%/, 'string'],
+            ],
+        },
+    });
+}

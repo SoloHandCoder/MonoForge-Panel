@@ -167,6 +167,10 @@ export default function useFileManagerModel(): FileManagerModel {
                     openable,
                     extractable: isFileObjectArchiveType(file),
                     destination: entryDestination(id, file, path, openable),
+                    editorDestination:
+                        file.attributes.is_file && openable
+                            ? { to: '/server/$id/editor', params: { id }, search: { path } }
+                            : null,
                     file,
                 };
             }),
@@ -315,6 +319,7 @@ export default function useFileManagerModel(): FileManagerModel {
                 params: { id, action: 'new' },
                 hash: encodePathSegments(directory),
             },
+            editorDestination: { to: '/server/$id/editor', params: { id }, search: { dir: directory } },
             uploads,
             resolve: (name) => normalizeServerPath(join(directory, name)),
             actions,

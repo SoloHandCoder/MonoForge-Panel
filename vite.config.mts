@@ -67,7 +67,9 @@ function mainEntryChunks(entry: string) {
                 chunks.add(fileName);
                 chunk.imports.forEach(visit);
             };
-            const main = Object.values(bundle).find((output) => output.type === 'chunk' && output.facadeModuleId === entry);
+            const main = Object.values(bundle).find(
+                (output) => output.type === 'chunk' && output.facadeModuleId === entry
+            );
 
             chunks.clear();
             if (main) {
@@ -99,6 +101,11 @@ export default defineConfig(({ mode }) => {
             alias: {
                 '@': fileURLToPath(new URL('./resources/scripts', import.meta.url)),
                 '@feature': fileURLToPath(new URL('./resources/scripts/components/server/features', import.meta.url)),
+                // Monaco's package exports map every subpath to a `.js` module, so its icon font's
+                // stylesheet is reached through this alias instead.
+                'monaco-codicons': fileURLToPath(
+                    new URL('./node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon', import.meta.url)
+                ),
             },
         },
         plugins: [

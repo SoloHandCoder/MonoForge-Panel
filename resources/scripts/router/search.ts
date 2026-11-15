@@ -8,6 +8,7 @@ import type { AdminDatabaseHostListSort } from '@/api/admin/database-hosts/queri
 import type { AdminMountListSort } from '@/api/admin/mounts/queries';
 import type { ApiKeyListSort } from '@/api/admin/api-keys/queries';
 import type { AdminTagListSort } from '@/api/admin/tags/queries';
+import { isString } from '@/lib/objects';
 import { parsePageSearch, searchText, type PageSearch, type RawSearch } from '@/router/pageSearch';
 
 export {
@@ -167,3 +168,25 @@ export const useDatabaseHostListSearch = () => useSortableAdminListSearch(parseD
 export const useMountListSearch = () => useSortableAdminListSearch(parseMountListSearch);
 export const useTagListSearch = () => useSortableAdminListSearch(parseTagListSearch);
 export const useApiKeyListSearch = () => useSortableAdminListSearch(parseApiKeyListSearch);
+
+/** The editor route's search: the file to open and a folder to expand, both absolute server paths. */
+export type EditorSearch = { path?: string; dir?: string };
+
+const serverPathSearch = (value: RawSearch[keyof RawSearch]): string | undefined =>
+    isString(value) && value.startsWith('/') && value.length <= 2048 ? value : undefined;
+
+export const parseEditorSearch = (search: RawSearch): EditorSearch => {
+    const result: EditorSearch = {};
+    const path = serverPathSearch(search.path);
+    const dir = serverPathSearch(search.dir);
+
+    if (path) {
+        result.path = path;
+    }
+
+    if (dir) {
+        result.dir = dir;
+    }
+
+    return result;
+};

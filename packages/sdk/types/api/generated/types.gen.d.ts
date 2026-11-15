@@ -1312,6 +1312,23 @@ export type ClientFileObjectResource = {
     object: string;
     attributes: ClientFileObjectAttributes;
 };
+export type ClientFileSearchResultAttributes = {
+    path: string;
+    name: string;
+    is_file: boolean;
+    size: number | null;
+};
+export type ClientFileSearchResultListResponse = {
+    object: string;
+    data: Array<ClientFileSearchResultResource>;
+    meta?: {
+        truncated: boolean;
+    };
+};
+export type ClientFileSearchResultResource = {
+    object: string;
+    attributes: ClientFileSearchResultAttributes;
+};
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
         id: number;
@@ -7572,6 +7589,15 @@ export type ClientDeleteServerDatabaseDatabaseIdPathParameter = string;
  */
 export type ClientListFilesDirectoryQueryParameter = string | null;
 export type ClientListFilesServerUuidPathParameter = string;
+/**
+ * Words the path must contain, case-insensitively.
+ */
+export type ClientSearchFilesQueryQueryParameter = string;
+/**
+ * Directory to search below. Defaults to the server root.
+ */
+export type ClientSearchFilesDirectoryQueryParameter = string | null;
+export type ClientSearchFilesServerUuidPathParameter = string;
 /**
  * Path to the file to read.
  */
@@ -18327,6 +18353,56 @@ export type ClientListFilesResponses = {
     200: ClientFileObjectListResponse;
 };
 export type ClientListFilesResponse = ClientListFilesResponses[keyof ClientListFilesResponses];
+export type ClientSearchFilesData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientSearchFilesServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * Words the path must contain, case-insensitively.
+         */
+        query: ClientSearchFilesQueryQueryParameter;
+        /**
+         * Directory to search below. Defaults to the server root.
+         */
+        directory?: ClientSearchFilesDirectoryQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/files/search';
+};
+export type ClientSearchFilesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not list the directory.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientSearchFilesError = ClientSearchFilesErrors[keyof ClientSearchFilesErrors];
+export type ClientSearchFilesResponses = {
+    /**
+     * Matching files returned.
+     */
+    200: ClientFileSearchResultListResponse;
+};
+export type ClientSearchFilesResponse = ClientSearchFilesResponses[keyof ClientSearchFilesResponses];
 export type ClientGetFileContentsData = {
     body?: never;
     path: {

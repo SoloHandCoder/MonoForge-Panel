@@ -96,6 +96,8 @@ export function createTestFileManagerEntry(options: Partial<FileManagerEntry> = 
             kind === 'directory'
                 ? { to: '/server/$id/files', params: { id: TEST_SERVER }, hash: path }
                 : { to: '/server/$id/files/$action', params: { id: TEST_SERVER, action: 'edit' }, hash: path },
+        editorDestination:
+            kind === 'directory' ? null : { to: '/server/$id/editor', params: { id: TEST_SERVER }, search: { path } },
         file,
         ...options,
     };
@@ -123,6 +125,7 @@ export function createTestFileManager(options: Partial<FileManagerModel> = {}): 
             params: { id: TEST_SERVER, action: 'new' },
             hash: directory,
         },
+        editorDestination: { to: '/server/$id/editor', params: { id: TEST_SERVER }, search: { dir: directory } },
         uploads: [],
         resolve: (name) => `${directory}/${name}`.replace(/^\/+/, ''),
         slot: {
