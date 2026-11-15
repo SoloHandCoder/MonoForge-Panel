@@ -172,6 +172,30 @@ it('sends guests to sign in with the page they asked for', { timeout: 20_000 }, 
     expect(router.state.location.search).toEqual({ redirect: '/panel/nodes/42/settings?tab=network' });
 });
 
+it('shows guests the public homepage at "/" without loading any account data', { timeout: 20_000 }, async () => {
+    (window as BootstrapWindow).SiteConfiguration = { name: 'Panel', locale: 'en', recaptcha: { enabled: false } };
+    const { buildRouteTree } = await import('@/router/routeTree');
+    const http = (await import('@/api/http')).default;
+    const requests: string[] = [];
+
+    http.defaults.adapter = async (config) => {
+        requests.push(config.url ?? '');
+        throw new Error(`unexpected request to ${config.url}`);
+    };
+
+    const router = createRouter({
+        routeTree: buildRouteTree([]),
+        context: { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+        history: createMemoryHistory({ initialEntries: ['/'] }),
+    });
+
+    await router.load();
+
+    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.matches.at(-1)?.status).toBe('success');
+    expect(requests).toEqual([]);
+});
+
 it('denies a server tab before its loader requests data the subuser cannot read', { timeout: 20_000 }, async () => {
     const { createTestServer } = await import('@/sdk/testing');
     const { serverQueryOptions } = await import('@/api/server/queries');
