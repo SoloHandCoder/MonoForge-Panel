@@ -33,6 +33,7 @@ use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
+use Pterodactyl\Http\Controllers\Api\Client\StorePurchaseController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
@@ -56,10 +57,11 @@ Route::get('/extension-progress/{extension}/{job}', [ExtensionProgressController
 Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
 Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
 
-// Phase 3 Task R: the store catalog and quotes. Task S adds the purchase endpoint here.
+// The store: catalog, quotes and buying a server.
 Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');
 Route::post('/store/quote', [StoreController::class, 'quote'])->name('api:client.store.quote');
-// Phase 3 Task P: buy tokens through Tebex.
+Route::post('/store/purchase', [StorePurchaseController::class, 'store'])->middleware('throttle:6,1')->name('api:client.store.purchase');
+// Buying tokens through Tebex.
 Route::get('/store/tokens/packs', [TokenPackController::class, 'index'])->name('api:client.store.tokens.packs');
 Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])
     ->middleware('throttle:10,1')

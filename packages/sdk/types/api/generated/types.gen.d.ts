@@ -1447,6 +1447,24 @@ export type ClientStatsResource = {
     object: string;
     attributes: ClientStatsAttributes;
 };
+export type ClientStorePurchaseAttributes = {
+    server: {
+        identifier: string;
+        uuid: string;
+        name: string;
+    };
+    tokens_charged: number;
+    period_days: number;
+    replayed: boolean;
+    /**
+     * The playit.gg address of the server once its tunnel is ready; null until then.
+     */
+    address: string | null;
+};
+export type ClientStorePurchaseResource = {
+    object: string;
+    attributes: ClientStorePurchaseAttributes;
+};
 export type ClientSystemPermissionsResponse = {
     object: string;
     attributes: {
@@ -3305,6 +3323,50 @@ export type AuthRegisterRequest = {
      * The captcha token (reCAPTCHA or Turnstile) when a captcha is enabled.
      */
     'g-recaptcha-response'?: string | null;
+};
+export type ClientPurchaseServerRequest = {
+    /**
+     * The plan id. Must be at least 1.
+     */
+    plan_id: number;
+    /**
+     * The period id. Must be at least 1.
+     */
+    period_id: number;
+    /**
+     * The egg ID. Must be at least 1.
+     */
+    egg_id: number;
+    /**
+     * The location ID. Must be at least 1.
+     */
+    location_id?: number | null;
+    /**
+     * The node ID. Must be at least 1.
+     */
+    node_id?: number | null;
+    /**
+     * The display name. Must match the regex /^[^<>]+$/u. Must be at least 1 character. Must not be greater than 60 characters.
+     */
+    name: string;
+    /**
+     * Add-on keys mapped to the units to buy; keys left out or at 0 buy none.
+     */
+    addons?: {
+        [key: string]: number;
+    };
+    /**
+     * The subdomain. Must match the regex /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/.
+     */
+    subdomain?: string | null;
+    /**
+     * The expected total. Must be at least 0.
+     */
+    expected_total?: number | null;
+    /**
+     * The idempotency key. Must match the regex /^[A-Za-z0-9_-]+$/. Must be at least 16 characters. Must not be greater than 100 characters.
+     */
+    idempotency_key: string;
 };
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
@@ -12345,6 +12407,38 @@ export type ClientMarkNoticeReadResponses = {
     204: void;
 };
 export type ClientMarkNoticeReadResponse = ClientMarkNoticeReadResponses[keyof ClientMarkNoticeReadResponses];
+export type ClientPurchaseServerData = {
+    body: ClientPurchaseServerRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/purchase';
+};
+export type ClientPurchaseServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientPurchaseServerError = ClientPurchaseServerErrors[keyof ClientPurchaseServerErrors];
+export type ClientPurchaseServerResponses = {
+    /**
+     * The idempotency key already bought this server; nothing was charged again.
+     */
+    200: ClientStorePurchaseResource;
+    /**
+     * Server bought and installing.
+     */
+    201: ClientStorePurchaseResource;
+};
+export type ClientPurchaseServerResponse = ClientPurchaseServerResponses[keyof ClientPurchaseServerResponses];
 export type ClientGetAccountData = {
     body?: never;
     path?: never;

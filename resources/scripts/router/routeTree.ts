@@ -75,6 +75,7 @@ import { serverSubusersQueryOptions } from '@/api/server/users/queries';
 import { serverActivityFacetsQueryOptions, serverActivityLogsQueryOptions } from '@/api/server/activity/queries';
 import { systemPermissionsQueryOptions } from '@/api/system/queries';
 import { siteSettingsQueryOptions } from '@/api/settings/queries';
+import { storeCatalogQueryOptions } from '@/api/store/queries';
 import { getBootstrapExtensions, hasBootstrapSession } from '@/bootstrap';
 import { registerClassPrefixes } from '@/lib/cn';
 import RootLayout from '@/router/layouts/RootLayout';
@@ -196,6 +197,24 @@ const dashboardRoute = createRoute({
         });
     },
     component: pageRoute('page.dashboard'),
+});
+
+// The store prefetches its catalog without waiting on it, so the page draws its own loading state.
+const storeRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'store',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(storeCatalogQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/store/StoreContainer')),
+});
+const storeCheckoutRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'store/$planId',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(storeCatalogQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/store/CheckoutContainer')),
 });
 
 const accountRoute = createRoute({
@@ -1302,6 +1321,8 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
         authRoute.addChildren(authChildren),
         authenticatedRoute.addChildren([
             dashboardRoute,
+            storeRoute,
+            storeCheckoutRoute,
             accountRoute.addChildren(accountRouteChildren),
             serverRoute.addChildren(serverRouteChildren),
             panelRoute.addChildren(panelRouteChildren),

@@ -17,6 +17,8 @@ export type CorePanelPath =
     | '/auth/login'
     | '/auth/password'
     | '/auth/register'
+    | '/store'
+    | '/store/$planId'
     | `/account${'' | '/api' | '/ssh' | '/activity'}`
     | `/server/$id${'' | '/files' | '/databases' | '/schedules' | '/users' | '/users/new' | '/backups' | '/network' | '/startup' | '/settings' | '/activity'}`
     | '/server/$id/files/$action'
