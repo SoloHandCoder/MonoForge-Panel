@@ -4153,7 +4153,7 @@ export const clientRemoveFriend = <ThrowOnError extends boolean = true>(options:
 /**
  * List permission templates
  *
- * Returns the built-in templates (Viewer, Moderator, Builder, Co-owner), the global templates an admin made and the authenticated user's own. A template only pre-fills the subuser form; the user can still only grant the permissions they hold on that server.
+ * Returns, each with a key such as builtin:viewer, global:3 or personal:1 and its source (builtin, global or personal), the built-in templates (Viewer, Moderator, Builder, Co-owner), the global templates an admin made and the authenticated user's own. A template only pre-fills the subuser form; the user can still only grant the permissions they hold on that server.
  */
 export const clientListPermissionTemplates = <ThrowOnError extends boolean = true>(options?: Options<ClientListPermissionTemplatesData, ThrowOnError>): RequestResult<ClientListPermissionTemplatesResponses, ClientListPermissionTemplatesErrors, ThrowOnError> => (options?.client ?? client).get<ClientListPermissionTemplatesResponses, ClientListPermissionTemplatesErrors, ThrowOnError>({
     responseType: 'json',

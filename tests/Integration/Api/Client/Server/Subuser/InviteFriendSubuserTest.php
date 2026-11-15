@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Server\Subuser\InviteFriendSubuserTest;
 
+use Illuminate\Database\Eloquent\Builder;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Models\PermissionTemplate;
 use Pterodactyl\Models\Subuser;
@@ -88,6 +89,6 @@ test('changing a template later does not change subusers invited with it', funct
         'permissions' => ['file.read', 'file.update'],
     ])->assertOk();
 
-    $subuser = Subuser::query()->where('server_id', $server->id)->whereHas('user', fn ($query) => $query->where('email', 'invitee@example.com'))->sole();
+    $subuser = Subuser::query()->where('server_id', $server->id)->whereHas('user', fn (Builder $query): Builder => $query->where('email', 'invitee@example.com'))->sole();
     expect($subuser->permissions)->toEqualCanonicalizing(['control.console', 'websocket.connect']);
 });

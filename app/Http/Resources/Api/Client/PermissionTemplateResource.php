@@ -10,7 +10,7 @@ use Pterodactyl\Models\PermissionTemplate;
 use Pterodactyl\Services\Subusers\PermissionTemplateCatalog;
 
 /**
- * One subuser permission template, in the shape the template list uses.
+ * One of the user's own subuser permission templates: its ID and the fields the template list shows.
  *
  * @extends ClientResource<PermissionTemplate>
  */
@@ -26,6 +26,6 @@ class PermissionTemplateResource extends ClientResource
 
     public function toArray(Request $request): array
     {
-        return resolve(PermissionTemplateCatalog::class)->row($this->resource);
+        return ['id' => $this->resource->id, ...resolve(PermissionTemplateCatalog::class)->row($this->resource)];
     }
 }

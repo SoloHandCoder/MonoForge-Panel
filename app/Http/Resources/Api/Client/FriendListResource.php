@@ -51,13 +51,13 @@ class FriendListResource extends ClientResource
     }
 
     /**
-     * When the friendship began, which the friend list query selects as `friends_since`.
+     * When the friendship began, which the friend list query selects as `friends_since`; blank if unknown.
      */
-    private function since(User $friend): ?string
+    private function since(User $friend): string
     {
         $since = $friend->getAttribute('friends_since');
 
-        return is_string($since) ? CarbonImmutable::parse($since)->toAtomString() : null;
+        return is_string($since) ? CarbonImmutable::parse($since)->toAtomString() : '';
     }
 
     private function avatar(User $user): string

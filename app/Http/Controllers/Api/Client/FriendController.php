@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
 use Illuminate\Http\JsonResponse;
+use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
@@ -76,6 +77,7 @@ class FriendController extends ClientApiController
      * Send a friend request by username or email.
      */
     #[Endpoint('Send friend request', 'Sends a friend request to the user with this username or email. The response is the same whether or not such a user exists. Limited to 5 a minute and 20 an hour, with at most 25 requests waiting.')]
+    #[BodyParam('user', 'string', 'The username or email of the user to ask.', required: true, example: 'alex@example.com')]
     #[ScribeResponse(self::SENT_EXAMPLE, status: 202, description: 'Request recorded; the user gets it if they exist.')]
     #[ScribeResponse(self::TOO_MANY_EXAMPLE, status: 400, description: 'Too many requests are waiting.')]
     public function store(StoreFriendRequestRequest $request): JsonResponse

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 
 use Illuminate\Http\JsonResponse;
+use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
@@ -70,6 +71,7 @@ class SubuserController extends ClientApiController
      * @throws Throwable
      */
     #[Endpoint('Create server subuser', 'Assigns an existing or new user as a subuser on the server, given by email or, as `friend`, by the UUID of a friend of the authenticated user.')]
+    #[BodyParam('friend', 'string', 'The UUID of a friend of the authenticated user to invite instead of an email.', required: false, example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[ResponseFromResource(SubuserResource::class, Subuser::class, description: 'Server subuser created.', resourceKey: 'server_subuser')]
     #[ScribeResponse(self::SUBUSER_EXISTS_ERROR, status: 400, description: 'The user is already assigned to the server or is the server owner.')]
     public function store(StoreSubuserRequest $request, CreatesSubusers $subusers, Server $server): SubuserResource

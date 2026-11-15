@@ -1394,8 +1394,8 @@ export type ClientNoticeFeedResource = {
     attributes: ClientNoticeFeedAttributes;
 };
 export type ClientPermissionTemplateAttributes = {
-    key: string;
     id: number;
+    key: string;
     source: 'builtin' | 'global' | 'personal';
     name: string;
     permissions: Array<string>;
@@ -1403,7 +1403,6 @@ export type ClientPermissionTemplateAttributes = {
 export type ClientPermissionTemplateListAttributes = {
     templates: Array<{
         key: string;
-        id: string | null;
         source: string;
         name: string;
         permissions: Array<string>;
@@ -4430,7 +4429,7 @@ export type ClientCreateAccountApiKeyRequest = {
 };
 export type ClientSendFriendRequestRequest = {
     /**
-     * The user ID. Must be at least 1 character. Must not be greater than 191 characters.
+     * The username or email of the user to ask.
      */
     user: string;
 };
@@ -4737,7 +4736,7 @@ export type ClientCreateServerSubuserRequest = {
      */
     permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
     /**
-     * The friend. Must be a valid UUID.
+     * The UUID of a friend of the authenticated user to invite instead of an email.
      */
     friend?: string;
 };

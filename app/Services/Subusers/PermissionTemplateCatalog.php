@@ -14,7 +14,7 @@ use Pterodactyl\Services\Servers\SubuserPermissionCatalog;
  * admin made and the user's own. Templates only pre-fill the subuser form; what a subuser may be
  * granted is still checked against the inviter's own permissions when the form is saved.
  *
- * @phpstan-type TemplateRow array{key: string, id: int|null, source: 'builtin'|'global'|'personal', name: string, permissions: list<string>}
+ * @phpstan-type TemplateRow array{key: string, source: 'builtin'|'global'|'personal', name: string, permissions: list<string>}
  */
 final readonly class PermissionTemplateCatalog
 {
@@ -84,7 +84,6 @@ final readonly class PermissionTemplateCatalog
         foreach (self::BUILT_IN as $key => $name) {
             $rows[] = [
                 'key' => "builtin:{$key}",
-                'id' => null,
                 'source' => 'builtin',
                 'name' => $name,
                 'permissions' => $this->clean($sets[$key]),
@@ -122,7 +121,6 @@ final readonly class PermissionTemplateCatalog
 
         return [
             'key' => "{$source}:{$template->id}",
-            'id' => $template->id,
             'source' => $source,
             'name' => $template->name,
             // A permission that was removed from the panel since the template was saved is left out.

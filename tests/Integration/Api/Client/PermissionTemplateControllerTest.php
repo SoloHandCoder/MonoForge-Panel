@@ -25,7 +25,6 @@ test("lists the built-in, global and own templates, but not other users' ones", 
         ->and($templates->pluck('source')->all())->toBe(['builtin', 'builtin', 'builtin', 'builtin', 'global', 'personal'])
         ->and($templates->last())->toBe([
             'key' => "personal:{$own->id}",
-            'id' => $own->id,
             'source' => 'personal',
             'name' => 'Mine',
             // A key the panel no longer knows is dropped; console access is always there.
