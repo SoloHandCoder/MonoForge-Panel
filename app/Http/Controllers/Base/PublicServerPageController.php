@@ -6,6 +6,7 @@ namespace Pterodactyl\Http\Controllers\Base;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
@@ -14,6 +15,7 @@ use Knuckles\Scribe\Attributes\Unauthenticated;
 use Knuckles\Scribe\Attributes\UrlParam;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
 use Pterodactyl\Http\Controllers\Controller;
+use Pterodactyl\Http\Middleware\VerifyCaptcha;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
@@ -21,6 +23,8 @@ use Pterodactyl\Services\ServerPages\ServerPageVisitor;
 use Pterodactyl\Services\ServerPages\ServerPageVotes;
 use Pterodactyl\Services\ServerPages\ServerPageWake;
 use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
@@ -73,6 +77,7 @@ class PublicServerPageController extends Controller
         'address' => 'skyblock.joinmc.link',
         'join_url' => null,
         'votes' => 42,
+        'can_wake' => false,
     ];
 
     private const array NOT_FOUND_ERROR = [
@@ -100,10 +105,36 @@ class PublicServerPageController extends Controller
             [
                 'code' => 'UnsupportedMediaTypeHttpException',
                 'status' => '415',
-                'detail' => 'Send this request as JSON or with the X-Requested-With: XMLHttpRequest header.',
+                'detail' => self::JSON_MESSAGE,
             ],
         ],
     ];
+
+    private const array CROSS_SITE_ERROR = [
+        'errors' => [
+            [
+                'code' => 'AccessDeniedHttpException',
+                'status' => '403',
+                'detail' => self::ORIGIN_MESSAGE,
+            ],
+        ],
+    ];
+
+    private const array WAKE_OFF_ERROR = [
+        'errors' => [
+            [
+                'code' => 'AccessDeniedHttpException',
+                'status' => '403',
+                'detail' => self::WAKE_OFF_MESSAGE,
+            ],
+        ],
+    ];
+
+    private const string JSON_MESSAGE = 'Send this request with a JSON body (Content-Type: application/json) and the X-Requested-With: XMLHttpRequest header.';
+
+    private const string ORIGIN_MESSAGE = 'This request must come from the panel itself.';
+
+    private const string WAKE_OFF_MESSAGE = 'The owner of this server has not allowed visitors to wake it.';
 
     public function __construct(private readonly PublicServerPages $pages) {}
 
@@ -122,6 +153,7 @@ class PublicServerPageController extends Controller
     #[ResponseField('address', 'string', 'The playit address to join with, or null when the server has none.', nullable: true)]
     #[ResponseField('join_url', 'string', 'A link that adds the server in the game (Minecraft Bedrock), or null.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes.')]
+    #[ResponseField('can_wake', 'boolean', 'Whether a visitor may wake the server now: it is sleeping and its owner allows it.')]
     #[ScribeResponse(self::PAGE_EXAMPLE, description: 'Page returned.')]
     #[ScribeResponse(self::NOT_FOUND_ERROR, status: 404, description: 'No published page has that address.')]
     public function show(string $slug): JsonResponse
@@ -130,14 +162,16 @@ class PublicServerPageController extends Controller
     }
 
     #[Unauthenticated]
-    #[Endpoint('Vote for a public server page', 'Adds one vote. A visitor votes once every 24 hours per page, known by a keyed hash of their address and of a visitor cookie this endpoint sets; neither is stored as is. A vote that is not counted returns counted false and when the next one is possible. Must be sent as JSON or with the X-Requested-With: XMLHttpRequest header.')]
+    #[Endpoint('Vote for a public server page', 'Adds one vote. A visitor votes once every 24 hours per page, known by a keyed hash of their address and of a visitor cookie this endpoint sets; neither is stored as is. A vote that is not counted returns counted false and when the next one is possible. A page takes at most five votes a day from one /24 (IPv4) or /48 (IPv6) network. Must be sent from the panel itself (Origin or Referer), with a JSON body and the X-Requested-With: XMLHttpRequest header.')]
     #[UrlParam('slug', 'string', 'The part of the page address after /s/.', example: 'skyblock')]
+    #[BodyParam('vote', 'boolean', 'Always true.', required: true, example: true)]
     #[ResponseField('counted', 'boolean', 'Whether this vote was counted.')]
     #[ResponseField('votes', 'integer', 'The total votes now.')]
     #[ResponseField('next_vote_at', 'string', 'When this visitor can vote for the page again.')]
     #[ScribeResponse(['counted' => true, 'votes' => 43, 'next_vote_at' => '2026-11-16T12:00:00+00:00'], description: 'Vote handled.')]
     #[ScribeResponse(self::NOT_FOUND_ERROR, status: 404, description: 'No published page has that address.')]
-    #[ScribeResponse(self::UNSUPPORTED_ERROR, status: 415, description: 'The request was neither JSON nor marked with X-Requested-With.')]
+    #[ScribeResponse(self::CROSS_SITE_ERROR, status: 403, description: 'The request did not come from the panel.')]
+    #[ScribeResponse(self::UNSUPPORTED_ERROR, status: 415, description: 'The request was not JSON with X-Requested-With.')]
     public function vote(Request $request, ServerPageVotes $votes, string $slug): JsonResponse
     {
         $this->assertJson($request);
@@ -164,19 +198,25 @@ class PublicServerPageController extends Controller
     }
 
     #[Unauthenticated]
-    #[Endpoint('Wake a sleeping server', 'Starts a server that auto-sleep stopped. A server is woken at most once a minute and one visitor wakes at most five servers an hour; when limited, 429 is returned with a Retry-After header. A server that is not sleeping is left alone and returns sleeping false. Must be sent as JSON or with the X-Requested-With: XMLHttpRequest header.')]
+    #[Endpoint('Wake a sleeping server', 'Starts a server that auto-sleep stopped, when its owner allows visitors to (403 otherwise). A server is woken at most once a minute and three times an hour, and one visitor wakes at most two servers an hour; when limited, 429 is returned with a Retry-After header. A server that is not sleeping is left alone and returns sleeping false. When the panel uses a captcha, its token is required. Must be sent from the panel itself (Origin or Referer), with a JSON body and the X-Requested-With: XMLHttpRequest header.')]
     #[UrlParam('slug', 'string', 'The part of the page address after /s/.', example: 'skyblock')]
+    #[BodyParam('g-recaptcha-response', 'string', 'The captcha token (Turnstile action wake), required when the panel uses a captcha.', required: false, example: 'XXXX.DUMMY.TOKEN')]
     #[ResponseField('woken', 'boolean', 'Whether the server was started.')]
     #[ResponseField('sleeping', 'boolean', 'Whether the server is still sleeping.')]
     #[ScribeResponse(['woken' => true, 'sleeping' => false], description: 'Wake handled.')]
     #[ScribeResponse(self::TOO_MANY_ERROR, status: 429, description: 'Woken too recently; the Retry-After header says when to try again.')]
     #[ScribeResponse(self::NOT_FOUND_ERROR, status: 404, description: 'No published page has that address.')]
-    #[ScribeResponse(self::UNSUPPORTED_ERROR, status: 415, description: 'The request was neither JSON nor marked with X-Requested-With.')]
+    #[ScribeResponse(self::WAKE_OFF_ERROR, status: 403, description: 'Visitors may not wake this server, or the request did not come from the panel.')]
+    #[ScribeResponse(self::UNSUPPORTED_ERROR, status: 415, description: 'The request was not JSON with X-Requested-With.')]
     public function wake(Request $request, ServerPageWake $wake, string $slug): JsonResponse
     {
         $this->assertJson($request);
         $page = $this->find($slug);
         $server = $page->server ?? throw new NotFoundHttpException;
+        throw_unless($page->allow_wake, AccessDeniedHttpException::class, self::WAKE_OFF_MESSAGE);
+
+        // The panel's captcha (Turnstile or reCAPTCHA), when it has one; throws on a bad token.
+        resolve(VerifyCaptcha::class)->handle($request, fn (Request $verified): Response => new Response, 'wake');
 
         $result = $wake->wake($server, new ServerPageVisitor($request));
         if ($result['woken']) {
@@ -196,12 +236,23 @@ class PublicServerPageController extends Controller
     }
 
     /**
-     * A JSON body or a custom header cannot be sent from another site without the browser asking
-     * first (and nothing here allows it), so a page elsewhere cannot make its visitors vote or wake
-     * a server with a plain form.
+     * Votes and wakes come only from the panel's own page. The Origin (or the Referer when a
+     * browser sends no Origin) must be the panel's host, and the body must be exactly
+     * application/json with the X-Requested-With header: both force a CORS preflight, which
+     * nothing here allows, so another site cannot send them from its visitors' browsers.
      */
     private function assertJson(Request $request): void
     {
-        throw_unless($request->isJson() || $request->ajax(), UnsupportedMediaTypeHttpException::class, 'Send this request as JSON or with the X-Requested-With: XMLHttpRequest header.');
+        $source = $request->headers->get('Origin');
+        if (! is_string($source) || $source === '' || $source === 'null') {
+            $source = $request->headers->get('Referer');
+        }
+
+        $host = is_string($source) ? parse_url($source, PHP_URL_HOST) : null;
+        $panel = parse_url(config()->string('app.url'), PHP_URL_HOST);
+        throw_unless(is_string($host) && is_string($panel) && strcasecmp($host, $panel) === 0, AccessDeniedHttpException::class, self::ORIGIN_MESSAGE);
+
+        $type = mb_strtolower(mb_trim(explode(';', (string) $request->headers->get('Content-Type', ''))[0]));
+        throw_unless($type === 'application/json' && $request->ajax(), UnsupportedMediaTypeHttpException::class, self::JSON_MESSAGE);
     }
 }

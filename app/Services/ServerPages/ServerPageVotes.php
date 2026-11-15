@@ -26,8 +26,9 @@ final readonly class ServerPageVotes
         $scope = (string) $page->id;
         $address = $visitor->addressKey('vote', $scope);
         $cookie = $visitor->cookieKey('vote', $scope);
+        $network = $visitor->networkKey('vote', $scope);
 
-        return DB::transaction(function () use ($page, $address, $cookie): array {
+        return DB::transaction(function () use ($page, $address, $cookie, $network): array {
             $locked = ServerPage::query()->whereKey($page->id)->lockForUpdate()->firstOrFail();
             $now = CarbonImmutable::now();
 
@@ -46,10 +47,27 @@ final readonly class ServerPageVotes
                 ];
             }
 
+            // A page takes at most NETWORK_DAILY_VOTES a day from one /24 or /48.
+            $fromNetwork = ServerPageVote::query()
+                ->where('server_page_id', $locked->id)
+                ->where('network_hash', $network)
+                ->where('voted_at', '>', $now->subHours(ServerPageVote::COOLDOWN_HOURS))
+                ->oldest('voted_at')
+                ->get(['voted_at']);
+            $oldest = $fromNetwork->first();
+            if ($fromNetwork->count() >= ServerPageVote::NETWORK_DAILY_VOTES && $oldest instanceof ServerPageVote) {
+                return [
+                    'counted' => false,
+                    'votes' => $locked->votes,
+                    'next_vote_at' => $oldest->voted_at->addHours(ServerPageVote::COOLDOWN_HOURS),
+                ];
+            }
+
             ServerPageVote::query()->create([
                 'server_page_id' => $locked->id,
                 'address_hash' => $address,
                 'cookie_hash' => $cookie,
+                'network_hash' => $network,
                 'voted_at' => $now,
             ]);
             $locked->increment('votes');

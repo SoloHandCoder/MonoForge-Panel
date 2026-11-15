@@ -5795,23 +5795,31 @@ export const apiGetAPublicServerPage = <ThrowOnError extends boolean = true>(opt
 /**
  * Vote for a public server page
  *
- * Adds one vote. A visitor votes once every 24 hours per page, known by a keyed hash of their address and of a visitor cookie this endpoint sets; neither is stored as is. A vote that is not counted returns counted false and when the next one is possible. Must be sent as JSON or with the X-Requested-With: XMLHttpRequest header.
+ * Adds one vote. A visitor votes once every 24 hours per page, known by a keyed hash of their address and of a visitor cookie this endpoint sets; neither is stored as is. A vote that is not counted returns counted false and when the next one is possible. A page takes at most five votes a day from one /24 (IPv4) or /48 (IPv6) network. Must be sent from the panel itself (Origin or Referer), with a JSON body and the X-Requested-With: XMLHttpRequest header.
  */
 export const apiVoteForAPublicServerPage = <ThrowOnError extends boolean = true>(options: Options<ApiVoteForAPublicServerPageData, ThrowOnError>): RequestResult<ApiVoteForAPublicServerPageResponses, ApiVoteForAPublicServerPageErrors, ThrowOnError> => (options.client ?? client).post<ApiVoteForAPublicServerPageResponses, ApiVoteForAPublicServerPageErrors, ThrowOnError>({
     responseType: 'json',
     url: '/api/public/servers/{slug}/vote',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
  * Wake a sleeping server
  *
- * Starts a server that auto-sleep stopped. A server is woken at most once a minute and one visitor wakes at most five servers an hour; when limited, 429 is returned with a Retry-After header. A server that is not sleeping is left alone and returns sleeping false. Must be sent as JSON or with the X-Requested-With: XMLHttpRequest header.
+ * Starts a server that auto-sleep stopped, when its owner allows visitors to (403 otherwise). A server is woken at most once a minute and three times an hour, and one visitor wakes at most two servers an hour; when limited, 429 is returned with a Retry-After header. A server that is not sleeping is left alone and returns sleeping false. When the panel uses a captcha, its token is required. Must be sent from the panel itself (Origin or Referer), with a JSON body and the X-Requested-With: XMLHttpRequest header.
  */
 export const apiWakeASleepingServer = <ThrowOnError extends boolean = true>(options: Options<ApiWakeASleepingServerData, ThrowOnError>): RequestResult<ApiWakeASleepingServerResponses, ApiWakeASleepingServerErrors, ThrowOnError> => (options.client ?? client).post<ApiWakeASleepingServerResponses, ApiWakeASleepingServerErrors, ThrowOnError>({
     responseType: 'json',
     url: '/api/public/servers/{slug}/wake',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

@@ -9,14 +9,17 @@ use Pterodactyl\Contracts\Servers\WakesServers;
 use Pterodactyl\Models\Server;
 
 /**
- * The public "Wake server" button. A server is woken at most once a minute, and one visitor (by
- * the keyed hash of their address) wakes at most five servers an hour, whatever they click.
+ * The public "Wake server" button, only on pages whose owner allows it. A server is woken at most
+ * once a minute and three times an hour in total, and one visitor (by the keyed hash of their
+ * address) wakes at most two servers an hour, whatever they click.
  */
 final readonly class ServerPageWake
 {
     public const int SERVER_DECAY_SECONDS = 60;
 
-    public const int VISITOR_ATTEMPTS = 5;
+    public const int SERVER_HOURLY_ATTEMPTS = 3;
+
+    public const int VISITOR_ATTEMPTS = 2;
 
     public const int VISITOR_DECAY_SECONDS = 3600;
 
@@ -32,11 +35,16 @@ final readonly class ServerPageWake
         }
 
         $serverKey = 'server-page-wake:server:'.$server->id;
+        $hourlyKey = 'server-page-wake:server-hour:'.$server->id;
         $visitorKey = 'server-page-wake:visitor:'.$visitor->addressKey('wake', 'all');
 
         $retry = 0;
         if ($this->limiter->tooManyAttempts($serverKey, 1)) {
             $retry = $this->limiter->availableIn($serverKey);
+        }
+
+        if ($this->limiter->tooManyAttempts($hourlyKey, self::SERVER_HOURLY_ATTEMPTS)) {
+            $retry = max($retry, $this->limiter->availableIn($hourlyKey));
         }
 
         if ($this->limiter->tooManyAttempts($visitorKey, self::VISITOR_ATTEMPTS)) {
@@ -48,6 +56,7 @@ final readonly class ServerPageWake
         }
 
         $this->limiter->hit($serverKey, self::SERVER_DECAY_SECONDS);
+        $this->limiter->hit($hourlyKey, self::VISITOR_DECAY_SECONDS);
         $this->limiter->hit($visitorKey, self::VISITOR_DECAY_SECONDS);
 
         $woken = $this->sleep->wake($server, public: true);

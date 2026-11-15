@@ -25,11 +25,12 @@ use Pterodactyl\Models\Server;
  * @property string|null $banner_color `#rrggbb`
  * @property string|null $banner_image the stored banner file name (ServerPageBanners)
  * @property int $votes
+ * @property bool $allow_wake whether visitors may wake the sleeping server (off by default)
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Server|null $server
  */
-#[Fillable(['server_id', 'slug', 'published', 'noindex', 'description', 'banner_color', 'banner_image'])]
+#[Fillable(['server_id', 'slug', 'published', 'noindex', 'description', 'banner_color', 'banner_image', 'allow_wake'])]
 #[RouteKey('slug')]
 class ServerPage extends Model
 {
@@ -50,6 +51,7 @@ class ServerPage extends Model
             'server_id' => 'int',
             'published' => 'bool',
             'noindex' => 'bool',
+            'allow_wake' => 'bool',
             'votes' => 'int',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',

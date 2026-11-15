@@ -23,6 +23,7 @@ use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\FriendRequest;
 use Pterodactyl\Models\ServerCrash;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Models\Share\ServerPageSlugHold;
 use Pterodactyl\Models\Share\ServerPageVote;
 use Pterodactyl\Models\Status\StatusCheck;
 use Pterodactyl\Models\Status\StatusDay;
@@ -69,7 +70,7 @@ final class Scheduler
         $schedule->command(PruneCommand::class, ['--model' => [StatusCheck::class, StatusDay::class]])->daily()->withoutOverlapping()->onOneServer();
 
         // Public server page votes only matter while they block the next one (24 hours).
-        $schedule->command(PruneCommand::class, ['--model' => [ServerPageVote::class]])->daily()->withoutOverlapping()->onOneServer();
+        $schedule->command(PruneCommand::class, ['--model' => [ServerPageVote::class, ServerPageSlugHold::class]])->daily()->withoutOverlapping()->onOneServer();
         // The AI crash doctor: compare the servers' states each minute (cached Wings readings, one
         // pool per node) and record crashes; crashes go after 30 days.
         $schedule->command(DetectCrashesCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();

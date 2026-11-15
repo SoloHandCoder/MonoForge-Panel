@@ -23,6 +23,9 @@ class ServerPageBanners
 
     public const int MAX_DIMENSION = 4096;
 
+    /** Decoding a big image is costly on a weak CPU: at most 8 megapixels. */
+    public const int MAX_PIXELS = 8_000_000;
+
     /** The detected type mapped to the stored file extension. No SVG, GIF or anything else. */
     public const array TYPES = [
         'image/png' => 'png',
@@ -88,6 +91,34 @@ class ServerPageBanners
         }
     }
 
+    /** Gives a stored banner a new random name (the old one stops working) and returns it. */
+    public function rename(string $name): ?string
+    {
+        $file = $this->read($name);
+        if ($file === null) {
+            return null;
+        }
+
+        $disk = $this->disk();
+        do {
+            $new = bin2hex(random_bytes(20)).'.'.pathinfo($name, PATHINFO_EXTENSION);
+        } while ($disk->exists($this->path($new)));
+
+        if (! $disk->put($this->path($new), $file['contents'])) {
+            return $name;
+        }
+
+        $this->delete($name);
+
+        return $new;
+    }
+
+    /** Whether GD can decode and encode images here. */
+    protected function canReencode(): bool
+    {
+        return function_exists('imagecreatefromstring');
+    }
+
     /** The type of the bytes from their signature alone. */
     private function detect(string $bytes): ?string
     {
@@ -110,12 +141,27 @@ class ServerPageBanners
         if ($size[0] < 1 || $size[1] < 1 || $size[0] > self::MAX_DIMENSION || $size[1] > self::MAX_DIMENSION) {
             $this->reject(sprintf('The image must be at most %d pixels on each side.', self::MAX_DIMENSION));
         }
+
+        if ($size[0] * $size[1] > self::MAX_PIXELS) {
+            $this->reject('The image has too many pixels. Use one of at most 8 megapixels.');
+        }
+    }
+
+    /** Whether a JPEG carries an EXIF block (camera, time, often GPS). */
+    private function hasExif(string $bytes): bool
+    {
+        return preg_match('/\xFF\xE1..Exif\x00\x00/s', mb_substr($bytes, 0, 65_536)) === 1;
     }
 
     /** Decodes and encodes the image again when GD can, so only its pixels are kept. */
     private function reencode(string $mime, string $bytes): string
     {
-        if (! function_exists('imagecreatefromstring')) {
+        if (! $this->canReencode()) {
+            // Without GD nothing can strip metadata: a JPEG carrying EXIF (often GPS) is refused.
+            if ($mime === 'image/jpeg' && $this->hasExif($bytes)) {
+                $this->reject('This photo carries camera data (EXIF) that cannot be removed here. Export it without metadata and try again.');
+            }
+
             return $bytes;
         }
 

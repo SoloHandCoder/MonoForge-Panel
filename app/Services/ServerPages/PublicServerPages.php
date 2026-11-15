@@ -35,6 +35,7 @@ use Pterodactyl\Support\LockedCache;
  *     address: string|null,
  *     join_url: string|null,
  *     votes: int,
+ *     can_wake: bool,
  * }
  */
 final readonly class PublicServerPages
@@ -110,6 +111,7 @@ final readonly class PublicServerPages
             'address' => $address,
             'join_url' => $address === null ? null : $this->joinUrl($game, $server->name, $address),
             'votes' => $page->votes,
+            'can_wake' => $page->allow_wake && $status === 'sleeping',
         ];
     }
 

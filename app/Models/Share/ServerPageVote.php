@@ -20,14 +20,18 @@ use Pterodactyl\Models\Model;
  * @property int $server_page_id
  * @property string $address_hash
  * @property string $cookie_hash
+ * @property string $network_hash
  * @property CarbonImmutable $voted_at
  */
-#[Fillable(['server_page_id', 'address_hash', 'cookie_hash', 'voted_at'])]
+#[Fillable(['server_page_id', 'address_hash', 'cookie_hash', 'network_hash', 'voted_at'])]
 #[RouteKey('id')]
 #[WithoutTimestamps]
 class ServerPageVote extends Model
 {
     use MassPrunable;
+
+    /** Votes a page takes in a day from one /24 (IPv4) or /48 (IPv6). */
+    public const int NETWORK_DAILY_VOTES = 5;
 
     /** A visitor votes once per this many hours on a page. */
     public const int COOLDOWN_HOURS = 24;

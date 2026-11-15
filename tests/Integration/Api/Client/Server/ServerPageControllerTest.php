@@ -6,10 +6,15 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Server\ServerPageControl
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
+use Pterodactyl\Models\Share\ServerPageSlugHold;
+use Pterodactyl\Models\User;
+use Pterodactyl\Services\ServerPages\ServerPageBanners;
+use Pterodactyl\Services\ServerPages\ServerPageSlug;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 uses(ClientApiIntegrationTestCase::class);
@@ -68,6 +73,7 @@ test('a server without a page returns the defaults', function (): void {
             'banner_image_url' => null,
             'votes' => 0,
             'has_address' => false,
+            'allow_wake' => false,
         ]);
 });
 
@@ -226,4 +232,82 @@ test('anything but a real png, jpeg or webp image is refused', function (Uploade
     'a png signature with garbage' => fn (): UploadedFile => UploadedFile::fake()->createWithContent('banner.png', "\x89PNG\r\n\x1a\n".str_repeat('x', 200)),
     'too large' => fn (): UploadedFile => UploadedFile::fake()->create('banner.png', 1025, 'image/png'),
     'too wide' => fn (): UploadedFile => bannerImage('png', 4097, 1),
+    'more than 8 megapixels' => fn (): UploadedFile => bannerImage('png', 4000, 2100),
 ]);
+
+test('a slug containing a brand or role word is refused, except for a root admin', function (string $slug): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['slug' => $slug]))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', ServerPageSlug::RESERVED_PART_MESSAGE);
+
+    $admin = User::factory()->create(['root_admin' => true]);
+    $this->actingAs($admin)->putJson(pageUrl($server), pageInput(['slug' => $slug]))->assertOk()->assertJsonPath('slug', $slug);
+})->with(['monoforge-support', 'official-staff', 'admin-login', 'support-team', 'mypanel', 'billing-help', 'status-page', 'storefront']);
+
+test('a renamed slug is held for its server for 30 days', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    [$other, $otherServer] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['slug' => 'popular-page']))->assertOk();
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['slug' => 'new-name']))->assertOk();
+
+    // Somebody else cannot take the old address while links to it are still around...
+    $this->actingAs($other)->putJson(pageUrl($otherServer), pageInput(['slug' => 'popular-page']))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', ServerPageSlug::HELD_MESSAGE);
+
+    // ...but the same server can take it back.
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['slug' => 'popular-page']))->assertOk();
+    expect(ServerPageSlugHold::query()->where('slug', 'popular-page')->exists())->toBeFalse()
+        ->and(ServerPageSlugHold::query()->where('slug', 'new-name')->value('server_id'))->toBe($server->id);
+
+    // After 30 days the hold is gone.
+    $this->travel(ServerPageSlugHold::HOLD_DAYS + 1)->days();
+    $this->actingAs($other)->putJson(pageUrl($otherServer), pageInput(['slug' => 'new-name']))->assertOk();
+    $this->artisan('model:prune', ['--model' => [ServerPageSlugHold::class]])->assertSuccessful();
+    expect(ServerPageSlugHold::query()->count())->toBe(0);
+});
+
+test('the owner lets visitors wake the server; it is off by default', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput())->assertOk()->assertJsonPath('allow_wake', false);
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['allow_wake' => true]))->assertOk()->assertJsonPath('allow_wake', true);
+    // Left out, it keeps its value.
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput())->assertOk()->assertJsonPath('allow_wake', true);
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['allow_wake' => 'maybe']))->assertUnprocessable();
+});
+
+test('unpublishing gives the banner a new name, so the old address stops working', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput())->assertOk();
+    $old = (string) $this->actingAs($user)->postJson(pageUrl($server, '/banner'), ['banner' => bannerImage()])->json('banner_image_url');
+
+    $new = (string) $this->actingAs($user)->putJson(pageUrl($server), pageInput(['published' => false]))->assertOk()->json('banner_image_url');
+
+    expect($new)->not->toBe($old);
+    Storage::disk('local')->assertMissing('server-pages/'.basename($old));
+    Storage::disk('local')->assertExists('server-pages/'.basename($new));
+
+    // Published again, the old address does not come back either.
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput())->assertOk();
+    $this->get($old)->assertNotFound();
+    $this->get($new)->assertOk()->assertHeader('Cache-Control', 'max-age=300, public');
+});
+
+test('without gd a jpeg carrying exif is refused, and other images are only checked', function (): void {
+    $banners = new class extends ServerPageBanners
+    {
+        protected function canReencode(): bool
+        {
+            return false;
+        }
+    };
+    $jpeg = (string) bannerImage('jpg')->getContent();
+    $exif = "\xFF\xD8\xFF\xE1\x00\x10Exif\x00\x00II*\x00\x08\x00\x00\x00".mb_substr($jpeg, 2);
+
+    expect(fn (): string => $banners->store(UploadedFile::fake()->createWithContent('photo.jpg', $exif)))->toThrow(ValidationException::class);
+    expect($banners->store(UploadedFile::fake()->createWithContent('plain.jpg', $jpeg)))->toMatch('/\A[a-f0-9]{40}\.jpg\z/');
+});

@@ -5420,6 +5420,10 @@ export type ClientUpdateServerPublicPageRequest = {
      */
     noindex: boolean;
     /**
+     * Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.
+     */
+    allow_wake?: boolean;
+    /**
      * The description in markdown, at most 2000 characters, or null for none.
      */
     description: string;
@@ -5530,6 +5534,20 @@ export type ClientSetServerDockerImageRequest = {
      * The Docker image to use.
      */
     docker_image: string;
+};
+
+export type ApiVoteForAPublicServerPageRequest = {
+    /**
+     * Always true.
+     */
+    vote: boolean;
+};
+
+export type ApiWakeASleepingServerRequest = {
+    /**
+     * The captcha token (Turnstile action wake), required when the panel uses a captcha.
+     */
+    'g-recaptcha-response'?: string;
 };
 
 export type AdminListActivityFilterOptionsResponseBody = {
@@ -8389,6 +8407,10 @@ export type ClientGetServerPublicPageResponseBody = {
      * Whether the page shows a join address: only a live playit tunnel address is ever shown.
      */
     has_address: boolean;
+    /**
+     * Whether visitors may wake the sleeping server from the page.
+     */
+    allow_wake: boolean;
 };
 
 export type ClientUpdateServerPublicPageResponseBody = {
@@ -8432,6 +8454,10 @@ export type ClientUpdateServerPublicPageResponseBody = {
      * Whether the page shows a join address.
      */
     has_address: boolean;
+    /**
+     * Whether visitors may wake the sleeping server from the page.
+     */
+    allow_wake: boolean;
 };
 
 export type ClientUploadServerPublicPageBannerResponseBody = {
@@ -8475,6 +8501,10 @@ export type ClientUploadServerPublicPageBannerResponseBody = {
      * Whether the page shows a join address.
      */
     has_address: boolean;
+    /**
+     * Whether visitors may wake the sleeping server from the page.
+     */
+    allow_wake: boolean;
 };
 
 export type ClientDeleteServerPublicPageBannerResponseBody = {
@@ -8518,6 +8548,10 @@ export type ClientDeleteServerPublicPageBannerResponseBody = {
      * Whether the page shows a join address.
      */
     has_address: boolean;
+    /**
+     * Whether visitors may wake the sleeping server from the page.
+     */
+    allow_wake: boolean;
 };
 
 export type ClientGetCrashDoctorStatusResponseBody = {
@@ -8836,6 +8870,10 @@ export type ApiGetAPublicServerPageResponseBody = {
      * The total votes.
      */
     votes: number;
+    /**
+     * Whether a visitor may wake the server now: it is sleeping and its owner allows it.
+     */
+    can_wake: boolean;
 };
 
 export type ApiVoteForAPublicServerPageResponseBody = {
@@ -27657,7 +27695,7 @@ export type ApiGetAPublicServerPageResponses = {
 export type ApiGetAPublicServerPageResponse = ApiGetAPublicServerPageResponses[keyof ApiGetAPublicServerPageResponses];
 
 export type ApiVoteForAPublicServerPageData = {
-    body?: never;
+    body: ApiVoteForAPublicServerPageRequest;
     path: {
         /**
          * The part of a public server page address after /s/.
@@ -27674,13 +27712,21 @@ export type ApiVoteForAPublicServerPageErrors = {
      */
     401: ErrorEnvelope;
     /**
+     * The request did not come from the panel.
+     */
+    403: ErrorEnvelope;
+    /**
      * No published page has that address.
      */
     404: ErrorEnvelope;
     /**
-     * The request was neither JSON nor marked with X-Requested-With.
+     * The request was not JSON with X-Requested-With.
      */
     415: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
 };
 
 export type ApiVoteForAPublicServerPageError = ApiVoteForAPublicServerPageErrors[keyof ApiVoteForAPublicServerPageErrors];
@@ -27695,7 +27741,7 @@ export type ApiVoteForAPublicServerPageResponses = {
 export type ApiVoteForAPublicServerPageResponse = ApiVoteForAPublicServerPageResponses[keyof ApiVoteForAPublicServerPageResponses];
 
 export type ApiWakeASleepingServerData = {
-    body?: never;
+    body?: ApiWakeASleepingServerRequest;
     path: {
         /**
          * The part of a public server page address after /s/.
@@ -27712,13 +27758,21 @@ export type ApiWakeASleepingServerErrors = {
      */
     401: ErrorEnvelope;
     /**
+     * Visitors may not wake this server, or the request did not come from the panel.
+     */
+    403: ErrorEnvelope;
+    /**
      * No published page has that address.
      */
     404: ErrorEnvelope;
     /**
-     * The request was neither JSON nor marked with X-Requested-With.
+     * The request was not JSON with X-Requested-With.
      */
     415: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
     /**
      * Woken too recently; the Retry-After header says when to try again.
      */

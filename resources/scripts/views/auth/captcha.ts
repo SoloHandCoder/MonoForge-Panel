@@ -23,7 +23,7 @@ function captchaLeaf(
 }
 
 /** The form a captcha token is for; the panel rejects Turnstile tokens solved on another form. */
-export type CaptchaAction = 'login' | 'register' | 'password';
+export type CaptchaAction = 'login' | 'register' | 'password' | 'wake';
 
 /** The panel's captcha: the provider setting, or the legacy reCAPTCHA switch on older documents. */
 export function captchaSettings(settings: SiteSettings): { provider: CaptchaProvider; siteKey: string } {

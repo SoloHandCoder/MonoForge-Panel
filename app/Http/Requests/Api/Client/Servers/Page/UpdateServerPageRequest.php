@@ -21,9 +21,10 @@ class UpdateServerPageRequest extends ServerPageRequest
         $page = $server instanceof Server ? ServerPage::query()->where('server_id', $server->id)->first() : null;
 
         return [
-            'slug' => ServerPageSlug::rules($page),
+            'slug' => ServerPageSlug::rules($page, $this->user()->root_admin === true, $server instanceof Server ? $server->id : null),
             'published' => ['required', 'boolean'],
             'noindex' => ['required', 'boolean'],
+            'allow_wake' => ['sometimes', 'boolean'],
             'description' => ['present', 'nullable', 'string', 'max:'.self::DESCRIPTION_MAX],
             'banner_color' => ['present', 'nullable', 'string', 'regex:/\A#[0-9a-fA-F]{6}\z/'],
         ];

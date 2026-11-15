@@ -39,6 +39,7 @@ interface Draft {
     slug: string;
     published: boolean;
     noindex: boolean;
+    allowWake: boolean;
     description: string;
     color: string | null;
 }
@@ -47,6 +48,7 @@ const draftFrom = (settings: ServerPageSettings, serverName: string): Draft => (
     slug: settings.slug ?? suggestSlug(serverName),
     published: settings.published,
     noindex: settings.noindex,
+    allowWake: settings.allow_wake,
     description: settings.description,
     color: settings.banner_color,
 });
@@ -148,6 +150,7 @@ function PageForm({ uuid, settings, serverName }: { uuid: string; settings: Serv
                 slug: draft.slug,
                 published: draft.published,
                 noindex: draft.noindex,
+                allow_wake: draft.allowWake,
                 description: draft.description,
                 // An empty colour is stored as none, which shows the panel's default.
                 banner_color: draft.color ?? '',
@@ -208,6 +211,12 @@ function PageForm({ uuid, settings, serverName }: { uuid: string; settings: Serv
                         onChange={(noindex) => change({ noindex })}
                         label='Hide from search engines'
                         description='Asks Google and others not to list the page. Links still work.'
+                    />
+                    <Switch
+                        checked={draft.allowWake}
+                        onChange={(allowWake) => change({ allowWake })}
+                        label='Let visitors wake the server'
+                        description='While the server sleeps, visitors can start it from the page (a few times an hour). Each wake means paying for the time it runs.'
                     />
                 </div>
             </Card>

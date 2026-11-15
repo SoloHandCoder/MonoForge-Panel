@@ -18,6 +18,7 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Page\UpdateServerPageRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Page\UploadServerPageBannerRequest;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
+use Pterodactyl\Models\Share\ServerPageSlugHold;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
 use Pterodactyl\Services\ServerPages\ServerPageBanners;
 use Pterodactyl\Services\Tunnels\TunnelService;
@@ -38,6 +39,7 @@ class ServerPageController extends ClientApiController
         'banner_image_url' => '/s/skyblock/banner/3f786850e387550fdab836ed7e6dc881de23001b.png',
         'votes' => 42,
         'has_address' => true,
+        'allow_wake' => false,
     ];
 
     private const array CONFLICT_ERROR = [
@@ -67,6 +69,7 @@ class ServerPageController extends ClientApiController
     #[ResponseField('banner_image_url', 'string', 'The path of the banner image, or null when there is none.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address: only a live playit tunnel address is ever shown.')]
+    #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Public page returned.')]
     public function show(ServerPageRequest $request, Server $server): JsonResponse
     {
@@ -79,6 +82,7 @@ class ServerPageController extends ClientApiController
     #[BodyParam('noindex', 'boolean', 'Whether search engines are asked not to list the page.', required: true, example: false)]
     #[BodyParam('description', 'string', 'The description in markdown, at most 2000 characters, or null for none.', required: true, example: 'A friendly **skyblock** server.', nullable: true)]
     #[BodyParam('banner_color', 'string', 'The banner colour as #rrggbb, or null for the default.', required: true, example: '#8b5cf6', nullable: true)]
+    #[BodyParam('allow_wake', 'boolean', 'Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.', required: false, example: false)]
     #[ResponseField('exists', 'boolean', 'Always true after a save.')]
     #[ResponseField('slug', 'string', 'The part of the address after /s/.', nullable: true)]
     #[ResponseField('url', 'string', 'The full address of the page.', nullable: true)]
@@ -89,11 +93,13 @@ class ServerPageController extends ClientApiController
     #[ResponseField('banner_image_url', 'string', 'The path of the banner image, or null when there is none.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
+    #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Public page saved.')]
     public function update(UpdateServerPageRequest $request, Server $server): JsonResponse
     {
         $page = $this->page($server) ?? new ServerPage(['server_id' => $server->id]);
         $wasPublished = $page->exists && $page->published;
+        $oldSlug = $page->exists ? $page->slug : null;
         $description = $request->input('description');
         $color = $request->input('banner_color');
 
@@ -103,7 +109,22 @@ class ServerPageController extends ClientApiController
             'noindex' => $request->boolean('noindex'),
             'description' => is_string($description) && mb_trim($description) !== '' ? $description : null,
             'banner_color' => is_string($color) ? mb_strtolower($color) : null,
-        ])->save();
+        ]);
+        if ($request->has('allow_wake')) {
+            $page->allow_wake = $request->boolean('allow_wake');
+        }
+
+        // Unpublishing gives the banner a new name, so the old address (and any copy a CDN keeps
+        // of it) stops working at once.
+        if ($wasPublished && ! $page->published && $page->banner_image !== null) {
+            $page->banner_image = $this->banners->rename($page->banner_image);
+        }
+
+        $page->save();
+
+        if ($oldSlug !== null && $oldSlug !== $page->slug) {
+            ServerPageSlugHold::rename($server->id, $oldSlug, $page->slug);
+        }
 
         Activity::event('server:page.update')->property('slug', $page->slug)->log();
         if ($page->published !== $wasPublished) {
@@ -127,6 +148,7 @@ class ServerPageController extends ClientApiController
     #[ResponseField('banner_image_url', 'string', 'The path of the new banner image.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
+    #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Banner stored.')]
     #[ScribeResponse(self::CONFLICT_ERROR, status: 409, description: 'The page has not been saved yet.')]
     public function uploadBanner(UploadServerPageBannerRequest $request, Server $server): JsonResponse
@@ -154,6 +176,7 @@ class ServerPageController extends ClientApiController
     #[ResponseField('banner_image_url', 'string', 'Always null after the delete.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
+    #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
     #[ScribeResponse([...self::EXAMPLE, 'banner_image_url' => null], description: 'Banner deleted.')]
     public function deleteBanner(ServerPageRequest $request, Server $server): JsonResponse
     {
@@ -175,7 +198,7 @@ class ServerPageController extends ClientApiController
     }
 
     /**
-     * @return array{exists: bool, slug: string|null, url: string|null, published: bool, noindex: bool, description: string, banner_color: string|null, banner_image_url: string|null, votes: int, has_address: bool}
+     * @return array{exists: bool, slug: string|null, url: string|null, published: bool, noindex: bool, description: string, banner_color: string|null, banner_image_url: string|null, votes: int, has_address: bool, allow_wake: bool}
      */
     private function settings(Server $server, ?ServerPage $page): array
     {
@@ -190,6 +213,7 @@ class ServerPageController extends ClientApiController
             'banner_image_url' => $page?->bannerUrl(),
             'votes' => $page->votes ?? 0,
             'has_address' => $this->tunnels->displayAddress($server) !== null,
+            'allow_wake' => $page->allow_wake ?? false,
         ];
     }
 }

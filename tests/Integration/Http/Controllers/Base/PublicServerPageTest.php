@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Mockery;
+use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Contracts\Servers\DeletesServers;
 use Pterodactyl\Contracts\Servers\ReadsServerState;
 use Pterodactyl\Contracts\Servers\WakesServers;
@@ -20,6 +21,7 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Models\Share\ServerPageVote;
+use Pterodactyl\Services\Captcha\CaptchaSettings;
 use Pterodactyl\Services\Query\QueryStatus;
 use Pterodactyl\Services\Query\ServerQuery;
 use Pterodactyl\Services\ServerPages\ServerPageVisitor;
@@ -32,6 +34,8 @@ uses(HttpTestCase::class);
 
 beforeEach(function (): void {
     Cache::flush();
+    // The panel's own page: same origin, and its HTTP client marks every request.
+    $this->withHeaders(['Origin' => mb_rtrim(config()->string('app.url'), '/'), 'X-Requested-With' => 'XMLHttpRequest']);
     // By default Wings reports the server stopped and the game does not answer.
     $this->app->instance(ReadsServerState::class, fakeState('offline'));
 });
@@ -82,6 +86,7 @@ function publishedPage(array $attributes = [], array $server = []): ServerPage
         'published' => true,
         'description' => 'A **friendly** server',
         'banner_color' => '#8b5cf6',
+        'allow_wake' => true,
         ...$attributes,
     ])->setRelation('server', $model);
 }
@@ -93,7 +98,7 @@ function vote(string $slug = 'skyblock', string $ip = '203.0.113.7', ?string $co
     // Cookies set on the test case add up, so "no cookie" is sent as one that is not a visitor token.
     $test->withCredentials()->withUnencryptedCookies([ServerPageVisitor::COOKIE => $cookie ?? 'none']);
 
-    return $test->postJson("/api/public/servers/{$slug}/vote");
+    return $test->postJson("/api/public/servers/{$slug}/vote", ['vote' => true]);
 }
 
 test('a published page shows its details and never an ip address or node name', function (): void {
@@ -226,12 +231,31 @@ test('a visitor votes once a day, known by address or cookie, and neither is sto
     vote(cookie: $token)->assertJsonPath('counted', true)->assertJsonPath('votes', 3);
 });
 
-test('an ipv6 visitor counts by their /64', function (): void {
+test('an ipv6 visitor counts by their /48', function (): void {
     publishedPage();
 
     vote(ip: '2001:db8:1:2::1')->assertJsonPath('counted', true);
     vote(ip: '2001:db8:1:2:ffff::9')->assertJsonPath('counted', false);
-    vote(ip: '2001:db8:1:3::1')->assertJsonPath('counted', true);
+    // Another /64 inside the same /48 is the same visitor.
+    vote(ip: '2001:db8:1:3::1')->assertJsonPath('counted', false);
+    vote(ip: '2001:db8:2::1')->assertJsonPath('counted', true);
+});
+
+test('a page takes at most five votes a day from one /24 or /48', function (): void {
+    publishedPage();
+
+    foreach (range(1, 5) as $host) {
+        vote(ip: "203.0.113.{$host}")->assertJsonPath('counted', true);
+    }
+
+    vote(ip: '203.0.113.99')->assertJsonPath('counted', false)->assertJsonPath('votes', 5);
+    vote(ip: '203.0.114.1')->assertJsonPath('counted', true);
+
+    // Every address in one IPv6 /48 is one visitor already.
+    vote(ip: '2001:db8:aa:1::1')->assertJsonPath('counted', true);
+    foreach (range(2, 6) as $net) {
+        vote(ip: "2001:db8:aa:{$net}::1")->assertJsonPath('counted', false);
+    }
 });
 
 test('votes on one page do not block another page', function (): void {
@@ -242,15 +266,65 @@ test('votes on one page do not block another page', function (): void {
     vote('other-one')->assertJsonPath('counted', true);
 });
 
-test('votes and wakes must be sent as json, so another site cannot post a form', function (): void {
+test('votes and wakes must be exact json with x-requested-with, so another site cannot send them', function (): void {
     publishedPage();
 
+    // A "simple" cross-site fetch: no preflight, a JSON-looking type that is really text/plain.
+    $this->call('POST', '/api/public/servers/skyblock/vote', [], [], [], ['CONTENT_TYPE' => 'text/plain;x=/json', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest', 'HTTP_ORIGIN' => mb_rtrim(config()->string('app.url'), '/')], '{"vote":true}')->assertStatus(415);
     $this->post('/api/public/servers/skyblock/vote', [], ['Content-Type' => 'application/x-www-form-urlencoded'])->assertStatus(415);
     $this->post('/api/public/servers/skyblock/wake', [], ['Content-Type' => 'text/plain'])->assertStatus(415);
+    // JSON alone is not enough: the X-Requested-With header is required as well.
+    $this->postJson('/api/public/servers/skyblock/vote', ['vote' => true], ['X-Requested-With' => ''])->assertStatus(415);
     expect(ServerPageVote::query()->count())->toBe(0);
 
-    // The panel's own client marks its requests instead, which another site cannot do either.
-    $this->post('/api/public/servers/skyblock/vote', [], ['X-Requested-With' => 'XMLHttpRequest'])->assertOk()->assertJsonPath('counted', true);
+    $this->postJson('/api/public/servers/skyblock/vote', ['vote' => true], ['Content-Type' => 'application/json; charset=utf-8'])->assertOk()->assertJsonPath('counted', true);
+});
+
+test('votes and wakes from another origin are refused', function (string $origin, ?string $referer, int $status): void {
+    publishedPage();
+    $panel = mb_rtrim(config()->string('app.url'), '/');
+    $headers = ['Origin' => str_replace('{panel}', $panel, $origin)];
+    if ($referer !== null) {
+        $headers['Referer'] = str_replace('{panel}', $panel, $referer);
+    }
+
+    $this->postJson('/api/public/servers/skyblock/vote', ['vote' => true], $headers)->assertStatus($status);
+    $this->postJson('/api/public/servers/skyblock/wake', [], $headers)->assertStatus($status === 200 ? 200 : 403);
+})->with([
+    'another site' => ['https://evil.example', null, 403],
+    'a look-alike host' => ['https://panel.example.com.evil.example', null, 403],
+    'no origin and no referer' => ['', null, 403],
+    'an opaque origin' => ['null', 'https://evil.example/page', 403],
+    'no origin but the panel as referer' => ['', '{panel}/s/skyblock', 200],
+]);
+
+test('visitors may wake a server only when its owner allows it', function (): void {
+    $page = publishedPage(['allow_wake' => false]);
+    $sleep = new FakeSleep([$page->server_id]);
+    $this->app->instance(WakesServers::class, $sleep);
+
+    $this->getJson('/api/public/servers/skyblock')->assertJsonPath('status', 'sleeping')->assertJsonPath('can_wake', false);
+    $this->postJson('/api/public/servers/skyblock/wake')->assertForbidden()->assertJsonPath('errors.0.detail', 'The owner of this server has not allowed visitors to wake it.');
+    expect($sleep->woken)->toBe([]);
+
+    $page->forceFill(['allow_wake' => true])->save();
+    Cache::flush();
+    $this->getJson('/api/public/servers/skyblock')->assertJsonPath('can_wake', true);
+});
+
+test('a wake needs the captcha when the panel uses one', function (): void {
+    $page = publishedPage();
+    $this->app->instance(WakesServers::class, new FakeSleep([$page->server_id]));
+    config()->set('monoforge.captcha.provider', 'turnstile');
+    $verifier = Mockery::mock(VerifiesCaptcha::class);
+    $verifier->shouldReceive('verify')->andReturn(['success' => false, 'hostname' => null, 'action' => null]);
+    $this->app->instance(VerifiesCaptcha::class, $verifier);
+
+    if (CaptchaSettings::provider() === CaptchaSettings::NONE) {
+        $this->markTestSkipped('The captcha provider is not read from this config key.');
+    }
+
+    $this->postJson('/api/public/servers/skyblock/wake', ['g-recaptcha-response' => 'bad'])->assertStatus(400);
 });
 
 test('an unpublished page cannot be voted for or woken', function (): void {
@@ -289,19 +363,34 @@ test('a sleeping server is woken at most once a minute', function (): void {
     expect($sleep->woken)->toHaveCount(2);
 });
 
-test('one visitor wakes at most five servers an hour', function (): void {
+test('one visitor wakes at most two servers an hour', function (): void {
     $sleep = new FakeSleep;
     $this->app->instance(WakesServers::class, $sleep);
-    foreach (range(1, 6) as $index) {
+    foreach (range(1, 3) as $index) {
         $sleep->sleeping[] = publishedPage(['slug' => "server-{$index}"])->server_id;
     }
 
-    foreach (range(1, 5) as $index) {
+    foreach (range(1, 2) as $index) {
         $this->postJson("/api/public/servers/server-{$index}/wake")->assertOk()->assertJsonPath('woken', true);
     }
 
-    $this->postJson('/api/public/servers/server-6/wake')->assertStatus(429);
-    $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.31'])->postJson('/api/public/servers/server-6/wake')->assertOk()->assertJsonPath('woken', true);
+    $this->postJson('/api/public/servers/server-3/wake')->assertStatus(429);
+    $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.31'])->postJson('/api/public/servers/server-3/wake')->assertOk()->assertJsonPath('woken', true);
+});
+
+test('a server is woken from its page at most three times an hour in total', function (): void {
+    $page = publishedPage();
+    $sleep = new FakeSleep([$page->server_id]);
+    $this->app->instance(WakesServers::class, $sleep);
+
+    foreach (range(1, 3) as $visitor) {
+        $sleep->sleeping = [$page->server_id];
+        $this->withServerVariables(['REMOTE_ADDR' => "198.51.10{$visitor}.1"])->postJson('/api/public/servers/skyblock/wake')->assertOk()->assertJsonPath('woken', true);
+        $this->travel(61)->seconds();
+    }
+
+    $sleep->sleeping = [$page->server_id];
+    $this->withServerVariables(['REMOTE_ADDR' => '198.51.109.1'])->postJson('/api/public/servers/skyblock/wake')->assertStatus(429);
 });
 
 test('the page carries its own title, description and open graph tags', function (): void {
@@ -366,8 +455,8 @@ test('robots.txt lets crawlers reach the public server pages', function (): void
 
 test('old votes are pruned once they no longer block a vote', function (): void {
     $page = publishedPage();
-    ServerPageVote::query()->create(['server_page_id' => $page->id, 'address_hash' => str_repeat('a', 64), 'cookie_hash' => str_repeat('b', 64), 'voted_at' => CarbonImmutable::now()->subHours(25)]);
-    ServerPageVote::query()->create(['server_page_id' => $page->id, 'address_hash' => str_repeat('c', 64), 'cookie_hash' => str_repeat('d', 64), 'voted_at' => CarbonImmutable::now()->subHours(2)]);
+    ServerPageVote::query()->create(['server_page_id' => $page->id, 'address_hash' => str_repeat('a', 64), 'cookie_hash' => str_repeat('b', 64), 'network_hash' => str_repeat('e', 64), 'voted_at' => CarbonImmutable::now()->subHours(25)]);
+    ServerPageVote::query()->create(['server_page_id' => $page->id, 'address_hash' => str_repeat('c', 64), 'cookie_hash' => str_repeat('d', 64), 'network_hash' => str_repeat('f', 64), 'voted_at' => CarbonImmutable::now()->subHours(2)]);
 
     $this->artisan('model:prune', ['--model' => [ServerPageVote::class]])->assertSuccessful();
 

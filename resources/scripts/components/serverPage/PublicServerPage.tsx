@@ -18,6 +18,7 @@ import copyToClipboard from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
 import Markdown from '@/lib/markdown';
+import { useCaptcha } from '@/views/auth/captcha';
 import { Main } from '@/views/a11y';
 import { setPageTitle } from '@/views/pageTitle';
 
@@ -164,7 +165,7 @@ function VoteCard({ page, slug }: { page: PublicPage; slug: string }) {
             <button
                 type='button'
                 disabled={vote.isPending || result !== undefined}
-                onClick={() => vote.mutate(publicServerPageInput(slug))}
+                onClick={() => vote.mutate({ ...publicServerPageInput(slug), body: { vote: true } })}
                 className='inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
             >
                 <Icon
@@ -180,7 +181,29 @@ function VoteCard({ page, slug }: { page: PublicPage; slug: string }) {
 
 function WakeCard({ slug, onWoken }: { slug: string; onWoken: () => void }) {
     const wake = useWakeServer();
+    const { Captcha, token } = useCaptcha('wake');
     const [waitSeconds, setWaitSeconds] = useState<number | null>(null);
+
+    const start = async () => {
+        const captcha = await token();
+
+        if (captcha === null) {
+            return;
+        }
+
+        wake.mutate(
+            { ...publicServerPageInput(slug), body: captcha === '' ? {} : { 'g-recaptcha-response': captcha } },
+            {
+                onSuccess: (result) => {
+                    setWaitSeconds(null);
+                    if (result.woken) {
+                        onWoken();
+                    }
+                },
+                onError: (error) => setWaitSeconds(retryAfterSeconds(error)),
+            }
+        );
+    };
 
     let message = 'The server is asleep to save resources. Wake it up and it will be ready in a minute or two.';
 
@@ -209,22 +232,13 @@ function WakeCard({ slug, onWoken }: { slug: string; onWoken: () => void }) {
             <button
                 type='button'
                 disabled={wake.isPending || wake.data?.woken === true}
-                onClick={() =>
-                    wake.mutate(publicServerPageInput(slug), {
-                        onSuccess: (result) => {
-                            setWaitSeconds(null);
-                            if (result.woken) {
-                                onWoken();
-                            }
-                        },
-                        onError: (error) => setWaitSeconds(retryAfterSeconds(error)),
-                    })
-                }
+                onClick={() => void start()}
                 className='inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
             >
                 <Icon icon={Power} aria-hidden className='size-4' />
                 {wake.isPending ? 'Waking…' : 'Wake server'}
             </button>
+            {Captcha && <Captcha />}
         </section>
     );
 }
@@ -259,7 +273,7 @@ export function PublicServerView({ page, slug, onWoken }: { page: PublicPage; sl
                 </div>
             </section>
 
-            {page.status === 'sleeping' && <WakeCard slug={slug} onWoken={onWoken} />}
+            {page.can_wake && <WakeCard slug={slug} onWoken={onWoken} />}
 
             <div className='animate-rise' style={{ '--rise-delay': '60ms' } as CSSProperties}>
                 <JoinCard page={page} />

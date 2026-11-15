@@ -25,6 +25,7 @@ vi.mock('@/api/public/serverPage', async (importOriginal) => ({
     useWakeServer: () => wake.current,
 }));
 vi.mock('@/lib/clipboard', () => ({ default: copy }));
+vi.mock('@/views/auth/captcha', () => ({ useCaptcha: () => ({ Captcha: null, token: async () => '' }) }));
 
 const page = (overrides: Partial<PublicServerPage> = {}): PublicServerPage => ({
     slug: 'skyblock',
@@ -39,6 +40,7 @@ const page = (overrides: Partial<PublicServerPage> = {}): PublicServerPage => ({
     address: 'skyblock.joinmc.link',
     join_url: null,
     votes: 42,
+    can_wake: false,
     ...overrides,
 });
 
@@ -103,7 +105,7 @@ describe('public server page', () => {
         const { rerender } = renderView(page());
 
         await user.click(screen.getByRole('button', { name: /Vote/ }));
-        expect(vote.current.mutate).toHaveBeenCalledWith({ path: { slug: 'skyblock' } });
+        expect(vote.current.mutate).toHaveBeenCalledWith({ path: { slug: 'skyblock' }, body: { vote: true } });
 
         vote.current = { ...vote.current, data: { counted: false, votes: 42, next_vote_at: '2026-11-16T12:00:00Z' } };
         rerender(<PublicServerView page={page()} slug='skyblock' onWoken={vi.fn()} />);
@@ -120,11 +122,12 @@ describe('public server page', () => {
             (_input, options: { onSuccess: (result: { woken: boolean; sleeping: boolean }) => void }) =>
                 options.onSuccess({ woken: true, sleeping: false })
         );
-        renderView(page({ status: 'sleeping', players: null }), onWoken);
+        renderView(page({ status: 'sleeping', players: null, can_wake: true }), onWoken);
 
         expect(screen.getByRole('status')).toHaveTextContent('Sleeping');
         await user.click(screen.getByRole('button', { name: /Wake server/ }));
         expect(onWoken).toHaveBeenCalled();
+        expect(wake.current.mutate).toHaveBeenCalledWith({ path: { slug: 'skyblock' }, body: {} }, expect.anything());
 
         cleanup();
         const refused = new AxiosError('Too many', '429', undefined, undefined, {
@@ -138,10 +141,17 @@ describe('public server page', () => {
         wake.current.mutate = vi.fn((_input, options: { onError: (error: AxiosError) => void }) =>
             options.onError(refused)
         );
-        renderView(page({ status: 'sleeping', players: null }));
+        renderView(page({ status: 'sleeping', players: null, can_wake: true }));
         await user.click(screen.getByRole('button', { name: /Wake server/ }));
 
         expect(await screen.findByText('It was woken a moment ago. Try again in 42 seconds.')).toBeInTheDocument();
+    });
+
+    it('does not offer the wake button when the owner did not allow it', () => {
+        renderView(page({ status: 'sleeping', players: null, can_wake: false }));
+
+        expect(screen.getByRole('status')).toHaveTextContent('Sleeping');
+        expect(screen.queryByRole('button', { name: /Wake server/ })).not.toBeInTheDocument();
     });
 
     it('does not offer the wake button to a server that is awake', () => {

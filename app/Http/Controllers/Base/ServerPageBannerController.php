@@ -28,7 +28,8 @@ class ServerPageBannerController extends Controller
         return new Response($stored['contents'], Response::HTTP_OK, [
             'Content-Type' => $stored['mime'],
             'Content-Disposition' => 'inline; filename="'.$file.'"',
-            'Cache-Control' => 'public, max-age=86400',
+            // Short, so an unpublished banner (renamed on unpublish) leaves caches quickly.
+            'Cache-Control' => 'public, max-age=300',
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; sandbox",
         ]);
