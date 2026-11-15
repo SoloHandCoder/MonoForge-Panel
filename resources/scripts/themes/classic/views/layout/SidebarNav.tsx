@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useId, useState, type ReactNode } from 'react';
 import {
     Activity,
     Archive,
@@ -51,7 +51,7 @@ import {
     type ServerArea,
 } from '@/sdk/theme';
 import MonoForgeMark from '../brand/MonoForgeMark';
-import { discordLinkProps } from '../brand/links';
+import { discordLinkProps, LEGAL_LINKS, legalLinkProps } from '../brand/links';
 import {
     ADMIN_NAV,
     groupNavItems,
@@ -478,6 +478,16 @@ export default function SidebarNav({ model }: { model: AppLayoutModel }) {
                     <Icon icon={MessageCircle} className='size-4 shrink-0' aria-hidden />
                     <span className='min-w-0 flex-1 truncate'>Join our Discord</span>
                 </a>
+                <nav aria-label='Legal' className='flex flex-wrap gap-x-1.5 px-3 pt-1 text-xs text-muted-foreground'>
+                    {LEGAL_LINKS.map((link, index) => (
+                        <Fragment key={link.id}>
+                            {index > 0 && <span aria-hidden>·</span>}
+                            <a {...legalLinkProps(link.href)} className='no-underline hover:text-foreground'>
+                                {link.label}
+                            </a>
+                        </Fragment>
+                    ))}
+                </nav>
             </div>
             <div className='mt-auto flex items-center gap-3 border-t border-sidebar-border px-1 pt-4'>
                 <Avatar name={user.uuid} size={32} />

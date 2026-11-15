@@ -44,7 +44,7 @@ export interface ResetPasswordFormModel extends AuthFormModel<'password' | 'pass
     readonly email: string;
     readonly login: CorePanelDestination;
 }
-/** A checkbox the visitor must tick, such as agreeing to the rules. */
+/** A checkbox the visitor must tick, such as agreeing to the Terms of Service and Privacy Policy. */
 export interface CheckboxFieldModel {
     readonly name: string;
     readonly checked: boolean;
@@ -52,7 +52,7 @@ export interface CheckboxFieldModel {
     readonly disabled?: boolean;
     readonly error: string | null;
 }
-/** Sign-up: a new account's username, email and password, and the visitor's agreement to the rules. */
+/** Sign-up: a new account's username, email and password, and the visitor's agreement to the Terms of Service and Privacy Policy. */
 export interface RegisterFormModel extends AuthFormModel<'username' | 'email' | 'password' | 'passwordConfirmation'> {
     readonly terms: CheckboxFieldModel;
     readonly login: CorePanelDestination;

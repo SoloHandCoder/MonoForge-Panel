@@ -2,7 +2,10 @@ import { useId } from 'react';
 import { Button, Checkbox, PanelLink } from '@/sdk';
 import type { ViewProps } from '@/sdk/theme';
 import { TextField } from '../shared/fields';
+import { legalLinkProps } from '../brand/links';
 import AuthCard, { authLinkClass } from './AuthCard';
+
+const legalTextLinkClass = 'font-medium text-accent underline underline-offset-2 hover:text-foreground';
 
 export default function RegisterPage({ model, className }: ViewProps<'page.auth.register'>) {
     const { fields, terms, Captcha } = model;
@@ -26,7 +29,7 @@ export default function RegisterPage({ model, className }: ViewProps<'page.auth.
                 <TextField field={fields.passwordConfirmation} light label='Confirm Password' />
             </div>
             <div className='mt-6'>
-                <div className='flex items-center gap-3'>
+                <div className='flex items-start gap-3'>
                     <Checkbox
                         id={termsId}
                         name={terms.name}
@@ -37,7 +40,14 @@ export default function RegisterPage({ model, className }: ViewProps<'page.auth.
                         aria-describedby={terms.error ? `${termsId}-error` : undefined}
                     />
                     <label htmlFor={termsId} className='text-sm text-foreground'>
-                        I agree to the rules
+                        I agree to the{' '}
+                        <a {...legalLinkProps('/legal/terms')} className={legalTextLinkClass}>
+                            Terms of Service
+                        </a>{' '}
+                        and{' '}
+                        <a {...legalLinkProps('/legal/privacy')} className={legalTextLinkClass}>
+                            Privacy Policy
+                        </a>
                     </label>
                 </div>
                 {terms.error && (

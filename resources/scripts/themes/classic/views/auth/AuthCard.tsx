@@ -1,8 +1,8 @@
 /* oxlint-disable rules/design-tokens -- the card radius is the brand's fixed 18px */
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { cn, Form } from '@/sdk';
 import MonoForgeMark from '../brand/MonoForgeMark';
-import { discordLinkProps } from '../brand/links';
+import { discordLinkProps, LEGAL_LINKS, legalLinkProps } from '../brand/links';
 
 interface Props {
     title: string;
@@ -11,7 +11,7 @@ interface Props {
     children: ReactNode;
 }
 
-/** The sign-in card: the mark and name above the title, the form below, and the copyright under the card. */
+/** The sign-in card: the mark and name above the title, the form below, and the copyright and legal links under the card. */
 export default function AuthCard({ title, submit, className, children }: Props) {
     return (
         <div className={cn('mx-auto w-full max-w-md', className)}>
@@ -32,6 +32,16 @@ export default function AuthCard({ title, submit, className, children }: Props) 
                     Join our Discord
                 </a>
             </p>
+            <nav aria-label='Legal' className='mt-1 text-center text-muted-foreground text-xs'>
+                {LEGAL_LINKS.map((link, index) => (
+                    <Fragment key={link.id}>
+                        {index > 0 && <span aria-hidden> · </span>}
+                        <a {...legalLinkProps(link.href)} className='no-underline hover:text-foreground'>
+                            {link.label}
+                        </a>
+                    </Fragment>
+                ))}
+            </nav>
         </div>
     );
 }

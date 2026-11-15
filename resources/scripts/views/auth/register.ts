@@ -10,7 +10,7 @@ const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 // The same characters the panel accepts for usernames; the server has the final say.
 const isUsername = (value: string) => /^[a-z0-9]([\w.-]+)[a-z0-9]$/.test(value.toLowerCase());
 const newPassword = { type: 'password', autoComplete: 'new-password' } as const;
-const RULES_REQUIRED = 'You must agree to the rules to create an account.';
+const RULES_REQUIRED = 'You must agree to the Terms of Service and Privacy Policy to create an account.';
 
 function useRegisterFormModel(): RegisterFormModel {
     const register = useRegister();
@@ -99,7 +99,7 @@ function useRegisterFormModel(): RegisterFormModel {
             error: firstError(terms.state.meta.errors) ?? null,
         },
         submit: () => void form.handleSubmit(),
-        // The rules must be ticked before the form can be sent.
+        // The Terms of Service and Privacy Policy must be ticked before the form can be sent.
         canSubmit: canSubmit && terms.state.value,
         submitting,
         Captcha,
