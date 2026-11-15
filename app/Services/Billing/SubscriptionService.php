@@ -19,7 +19,6 @@ use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
-use Pterodactyl\Services\Tunnels\TunnelService;
 use Throwable;
 
 /**
@@ -66,7 +65,6 @@ class SubscriptionService
         private readonly TogglesServerSuspension $suspension,
         private readonly DeletesServers $deletion,
         private readonly BillingNotifier $notifier,
-        private readonly TunnelService $tunnels,
     ) {}
 
     /**
@@ -500,11 +498,14 @@ class SubscriptionService
         }
 
         $now = CarbonImmutable::now();
+        // `suspended_at` still set means billing's previous suspension was never lifted (the
+        // unsuspend failed): the server is still billing's, so its flag is kept.
+        $stillSuspended = $locked->suspended_at !== null;
         $locked->fill([
             'status' => ServerSubscription::STATUS_SUSPENDED,
             'suspended_at' => $now,
-            'server_suspended_at' => null,
-            'suspended_by_billing' => false,
+            'server_suspended_at' => $stillSuspended ? $locked->server_suspended_at : null,
+            'suspended_by_billing' => $stillSuspended && $locked->suspended_by_billing,
             'delete_at' => $now->addDays($grace),
         ])->save();
         $s->setRawAttributes($locked->getAttributes(), true);
@@ -558,8 +559,10 @@ class SubscriptionService
                 return null;
             }
 
+            // The tunnel and its subdomain are released by TunnelListener when the server row is
+            // deleted, which only happens once Wings accepted the delete: a refused delete keeps
+            // both, so a player who pays afterwards gets the server back with its name.
             $server = $locked->server;
-            $this->releaseTunnel($server);
 
             try {
                 $this->deletion->withForce($deleteAt->addHours(self::FORCE_DELETE_AFTER_HOURS)->isPast())->delete($server);
@@ -598,10 +601,11 @@ class SubscriptionService
             $server = $s->server()->firstOrFail();
             $claimed = ! $server->isSuspended();
             if ($claimed) {
-                $this->suspension->toggle($server, TogglesServerSuspension::ACTION_SUSPEND);
+                BillingSuspensionScope::run(fn () => $this->suspension->toggle($server, TogglesServerSuspension::ACTION_SUSPEND));
             }
 
-            $s->forceFill(['server_suspended_at' => CarbonImmutable::now(), 'suspended_by_billing' => $claimed])->save();
+            // A suspension billing made earlier and could not lift yet (Wings was down) stays billing's.
+            $s->forceFill(['server_suspended_at' => CarbonImmutable::now(), 'suspended_by_billing' => $claimed || $s->suspended_by_billing])->save();
 
             return true;
         } catch (Throwable $throwable) {
@@ -624,7 +628,7 @@ class SubscriptionService
 
         try {
             if ($s->suspended_by_billing) {
-                $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_UNSUSPEND);
+                BillingSuspensionScope::run(fn () => $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_UNSUSPEND));
             }
 
             $s->forceFill(['suspended_at' => null, 'server_suspended_at' => null, 'suspended_by_billing' => false])->save();
@@ -634,16 +638,6 @@ class SubscriptionService
             report($throwable);
 
             return false;
-        }
-    }
-
-    private function releaseTunnel(Server $server): void
-    {
-        try {
-            $this->tunnels->release($server);
-        } catch (Throwable $throwable) {
-            // A tunnel left behind must not keep an unpaid server alive.
-            report($throwable);
         }
     }
 

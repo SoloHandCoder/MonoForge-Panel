@@ -8,13 +8,16 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Contracts\Servers\TogglesServerSuspension;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Jobs\Tunnels\DeletePlayitTunnelJob;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
@@ -383,4 +386,76 @@ test('a server billing itself suspended is unsuspended once paid', function (): 
 
     expect($server->refresh()->isSuspended())->toBeFalse()
         ->and($subscription->fresh()->suspended_by_billing)->toBeFalse();
+});
+
+test('an admin who takes over a billing suspension keeps it after the player pays', function (string $how): void {
+    [$user, $server, $subscription] = dueSubscription($this, 0);
+    $toggle = $this->app->make(TogglesServerSuspension::class);
+
+    $this->service->renewDue();
+    expect($subscription->fresh()->suspended_by_billing)->toBeTrue();
+
+    if ($how === 'unsuspend and suspend again') {
+        $toggle->toggle($server->refresh(), TogglesServerSuspension::ACTION_UNSUSPEND);
+    }
+
+    // Abuse found: the admin suspends (a no-op when the server is still suspended).
+    $toggle->toggle($server->refresh(), TogglesServerSuspension::ACTION_SUSPEND);
+    expect($subscription->fresh()->suspended_by_billing)->toBeFalse();
+
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    expect($this->service->collectOverdue())->toBe(1)
+        ->and($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and($server->refresh()->isSuspended())->toBeTrue();
+})->with(['suspend on top' => ['suspend on top'], 'unsuspend and suspend again' => ['unsuspend and suspend again']]);
+
+test('billing keeps its suspension when lifting it failed and the next renewal fails too', function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 0);
+    $this->service->renewDue();
+
+    // Paid, but Wings refuses the unsuspend: the server stays suspended by billing.
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    $this->daemon->throwable = new DaemonConnectionException(Http::failedRequest([], 500));
+    $this->service->collectOverdue();
+    expect($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and($subscription->fresh()->suspended_at)->not->toBeNull()
+        ->and($server->refresh()->isSuspended())->toBeTrue();
+
+    // The next renewal is short as well before Wings comes back.
+    CarbonImmutable::setTestNow(CarbonImmutable::now()->addDays(30));
+    $subscription->refresh()->forceFill(['next_renewal_at' => CarbonImmutable::now()])->save();
+    $this->service->renewDue();
+    expect($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_SUSPENDED)
+        ->and($subscription->fresh()->suspended_by_billing)->toBeTrue();
+
+    $this->daemon->throwable = null;
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    $this->service->collectOverdue();
+    expect($server->refresh()->isSuspended())->toBeFalse();
+});
+
+test('a refused delete keeps the tunnel and its subdomain; a delete that goes through releases them', function (): void {
+    Bus::fake();
+    [, $server, $subscription] = dueSubscription($this, 0);
+    $this->service->renewDue();
+    $tunnel = ServerTunnel::query()->forceCreate([
+        'server_id' => $server->id,
+        'playit_tunnel_id' => '00000000-0000-4000-8000-0000000000aa',
+        'address' => 'survival.example.gl.at.ply.gg:12345',
+        'subdomain' => 'survival',
+        'status' => 'active',
+    ]);
+
+    CarbonImmutable::setTestNow(CarbonImmutable::now()->addDays(7)->addHour());
+    $this->daemon->throwable = new DaemonConnectionException(Http::failedRequest([], 500));
+    expect($this->service->deleteExpired())->toBe(0)
+        ->and($tunnel->fresh()->subdomain)->toBe('survival')
+        ->and($tunnel->fresh()->playit_tunnel_id)->not->toBeNull()
+        ->and($subscription->fresh())->not->toBeNull();
+    Bus::assertNotDispatched(DeletePlayitTunnelJob::class);
+
+    $this->daemon->throwable = null;
+    expect($this->service->deleteExpired())->toBe(1)
+        ->and(ServerTunnel::query()->find($tunnel->id))->toBeNull();
+    Bus::assertDispatched(DeletePlayitTunnelJob::class);
 });
