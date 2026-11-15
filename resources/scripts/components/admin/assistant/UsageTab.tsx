@@ -50,14 +50,6 @@ export default function UsageTab() {
     }
 
     const rows = data?.data ?? [];
-    const totals = rows.reduce(
-        (sum, row) => ({
-            ai: sum.ai + row.ai_tokens,
-            free: sum.free + row.free_tokens,
-            charged: sum.charged + row.panel_tokens_charged,
-        }),
-        { ai: 0, free: 0, charged: 0 }
-    );
 
     return (
         <>
@@ -65,7 +57,9 @@ export default function UsageTab() {
                 <MonthPicker period={period} onChange={setPeriod} />
                 {data && (
                     <p className='text-sm text-muted-foreground tabular-nums'>
-                        {formatTokens(totals.ai)} AI tokens · {formatTokens(totals.charged)} tokens charged
+                        {formatTokens(data.totals.ai_tokens)} AI tokens ·{' '}
+                        {formatTokens(data.totals.panel_tokens_charged)} tokens charged ·{' '}
+                        {formatTokens(data.totals.admin_ai_tokens)} admin
                     </p>
                 )}
             </div>
@@ -91,12 +85,21 @@ export default function UsageTab() {
                                 <th scope='col' className='px-4 py-2.5 text-right font-medium'>
                                     Charged
                                 </th>
+                                <th scope='col' className='px-4 py-2.5 text-right font-medium'>
+                                    Admin
+                                </th>
+                                <th scope='col' className='px-4 py-2.5 text-right font-medium'>
+                                    Calls
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {rows.map((row) => (
-                                <tr key={row.user_id} className='border-b border-border last:border-0'>
-                                    <td className='px-4 py-2.5 text-foreground'>{row.username}</td>
+                                <tr key={row.user.id} className='border-b border-border last:border-0'>
+                                    <td className='px-4 py-2.5 text-foreground'>
+                                        <span className='block'>{row.user.username}</span>
+                                        <span className='block text-xs text-muted-foreground'>{row.user.email}</span>
+                                    </td>
                                     <td className='px-4 py-2.5 text-right tabular-nums'>
                                         {formatTokens(row.ai_tokens)}
                                     </td>
@@ -106,11 +109,17 @@ export default function UsageTab() {
                                     <td className='px-4 py-2.5 text-right tabular-nums'>
                                         {formatTokens(row.panel_tokens_charged)}
                                     </td>
+                                    <td className='px-4 py-2.5 text-right text-muted-foreground tabular-nums'>
+                                        {formatTokens(row.admin_ai_tokens)}
+                                    </td>
+                                    <td className='px-4 py-2.5 text-right text-muted-foreground tabular-nums'>
+                                        {formatTokens(row.calls)}
+                                    </td>
                                 </tr>
                             ))}
                             {rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className='px-4 py-8 text-center text-muted-foreground'>
+                                    <td colSpan={6} className='px-4 py-8 text-center text-muted-foreground'>
                                         Nobody used the assistant in {formatPeriod(period)}.
                                     </td>
                                 </tr>

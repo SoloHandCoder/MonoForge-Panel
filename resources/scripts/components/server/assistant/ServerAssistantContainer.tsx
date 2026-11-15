@@ -39,7 +39,7 @@ export default function ServerAssistantContainer() {
                 description='Ask about your server. It can read the console and files, and asks before it changes anything.'
             />
             <div className='mt-6 space-y-4'>
-                {status.data && !status.data.server_enabled && (
+                {status.data && (!status.data.enabled || !status.data.server_enabled) && (
                     <Alert type='info' title='The assistant is turned off'>
                         An administrator has turned off the server assistant.
                     </Alert>

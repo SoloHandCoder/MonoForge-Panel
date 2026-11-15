@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useQueryClient } from '@tanstack/react-query';
 import { Bot, MessageSquarePlus, SendHorizontal, Sparkles, Trash2 } from 'lucide-react';
 import {
+    assistantErrorText,
     assistantStatusQueryKey,
     useAssistantConversation,
     useAssistantConversations,
@@ -17,7 +18,6 @@ import {
     type AssistantMessage,
     type AssistantScope,
 } from '@/api/assistant';
-import { httpErrorToHuman } from '@/api/http';
 import Markdown from '@/components/assistant/markdown';
 import ToolCallCard from '@/components/assistant/ToolCallCard';
 import { Alert } from '@/components/elements/alert';
@@ -101,7 +101,7 @@ function ConversationList({
                                     </span>
                                     <span className='block truncate text-xs text-muted-foreground'>
                                         <span className='sr-only'>{statusNames[conversation.status]}, </span>
-                                        {fromNow(conversation.updated_at)}
+                                        {conversation.updated_at ? fromNow(conversation.updated_at) : ''}
                                     </span>
                                 </span>
                             </button>
@@ -158,11 +158,6 @@ function MessageItem({
                 </p>
             </div>
         );
-    }
-
-    // Tool results are shown on the tool call cards.
-    if (message.role === 'tool') {
-        return null;
     }
 
     return (
@@ -514,7 +509,7 @@ export default function AssistantChat({
     useConversationSideEffects(scope, conversation.data);
 
     if (list.error && !list.data) {
-        return <ServerError message={httpErrorToHuman(list.error)} onRetry={() => void list.refetch()} />;
+        return <ServerError message={assistantErrorText(list.error)} onRetry={() => void list.refetch()} />;
     }
 
     const renderThread = () => {
@@ -533,7 +528,7 @@ export default function AssistantChat({
             return (
                 <div className='flex flex-1 items-center justify-center p-6'>
                     <ServerError
-                        message={httpErrorToHuman(conversation.error)}
+                        message={assistantErrorText(conversation.error)}
                         onRetry={() => void conversation.refetch()}
                     />
                 </div>

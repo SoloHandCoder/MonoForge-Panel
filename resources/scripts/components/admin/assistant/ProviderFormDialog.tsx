@@ -5,7 +5,11 @@ import {
     type AssistantProviderInput,
     type AssistantProviderPreset,
 } from '@/api/assistant';
-import { providerPresetOrder, providerPresets } from '@/components/admin/assistant/assistantTabs';
+import {
+    providerPresetOrder,
+    providerPresets,
+    type ProviderPresetMap,
+} from '@/components/admin/assistant/assistantTabs';
 import Button from '@/components/elements/Button';
 import { Dialog } from '@/components/elements/dialog';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
@@ -15,6 +19,8 @@ interface Props {
     open: boolean;
     onClose: () => void;
     provider?: AssistantProvider;
+    /** The prefills per preset; defaults to the built-in ones. */
+    presets?: ProviderPresetMap;
 }
 
 export interface ProviderFormValues {
@@ -31,10 +37,11 @@ export interface ProviderFormValues {
     extraHeaders: string;
 }
 
-const presetOptions = providerPresetOrder.map((preset) => ({ value: preset, label: providerPresets[preset].label }));
+const presetOptionsOf = (presets: ProviderPresetMap) =>
+    providerPresetOrder.map((preset) => ({ value: preset, label: presets[preset].label }));
 
-export const formatHeaders = (headers: Readonly<Record<string, string>> | null): string =>
-    Object.entries(headers ?? {})
+export const formatHeaders = (headers: Readonly<Record<string, string>>): string =>
+    Object.entries(headers)
         .map(([name, value]) => `${name}: ${value}`)
         .join('\n');
 
@@ -114,7 +121,7 @@ const required = (message: string) => ({
 });
 
 /** Adds or edits an AI provider. Picking a preset prefills its base URL and model. */
-export default function ProviderFormDialog({ open, onClose, provider }: Props) {
+export default function ProviderFormDialog({ open, onClose, provider, presets = providerPresets }: Props) {
     const save = useSaveAssistantProvider();
     const form = useAppForm({
         defaultValues: providerFormValues(provider),
@@ -129,7 +136,7 @@ export default function ProviderFormDialog({ open, onClose, provider }: Props) {
     });
     const isSubmitting = useStore(form.store, (state) => state.isSubmitting);
     const preset = useStore(form.store, (state) => state.values.preset);
-    const keyDescription = apiKeyDescription(provider?.has_key ?? false, providerPresets[preset].needs_key);
+    const keyDescription = apiKeyDescription(provider?.has_key ?? false, presets[preset].needs_key);
 
     return (
         <Dialog
@@ -146,7 +153,7 @@ export default function ProviderFormDialog({ open, onClose, provider }: Props) {
                         name='preset'
                         listeners={{
                             onChange: ({ value }) => {
-                                const defaults = providerPresets[value];
+                                const defaults = presets[value];
 
                                 form.setFieldValue('baseUrl', defaults.base_url);
                                 form.setFieldValue('model', defaults.model);
@@ -157,7 +164,7 @@ export default function ProviderFormDialog({ open, onClose, provider }: Props) {
                             },
                         }}
                     >
-                        {(field) => <field.SelectField label='Preset' options={presetOptions} />}
+                        {(field) => <field.SelectField label='Preset' options={presetOptionsOf(presets)} />}
                     </form.AppField>
                     <form.AppField name='name' validators={required('A name is required.')}>
                         {(field) => <field.TextField type='text' label='Name' autoComplete='off' />}

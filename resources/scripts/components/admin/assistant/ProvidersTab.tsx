@@ -7,7 +7,7 @@ import {
     type AssistantProvider,
 } from '@/api/assistant';
 import { httpErrorToHuman } from '@/api/http';
-import { providerPresets } from '@/components/admin/assistant/assistantTabs';
+import { withServerPresets, type ProviderPresetMap } from '@/components/admin/assistant/assistantTabs';
 import ProviderFormDialog from '@/components/admin/assistant/ProviderFormDialog';
 import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
@@ -19,7 +19,17 @@ import { formatTokens } from '@/api/account/wallet/queries';
 
 type Editing = { readonly provider?: AssistantProvider } | null;
 
-function ProviderCard({ provider, onEdit }: { provider: AssistantProvider; onEdit: () => void }) {
+function ProviderCard({
+    provider,
+    presets,
+    isDefault,
+    onEdit,
+}: {
+    provider: AssistantProvider;
+    presets: ProviderPresetMap;
+    isDefault: boolean;
+    onEdit: () => void;
+}) {
     const test = useTestAssistantProvider();
     const remove = useDeleteAssistantProvider();
 
@@ -35,8 +45,13 @@ function ProviderCard({ provider, onEdit }: { provider: AssistantProvider; onEdi
                 <div className='flex flex-wrap items-center gap-2'>
                     <p className='truncate font-medium text-foreground'>{provider.name}</p>
                     <Badge tone='accent' variant='soft' size='sm'>
-                        {providerPresets[provider.preset].label}
+                        {presets[provider.preset].label}
                     </Badge>
+                    {isDefault && (
+                        <Badge tone='success' variant='soft' size='sm'>
+                            Default
+                        </Badge>
+                    )}
                     {!provider.enabled && (
                         <Badge tone='neutral' variant='soft' size='sm'>
                             Disabled
@@ -107,6 +122,7 @@ function ProviderCard({ provider, onEdit }: { provider: AssistantProvider; onEdi
 export default function ProvidersTab() {
     const { data, error, refetch } = useAssistantProviders();
     const [editing, setEditing] = useState<Editing>(null);
+    const presets = withServerPresets(data?.meta.presets);
 
     if (error && !data) {
         return <ServerError message={httpErrorToHuman(error)} onRetry={() => void refetch()} />;
@@ -126,7 +142,13 @@ export default function ProvidersTab() {
             {data ? (
                 <ul className='grid gap-3'>
                     {data.data.map((provider) => (
-                        <ProviderCard key={provider.id} provider={provider} onEdit={() => setEditing({ provider })} />
+                        <ProviderCard
+                            key={provider.id}
+                            provider={provider}
+                            presets={presets}
+                            isDefault={provider.id === data.meta.default_provider_id}
+                            onEdit={() => setEditing({ provider })}
+                        />
                     ))}
                     {data.data.length === 0 && (
                         <li className='rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground'>
@@ -142,6 +164,7 @@ export default function ProvidersTab() {
                     key={editing.provider?.id ?? 'new'}
                     open
                     provider={editing.provider}
+                    presets={presets}
                     onClose={() => setEditing(null)}
                 />
             )}

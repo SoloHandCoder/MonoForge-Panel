@@ -1,11 +1,13 @@
-// The AI assistant (phase 4 Task Y), written by hand against the API section of
-// docs/superpowers/plans/2026-11-15-phase4-ai-assistant.md until the generated API client is
-// regenerated with /api/client/assistant… and /api/admin/assistant….
+// The AI assistant (phase 4). The endpoints are in the generated client, but its response types
+// are loose (every field optional, open objects), and the server and admin assistants share one
+// set of hooks, so the calls stay hand-written here with the exact shapes the controllers return
+// (ConversationPresenter, AiProvider::toApiArray, AssistantUsageController).
 /* oxlint-disable no-restricted-properties, rules/generated-api-mutations */
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { toast } from 'sonner';
-import http from '@/api/http';
-import { notifyHttpError } from '@/plugins/notifications';
+import http, { httpErrorToHuman } from '@/api/http';
+import { notifyHttpError, notifyServerError } from '@/plugins/notifications';
 
 /** A JSON value, as tool arguments and tool display summaries carry them. */
 export type AssistantJson =
@@ -39,7 +41,8 @@ export type AssistantConversationStatus = 'idle' | 'running' | 'awaiting_approva
 
 export type AssistantToolCallStatus = 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
 
-export type AssistantRole = 'user' | 'assistant' | 'tool';
+/** Tool results are not messages in the payload: they appear on their call as `result_preview`. */
+export type AssistantRole = 'user' | 'assistant';
 
 export interface AssistantToolCall {
     id: number;
@@ -58,7 +61,7 @@ export interface AssistantMessage {
     id: number;
     role: AssistantRole;
     content: string | null;
-    created_at: string;
+    created_at: string | null;
     tool_calls: AssistantToolCall[];
 }
 
@@ -66,7 +69,7 @@ export interface AssistantConversationSummary {
     uuid: string;
     title: string;
     status: AssistantConversationStatus;
-    updated_at: string;
+    updated_at: string | null;
 }
 
 export interface AssistantConversationUsage {
@@ -85,10 +88,7 @@ export interface AssistantConversation {
     usage: AssistantConversationUsage;
 }
 
-/**
- * The conversation list. The plan only says "list"; this assumes a `data` array, like the panel's
- * other list endpoints. Integration: check against Task W's resource.
- */
+/** The conversation list, newest first. */
 export interface AssistantConversationList {
     data: AssistantConversationSummary[];
 }
@@ -133,14 +133,13 @@ export const getAssistantConversation = async (
 ): Promise<AssistantConversation> =>
     (await http.get<AssistantConversation>(conversationPath(scope, conversation), { signal })).data;
 
-/** Answers 409 while the conversation is running or awaiting approval. */
+/** Answers 409 while the conversation is running or awaiting approval; returns the conversation. */
 export const sendAssistantMessage = async (
     scope: AssistantScope,
     conversation: string,
     body: AssistantMessageInput
-): Promise<void> => {
-    await http.post(`${conversationPath(scope, conversation)}/messages`, body);
-};
+): Promise<AssistantConversation> =>
+    (await http.post<AssistantConversation>(`${conversationPath(scope, conversation)}/messages`, body)).data;
 
 export type AssistantDecision = 'approve' | 'deny';
 
@@ -149,9 +148,12 @@ export const decideAssistantToolCall = async (
     conversation: string,
     toolCall: number,
     decision: AssistantDecision
-): Promise<void> => {
-    await http.post(`${conversationPath(scope, conversation)}/tool-calls/${toolCall}/${decision}`);
-};
+): Promise<AssistantConversation> =>
+    (
+        await http.post<AssistantConversation>(
+            `${conversationPath(scope, conversation)}/tool-calls/${toolCall}/${decision}`
+        )
+    ).data;
 
 export const deleteAssistantConversation = async (scope: AssistantScope, conversation: string): Promise<void> => {
     await http.delete(conversationPath(scope, conversation));
@@ -174,14 +176,15 @@ export interface AssistantProvider {
     preset: AssistantProviderPreset;
     base_url: string;
     model: string;
-    extra_headers: Readonly<Record<string, string>> | null;
+    /** `{}` when the provider has none. */
+    extra_headers: Readonly<Record<string, string>>;
     context_window: number;
     supports_tools: boolean;
     enabled: boolean;
     /** Keys are write-only: the panel only says whether one is stored. */
     has_key: boolean;
-    created_at: string;
-    updated_at: string;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 export interface AssistantProviderInput {
@@ -193,19 +196,35 @@ export interface AssistantProviderInput {
     context_window: number;
     supports_tools: boolean;
     enabled: boolean;
-    /** Left out to keep the stored key. */
-    api_key?: string;
+    /** Left out to keep the stored key; null removes it. */
+    api_key?: string | null;
+}
+
+/** What the provider form prefills for a preset. */
+export interface AssistantPresetInfo {
+    preset: AssistantProviderPreset;
+    label: string;
+    base_url: string;
+    model: string;
+    /** Whether the provider answers without an API key (a local Ollama does). */
+    key_optional: boolean;
 }
 
 export interface AssistantProviderList {
     data: AssistantProvider[];
+    meta: {
+        default_provider_id: number | null;
+        presets: AssistantPresetInfo[];
+    };
 }
 
-/** `POST /api/admin/assistant/providers/{provider}/test`. */
+/** `POST /api/admin/assistant/providers/{provider}/test`; never charged. */
 export interface AssistantProviderTest {
     ok: boolean;
+    latency_ms: number;
     error: string | null;
-    latency_ms: number | null;
+    /** The start of the model's reply when it answered. */
+    reply: string | null;
 }
 
 /** The `monoforge:ai:*` settings. */
@@ -222,18 +241,27 @@ export interface AssistantSettings {
     max_output_tokens: number;
 }
 
-export interface AssistantUsageRow {
-    user_id: number;
-    username: string;
+export interface AssistantUsageTotals {
+    /** All AI tokens of the server assistant. */
     ai_tokens: number;
+    /** The part of them covered by the free allowance. */
     free_tokens: number;
     panel_tokens_charged: number;
+    /** AI tokens of the admin assistant, which are never charged. */
+    admin_ai_tokens: number;
+    /** Model calls. */
+    calls: number;
+}
+
+export interface AssistantUsageRow extends AssistantUsageTotals {
+    user: { id: number; username: string; email: string };
 }
 
 /** `GET /api/admin/assistant/usage?period=YYYY-MM`: per-user totals for the month. */
 export interface AssistantUsageReport {
     period: string;
     data: AssistantUsageRow[];
+    totals: AssistantUsageTotals;
 }
 
 const providersPath = '/api/admin/assistant/providers';
@@ -262,6 +290,84 @@ export const updateAssistantSettings = async (body: AssistantSettings): Promise<
 
 export const getAssistantUsage = async (period: string, signal?: AbortSignal): Promise<AssistantUsageReport> =>
     (await http.get<AssistantUsageReport>('/api/admin/assistant/usage', { params: { period }, signal })).data;
+
+// Refusals.
+
+/** Where a user tops up panel tokens once the free AI tokens are used up. */
+export const ASSISTANT_WALLET_PATH = '/account/wallet';
+
+export interface AssistantErrorMessage {
+    title: string;
+    description: string;
+    /** Whether topping up the wallet fixes it (402). */
+    wallet: boolean;
+}
+
+const httpStatus = (cause: unknown): number | undefined =>
+    axios.isAxiosError(cause) ? cause.response?.status : undefined;
+
+/**
+ * The assistant's refusals in words a user can act on: 402 no free AI tokens and no balance,
+ * 403 turned off (or no access), 503 no provider set up, 409 a turn is still running or waiting
+ * for Allow/Deny. Anything else keeps the server's message under `fallback`.
+ */
+export const describeAssistantError = (cause: unknown, fallback: string): AssistantErrorMessage => {
+    switch (httpStatus(cause) ?? 0) {
+        case 402:
+            return {
+                title: 'Out of AI tokens',
+                description:
+                    "You have used this month's free AI tokens and your token balance is empty. Top up your wallet to keep using the assistant.",
+                wallet: true,
+            };
+        case 403: {
+            const message = httpErrorToHuman(cause);
+
+            return /turned off/i.test(message)
+                ? {
+                      title: 'The assistant is turned off',
+                      description: 'An administrator has turned the AI assistant off.',
+                      wallet: false,
+                  }
+                : { title: 'You cannot use the assistant here', description: message, wallet: false };
+        }
+
+        case 503:
+            return {
+                title: 'The assistant is not set up yet',
+                description: 'No AI provider is enabled. An administrator needs to add one under Admin → AI Assistant.',
+                wallet: false,
+            };
+        case 409:
+            return {
+                title: 'The assistant is busy',
+                description: 'Wait for the current reply, or allow or deny the pending action first.',
+                wallet: false,
+            };
+        default:
+            return { title: fallback, description: httpErrorToHuman(cause), wallet: false };
+    }
+};
+
+/** One line for inline error states, such as a conversation that failed to load. */
+export const assistantErrorText = (cause: unknown): string => {
+    const { title, description } = describeAssistantError(cause, 'Something went wrong');
+
+    return httpStatus(cause) === undefined ? description : `${title}. ${description}`;
+};
+
+export const notifyAssistantError = (cause: unknown, fallback: string) => {
+    console.error(cause);
+
+    const { title, description, wallet } = describeAssistantError(cause, fallback);
+
+    return notifyServerError(title, {
+        description,
+        action: wallet
+            ? { label: 'Open wallet', onClick: () => window.location.assign(ASSISTANT_WALLET_PATH) }
+            : undefined,
+    });
+};
 
 // Queries.
 
@@ -349,7 +455,10 @@ export const useCreateAssistantConversation = (scope: AssistantScope) => {
                 queryClient.invalidateQueries({ queryKey: statusKey }),
             ]);
         },
-        onError: (error) => notifyHttpError(error, 'Unable to start the conversation'),
+        onError: async (error) => {
+            notifyAssistantError(error, 'Unable to start the conversation');
+            await queryClient.invalidateQueries({ queryKey: statusKey });
+        },
     });
 };
 
@@ -379,34 +488,20 @@ export const useSendAssistantMessage = (scope: AssistantScope, conversation: str
                 queryClient.setQueryData(key, context.previous);
             }
 
-            notifyHttpError(error, 'Unable to send the message');
+            notifyAssistantError(error, 'Unable to send the message');
         },
-        onSettled: async () => {
-            await queryClient.invalidateQueries({ queryKey: key, exact: true });
+        onSuccess: (updated) => {
+            queryClient.setQueryData(key, updated);
+        },
+        onSettled: async (_updated, error) => {
+            // A successful send already returned the conversation; refetch only to recover from an error.
+            if (error) {
+                await queryClient.invalidateQueries({ queryKey: key, exact: true });
+            }
+
             await queryClient.invalidateQueries({ queryKey: statusKey });
         },
     });
-};
-
-/** A copy of the conversation with the call decided and the turn running again. */
-const withDecision = (
-    conversation: AssistantConversation,
-    toolCall: number,
-    decision: AssistantDecision
-): AssistantConversation => {
-    const next = structuredClone(conversation);
-
-    next.status = 'running';
-
-    for (const message of next.messages) {
-        for (const call of message.tool_calls) {
-            if (call.id === toolCall) {
-                call.status = decision === 'approve' ? 'approved' : 'denied';
-            }
-        }
-    }
-
-    return next;
 };
 
 export interface AssistantDecisionInput {
@@ -421,16 +516,18 @@ export const useDecideAssistantToolCall = (scope: AssistantScope, conversation: 
     return useMutation({
         mutationFn: ({ toolCall, decision }: AssistantDecisionInput) =>
             decideAssistantToolCall(scope, conversation, toolCall, decision),
-        onSuccess: (_result, { toolCall, decision }) => {
-            const previous = queryClient.getQueryData<AssistantConversation>(key);
-
-            if (previous) {
-                queryClient.setQueryData(key, withDecision(previous, toolCall, decision));
-            }
+        // The response is the conversation after the call ran (Allow) or was refused (Deny); while
+        // the turn continues in the queue its status is `running`, so polling picks it up.
+        onSuccess: (updated) => {
+            queryClient.setQueryData(key, updated);
         },
-        onError: (error, { decision }) =>
-            notifyHttpError(error, decision === 'approve' ? 'Unable to allow the action' : 'Unable to deny the action'),
-        onSettled: () => queryClient.invalidateQueries({ queryKey: key, exact: true }),
+        onError: async (error, { decision }) => {
+            notifyAssistantError(
+                error,
+                decision === 'approve' ? 'Unable to allow the action' : 'Unable to deny the action'
+            );
+            await queryClient.invalidateQueries({ queryKey: key, exact: true });
+        },
     });
 };
 
@@ -497,10 +594,12 @@ export const useTestAssistantProvider = () =>
     useMutation({
         mutationFn: (id: number) => testAssistantProvider(id),
         onSuccess: (result) => {
-            const latency = result.latency_ms === null ? undefined : `${result.latency_ms} ms`;
+            const latency = `${result.latency_ms} ms`;
 
             return result.ok
-                ? toast.success('The provider answered', { description: latency })
+                ? toast.success('The provider answered', {
+                      description: result.reply ? `“${result.reply}” in ${latency}` : latency,
+                  })
                 : toast.error('The provider failed', { description: result.error ?? latency });
         },
         onError: (error) => notifyHttpError(error, 'Unable to test the provider'),

@@ -1,4 +1,4 @@
-import type { AssistantProviderPreset } from '@/api/assistant';
+import type { AssistantPresetInfo, AssistantProviderPreset } from '@/api/assistant';
 
 /**
  * The admin AI Assistant tab's sub-tabs, in order. Each has a route at /panel/assistant[/<key>] (see
@@ -28,7 +28,11 @@ export interface ProviderPresetDefaults {
     needs_key: boolean;
 }
 
-/** Prefills for the provider form; the backend applies the preset's protocol quirks itself. */
+/**
+ * Prefills for the provider form, matching AiProviderPreset; the backend applies the preset's
+ * protocol quirks itself. The providers list sends the server's own copy in `meta.presets`,
+ * which withServerPresets() lays over these.
+ */
 export const providerPresets = {
     clinepass: {
         label: 'ClinePass',
@@ -37,12 +41,12 @@ export const providerPresets = {
         needs_key: true,
     },
     cline: {
-        label: 'Cline (pay as you go)',
+        label: 'Cline',
         base_url: 'https://api.cline.bot/api/v1',
         model: 'deepseek/deepseek-chat',
         needs_key: true,
     },
-    ollama: { label: 'Ollama', base_url: 'http://127.0.0.1:11434/v1', model: 'llama3.1', needs_key: false },
+    ollama: { label: 'Ollama', base_url: 'http://127.0.0.1:11434/v1', model: 'llama3.1:8b', needs_key: false },
     openrouter: {
         label: 'OpenRouter',
         base_url: 'https://openrouter.ai/api/v1',
@@ -50,9 +54,32 @@ export const providerPresets = {
         needs_key: true,
     },
     deepseek: { label: 'DeepSeek', base_url: 'https://api.deepseek.com', model: 'deepseek-flash', needs_key: true },
-    openai: { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', needs_key: true },
+    openai: { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', needs_key: true },
     custom: { label: 'Custom (OpenAI-compatible)', base_url: '', model: '', needs_key: false },
 } as const satisfies Record<AssistantProviderPreset, ProviderPresetDefaults>;
+
+export type ProviderPresetMap = Readonly<Record<AssistantProviderPreset, ProviderPresetDefaults>>;
+
+/** The built-in prefills with the server's `meta.presets` laid over them. */
+export const withServerPresets = (presets: readonly AssistantPresetInfo[] | undefined): ProviderPresetMap => {
+    const pick = (preset: AssistantProviderPreset): ProviderPresetDefaults => {
+        const server = presets?.find((info) => info.preset === preset);
+
+        return server
+            ? { label: server.label, base_url: server.base_url, model: server.model, needs_key: !server.key_optional }
+            : providerPresets[preset];
+    };
+
+    return {
+        clinepass: pick('clinepass'),
+        cline: pick('cline'),
+        ollama: pick('ollama'),
+        openrouter: pick('openrouter'),
+        deepseek: pick('deepseek'),
+        openai: pick('openai'),
+        custom: pick('custom'),
+    };
+};
 
 export const providerPresetOrder: readonly AssistantProviderPreset[] = [
     'clinepass',

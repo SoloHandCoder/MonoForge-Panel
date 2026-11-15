@@ -102,7 +102,7 @@ describe('AssistantChat', () => {
         http.get.mockImplementation((url: string) =>
             Promise.resolve({ data: url === base ? list : conversation('awaiting_approval') })
         );
-        http.post.mockResolvedValue({ data: null });
+        http.post.mockResolvedValue({ data: conversation('running') });
 
         render(<AssistantChat scope={serverAssistantScope('srv-uuid')} />, { wrapper });
 
@@ -117,6 +117,8 @@ describe('AssistantChat', () => {
         await userEvent.click(screen.getByRole('button', { name: 'Allow: Delete logs/old.log' }));
 
         expect(http.post).toHaveBeenCalledWith(`${base}/c1/tool-calls/7/approve`);
+        // The approve response is the conversation, now running again, so the composer stays off.
+        await waitFor(() => expect(screen.queryByRole('button', { name: /^Allow:/ })).not.toBeInTheDocument());
     });
 
     it('sends with Enter, keeps Shift+Enter as a new line, and starts a conversation', async () => {

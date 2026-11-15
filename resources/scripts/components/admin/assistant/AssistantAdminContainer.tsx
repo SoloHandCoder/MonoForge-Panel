@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import { adminAssistantScope, useAssistantSettings } from '@/api/assistant';
+import { adminAssistantScope, useAssistantProviders, useAssistantSettings } from '@/api/assistant';
 import { Alert } from '@/components/elements/alert';
 import AssistantChat from '@/components/assistant/AssistantChat';
 import AdminContentBlock from '@/components/admin/AdminContentBlock';
@@ -18,7 +18,16 @@ const suggestions = [
 
 function ChatTab() {
     const { data: settings } = useAssistantSettings();
+    const { data: providers } = useAssistantProviders();
     const off = !!settings && (!settings.enabled || !settings.admin_enabled);
+    const noProvider = !!providers && !providers.data.some((provider) => provider.enabled);
+    let blockedReason: string | null = null;
+
+    if (off) {
+        blockedReason = 'The admin assistant is turned off.';
+    } else if (noProvider) {
+        blockedReason = 'Add an AI provider first.';
+    }
 
     return (
         <div className='space-y-4'>
@@ -27,11 +36,12 @@ function ChatTab() {
                     Turn it on in the Settings tab to chat.
                 </Alert>
             )}
-            <AssistantChat
-                scope={adminAssistantScope}
-                suggestions={suggestions}
-                blockedReason={off ? 'The admin assistant is turned off.' : null}
-            />
+            {!off && noProvider && (
+                <Alert type='warning' title='No AI provider is set up'>
+                    Add and enable a provider in the Providers tab before chatting.
+                </Alert>
+            )}
+            <AssistantChat scope={adminAssistantScope} suggestions={suggestions} blockedReason={blockedReason} />
         </div>
     );
 }

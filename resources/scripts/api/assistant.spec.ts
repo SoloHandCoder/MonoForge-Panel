@@ -1,3 +1,4 @@
+import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as Http from '@/api/http';
 import {
@@ -7,6 +8,7 @@ import {
     createAssistantConversation,
     decideAssistantToolCall,
     deleteAssistantConversation,
+    describeAssistantError,
     getAssistantStatus,
     getAssistantUsage,
     listAssistantConversations,
@@ -49,12 +51,12 @@ describe('assistant API', () => {
 
     it('calls the admin endpoints', async () => {
         http.get.mockResolvedValue({ data: {} });
-        http.post.mockResolvedValue({ data: { ok: true, error: null, latency_ms: 420 } });
+        http.post.mockResolvedValue({ data: { ok: true, latency_ms: 420, error: null, reply: 'OK' } });
 
         await listAssistantConversations(adminAssistantScope);
         await getAssistantUsage('2026-11');
 
-        expect(await testAssistantProvider(2)).toEqual({ ok: true, error: null, latency_ms: 420 });
+        expect(await testAssistantProvider(2)).toEqual({ ok: true, latency_ms: 420, error: null, reply: 'OK' });
         expect(http.get.mock.calls.map(([url, config]) => [url, config.params])).toEqual([
             ['/api/admin/assistant/conversations', undefined],
             ['/api/admin/assistant/usage', { period: '2026-11' }],
@@ -68,5 +70,39 @@ describe('assistant API', () => {
         expect(conversationPollInterval({ status: 'idle' })).toBe(false);
         expect(conversationPollInterval({ status: 'error' })).toBe(false);
         expect(conversationPollInterval(undefined)).toBe(false);
+    });
+
+    it('explains the refusals in words a user can act on', () => {
+        const refusal = (status: number, detail: string) => {
+            const config = { headers: new AxiosHeaders() };
+
+            return new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, {
+                status,
+                statusText: '',
+                headers: {},
+                config,
+                data: { errors: [{ code: 'HttpException', status: String(status), detail }] },
+            });
+        };
+
+        expect(describeAssistantError(refusal(402, 'no tokens'), 'x')).toMatchObject({
+            title: 'Out of AI tokens',
+            wallet: true,
+        });
+        expect(describeAssistantError(refusal(403, 'The AI assistant is turned off.'), 'x')).toMatchObject({
+            title: 'The assistant is turned off',
+            wallet: false,
+        });
+        expect(describeAssistantError(refusal(403, 'This action is unauthorized.'), 'x')).toMatchObject({
+            title: 'You cannot use the assistant here',
+            description: 'This action is unauthorized.',
+        });
+        expect(describeAssistantError(refusal(503, 'none'), 'x').title).toBe('The assistant is not set up yet');
+        expect(describeAssistantError(refusal(409, 'busy'), 'x').title).toBe('The assistant is busy');
+        expect(describeAssistantError(refusal(500, 'Boom.'), 'Unable to send')).toEqual({
+            title: 'Unable to send',
+            description: 'Boom.',
+            wallet: false,
+        });
     });
 });
