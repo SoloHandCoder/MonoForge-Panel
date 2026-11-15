@@ -40,6 +40,7 @@ export const classicViews: ThemeViews = {
     'account.password': lazyView(account, 'PasswordCard'),
     'account.email': lazyView(account, 'EmailCard'),
     'account.twoFactor': lazyView(account, 'TwoFactorCard'),
+    'account.connections': lazyView(account, 'ConnectionsCard'),
     'page.account.api': lazyView(account, 'ApiKeysPage'),
     'account.apiKeys.list': lazyView(account, 'ApiKeyList'),
     'account.apiKeys.create': lazyView(account, 'ApiKeyCreate'),

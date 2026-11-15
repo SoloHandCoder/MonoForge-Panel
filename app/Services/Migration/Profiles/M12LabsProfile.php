@@ -206,7 +206,7 @@ final class M12LabsProfile extends ImportProfile
             'api_logs' => 'API request logs are not carried over',
             'tasks_log' => 'old scheduler history that nothing reads',
             'admin_roles' => 'MonoForge has no access profiles; only root administrators keep admin access',
-            'user_oauth_accounts' => 'Discord and Google sign-in are not part of MonoForge yet; those users sign in with their password',
+            'user_oauth_accounts' => 'imported separately with php artisan p:migrate:m12labs-oauth-links',
         ];
     }
 

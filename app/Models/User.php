@@ -42,7 +42,7 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
     'gravatar',
     'root_admin',
 ])]
-#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at'])]
+#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at', 'has_password'])]
 #[RouteKey('uuid')]
 class User extends Authenticatable implements Identifiable
 {

@@ -32,6 +32,38 @@ export interface AccountTwoFactorModel {
     readonly recoveryTokens: readonly string[];
     readonly dismissRecoveryTokens: () => void;
 }
+export type ConnectedProvider = 'discord' | 'google';
+export interface ConnectedAccountItem {
+    readonly provider: ConnectedProvider;
+    readonly label: string;
+    readonly linked: boolean;
+    /** The provider's name, email and avatar URL for the linked account. */
+    readonly username: string | null;
+    readonly email: string | null;
+    readonly avatar: string | null;
+    /** New links need the provider turned on; a linked account can always be unlinked. */
+    readonly canLink: boolean;
+}
+/**
+ * Discord and Google accounts that can sign the user in. Linking sends the browser to the provider, which
+ * sends it back to the account page.
+ */
+export interface AccountConnectionsModel {
+    /** The providers that are turned on or linked; empty hides the card. */
+    readonly accounts: readonly ConnectedAccountItem[];
+    readonly loading: boolean;
+    /** A link or unlink request is running. */
+    readonly busy: boolean;
+    readonly link: (provider: ConnectedProvider) => void;
+    /** Settles once the request does; a failure has already been toasted. Confirm with the user first. */
+    readonly unlink: (provider: ConnectedProvider) => Promise<void>;
+    /**
+     * The account was created through Discord or Google and has no password yet, so its last linked account
+     * cannot be unlinked until it sets one with `setPassword`.
+     */
+    readonly needsPassword: boolean;
+    readonly setPassword: FormModel<'password' | 'confirmPassword'>;
+}
 export interface ApiKeyItem {
     readonly identifier: string;
     readonly description: string;
@@ -72,6 +104,7 @@ declare module '../registry' {
         'account.password': AccountPasswordModel;
         'account.email': AccountEmailModel;
         'account.twoFactor': AccountTwoFactorModel;
+        'account.connections': AccountConnectionsModel;
         'account.apiKeys.list': ApiKeyListModel;
         'account.apiKeys.create': ApiKeyCreateModel;
         'account.sshKeys.list': SshKeyListModel;

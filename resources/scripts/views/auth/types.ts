@@ -12,10 +12,22 @@ interface AuthFormModel<F extends string> extends FormModel<F> {
     readonly Captcha: ComponentType | null;
 }
 
+/** A "Continue with Discord/Google" button. */
+export interface SocialLoginProvider {
+    readonly id: 'discord' | 'google';
+    readonly label: string;
+    /** Runs the captcha and sends the browser to the provider. */
+    readonly start: () => void;
+    /** A sign in with this provider is starting. */
+    readonly pending: boolean;
+}
+
 export interface LoginFormModel extends AuthFormModel<'username' | 'password'> {
     readonly forgotPassword: CorePanelDestination;
     /** What the `auth.login.form.after` slot receives. */
     readonly route: RouteSlotData;
+    /** The enabled Discord and Google sign-in buttons, in display order; empty when none are enabled. */
+    readonly providers: readonly SocialLoginProvider[];
 }
 
 /** The second step of a two-factor sign-in, by authenticator code or by recovery code. */

@@ -12,6 +12,7 @@ use Pterodactyl\Http\Controllers\Api\Client\ApiKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
 use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
+use Pterodactyl\Http\Controllers\Api\Client\OAuthAccountController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\BackupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\CommandController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\DatabaseController;
@@ -75,6 +76,18 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
         Route::get('/', [SSHKeyController::class, 'index']);
         Route::post('/', [SSHKeyController::class, 'store']);
         Route::post('/remove', [SSHKeyController::class, 'delete']);
+    });
+
+    // Discord and Google accounts linked for signing in (phase 2 Task G).
+    Route::prefix('/oauth')->group(function (): void {
+        Route::get('/', [OAuthAccountController::class, 'index'])->name('api:client.account.oauth');
+        Route::post('/password', [OAuthAccountController::class, 'setPassword'])->name('api:client.account.oauth.password');
+        Route::post('/{provider}/link', [OAuthAccountController::class, 'link'])
+            ->whereIn('provider', ['discord', 'google'])
+            ->name('api:client.account.oauth.link');
+        Route::delete('/{provider}', [OAuthAccountController::class, 'unlink'])
+            ->whereIn('provider', ['discord', 'google'])
+            ->name('api:client.account.oauth.unlink');
     });
 });
 
