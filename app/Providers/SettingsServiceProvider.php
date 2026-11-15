@@ -133,10 +133,15 @@ class SettingsServiceProvider extends ServiceProvider
     }
 
     /**
-     * Boot the service provider.
+     * Boot the service provider. With `APP_ENVIRONMENT_ONLY` (pterodactyl.load_environment_only)
+     * the upstream settings come from the environment only, but MonoForge's own settings
+     * (`monoforge:*`: shop, AI, privacy, sign-up, OAuth, captcha...) can only be set in the
+     * panel, so they are always loaded from the database.
      */
     public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log): void
     {
+        $environmentOnly = (bool) $config->get('pterodactyl.load_environment_only', false);
+
         try {
             $values = Setting::values();
         } catch (QueryException $queryException) {
@@ -149,19 +154,11 @@ class SettingsServiceProvider extends ServiceProvider
         // (`mail:default`) is applied first, because it decides which of the
         // driver-specific keys below are loaded.
         $driver = Arr::get($values, 'settings::mail:default');
-        if (is_string($driver) && in_array($driver, self::MAIL_DRIVERS, true)) {
+        if (! $environmentOnly && is_string($driver) && in_array($driver, self::MAIL_DRIVERS, true)) {
             $config->set('mail.default', $driver);
         }
 
-        // Only set the email driver settings from the database if we
-        // are configured using SMTP (or, for Task H, Resend) as the driver.
-        if ($config->get('mail.default') === 'smtp') {
-            $this->keys = array_merge($this->keys, $this->emailKeys);
-        } elseif ($config->get('mail.default') === 'resend') {
-            $this->keys = array_merge($this->keys, $this->resendKeys);
-        }
-
-        foreach ($this->keys as $key) {
+        foreach ($this->keysToLoad($environmentOnly, $config->get('mail.default')) as $key) {
             $default = $config->get(str_replace(':', '.', $key));
             $value = Arr::get($values, 'settings::'.$key, $default);
             if (in_array($key, self::$encrypted, true) && is_string($value)) {
@@ -195,6 +192,27 @@ class SettingsServiceProvider extends ServiceProvider
 
             $config->set(str_replace(':', '.', $key), $this->cast($value, $default));
         }
+    }
+
+    /**
+     * The keys to load from the database: all of them, with the mail keys of the SMTP or
+     * Resend driver, or in environment-only mode just MonoForge's own.
+     *
+     * @return list<string>
+     */
+    protected function keysToLoad(bool $environmentOnly, mixed $mailDriver = null): array
+    {
+        if ($environmentOnly) {
+            return array_values(array_filter($this->keys, fn (string $key): bool => str_starts_with($key, 'monoforge:')));
+        }
+
+        // Only set the email driver settings from the database if we
+        // are configured using SMTP (or, for Task H, Resend) as the driver.
+        return match ($mailDriver) {
+            'smtp' => array_merge($this->keys, $this->emailKeys),
+            'resend' => array_merge($this->keys, $this->resendKeys),
+            default => $this->keys,
+        };
     }
 
     /**

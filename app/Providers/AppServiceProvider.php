@@ -158,9 +158,9 @@ class AppServiceProvider extends ServiceProvider
             });
         });
 
-        // Only load the settings service provider if the environment
-        // is configured to allow it.
-        if (! config('pterodactyl.load_environment_only', false) && ! $this->app->environment('testing')) {
+        // Settings stored in the database. With APP_ENVIRONMENT_ONLY the provider still runs,
+        // but only applies MonoForge's own settings, which can only be set in the panel.
+        if (! $this->app->environment('testing')) {
             $this->app->register(SettingsServiceProvider::class);
         }
     }

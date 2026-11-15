@@ -16,6 +16,11 @@ use RuntimeException;
 
 uses(IntegrationTestCase::class, DatabaseTransactions::class);
 
+// .env.example turns environment-only mode on; these tests load every setting unless they say otherwise.
+beforeEach(function (): void {
+    config()->set('pterodactyl.load_environment_only', false);
+});
+
 /** @param array<string, string> $settings */
 function bootSettings(array $settings): void
 {
@@ -98,4 +103,51 @@ test('settings are read from the database when the cache store fails', function 
     Cache::shouldReceive('get')->andThrow(new RuntimeException('cache store down'));
 
     expect(Setting::values())->toHaveKey('settings::app:name', 'Uncached Panel');
+});
+
+test('in environment-only mode MonoForge settings still load from the database, upstream ones do not', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('app.name', 'From env');
+    config()->set('mail.default', 'smtp');
+    config()->set('mail.mailers.smtp.host', 'env.mail.test');
+    config()->set('monoforge.shop.enabled', false);
+    config()->set('monoforge.ai.enabled', false);
+    config()->set('monoforge.auth.registration.enabled', false);
+
+    bootSettings([
+        'app:name' => 'From database',
+        'mail:default' => 'log',
+        'mail:mailers:smtp:host' => 'db.mail.test',
+        'monoforge:shop:enabled' => 'true',
+        'monoforge:ai:enabled' => 'true',
+        'monoforge:auth:registration:enabled' => 'true',
+        'monoforge:privacy:hidden_ips' => '203.0.113.9',
+    ]);
+
+    // The panel is the only place MonoForge's own settings can be set, so they always apply.
+    expect(config('monoforge.shop.enabled'))->toBeTrue()
+        ->and(config('monoforge.ai.enabled'))->toBeTrue()
+        ->and(config('monoforge.auth.registration.enabled'))->toBeTrue()
+        ->and(config('monoforge.privacy.hidden_ips'))->toBe('203.0.113.9')
+        // Upstream settings keep coming from the environment.
+        ->and(config('app.name'))->toBe('From env')
+        ->and(config('mail.default'))->toBe('smtp')
+        ->and(config('mail.mailers.smtp.host'))->toBe('env.mail.test');
+});
+
+test('every MonoForge setting key is loaded in environment-only mode', function (): void {
+    $provider = new class(app()) extends SettingsServiceProvider
+    {
+        /** @return list<string> */
+        public function loaded(bool $environmentOnly): array
+        {
+            return $this->keysToLoad($environmentOnly);
+        }
+    };
+
+    $all = $provider->loaded(false);
+    $monoforge = array_values(array_filter($all, fn (string $key): bool => str_starts_with($key, 'monoforge:')));
+
+    expect($provider->loaded(true))->toBe($monoforge)
+        ->and($monoforge)->toContain('monoforge:shop:enabled', 'monoforge:ai:enabled', 'monoforge:auth:discord:client_secret', 'monoforge:captcha:provider', 'monoforge:privacy:hidden_ips');
 });
