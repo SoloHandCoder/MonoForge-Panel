@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Pterodactyl\Jobs\Assistant\RunAssistantTurn;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Assistant\AiConversation;
@@ -161,6 +162,8 @@ test('M2: assistant turns run on their own queue connection whose retry_after is
     expect(config('queue.connections.assistant.retry_after'))->toBeGreaterThan($job->timeout)
         ->and($job->failOnTimeout)->toBeTrue()
         ->and($job->maxExceptions)->toBe(1)
+        // A crashed or killed worker never hands the turn to another one.
+        ->and($job->tries)->toBe(1)
         ->and(config('queue.connections.assistant.queue'))->toBe('assistant');
 });
 
@@ -311,4 +314,36 @@ test('L5: the activity of an allowed call keeps the tool name and a masked label
     $log = ActivityLog::query()->where('event', 'server:assistant.tool')->sole();
     expect($log->properties->get('tool'))->toBe('pretend_delete')
         ->and($log->properties->get('label'))->toBeString()->not->toContain('ghp_abcdefghijklmnop1234567890XYZ');
+});
+
+test('M2: a turn whose worker died is marked as stopped instead of running again, unless a newer run owns it', function (): void {
+    Queue::fake();
+    $this->actingAs($this->user)->postJson($this->base, ['message' => 'Hi'])->assertOk();
+    $conversation = AiConversation::query()->sole();
+    $token = (string) $conversation->run_token;
+
+    // The queue fails the redelivered job (tries = 1) and calls failed() with the old token.
+    (new RunAssistantTurn($conversation->id, 'an-older-run'))->failed(null);
+    expect($conversation->refresh()->status)->toBe(AiConversation::STATUS_RUNNING);
+
+    (new RunAssistantTurn($conversation->id, $token))->failed(null);
+    expect($conversation->refresh()->status)->toBe(AiConversation::STATUS_ERROR);
+});
+
+test('M2: a turn waits for the lock of an older run and gives up after the wait', function (): void {
+    Queue::fake();
+    $this->actingAs($this->user)->postJson($this->base, ['message' => 'Hi'])->assertOk();
+    $conversation = AiConversation::query()->sole();
+    Http::fake();
+
+    $lock = Cache::lock(AssistantAgent::lockKey($conversation->id), 600);
+    $lock->get();
+
+    // The fake sleep moves the test clock, so the wait ends without really waiting.
+    Sleep::fake(syncWithCarbon: true);
+    $start = now();
+    expect(resolve(AssistantAgent::class)->run($conversation, (string) $conversation->run_token, 5))->toBeFalse()
+        ->and($start->diffInSeconds(now()))->toBeGreaterThan(4.5);
+    Http::assertNothingSent();
+    $lock->release();
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -51,13 +52,20 @@ class AssistantAgent
     }
 
     /**
-     * Runs the turn the token belongs to. Returns false when another loop holds the
-     * conversation's lock, so the caller may try again later.
+     * Runs the turn the token belongs to. Returns false when another loop still holds the
+     * conversation's lock after waiting up to $waitSeconds for it.
      */
-    public function run(AiConversation $conversation, string $token): bool
+    public function run(AiConversation $conversation, string $token, int $waitSeconds = 0): bool
     {
         $lock = Cache::lock(self::lockKey($conversation->id), RunAssistantTurn::TIMEOUT + 60);
-        if (! $lock->get()) {
+
+        try {
+            $acquired = $waitSeconds > 0 ? $lock->block($waitSeconds) : $lock->get();
+        } catch (LockTimeoutException) {
+            $acquired = false;
+        }
+
+        if (! $acquired) {
             return false;
         }
 

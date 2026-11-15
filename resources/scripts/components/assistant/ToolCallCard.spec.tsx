@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssistantToolCall } from '@/api/assistant';
-import ToolCallCard from './ToolCallCard';
+import ToolCallCard, { revealHidden } from './ToolCallCard';
 
 afterEach(cleanup);
 
@@ -116,5 +116,34 @@ describe('ToolCallCard', () => {
 
         expect(screen.queryByTestId('tool-call-details')).not.toBeInTheDocument();
         expect(screen.getByText('Read .env')).toHaveClass('truncate');
+    });
+
+    it('shows hidden and direction-changing characters and warns about them', () => {
+        const command = 'say hi‮​op me';
+
+        render(
+            <ToolCallCard
+                call={call({
+                    name: 'send_command',
+                    label: `Run the command: ${command}`,
+                    arguments: { command },
+                    details: [{ label: 'command', value: command }],
+                })}
+                onDecide={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('hidden-characters')).toBeVisible();
+        expect(screen.getByTestId('tool-call-details')).toHaveTextContent('say hi\\u{202E}\\u{200B}op me');
+        expect(screen.getByText(/^Run the command:/).textContent).not.toMatch(/[‮​]/u);
+        expect(revealHidden('plain text')).toEqual({ text: 'plain text', found: false });
+    });
+
+    it('offers no Allow on a pending call that a newer step replaced', () => {
+        render(<ToolCallCard call={call()} onDecide={vi.fn()} superseded />);
+
+        expect(screen.queryByRole('button', { name: /Allow/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Expired')).toBeInTheDocument();
+        expect(screen.getByText(/can no longer be allowed/)).toBeInTheDocument();
     });
 });

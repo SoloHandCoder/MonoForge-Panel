@@ -28,14 +28,19 @@ class RunAssistantTurn implements ShouldQueue
 
     public const int TIMEOUT = 900;
 
-    /** Seconds to wait before trying again while another run holds the conversation. */
-    public const int RELEASE_SECONDS = 10;
+    /**
+     * How long a turn waits for an older run to let go of the conversation. An older run that
+     * lost its token stops at its next check, at the latest after one model call (290 s) and
+     * a tool run.
+     */
+    public const int LOCK_WAIT_SECONDS = 420;
 
     /**
-     * Attempts only cover waiting for the conversation lock (release()); an exception or a
-     * timeout fails the job at once, so a turn and its tool calls are never repeated.
+     * One attempt only: a worker that crashed or was killed never hands the turn to another
+     * one, which would call the model (and charge) again and could repeat tool calls. The
+     * redelivered job fails at once, and failed() marks the turn as stopped.
      */
-    public int $tries = 30;
+    public int $tries = 1;
 
     public int $maxExceptions = 1;
 
@@ -52,8 +57,8 @@ class RunAssistantTurn implements ShouldQueue
     public function handle(AssistantAgent $agent): void
     {
         $conversation = AiConversation::query()->find($this->conversationId);
-        if ($conversation instanceof AiConversation && ! $agent->run($conversation, $this->runToken)) {
-            $this->release(self::RELEASE_SECONDS);
+        if ($conversation instanceof AiConversation && ! $agent->run($conversation, $this->runToken, self::LOCK_WAIT_SECONDS)) {
+            $agent->fail($conversation, 'The assistant was still busy with an earlier step. Send your message again to continue.', $this->runToken);
         }
     }
 

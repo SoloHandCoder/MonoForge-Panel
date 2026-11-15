@@ -145,10 +145,13 @@ function MessageItem({
     message,
     onDecide,
     deciding,
+    superseded,
 }: {
     message: AssistantMessage;
     onDecide?: (toolCall: number, decision: AssistantDecision) => void;
     deciding: { toolCall: number; decision: AssistantDecision } | null;
+    /** A newer assistant message exists, so this one's pending calls can no longer be decided. */
+    superseded: boolean;
 }) {
     if (message.role === 'user') {
         return (
@@ -173,8 +176,9 @@ function MessageItem({
                     <ToolCallCard
                         key={call.id}
                         call={call}
-                        onDecide={onDecide && ((decision) => onDecide(call.id, decision))}
+                        onDecide={!superseded && onDecide ? (decision) => onDecide(call.id, decision) : undefined}
                         deciding={deciding?.toolCall === call.id ? deciding.decision : null}
+                        superseded={superseded}
                     />
                 ))}
             </div>
@@ -340,6 +344,8 @@ function Thread({
     const running = conversation.status === 'running';
     const awaiting = conversation.status === 'awaiting_approval';
     const deciding = decide.isPending && decide.variables ? decide.variables : null;
+    // Only the latest step can be decided; the server refuses older pending calls.
+    const latestAssistant = [...conversation.messages].reverse().find((message) => message.role === 'assistant')?.id;
     const onDecide = awaiting
         ? (toolCall: number, decision: AssistantDecision) => decide.mutate({ toolCall, decision })
         : undefined;
@@ -406,7 +412,13 @@ function Thread({
                 data-testid='assistant-thread'
             >
                 {conversation.messages.map((message) => (
-                    <MessageItem key={message.id} message={message} onDecide={onDecide} deciding={deciding} />
+                    <MessageItem
+                        key={message.id}
+                        message={message}
+                        onDecide={onDecide}
+                        deciding={deciding}
+                        superseded={message.role === 'assistant' && message.id !== latestAssistant}
+                    />
                 ))}
                 {running && <TypingIndicator />}
                 {conversation.status === 'error' && (

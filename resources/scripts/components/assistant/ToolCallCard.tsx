@@ -22,6 +22,8 @@ export interface ToolCallCardProps {
     onDecide?: (decision: AssistantDecision) => void;
     /** The decision being sent, while it is. */
     deciding?: AssistantDecision | null;
+    /** A newer step of the assistant exists, so a call still pending here can no longer be decided. */
+    superseded?: boolean;
 }
 
 const hasArguments = (call: AssistantToolCall) => Object.keys(call.arguments).length > 0;
@@ -40,14 +42,42 @@ function Section({ title, text }: { title: string; text: string }) {
     );
 }
 
+/**
+ * Invisible and direction-changing characters (zero-width spaces, bidi overrides and isolates,
+ * soft hyphens, BOM) that can make a command or path look different from what runs.
+ */
+const hiddenCharacters = /[­؜᠎​-‏‪-‮⁠-⁤⁦-⁩﻿]/gu;
+
+export interface RevealedText {
+    text: string;
+    found: boolean;
+}
+
+/** Text with every hidden character shown as `\u{XXXX}`, and whether there was any. */
+export function revealHidden(text: string): RevealedText {
+    let found = false;
+    const shown = text.replace(hiddenCharacters, (character) => {
+        found = true;
+
+        return `\\u{${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}}`;
+    });
+
+    return { text: shown, found };
+}
+
+/** The details of a call, or its raw arguments for calls recorded before details existed. */
+const detailsOf = (call: AssistantToolCall) =>
+    call.details.length || !hasArguments(call)
+        ? call.details
+        : [{ label: 'Arguments', value: JSON.stringify(call.arguments, null, 2) }];
+
+/** Whether the label or a detail of the call holds hidden characters. */
+export const hasHiddenCharacters = (call: AssistantToolCall): boolean =>
+    [call.label, ...detailsOf(call).map((detail) => detail.value)].some((text) => revealHidden(text).found);
+
 /** What the call will do, every argument in full, as it will run. Long values wrap; nothing is cut. */
 function ConfirmationDetails({ call }: { call: AssistantToolCall }) {
-    // Calls recorded before details existed show their raw arguments instead.
-    let details = call.details;
-
-    if (!details.length && hasArguments(call)) {
-        details = [{ label: 'Arguments', value: JSON.stringify(call.arguments, null, 2) }];
-    }
+    const details = detailsOf(call);
 
     if (!details.length) {
         return null;
@@ -55,6 +85,20 @@ function ConfirmationDetails({ call }: { call: AssistantToolCall }) {
 
     return (
         <dl data-testid='tool-call-details' className='grid gap-3 border-t border-inherit px-4 py-3'>
+            {hasHiddenCharacters(call) && (
+                <p
+                    data-testid='hidden-characters'
+                    role='alert'
+                    className='flex items-start gap-2 text-sm font-medium text-destructive'
+                >
+                    <Icon icon={ShieldAlert} className='mt-0.5 size-4 shrink-0' aria-hidden />
+                    <span>
+                        This request contains hidden or direction-changing characters, shown below as{' '}
+                        <code className='font-mono'>{'\\u{…}'}</code>. They can make text look different from what runs.
+                        Only allow it if you expected them.
+                    </span>
+                </p>
+            )}
             {details.map((detail, index) => (
                 // oxlint-disable-next-line react/no-array-index-key -- details have no identity of their own.
                 <div key={index} className='min-w-0'>
@@ -63,7 +107,7 @@ function ConfirmationDetails({ call }: { call: AssistantToolCall }) {
                     </dt>
                     <dd>
                         <pre className='rounded-lg border border-border bg-sunken p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground'>
-                            {detail.value}
+                            {revealHidden(detail.value).text}
                         </pre>
                     </dd>
                 </div>
@@ -168,11 +212,37 @@ function CallIcon({ call, tone }: { call: AssistantToolCall; tone: CardTone }) {
     );
 }
 
+/** The label (wrapped, with hidden characters shown, while it waits) and the tool name. */
+function CallTitle({ call, awaiting }: { call: AssistantToolCall; awaiting: boolean }) {
+    return (
+        <div className='min-w-0 flex-1'>
+            <p
+                className={cn(
+                    'text-sm font-medium text-foreground',
+                    awaiting ? 'break-words whitespace-normal' : 'truncate'
+                )}
+            >
+                {awaiting ? revealHidden(call.label).text : call.label}
+            </p>
+            <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
+        </div>
+    );
+}
+
+function CallStatus({ call, expired }: { call: AssistantToolCall; expired: boolean }) {
+    return (
+        <Badge tone={expired ? 'neutral' : toolStatusTones[call.status]} variant='soft' size='sm' className='shrink-0'>
+            {expired ? 'Expired' : toolStatusLabels[call.status]}
+        </Badge>
+    );
+}
+
 /** One tool call in the thread: what the assistant does, its arguments and result, and Allow / Deny while it waits. */
-export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCallCardProps) {
+export default function ToolCallCard({ call, onDecide, deciding = null, superseded = false }: ToolCallCardProps) {
     const [open, setOpen] = useState(false);
     const detailsId = useId();
-    const tone = cardTone(call);
+    const expired = superseded && call.status === 'pending' && call.needs_confirmation;
+    const tone = expired ? 'normal' : cardTone(call);
     const destructive = isDestructiveTool(call.name);
     const expandable = hasArguments(call) || !!call.result_preview;
     const awaiting = tone !== 'normal';
@@ -189,20 +259,8 @@ export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCa
         >
             <div className='flex items-center gap-3 px-3 py-2.5'>
                 <CallIcon call={call} tone={tone} />
-                <div className='min-w-0 flex-1'>
-                    <p
-                        className={cn(
-                            'text-sm font-medium text-foreground',
-                            awaiting ? 'break-words whitespace-normal' : 'truncate'
-                        )}
-                    >
-                        {call.label}
-                    </p>
-                    <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
-                </div>
-                <Badge tone={toolStatusTones[call.status]} variant='soft' size='sm' className='shrink-0'>
-                    {toolStatusLabels[call.status]}
-                </Badge>
+                <CallTitle call={call} awaiting={awaiting} />
+                <CallStatus call={call} expired={expired} />
                 {expandable && (
                     <button
                         type='button'
@@ -224,6 +282,11 @@ export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCa
             {awaiting && <ConfirmationDetails call={call} />}
             {awaiting && onDecide && (
                 <ConfirmationBar call={call} destructive={destructive} onDecide={onDecide} deciding={deciding} />
+            )}
+            {expired && (
+                <p className='border-t border-border px-4 py-3 text-sm text-muted-foreground'>
+                    The assistant moved on to a newer step, so this request can no longer be allowed.
+                </p>
             )}
         </div>
     );

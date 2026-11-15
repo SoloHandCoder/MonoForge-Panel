@@ -122,6 +122,29 @@ describe('AssistantChat', () => {
         await waitFor(() => expect(screen.queryByRole('button', { name: /^Allow:/ })).not.toBeInTheDocument());
     });
 
+    it('offers Allow only on the latest step', async () => {
+        const waiting = conversation('awaiting_approval');
+        const newer = {
+            id: 3,
+            role: 'assistant' as const,
+            content: null,
+            created_at: '2026-11-15T12:00:02+00:00',
+            tool_calls: [{ ...waiting.messages[1]!.tool_calls[0]!, id: 8, label: 'Delete /logs/new.log' }],
+        };
+
+        http.get.mockImplementation((url: string) =>
+            Promise.resolve({ data: url === base ? list : { ...waiting, messages: [...waiting.messages, newer] } })
+        );
+
+        render(<AssistantChat scope={serverAssistantScope('srv-uuid')} />, { wrapper });
+
+        await userEvent.click(await screen.findByRole('button', { name: /Why did it crash\?/ }));
+
+        expect(await screen.findByRole('button', { name: 'Allow: Delete /logs/new.log' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: 'Allow: Delete /logs/old.log' })).not.toBeInTheDocument();
+        expect(screen.getByText('Expired')).toBeInTheDocument();
+    });
+
     it('sends with Enter, keeps Shift+Enter as a new line, and starts a conversation', async () => {
         http.get.mockImplementation((url: string) =>
             Promise.resolve({ data: url === base ? { data: [] } : conversation('running') })
