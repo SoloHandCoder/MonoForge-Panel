@@ -47,6 +47,7 @@ use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserSSHKey;
+use Pterodactyl\Services\Activity\InfrastructureIps;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
@@ -133,6 +134,9 @@ class AppServiceProvider extends ServiceProvider
         // Keys registered through setEnvironmentKey() must survive to every consumer,
         // so the service is shared rather than rebuilt on each resolve.
         $this->app->singleton(EnvironmentService::class);
+
+        // Resolved node addresses are kept for the rest of the request (or queued job).
+        $this->app->scoped(InfrastructureIps::class);
 
         $this->app->extend('auth.password', fn (): PasswordBrokerManager => new PasswordBrokerManager($this->app));
 

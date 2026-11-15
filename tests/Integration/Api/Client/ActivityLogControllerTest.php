@@ -11,6 +11,11 @@ use Pterodactyl\Models\User;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 uses(ClientApiIntegrationTestCase::class);
+
+// Loopback and private addresses are never shown, so entries come from a public address.
+beforeEach(function (): void {
+    request()->server->set('REMOTE_ADDR', '203.0.113.50');
+});
 test('account activity is returned', function (): void {
     /** @var User $user */
     $user = User::factory()->create();
@@ -74,8 +79,8 @@ test('a failed log in reveals the attempt address to the account it targeted', f
     $row = $this->actingAs($user)->getJson('/api/client/account/activity')->assertOk()->json('data.0.attributes');
 
     expect($row['event'])->toBe('auth:fail');
-    expect($row['ip'])->toBe('127.0.0.1');
-    expect($row['properties']['ip'])->toBe('127.0.0.1');
+    expect($row['ip'])->toBe('203.0.113.50');
+    expect($row['properties']['ip'])->toBe('203.0.113.50');
 });
 test('an entry with an actor never reveals that actor address to its subject', function (): void {
     $owner = User::factory()->create(['root_admin' => false]);
@@ -118,8 +123,8 @@ test('an administrator sees the same address in both fields', function (): void 
 
     $row = $this->actingAs($user)->getJson($this->link($server, '/activity'))->assertOk()->json('data.0.attributes');
 
-    expect($row['ip'])->toBe('127.0.0.1');
-    expect($row['properties']['ip'])->toBe('127.0.0.1');
+    expect($row['ip'])->toBe('203.0.113.50');
+    expect($row['properties']['ip'])->toBe('203.0.113.50');
 });
 test('entries are identified by the log id rather than the subject pivot id', function (): void {
     $user = User::factory()->create(['root_admin' => false]);

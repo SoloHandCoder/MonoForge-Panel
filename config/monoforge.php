@@ -74,4 +74,21 @@ return [
             'domain' => env('TURNSTILE_DOMAIN', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Privacy
+    |--------------------------------------------------------------------------
+    |
+    | Activity entries never show the address of the panel host or a node. Beside
+    | loopback, private and link-local ranges and each node's FQDN (resolved
+    | through DNS), these IPs or CIDR ranges (one per line) are hidden as well.
+    | The admin Settings page stores them as "monoforge:privacy:hidden_ips".
+    |
+    */
+    'privacy' => [
+        'hidden_ips' => env('MONOFORGE_HIDDEN_IPS', ''),
+        // How long resolved node addresses are cached, in seconds.
+        'node_dns_ttl' => 3600,
+    ],
 ];

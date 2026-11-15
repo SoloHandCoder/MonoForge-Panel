@@ -3038,7 +3038,7 @@ export const adminUpdateAdvancedSettingsMutationKey = (options?: Partial<Options
 /**
  * Update advanced settings
  *
- * Updates reCAPTCHA, HTTP client timeout, and client allocation feature settings.
+ * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings.
  */
 export const adminUpdateAdvancedSettingsMutation = (options?: Partial<Options<AdminUpdateAdvancedSettingsData>>): UseMutationOptions<AdminUpdateAdvancedSettingsResponse, AxiosError<AdminUpdateAdvancedSettingsError>, Options<AdminUpdateAdvancedSettingsData>> => {
     const mutationOptions: UseMutationOptions<AdminUpdateAdvancedSettingsResponse, AxiosError<AdminUpdateAdvancedSettingsError>, Options<AdminUpdateAdvancedSettingsData>> = {

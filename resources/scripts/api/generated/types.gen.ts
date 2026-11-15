@@ -722,6 +722,10 @@ export type AdminSettingsResponse = {
         'pterodactyl:client_features:allocations:enabled': boolean;
         'pterodactyl:client_features:allocations:range_start': number | null;
         'pterodactyl:client_features:allocations:range_end': number | null;
+        /**
+         * IPs or CIDR ranges, one per line, never shown in activity entries.
+         */
+        'monoforge:privacy:hidden_ips': string;
     };
     meta: {
         load_environment_only: boolean;
@@ -2742,6 +2746,10 @@ export type AdminUpdateAdvancedSettingsRequest = {
      * The pterodactyl:client features:allocations:range end. This field is required when <code>pterodactyl:client_features:allocations:enabled</code> is <code>true</code>. Must be between 1024 and 65535.
      */
     'pterodactyl:client_features:allocations:range_end'?: number | null;
+    /**
+     * The monoforge:privacy:hidden ips. Must not be greater than 10000 characters.
+     */
+    'monoforge:privacy:hidden_ips'?: string | null;
 };
 
 export type AdminUpdateLoginProvidersRequest = {

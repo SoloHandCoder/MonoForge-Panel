@@ -11,6 +11,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Middleware\TrustProxies as FrameworkTrustProxies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -38,6 +39,7 @@ use Pterodactyl\Http\Middleware\RedirectIfAuthenticated;
 use Pterodactyl\Http\Middleware\RememberThemeFlags;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Http\Middleware\SetSecurityHeaders;
+use Pterodactyl\Http\Middleware\TrustProxies;
 use Pterodactyl\Http\Middleware\VerifyCaptcha;
 use Pterodactyl\Services\Themes\ThemeResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -80,6 +82,9 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SetSecurityHeaders::class);
+
+        // Client addresses come from CF-Connecting-IP / X-Forwarded-For only behind a trusted proxy.
+        $middleware->replace(FrameworkTrustProxies::class, TrustProxies::class);
 
         $middleware->trimStrings(except: [
             'password',

@@ -52,7 +52,7 @@ trait FormatsActivityLogs
         $properties = collect($values)
             ->except($isAdminViewer ? [] : self::NODE_ADDRESS_KEYS)
             ->mapWithKeys(function (mixed $value, string $key) use ($ipHidden): array {
-                if ($key === 'ip' && $ipHidden) {
+                if ($key === 'ip' && ($ipHidden || (is_string($value) && ActivityLog::isInfrastructureIp($value)))) {
                     return [$key => '[hidden]'];
                 }
 

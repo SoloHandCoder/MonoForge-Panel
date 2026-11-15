@@ -1712,7 +1712,7 @@ export const adminSendTestMail = <ThrowOnError extends boolean = true>(options?:
 /**
  * Update advanced settings
  *
- * Updates reCAPTCHA, HTTP client timeout, and client allocation feature settings.
+ * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings.
  */
 export const adminUpdateAdvancedSettings = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateAdvancedSettingsData, ThrowOnError>): RequestResult<AdminUpdateAdvancedSettingsResponses, AdminUpdateAdvancedSettingsErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateAdvancedSettingsResponses, AdminUpdateAdvancedSettingsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

@@ -42,6 +42,7 @@ class SettingsController extends AdminApiController
             'pterodactyl:client_features:allocations:enabled' => false,
             'pterodactyl:client_features:allocations:range_start' => null,
             'pterodactyl:client_features:allocations:range_end' => null,
+            'monoforge:privacy:hidden_ips' => "203.0.113.7\n2001:db8::/32",
         ],
         'meta' => [
             'load_environment_only' => false,
@@ -84,6 +85,7 @@ class SettingsController extends AdminApiController
                 'pterodactyl:client_features:allocations:enabled' => config('pterodactyl.client_features.allocations.enabled'),
                 'pterodactyl:client_features:allocations:range_start' => config('pterodactyl.client_features.allocations.range_start'),
                 'pterodactyl:client_features:allocations:range_end' => config('pterodactyl.client_features.allocations.range_end'),
+                'monoforge:privacy:hidden_ips' => (string) config('monoforge.privacy.hidden_ips'),
             ],
             'meta' => [
                 'load_environment_only' => config('pterodactyl.load_environment_only'),

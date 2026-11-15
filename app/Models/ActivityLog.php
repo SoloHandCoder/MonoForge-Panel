@@ -22,6 +22,7 @@ use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Events\ActivityLogged;
 use Pterodactyl\Models\Builders\ActivityLogBuilder;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
+use Pterodactyl\Services\Activity\InfrastructureIps;
 
 /**
  * @property Collection<string, mixed> $properties
@@ -63,6 +64,23 @@ class ActivityLog extends Model implements Identifiable
     }
 
     /**
+     * Whether an address is part of the panel's own infrastructure and so never shown.
+     */
+    public static function isInfrastructureIp(?string $ip): bool
+    {
+        return resolve(InfrastructureIps::class)->contains($ip);
+    }
+
+    /**
+     * Whether the user is an administrator. Admin permissions are granted through the root
+     * administrator flag only (see AuthServiceProvider and the Permissions enum).
+     */
+    public static function isAdministrator(User $user): bool
+    {
+        return (bool) $user->root_admin;
+    }
+
+    /**
      * @return MorphTo<IlluminateModel, $this>
      */
     public function actor(): MorphTo
@@ -92,19 +110,26 @@ class ActivityLog extends Model implements Identifiable
     }
 
     /**
-     * The originating address as it may be shown to anyone. It is withheld when the
-     * actor is a root administrator or when no user actor performed the action, such
-     * as system, node and Wings triggered events. Anonymous authentication attempts
-     * against an account keep their address, as it belongs to whoever made the attempt.
+     * The originating address as it may be shown to anyone. It is withheld when:
+     * - it belongs to the panel host or a node (see InfrastructureIps): loopback, private,
+     *   unique local and link-local ranges, the node FQDNs and the admin's hidden list;
+     * - the actor is an administrator (root administrators are the panel's only admin role);
+     * - no user actor performed the action, such as system, node and Wings triggered events.
+     * Anonymous authentication attempts against an account keep a genuine external address,
+     * as it belongs to whoever made the attempt.
      */
     public function visibleIp(): ?string
     {
+        if (self::isInfrastructureIp($this->ip)) {
+            return null;
+        }
+
         if ($this->isAnonymousAuthAttempt()) {
             return $this->ip;
         }
 
         $actor = $this->actor;
-        if (! $actor instanceof User || $actor->root_admin) {
+        if (! $actor instanceof User || self::isAdministrator($actor)) {
             return null;
         }
 

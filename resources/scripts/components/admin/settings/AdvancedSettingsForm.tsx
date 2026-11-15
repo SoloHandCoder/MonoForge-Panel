@@ -14,6 +14,7 @@ interface AdvancedSettingsFormValues {
     allocationsEnabled: boolean;
     allocationsRangeStart: string;
     allocationsRangeEnd: string;
+    hiddenIps: string;
 }
 
 const advancedSettingsFormValues = (settings: AdminSettings): AdvancedSettingsFormValues => ({
@@ -25,6 +26,7 @@ const advancedSettingsFormValues = (settings: AdminSettings): AdvancedSettingsFo
     allocationsEnabled: settings.advanced['pterodactyl:client_features:allocations:enabled'],
     allocationsRangeStart: String(settings.advanced['pterodactyl:client_features:allocations:range_start'] ?? ''),
     allocationsRangeEnd: String(settings.advanced['pterodactyl:client_features:allocations:range_end'] ?? ''),
+    hiddenIps: settings.advanced['monoforge:privacy:hidden_ips'],
 });
 
 export default function AdvancedSettingsForm({ settings }: { settings: AdminSettings }) {
@@ -50,6 +52,7 @@ export default function AdvancedSettingsForm({ settings }: { settings: AdminSett
                         allocationsRangeStart:
                             value.allocationsRangeStart === '' ? '' : Number(value.allocationsRangeStart),
                         allocationsRangeEnd: value.allocationsRangeEnd === '' ? '' : Number(value.allocationsRangeEnd),
+                        hiddenIps: value.hiddenIps,
                     })
                 );
                 form.reset({ ...value, recaptchaSecretKey: '' });
@@ -161,6 +164,21 @@ export default function AdvancedSettingsForm({ settings }: { settings: AdminSett
                         )}
                     </form.AppField>
                 </div>
+            </TitledGreyBox>
+            <TitledGreyBox title='Activity Privacy' className='mt-6'>
+                <form.AppField name='hiddenIps'>
+                    {(field) => (
+                        <field.TextAreaField
+                            id='privacy_hidden_ips'
+                            label='Hidden IP Addresses'
+                            description='One IP address or CIDR range per line (IPv4 or IPv6). Activity entries from these addresses show "Hidden". Loopback, private and link-local ranges and the addresses of your nodes are always hidden.'
+                            rows={5}
+                            spellCheck={false}
+                            placeholder={'203.0.113.7\n2001:db8::/32'}
+                            disabled={readOnly}
+                        />
+                    )}
+                </form.AppField>
             </TitledGreyBox>
             <div className='flex justify-end mt-6'>
                 <form.AppForm>

@@ -44,6 +44,7 @@ const settings: AdminSettings = {
         'pterodactyl:client_features:allocations:enabled': false,
         'pterodactyl:client_features:allocations:range_start': null,
         'pterodactyl:client_features:allocations:range_end': null,
+        'monoforge:privacy:hidden_ips': '',
     },
     meta: { load_environment_only: true, show_recaptcha_warning: false },
 };
@@ -108,6 +109,25 @@ describe('mail settings', () => {
             },
         });
         expect(key).toHaveValue('');
+    });
+});
+
+describe('advanced settings', () => {
+    it('sends the hidden IP address list', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <AdvancedSettingsForm
+                settings={{ ...settings, meta: { ...settings.meta, load_environment_only: false } }}
+            />
+        );
+
+        await user.type(screen.getByLabelText('Hidden IP Addresses'), '203.0.113.7{Enter}2001:db8::/32');
+        await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+        expect(mutations.advanced).toHaveBeenCalledWith({
+            body: expect.objectContaining({ 'monoforge:privacy:hidden_ips': '203.0.113.7\n2001:db8::/32' }),
+        });
     });
 });
 
