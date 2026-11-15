@@ -9,6 +9,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Number;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
@@ -48,6 +49,7 @@ use Pterodactyl\Http\Resources\Api\ApiResourceCollection;
 use Pterodactyl\Http\Resources\Api\Client\FileObjectResource;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Services\Nodes\NodeJwt;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
@@ -114,6 +116,16 @@ class FileController extends ClientApiController
         'object' => 'signed_url',
         'attributes' => [
             'url' => 'https://node.example.test/download/file?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.example.signature',
+        ],
+    ];
+
+    private const array TOO_LARGE_ERROR = [
+        'errors' => [
+            [
+                'code' => 'HttpException',
+                'status' => '413',
+                'detail' => 'This file is 5 MiB; the panel saves files up to 4 MiB. Upload it from the file manager instead.',
+            ],
         ],
     ];
 
@@ -238,14 +250,27 @@ class FileController extends ClientApiController
     #[Endpoint('Write file contents', 'Writes the raw request body to a server file. This endpoint does not expect a JSON wrapper for the file contents.')]
     #[QueryParam('file', 'string', 'Path to the file to write.', required: true, example: '/server.properties')]
     #[ScribeResponse(status: 204, description: 'File contents written.')]
+    #[ScribeResponse(self::TOO_LARGE_ERROR, status: 413, description: 'The contents are larger than the panel saves for editing (pterodactyl.files.max_edit_size).')]
     #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not write the file.')]
     public function write(WriteFileContentRequest $request, WritesFileContents $operation, ListsDirectories $lister, Server $server): JsonResponse
     {
+        // The same limit as reading a file for editing, so the editor cannot be bypassed with a crafted request.
+        $content = $request->getContent();
+        $bytes = mb_strlen($content, '8bit');
+        $limit = config()->integer('pterodactyl.files.max_edit_size');
+        if ($bytes > $limit) {
+            throw new HttpException(Response::HTTP_REQUEST_ENTITY_TOO_LARGE, sprintf(
+                'This file is %s; the panel saves files up to %s. Upload it from the file manager instead.',
+                Number::fileSize($bytes, maxPrecision: 1),
+                Number::fileSize($limit, maxPrecision: 1),
+            ));
+        }
+
         $file = $request->string('file')->toString();
         $permission = $this->fileExists($lister, $server, $file) ? Permissions::FileUpdate : Permissions::FileCreate;
         throw_unless($request->user()->can($permission->value, $server), AuthorizationException::class);
 
-        $operation->write($server, $file, $request->getContent());
+        $operation->write($server, $file, $content);
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }

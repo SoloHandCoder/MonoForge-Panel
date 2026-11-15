@@ -177,3 +177,16 @@ test('pull requires a valid url', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::FileCreate->value, Permissions::FileUpdate->value]);
     $this->actingAs($user)->postJson($this->link($server, '/files/pull'), ['url' => 'not-a-url'])->assertUnprocessable()->assertJsonPath('errors.0.meta.source_field', 'url');
 });
+test('contents over the max edit size are refused with a 413 before Wings is called', function (): void {
+    config(['pterodactyl.files.max_edit_size' => 1024 * 1024]);
+    [$user, $server] = $this->generateTestAccount([Permissions::FileCreate->value, Permissions::FileUpdate->value]);
+    $fake = new FakeDaemonFile;
+
+    $this->actingAs($user)->call('POST', $this->link($server, '/files/write?file=%2Ftest.txt'), [], [], [], $this->transformHeadersToServerVars(['Accept' => 'application/json']), str_repeat('é', 768 * 1024))
+        ->assertStatus(413)
+        ->assertJsonPath('errors.0.detail', 'This file is 1.5 MB; the panel saves files up to 1 MB. Upload it from the file manager instead.');
+    expect($fake->callsFor('putContent'))->toBeEmpty();
+
+    $this->actingAs($user)->call('POST', $this->link($server, '/files/write?file=%2Ftest.txt'), [], [], [], $this->transformHeadersToServerVars(['Accept' => 'application/json']), str_repeat('x', 1024 * 1024))->assertNoContent();
+    $fake->assertContentPut('/test.txt', str_repeat('x', 1024 * 1024));
+});
