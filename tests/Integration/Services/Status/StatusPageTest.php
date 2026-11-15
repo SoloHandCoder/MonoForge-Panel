@@ -38,8 +38,8 @@ uses(IntegrationTestCase::class, DatabaseTransactions::class);
 function statusWorld(): array
 {
     $location = Location::factory()->create(['short' => 'EU']);
-    $up = Node::factory()->create(['location_id' => $location->id, 'name' => 'secret-alpha', 'fqdn' => 'alpha-node.example.test']);
-    $down = Node::factory()->create(['location_id' => $location->id, 'name' => 'secret-bravo', 'fqdn' => 'bravo-node.example.test']);
+    $up = Node::factory()->create(['location_id' => $location->id, 'name' => 'secret-alpha', 'fqdn' => 'alpha-node.example.test', 'shop_enabled' => true]);
+    $down = Node::factory()->create(['location_id' => $location->id, 'name' => 'secret-bravo', 'fqdn' => 'bravo-node.example.test', 'shop_enabled' => true]);
     $hidden = Node::factory()->create(['location_id' => $location->id, 'name' => 'secret-charlie', 'fqdn' => 'charlie-node.example.test', 'public' => false]);
 
     Http::fake(function (HttpRequest $request): PromiseInterface {

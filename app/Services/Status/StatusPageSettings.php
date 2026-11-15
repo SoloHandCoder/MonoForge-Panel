@@ -54,7 +54,8 @@ final class StatusPageSettings
 
             $rows[] = [
                 'node' => $node,
-                'visible' => $preference['visible'] ?? (bool) $node->public,
+                // Until the admin chooses, only nodes players can buy on (public and in the shop) are shown.
+                'visible' => $preference['visible'] ?? ($node->public && $node->shop_enabled),
                 'name' => $custom !== '' ? $custom : $default,
                 'default_name' => $default,
                 'custom_name' => $custom,

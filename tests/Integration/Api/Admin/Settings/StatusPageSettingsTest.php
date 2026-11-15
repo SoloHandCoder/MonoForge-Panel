@@ -13,12 +13,13 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
-test('every node is listed with its default display name, public nodes shown', function (): void {
+test('every node is listed with its default display name, only nodes in the shop shown until chosen', function (): void {
     $eu = Location::factory()->create(['short' => 'EU']);
     $us = Location::factory()->create(['short' => 'US']);
-    $first = Node::factory()->create(['location_id' => $eu->id, 'name' => 'fsn-01']);
-    $other = Node::factory()->create(['location_id' => $us->id, 'name' => 'nyc-01']);
-    $second = Node::factory()->create(['location_id' => $eu->id, 'name' => 'fsn-02', 'public' => false]);
+    $first = Node::factory()->create(['location_id' => $eu->id, 'name' => 'fsn-01', 'shop_enabled' => true]);
+    $other = Node::factory()->create(['location_id' => $us->id, 'name' => 'nyc-01', 'shop_enabled' => true]);
+    $second = Node::factory()->create(['location_id' => $eu->id, 'name' => 'fsn-02', 'public' => false, 'shop_enabled' => true]);
+    $offShop = Node::factory()->create(['location_id' => $us->id, 'name' => 'nyc-02', 'shop_enabled' => false]);
 
     $nodes = collect($this->getJson(route('api.admin.settings.status'))->assertOk()
         ->assertJsonPath('enabled', true)
@@ -27,7 +28,17 @@ test('every node is listed with its default display name, public nodes shown', f
 
     expect($nodes[$first->id])->toMatchArray(['name' => 'fsn-01', 'location' => 'EU', 'visible' => true, 'display_name' => 'EU Node 1', 'custom_name' => '', 'default_name' => 'EU Node 1'])
         ->and($nodes[$second->id])->toMatchArray(['visible' => false, 'display_name' => 'EU Node 2'])
-        ->and($nodes[$other->id])->toMatchArray(['visible' => true, 'display_name' => 'US Node 1']);
+        ->and($nodes[$other->id])->toMatchArray(['visible' => true, 'display_name' => 'US Node 1'])
+        ->and($nodes[$offShop->id])->toMatchArray(['visible' => false, 'display_name' => 'US Node 2']);
+});
+
+test('an explicit choice to show a node outside the shop is kept', function (): void {
+    $node = Node::factory()->create(['location_id' => Location::factory()->create(['short' => 'EU'])->id, 'shop_enabled' => false]);
+    expect(StatusPageSettings::visibleNodes())->toBe([]);
+
+    $this->putJson(route('api.admin.settings.status.update'), ['enabled' => true, 'nodes' => [['id' => $node->id, 'visible' => true, 'display_name' => 'Lab']]])->assertOk();
+
+    expect(array_map(fn (array $row): array => [$row['node']->id, $row['name']], StatusPageSettings::visibleNodes()))->toBe([[$node->id, 'Lab']]);
 });
 
 test('updating turns the page off, hides nodes, renames them and clears the public cache', function (): void {
