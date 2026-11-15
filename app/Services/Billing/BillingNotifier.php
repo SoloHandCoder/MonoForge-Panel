@@ -31,7 +31,7 @@ class BillingNotifier
     public const string RESTORED = 'restored';
 
     /** The client Wallet page (Task Q), where tokens are bought. */
-    public const string WALLET_PATH = '/wallet';
+    public const string WALLET_PATH = '/account/wallet';
 
     /** The client Store page (Task S). */
     public const string STORE_PATH = '/store';

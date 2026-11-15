@@ -14,6 +14,7 @@ use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Tag;
+use Pterodactyl\Services\Tunnels\TunnelSettings;
 
 /**
  * What the store shows a player: visible categories with their plans cheapest first,
@@ -39,7 +40,7 @@ class StoreCatalogService
     public function catalog(): array
     {
         if (! ShopSettings::enabled()) {
-            return ['enabled' => false, 'subdomains_enabled' => false, 'categories' => [], 'periods' => [], 'addons' => []];
+            return ['enabled' => false, 'subdomains_enabled' => false, 'subdomain_base' => null, 'categories' => [], 'periods' => [], 'addons' => []];
         }
 
         $categories = ShopCategory::query()->ordered()->where('visible', true)->get();
@@ -67,8 +68,9 @@ class StoreCatalogService
 
         return [
             'enabled' => true,
-            // Task V reports custom subdomains; until then the store never offers them.
-            'subdomains_enabled' => config()->boolean('monoforge.tunnels.subdomains.enabled', false),
+            // Custom subdomains are offered at checkout only when the admin's Tunnels settings allow them.
+            'subdomains_enabled' => TunnelSettings::subdomainsEnabled(),
+            'subdomain_base' => TunnelSettings::subdomainsEnabled() ? TunnelSettings::baseDomain() : null,
             'categories' => $presented,
             'periods' => ShopPeriod::query()->ordered()->where('enabled', true)->get()
                 ->map(fn (ShopPeriod $period): array => [

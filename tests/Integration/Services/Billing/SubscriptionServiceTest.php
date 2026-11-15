@@ -11,16 +11,15 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Pterodactyl\Console\Scheduler;
+use Pterodactyl\Contracts\Servers\TogglesServerSuspension;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
 use Pterodactyl\Notifications\SubscriptionBillingNotification;
-use Pterodactyl\Services\Billing\BillingSettings;
 use Pterodactyl\Services\Billing\Quote;
 use Pterodactyl\Services\Billing\SubscriptionService;
 use Pterodactyl\Services\Billing\TokenWallet;
@@ -38,7 +37,7 @@ beforeEach(function (): void {
     $this->wallet = $this->app->make(TokenWallet::class);
     $this->app->instance(TokenWallet::class, $this->wallet);
     $this->service = $this->app->make(SubscriptionService::class);
-    Setting::put(BillingSettings::GRACE_DAYS, '7');
+    config()->set('monoforge.shop.grace_days', 7);
 });
 
 afterEach(function (): void {
@@ -144,7 +143,7 @@ test('an unpaid renewal suspends the server, warns once and counts down to the d
 });
 
 test('with a grace period of 0 days the failed renewal deletes the server at once', function (): void {
-    Setting::put(BillingSettings::GRACE_DAYS, '0');
+    config()->set('monoforge.shop.grace_days', 0);
     [$user, $server] = dueSubscription($this, 0);
 
     $this->service->renewDue();
@@ -229,6 +228,21 @@ test('a suspension Wings refused is retried, and an offline node is force delete
     CarbonImmutable::setTestNow(CarbonImmutable::now()->addDay());
     expect($this->service->deleteExpired())->toBe(1)
         ->and(Server::query()->find($server->id))->toBeNull();
+});
+
+test('a server an admin unsuspended by hand is not suspended again by the Wings retry', function (): void {
+    [, $server, $subscription] = dueSubscription($this, 0);
+
+    $this->service->renewDue();
+    expect($server->refresh()->isSuspended())->toBeTrue()
+        ->and($subscription->fresh()->server_suspended_at)->not->toBeNull();
+
+    // The admin lifts the suspension from the server page instead of extending the subscription.
+    $this->app->make(TogglesServerSuspension::class)->toggle($server->refresh(), TogglesServerSuspension::ACTION_UNSUSPEND);
+
+    expect($this->service->syncServerStates())->toBe(0)
+        ->and($server->refresh()->isSuspended())->toBeFalse()
+        ->and($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_SUSPENDED);
 });
 
 test('auto-renew off suspends at the end of the period, and cancel stops billing', function (): void {

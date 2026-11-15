@@ -14,8 +14,8 @@ return new class extends Migration
             $table->increments('id');
             $table->unsignedInteger('server_id')->unique();
             $table->unsignedInteger('user_id');
-            $this->catalogKey($table, 'plan_id', 'shop_plans');
-            $this->catalogKey($table, 'period_id', 'shop_periods');
+            $table->unsignedInteger('plan_id')->nullable();
+            $table->unsignedInteger('period_id')->nullable();
             $table->unsignedInteger('period_days');
             // Tokens per period, locked at purchase (multiplier and add-ons included).
             $table->unsignedInteger('price_tokens');
@@ -23,12 +23,17 @@ return new class extends Migration
             $table->enum('status', ['active', 'suspended', 'cancelled'])->default('active');
             $table->dateTime('next_renewal_at');
             $table->dateTime('suspended_at')->nullable();
+            // When billing's suspension reached the server. A server an admin unsuspends by hand
+            // afterwards is not suspended again by the scheduler's Wings retry.
+            $table->dateTime('server_suspended_at')->nullable();
             $table->dateTime('delete_at')->nullable();
             $table->boolean('auto_renew')->default(true);
             $table->timestamps();
 
             $table->foreign('server_id')->references('id')->on('servers')->cascadeOnDelete();
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            $table->foreign('plan_id')->references('id')->on('shop_plans')->nullOnDelete();
+            $table->foreign('period_id')->references('id')->on('shop_periods')->nullOnDelete();
             $table->index(['status', 'next_renewal_at']);
             $table->index(['status', 'delete_at']);
         });
@@ -52,22 +57,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('server_subscription_warnings');
         Schema::dropIfExists('server_subscriptions');
-    }
-
-    /**
-     * A nullable key into Task R's catalog that is set null when the row is deleted. The column
-     * matches the type of the catalog's id, and the foreign key is only added once the catalog
-     * table exists (Task R's migrations 2026_11_16_000030..34 run first once both are merged).
-     */
-    private function catalogKey(Blueprint $table, string $column, string $catalog): void
-    {
-        $hasCatalog = Schema::hasTable($catalog);
-        $bigint = ! $hasCatalog || Schema::getColumnType($catalog, 'id') === 'bigint';
-
-        ($bigint ? $table->unsignedBigInteger($column) : $table->unsignedInteger($column))->nullable();
-
-        if ($hasCatalog) {
-            $table->foreign($column)->references('id')->on($catalog)->nullOnDelete();
-        }
     }
 };

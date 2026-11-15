@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Store\StorePurchaseControllerTest;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Bus;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Billing\ShopAddon;
 use Pterodactyl\Models\Billing\ShopCategory;
 use Pterodactyl\Models\Billing\ShopPeriod;
@@ -22,6 +24,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\StorePurchaseService;
 use Pterodactyl\Services\Billing\TokenWallet;
+use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use RuntimeException;
 use Throwable;
@@ -173,6 +176,25 @@ test('a sold-out shop refuses with the capacity message', function (): void {
     expect(balance())->toBe(1000);
 });
 
+test('a custom subdomain is checked against the Tunnels settings and kept on the tunnel', function (): void {
+    Bus::fake();
+    $this->node->forceFill(['playit_agent_id' => '00000000-0000-4000-8000-000000000001', 'playit_secret' => 'agent-secret'])->save();
+
+    // Switched off: the name is refused, nothing is charged.
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'survival']))->assertStatus(422);
+
+    TunnelSettings::save(true, 'monoforge.net', ['admin']);
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'admin', 'idempotency_key' => 'key-'.str_repeat('b', 20)]))->assertStatus(422);
+    expect(balance())->toBe(1000);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['subdomain' => 'Survival', 'idempotency_key' => 'key-'.str_repeat('c', 20)]))->assertCreated();
+
+    $server = Server::query()->where('owner_id', $this->user->id)->sole();
+    expect(ServerTunnel::query()->where('server_id', $server->id)->value('subdomain'))->toBe('survival')
+        ->and(TunnelSettings::subdomainProblem('survival'))->toBe('That name is already taken.')
+        ->and(balance())->toBe(500);
+});
+
 test('refuses a price the player did not confirm, an egg the plan does not offer and a closed shop', function (): void {
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['expected_total' => 499]))->assertStatus(409);
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order(['egg_id' => $this->egg->id + 1000]))->assertStatus(422);
@@ -180,6 +202,14 @@ test('refuses a price the player did not confirm, an egg the plan does not offer
 
     config(['monoforge.shop.enabled' => false]);
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertForbidden();
+
+    expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
+});
+
+test('a plan in a hidden category is not for sale', function (): void {
+    $this->plan->category->forceFill(['visible' => false])->save();
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertStatus(422);
 
     expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
 });

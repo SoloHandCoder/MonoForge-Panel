@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,9 +17,6 @@ class CapacityService
     public const array COUNTED_STATUSES = ['active', 'suspended'];
 
     private const array KEYS = ['memory', 'disk', 'cpu'];
-
-    /** SQLSTATE for a table that does not exist. */
-    private const string MISSING_TABLE = '42S02';
 
     /**
      * Whether adding the resources to what is used stays within every non-zero limit.
@@ -76,20 +72,11 @@ class CapacityService
      */
     public function used(): array
     {
-        try {
-            $row = DB::table('servers')
-                ->join('server_subscriptions', 'server_subscriptions.server_id', '=', 'servers.id')
-                ->whereIn('server_subscriptions.status', self::COUNTED_STATUSES)
-                ->selectRaw('COALESCE(SUM(servers.memory), 0) AS memory, COALESCE(SUM(servers.disk), 0) AS disk, COALESCE(SUM(servers.cpu), 0) AS cpu')
-                ->first();
-        } catch (QueryException $queryException) {
-            // Task T creates server_subscriptions; until it exists no shop server does either.
-            if ($queryException->getCode() === self::MISSING_TABLE) {
-                return ['memory' => 0, 'disk' => 0, 'cpu' => 0];
-            }
-
-            throw $queryException;
-        }
+        $row = DB::table('servers')
+            ->join('server_subscriptions', 'server_subscriptions.server_id', '=', 'servers.id')
+            ->whereIn('server_subscriptions.status', self::COUNTED_STATUSES)
+            ->selectRaw('COALESCE(SUM(servers.memory), 0) AS memory, COALESCE(SUM(servers.disk), 0) AS disk, COALESCE(SUM(servers.cpu), 0) AS cpu')
+            ->first();
 
         return [
             'memory' => $this->toInt($row?->memory),

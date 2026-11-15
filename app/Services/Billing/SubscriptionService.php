@@ -19,6 +19,7 @@ use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Tunnels\TunnelService;
 use Throwable;
 
 /**
@@ -43,9 +44,6 @@ class SubscriptionService
      */
     public const int FORCE_DELETE_AFTER_HOURS = 24;
 
-    /** Task V's tunnel service, used only when it is installed. */
-    private const string TUNNEL_SERVICE = 'Pterodactyl\Services\Tunnels\TunnelService';
-
     private const string PAID = 'paid';
 
     private const string SKIPPED = 'skipped';
@@ -66,7 +64,7 @@ class SubscriptionService
         private readonly TogglesServerSuspension $suspension,
         private readonly DeletesServers $deletion,
         private readonly BillingNotifier $notifier,
-        private readonly BillingSettings $settings,
+        private readonly TunnelService $tunnels,
     ) {}
 
     /**
@@ -142,7 +140,7 @@ class SubscriptionService
      */
     public function suspend(ServerSubscription $s): void
     {
-        $grace = $this->settings->graceDays();
+        $grace = ShopSettings::graceDays();
 
         $suspended = DB::transaction(function () use ($s, $grace): bool {
             $locked = $this->lock($s);
@@ -154,6 +152,7 @@ class SubscriptionService
             $locked->fill([
                 'status' => ServerSubscription::STATUS_SUSPENDED,
                 'suspended_at' => $now,
+                'server_suspended_at' => null,
                 'delete_at' => $now->addDays($grace),
             ])->save();
             $s->setRawAttributes($locked->getAttributes(), true);
@@ -318,8 +317,10 @@ class SubscriptionService
     }
 
     /**
-     * Retries what Wings refused earlier: suspending the server of a suspended subscription, and
-     * unsuspending the server of one that was paid (or cancelled) since.
+     * Retries what Wings refused earlier: suspending the server of a suspended subscription whose
+     * suspension never reached the server, and unsuspending the server of one that was paid (or
+     * cancelled) since. A server billing did suspend and an admin then unsuspended by hand
+     * (`server_suspended_at` is set) is left alone; the admin extends or cancels the subscription.
      */
     public function syncServerStates(): int
     {
@@ -329,6 +330,7 @@ class SubscriptionService
             ServerSubscription::query()
                 ->where('status', ServerSubscription::STATUS_SUSPENDED)
                 ->where('delete_at', '>', CarbonImmutable::now())
+                ->whereNull('server_suspended_at')
                 ->whereHas('server', fn (Builder $query): Builder => $query->where(fn (Builder $state): Builder => $state->whereNull('status')->orWhere('status', '!=', Server::STATUS_SUSPENDED))),
             function (ServerSubscription $subscription) use (&$synced): void {
                 if ($this->suspendServer($subscription)) {
@@ -359,7 +361,7 @@ class SubscriptionService
     public function warnUpcoming(): int
     {
         $warned = 0;
-        $window = CarbonImmutable::now()->addDays($this->settings->lowBalanceDays());
+        $window = CarbonImmutable::now()->addDays(ShopSettings::lowBalanceDays());
 
         ServerSubscription::query()
             ->with(['user', 'server'])
@@ -429,7 +431,7 @@ class SubscriptionService
 
     public function graceDays(): int
     {
-        return $this->settings->graceDays();
+        return ShopSettings::graceDays();
     }
 
     /**
@@ -542,6 +544,7 @@ class SubscriptionService
     {
         try {
             $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_SUSPEND);
+            $s->forceFill(['server_suspended_at' => CarbonImmutable::now()])->save();
 
             return true;
         } catch (Throwable $throwable) {
@@ -562,7 +565,7 @@ class SubscriptionService
 
         try {
             $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_UNSUSPEND);
-            $s->forceFill(['suspended_at' => null])->save();
+            $s->forceFill(['suspended_at' => null, 'server_suspended_at' => null])->save();
 
             return true;
         } catch (Throwable $throwable) {
@@ -574,15 +577,8 @@ class SubscriptionService
 
     private function releaseTunnel(Server $server): void
     {
-        if (! class_exists(self::TUNNEL_SERVICE)) {
-            return;
-        }
-
         try {
-            $tunnels = resolve(self::TUNNEL_SERVICE);
-            if (is_object($tunnels) && method_exists($tunnels, 'release')) {
-                $tunnels->release($server);
-            }
+            $this->tunnels->release($server);
         } catch (Throwable $throwable) {
             // A tunnel left behind must not keep an unpaid server alive.
             report($throwable);

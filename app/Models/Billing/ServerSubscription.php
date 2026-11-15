@@ -26,6 +26,7 @@ use Pterodactyl\Models\User;
  * @property string $status
  * @property CarbonImmutable $next_renewal_at
  * @property CarbonImmutable|null $suspended_at
+ * @property CarbonImmutable|null $server_suspended_at when billing's suspension reached the server
  * @property CarbonImmutable|null $delete_at
  * @property bool $auto_renew
  * @property CarbonImmutable|null $created_at
@@ -46,6 +47,7 @@ use Pterodactyl\Models\User;
     'status',
     'next_renewal_at',
     'suspended_at',
+    'server_suspended_at',
     'delete_at',
     'auto_renew',
 ])]
@@ -80,6 +82,7 @@ class ServerSubscription extends Model
             'addons' => 'array',
             'next_renewal_at' => 'immutable_datetime',
             'suspended_at' => 'immutable_datetime',
+            'server_suspended_at' => 'immutable_datetime',
             'delete_at' => 'immutable_datetime',
             'auto_renew' => 'bool',
         ];

@@ -9,9 +9,6 @@ use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 
 class PurchaseServerRequest extends ClientApiRequest
 {
-    /** Lowercase letters, digits and inner hyphens, as a DNS label allows. */
-    public const string SUBDOMAIN_REGEX = '/^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/';
-
     /**
      * @return ValidationRules
      */
@@ -26,7 +23,8 @@ class PurchaseServerRequest extends ClientApiRequest
             'name' => ['required', 'string', 'min:1', 'max:60', 'regex:/^[^<>]+$/u'],
             'addons' => ['sometimes', 'array'],
             'addons.*' => ['integer', 'min:0', 'max:1000'],
-            'subdomain' => ['nullable', 'string', 'regex:'.self::SUBDOMAIN_REGEX],
+            // The format, blocklist and availability are checked by TunnelSettings::subdomainProblem().
+            'subdomain' => ['nullable', 'string', 'max:63'],
             'expected_total' => ['nullable', 'integer', 'min:0'],
             'idempotency_key' => ['required', 'string', 'min:16', 'max:100', 'regex:/^[A-Za-z0-9_-]+$/'],
         ];

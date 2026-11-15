@@ -9,8 +9,6 @@ use InvalidArgumentException;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
-use Pterodactyl\Models\UserNotice;
-use Pterodactyl\Services\Notices\NoticeService;
 
 /**
  * The only way a user's token balance changes. Every change locks the user row, writes a
@@ -23,9 +21,6 @@ class TokenWallet
 {
     /** The most tokens a single change may move; keeps every sum far inside a signed 64-bit integer. */
     public const int MAX_TOKENS = 1_000_000_000_000;
-
-    /** The notice kind of the low balance warning, one unread notice per user. */
-    public const string LOW_BALANCE_KIND = 'billing.low_balance';
 
     /** The user's current balance, read from the database rather than the model in memory. */
     public function balance(User $user): int
@@ -76,22 +71,6 @@ class TokenWallet
             ->where('reference_id', $refId)
             ->where('type', $type)
             ->exists();
-    }
-
-    /**
-     * Warns the user in the panel that their balance is low. Repeated calls replace the unread
-     * warning instead of stacking new ones.
-     *
-     * @param  int|null  $needed  Tokens the next renewal needs, when known.
-     */
-    public function notifyLowBalance(User $user, ?int $needed = null): UserNotice
-    {
-        $balance = $this->balance($user);
-        $body = $needed !== null && $needed > $balance
-            ? sprintf('Your balance is %d tokens, but your next renewal needs %d. Top up so your servers keep running.', $balance, $needed)
-            : sprintf('Your balance is %d tokens. Top up so your servers keep running.', $balance);
-
-        return resolve(NoticeService::class)->notify($user, 'warning', 'Low token balance', $body, self::LOW_BALANCE_KIND, 'Top up', '/account/wallet');
     }
 
     /**

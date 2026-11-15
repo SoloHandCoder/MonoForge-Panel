@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\StoreControllerTest;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Pterodactyl\Enum\ShopAddonResource;
 use Pterodactyl\Enum\ShopMultiplierScope;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopAddon;
 use Pterodactyl\Models\Billing\ShopCategory;
 use Pterodactyl\Models\Billing\ShopMultiplier;
@@ -18,6 +17,8 @@ use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\CapacityService;
+use Pterodactyl\Services\Billing\TokenWallet;
+use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 uses(ClientApiIntegrationTestCase::class);
@@ -159,34 +160,23 @@ test('a plan without a node list only runs on deployable nodes', function (): vo
 });
 
 test('capacity counts only active and suspended shop servers', function (): void {
-    // Task T owns server_subscriptions; a temporary stand-in keeps this test inside its transaction.
-    $created = ! Schema::hasTable('server_subscriptions');
-    if ($created) {
-        expect((new CapacityService())->used())->toBe(['memory' => 0, 'disk' => 0, 'cpu' => 0]);
-        DB::statement('CREATE TEMPORARY TABLE server_subscriptions (id INT AUTO_INCREMENT PRIMARY KEY, server_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, period_days INT NOT NULL, price_tokens INT NOT NULL, addons JSON NULL, status VARCHAR(16) NOT NULL, next_renewal_at DATETIME NOT NULL, created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)');
-    }
+    expect((new CapacityService())->used())->toBe(['memory' => 0, 'disk' => 0, 'cpu' => 0]);
 
     $active = $this->createServerModel(['memory' => 4096, 'disk' => 20000, 'cpu' => 200]);
     $suspended = $this->createServerModel(['memory' => 2048, 'disk' => 10000, 'cpu' => 100]);
     $cancelled = $this->createServerModel(['memory' => 8192, 'disk' => 50000, 'cpu' => 400]);
     $this->createServerModel(['memory' => 16384, 'disk' => 90000, 'cpu' => 800]);
-    // The columns of Task T's table that have no default.
-    $subscription = fn ($server, string $status): array => [
-        'server_id' => $server->id,
-        'user_id' => $server->owner_id,
-        'period_days' => 30,
-        'price_tokens' => 500,
-        'addons' => '[]',
-        'status' => $status,
-        'next_renewal_at' => now()->addDays(30),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ];
-    DB::table('server_subscriptions')->insert([
-        $subscription($active, 'active'),
-        $subscription($suspended, 'suspended'),
-        $subscription($cancelled, 'cancelled'),
-    ]);
+    foreach ([[$active, 'active'], [$suspended, 'suspended'], [$cancelled, 'cancelled']] as [$server, $status]) {
+        ServerSubscription::query()->create([
+            'server_id' => $server->id,
+            'user_id' => $server->owner_id,
+            'period_days' => 30,
+            'price_tokens' => 500,
+            'addons' => [],
+            'status' => $status,
+            'next_renewal_at' => now()->addDays(30),
+        ]);
+    }
 
     config()->set('monoforge.shop.limits', ['memory_mb' => 8192, 'disk_mb' => 0, 'cpu_percent' => 400]);
     $capacity = new CapacityService();
@@ -200,8 +190,21 @@ test('capacity counts only active and suspended shop servers', function (): void
     ($this->plan)(['memory' => 4096]);
     $this->actingAs(User::factory()->create())->getJson(route('api:client.store.catalog'))->assertOk()
         ->assertJsonPath('categories.0.plans.0.can_provision', false);
+});
 
-    if ($created) {
-        DB::statement('DROP TEMPORARY TABLE server_subscriptions');
-    }
+test('the catalog and quotes carry the balance, and subdomains follow the Tunnels settings', function (): void {
+    ($this->plan)(['name' => 'Stone']);
+    $user = User::factory()->create();
+    resolve(TokenWallet::class)->credit($user, 750, 'admin_adjust', 'Test balance');
+    TunnelSettings::save(true, 'monoforge.net', []);
+
+    $this->actingAs($user)->getJson(route('api:client.store.catalog'))->assertOk()
+        ->assertJsonPath('balance', 750)
+        ->assertJsonPath('subdomains_enabled', true)
+        ->assertJsonPath('subdomain_base', 'monoforge.net');
+
+    $plan = ShopPlan::query()->where('name', 'Stone')->sole();
+    $this->actingAs($user)->postJson(route('api:client.store.quote'), [
+        'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'location_id' => $this->home->location_id,
+    ])->assertOk()->assertJsonPath('balance', 750);
 });

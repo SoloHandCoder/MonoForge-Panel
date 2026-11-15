@@ -82,17 +82,3 @@ test('the balance cannot be mass assigned', function (): void {
     expect(fn (): User => $user->fill(['token_balance' => 9999]))->toThrow(MassAssignmentException::class);
     expect(wallet()->balance($user))->toBe(0);
 });
-
-test('the low balance notice replaces its unread predecessor', function (): void {
-    $user = User::factory()->create();
-    wallet()->credit($user, 20, TokenTransaction::TYPE_PURCHASE, 'Bought tokens');
-
-    wallet()->notifyLowBalance($user, 500);
-
-    $notice = wallet()->notifyLowBalance($user, 500);
-
-    expect($user->notices()->count())->toBe(1)
-        ->and($notice->kind)->toBe(TokenWallet::LOW_BALANCE_KIND)
-        ->and($notice->body)->toContain('20 tokens')->toContain('500')
-        ->and($notice->action_url)->toBe('/account/wallet');
-});

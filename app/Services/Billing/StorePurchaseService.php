@@ -13,6 +13,7 @@ use Pterodactyl\Contracts\Servers\DeletesServers;
 use Pterodactyl\Data\StorePurchaseOrder;
 use Pterodactyl\Data\StorePurchaseResult;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
+use Pterodactyl\Exceptions\Billing\InvalidQuoteException;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
@@ -28,6 +29,7 @@ use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Tunnels\TunnelService;
+use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Throwable;
 
 /**
@@ -51,6 +53,7 @@ class StorePurchaseService
         private readonly SubscriptionService $subscriptions,
         private readonly CreatesServers $creation,
         private readonly DeletesServers $deletion,
+        private readonly TunnelService $tunnels,
     ) {}
 
     /**
@@ -94,10 +97,11 @@ class StorePurchaseService
 
     private function buy(User $user, StorePurchaseOrder $order, string $reference): StorePurchaseResult
     {
-        throw_unless(filter_var(config('monoforge.shop.enabled', false), FILTER_VALIDATE_BOOL), StorePurchaseException::disabled());
+        throw_unless(ShopSettings::enabled(), StorePurchaseException::disabled());
 
-        $plan = ShopPlan::query()->whereKey($order->planId)->where('visible', true)->first()
+        $plan = ShopPlan::query()->with('category')->whereKey($order->planId)->where('visible', true)->first()
             ?? throw StorePurchaseException::unavailable('That plan is not for sale.');
+        throw_unless($plan->category->visible, StorePurchaseException::unavailable('That plan is not for sale.'));
         $period = ShopPeriod::query()->whereKey($order->periodId)->where('enabled', true)->first()
             ?? throw StorePurchaseException::unavailable('That billing period is not offered.');
 
@@ -114,10 +118,10 @@ class StorePurchaseService
         throw_if($candidates->isEmpty(), StorePurchaseException::noNode());
 
         // Resources do not depend on the node, only the price does, so any candidate sizes the order.
-        $quote = $this->pricing->quote($plan, $period, $candidates->firstOrFail(), $addons);
+        $quote = $this->sellableQuote($plan, $period, $candidates->firstOrFail(), $addons);
         $node = $this->chooseNode($candidates, $quote);
         if ($node->id !== $candidates->firstOrFail()->id) {
-            $quote = $this->pricing->quote($plan, $period, $node, $addons);
+            $quote = $this->sellableQuote($plan, $period, $node, $addons);
         }
 
         throw_if($order->expectedTotal !== null && $order->expectedTotal !== $quote->totalPerPeriod, StorePurchaseException::priceChanged($quote->totalPerPeriod));
@@ -172,7 +176,7 @@ class StorePurchaseService
             (int) ($subscription->price_tokens ?? 0),
             (int) ($subscription->period_days ?? 0),
             replayed: true,
-            address: class_exists(TunnelService::class) ? $this->tunnelAddress($server) : null,
+            address: $this->tunnelAddress($server),
         );
     }
 
@@ -203,21 +207,39 @@ class StorePurchaseService
     }
 
     /**
-     * The custom subdomain the player asked for, kept only while subdomains are enabled and
-     * refused when the admin reserved it.
+     * The custom subdomain the player asked for, checked against the Tunnels settings (switch,
+     * format, the admin's blocklist and names already taken).
      */
     private function subdomain(?string $subdomain): ?string
     {
-        if ($subdomain === null || ! filter_var(config('monoforge.tunnels.subdomains.enabled', false), FILTER_VALIDATE_BOOL)) {
+        $subdomain = $subdomain === null ? '' : mb_strtolower(mb_trim($subdomain));
+        if ($subdomain === '') {
             return null;
         }
 
-        $blocklist = config('monoforge.tunnels.subdomains.blocklist');
-        $blocked = is_array($blocklist) ? $blocklist : explode(',', is_string($blocklist) ? $blocklist : '');
-        $blocked = array_map(fn (mixed $name): string => mb_strtolower(mb_trim(is_scalar($name) ? (string) $name : '')), $blocked);
-        throw_if(in_array($subdomain, $blocked, true), StorePurchaseException::unavailable('That subdomain is reserved. Please pick another one.'));
+        $problem = TunnelSettings::subdomainProblem($subdomain);
+        throw_if($problem !== null, StorePurchaseException::unavailable((string) $problem));
 
         return $subdomain;
+    }
+
+    /**
+     * Checks that the plan, period and node may be sold together (Task R's rules), then prices
+     * the order on that node.
+     *
+     * @param  array<string, int>  $addons
+     *
+     * @throws StorePurchaseException
+     */
+    private function sellableQuote(ShopPlan $plan, ShopPeriod $period, Node $node, array $addons): Quote
+    {
+        try {
+            $this->pricing->assertSellable($plan, $period, $node);
+
+            return $this->pricing->quote($plan, $period, $node, $addons);
+        } catch (InvalidQuoteException $invalidQuoteException) {
+            throw StorePurchaseException::unavailable($invalidQuoteException->getMessage());
+        }
     }
 
     /**
@@ -350,17 +372,19 @@ class StorePurchaseService
     }
 
     /**
-     * Asks Task V's tunnel service for a playit tunnel when it is installed. A tunnel failure
-     * never fails the purchase: the service retries it and the node address shows meanwhile.
+     * Asks the tunnel service for a playit tunnel. A tunnel failure never fails the purchase:
+     * the service retries it and the node address shows meanwhile.
      */
     private function provisionTunnel(Server $server, ?string $subdomain): ?string
     {
-        if (! class_exists(TunnelService::class)) {
+        // Servers on nodes without a playit agent keep their node address (TunnelListener skips
+        // them too); provisioning there would only leave a failed tunnel row behind.
+        if (! $server->loadMissing('node')->node->hasPlayitAgent()) {
             return null;
         }
 
         try {
-            $tunnel = resolve(TunnelService::class)->provision($server);
+            $tunnel = $this->tunnels->provision($server);
             if ($subdomain !== null) {
                 $tunnel->forceFill(['subdomain' => $subdomain])->save();
             }
@@ -374,7 +398,7 @@ class StorePurchaseService
     private function tunnelAddress(Server $server): ?string
     {
         try {
-            return resolve(TunnelService::class)->displayAddress($server);
+            return $this->tunnels->displayAddress($server);
         } catch (Throwable $throwable) {
             report($throwable);
 
