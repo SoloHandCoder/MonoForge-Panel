@@ -9,6 +9,7 @@ use Illuminate\Http\Response;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
+use Knuckles\Scribe\Attributes\ResponseField;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Http\Requests\Api\Client\Store\PurchaseServerRequest;
@@ -42,6 +43,7 @@ class StorePurchaseController extends ClientApiController
     #[Endpoint('Purchase server', 'Charges the first billing period of a store plan and creates the server, which starts installing. Repeating a request with the same idempotency key returns the server it already bought without charging again; a failure after the charge refunds it.')]
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 201, description: 'Server bought and installing.')]
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 200, description: 'The idempotency key already bought this server; nothing was charged again.')]
+    #[ResponseField('attributes.address', 'string', 'The playit.gg address of the server once its tunnel is ready; null until then.', nullable: true)]
     public function store(PurchaseServerRequest $request): JsonResponse
     {
         $result = $this->purchases->purchase($request->user(), $request->order());

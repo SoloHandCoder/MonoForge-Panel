@@ -25,6 +25,7 @@ import {
     Settings,
     ShieldCheck,
     SquareTerminal,
+    Store,
     Tag,
     Terminal,
     UserRound,
@@ -76,6 +77,7 @@ const icons = new Map<string, LucideIcon>([
     ['blocks', Blocks],
     ['palette', Palette],
     ['user-cog', ShieldCheck],
+    ['store', Store],
 ]);
 
 /** A sidebar row: hover tints it, the active one is lit and carries a violet bar at its left edge. */
@@ -221,6 +223,10 @@ function PanelNav({ model, area }: { model: AppLayoutModel; area: AccountArea | 
                     )}
                 </AppLink>
             )}
+            <PanelLink destination={{ to: '/store' }} className={sidebarItemClass}>
+                <Glyph name='store' />
+                <span className='min-w-0 flex-1 truncate'>Store</span>
+            </PanelLink>
             {area && <AreaSlot area={area} at='before' />}
             <AccountItems items={area?.nav.items ?? published.items} accountLink={link('account')} />
             {area && <AreaSlot area={area} at='after' />}
