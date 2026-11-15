@@ -18,7 +18,7 @@ type SettingsSearch = {
 
 const tabs: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
-    { key: 'mail', label: 'Mail' },
+    { key: 'mail', label: 'Email' },
     { key: 'advanced', label: 'Advanced' },
 ];
 
@@ -59,7 +59,7 @@ export default function SettingsContainer() {
         <AdminContentBlock
             title='Admin · Settings'
             heading='Settings'
-            description="Manage your panel's general, mail, and advanced settings."
+            description="Manage your panel's general, email, and advanced settings."
         >
             {settings?.meta.load_environment_only && (
                 <Alert type='danger' className='mb-6 text-sm'>

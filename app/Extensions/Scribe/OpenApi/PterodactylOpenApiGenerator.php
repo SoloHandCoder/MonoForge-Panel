@@ -2414,6 +2414,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
                         'mail:mailers:smtp:password',
                         'mail:from:address',
                         'mail:from:name',
+                        'services:resend:key_set',
                     ],
                     'properties' => [
                         'mail:default' => ['type' => 'string', 'example' => 'smtp'],
@@ -2429,6 +2430,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
                         'mail:mailers:smtp:password' => ['type' => 'string', 'example' => ''],
                         'mail:from:address' => ['type' => 'string', 'example' => 'panel@example.com'],
                         'mail:from:name' => ['type' => 'string', 'nullable' => true, 'example' => 'Pterodactyl'],
+                        'services:resend:key_set' => ['type' => 'boolean', 'example' => false],
                     ],
                 ],
                 'advanced' => [
