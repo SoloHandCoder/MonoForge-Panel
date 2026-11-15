@@ -50,6 +50,10 @@ export interface SiteSettings {
     registration?: {
         enabled: boolean;
     };
+    /** File limits the panel enforces: the largest file it serves for editing, in bytes. */
+    files?: {
+        maxEditSize: number;
+    };
     /** The Terms of Service, Privacy Policy and Refund Policy, and those the signed-in user has to accept again. */
     legal?: {
         documents: Record<LegalDocumentId, LegalDocumentSummary>;
