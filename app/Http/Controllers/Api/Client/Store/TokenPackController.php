@@ -17,6 +17,7 @@ use Pterodactyl\Http\Requests\Api\Client\Store\CheckoutTokenPackRequest;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Services\Billing\Tebex\TebexClient;
 use Pterodactyl\Services\Billing\Tebex\TebexSettings;
+use Pterodactyl\Services\Legal\LegalSettings;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
 #[Subgroup('Store', 'Buy tokens and spend them on servers.')]
@@ -49,8 +50,11 @@ class TokenPackController extends ClientApiController
     #[Endpoint('Buy token pack', 'Creates a Tebex basket for a token pack and returns the Tebex checkout URL to send the user to. Tokens are credited when Tebex confirms the payment.')]
     #[BodyParam('pack_id', 'integer', 'The token pack to buy.', required: true, example: 1)]
     #[ScribeResponse(['url' => 'https://pay.tebex.io/abcdef-1234567890'], description: 'Checkout started.')]
+    #[ScribeResponse(status: 409, description: 'The user has to accept the updated Terms of Service or Privacy Policy first.')]
     public function checkout(CheckoutTokenPackRequest $request): JsonResponse
     {
+        LegalSettings::ensureAccepted($request->user());
+
         throw_unless($this->settings->checkoutEnabled(), DisplayException::class, 'The token store is not available right now.');
 
         $pack = TokenPack::query()->where('visible', true)->find($request->integer('pack_id'));

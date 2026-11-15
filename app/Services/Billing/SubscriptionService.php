@@ -92,7 +92,8 @@ class SubscriptionService
             'suspended_at' => null,
             'delete_at' => null,
             'auto_renew' => true,
-            'terms_version' => LegalSettings::version(LegalDocument::Terms),
+            // The version this user accepted (purchases are refused while a newer one waits).
+            'terms_version' => LegalSettings::acceptedVersion($user, LegalDocument::Terms),
         ])->save();
 
         return $subscription;

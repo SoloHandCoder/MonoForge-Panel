@@ -132,13 +132,32 @@ test('buys a server: charges the first period, creates it with the egg defaults 
         ->and(ServerSubscription::query()->where('server_id', $server->id)->value('price_tokens'))->toBe(500);
 });
 
-test('the subscription keeps the Terms of Service version the purchase accepted', function (): void {
+test('the subscription keeps the Terms of Service version the buyer accepted', function (): void {
     LegalSettings::save(LegalDocument::Terms, '# Terms', '', reaccept: true);
+    LegalSettings::recordAcceptance($this->user);
 
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
 
     $server = Server::query()->where('owner_id', $this->user->id)->sole();
     expect(ServerSubscription::query()->where('server_id', $server->id)->sole()->terms_version)->toBe(2);
+});
+
+test('a buyer without a record is stamped with the first version', function (): void {
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+
+    $server = Server::query()->where('owner_id', $this->user->id)->sole();
+    expect(ServerSubscription::query()->where('server_id', $server->id)->sole()->terms_version)->toBe(1);
+});
+
+test('nothing can be bought while updated terms wait to be accepted', function (): void {
+    LegalSettings::save(LegalDocument::Privacy, '# Privacy', '', reaccept: true);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())
+        ->assertConflict()
+        ->assertJsonPath('errors.0.detail', 'Please accept the updated terms first.');
+
+    expect(Server::query()->where('owner_id', $this->user->id)->exists())->toBeFalse()
+        ->and(balance())->toBe(1000);
 });
 
 test('the same idempotency key never buys twice', function (): void {
