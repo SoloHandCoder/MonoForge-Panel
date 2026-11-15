@@ -24,6 +24,7 @@ test('decrypts single, double and serialized encryption and leaves plaintext alo
     expect(importer()->decrypt($old->encryptString('re_single')))->toBe('re_single')
         ->and(importer()->decrypt($old->encryptString($old->encryptString('re_double'))))->toBe('re_double')
         ->and(importer()->decrypt($old->encrypt('re_serialized')))->toBe('re_serialized')
+        ->and(importer()->decrypt($old->encrypt('clé "quoted";')))->toBe('clé "quoted";')
         ->and(importer()->decrypt('plain-client-id'))->toBe('plain-client-id');
 });
 

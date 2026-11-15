@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Enum\OAuthProvider;
+use Pterodactyl\Exceptions\Service\Auth\OAuthException;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;

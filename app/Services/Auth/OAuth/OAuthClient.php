@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Pterodactyl\Enum\OAuthProvider;
+use Pterodactyl\Exceptions\Service\Auth\OAuthException;
 
 /**
  * The OAuth2 authorization-code flow for Discord and Google, with Laravel's HTTP client.

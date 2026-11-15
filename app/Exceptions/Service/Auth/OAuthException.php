@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pterodactyl\Services\Auth\OAuth;
+namespace Pterodactyl\Exceptions\Service\Auth;
 
 use RuntimeException;
 

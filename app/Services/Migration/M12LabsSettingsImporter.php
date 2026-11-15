@@ -243,11 +243,9 @@ class M12LabsSettingsImporter
         }
 
         // A value written with Crypt::encrypt() (serialized) rather than encryptString().
-        if (preg_match('/^s:\d+:".*";$/s', $value) === 1) {
-            $unserialized = @unserialize($value, ['allowed_classes' => false]);
-            if (is_string($unserialized)) {
-                return $this->decrypt($unserialized);
-            }
+        // Read the string out by hand rather than calling unserialize() on imported data.
+        if (preg_match('/^s:(\d+):"(.*)";$/s', $value, $matches) === 1 && mb_strlen($matches[2], '8bit') === (int) $matches[1]) {
+            return $this->decrypt($matches[2]);
         }
 
         return $value;

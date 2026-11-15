@@ -10,12 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Enum\OAuthProvider;
+use Pterodactyl\Exceptions\Service\Auth\OAuthException;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Services\Auth\OAuth\OAuthAccountService;
 use Pterodactyl\Services\Auth\OAuth\OAuthClient;
-use Pterodactyl\Services\Auth\OAuth\OAuthException;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
