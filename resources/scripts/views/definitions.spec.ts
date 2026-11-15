@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { QueryClient } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, type AnyRouter } from '@tanstack/react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as Registry from './registry';
 import type * as Engine from './View';
 import type * as Lazy from './lazy';
@@ -66,6 +66,14 @@ describe('view implementations', () => {
             },
             { routes: ['/authenticated/server/$id/backups'], views: ['page.server.backups', 'server.backups'] },
         ];
+
+        // Signed in: a visitor without a session gets the public homepage at "/" instead of the app layout.
+        const bootstrap = window as Window & { PterodactylUser?: unknown };
+
+        bootstrap.PterodactylUser = { uuid: 'user', created_at: '', updated_at: '' };
+        onTestFinished(() => {
+            delete bootstrap.PterodactylUser;
+        });
 
         for (const step of journey) {
             expect(step.views.every(ready), step.routes.at(-1)).toBe(false);

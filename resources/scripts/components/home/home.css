@@ -99,9 +99,9 @@
 
 /* The pointer glow follows --home-x/--home-y, which the hero sets from the pointer. */
 .home-pointer-glow {
-    background: radial-gradient(
+    background-image: radial-gradient(
         600px circle at var(--home-x, 50%) var(--home-y, 30%),
-        rgb(139 92 246 / 0.18),
+        color-mix(in srgb, var(--primary) 18%, transparent),
         transparent 60%
     );
 }
