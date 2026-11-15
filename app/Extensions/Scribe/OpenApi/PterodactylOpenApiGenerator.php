@@ -1482,6 +1482,15 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             default => null,
         };
 
+        // Older clients send only the smtp block: the driver defaults to smtp and the
+        // sender falls back to smtp.from_*, so none of these are required on the wire.
+        if (($pathItem['operationId'] ?? null) === 'adminUpdateMailSettings' && is_array($schema['required'] ?? null)) {
+            $schema['required'] = array_values(array_diff($schema['required'], ['driver', 'smtp', 'from_address']));
+            if ($schema['required'] === []) {
+                unset($schema['required']);
+            }
+        }
+
         $schema['properties'] = $properties;
         $media['schema'] = $schema;
         $content[$contentType] = $media;
@@ -1586,6 +1595,22 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
      */
     private function enforceAdminMailSettingsBodySchema(array &$properties): void
     {
+        $descriptions = [
+            'driver' => 'The mail driver. Defaults to smtp when omitted.',
+            'smtp' => 'Required when the driver is smtp.',
+            'smtp.properties.from_address' => 'The smtp from address. Must be a valid email address. Legacy: use from_address.',
+            'smtp.properties.from_name' => 'The smtp from name. Must not be greater than 191 characters. Legacy: use from_name.',
+            'from_address' => 'The sender address. Must be a valid email address.',
+            'from_name' => 'The sender name. Must not be greater than 191 characters.',
+            'resend' => 'Resend settings.',
+            'resend.properties.api_key' => 'The Resend API key (write-only). Blank keeps the stored key, "!e" clears it.',
+        ];
+        foreach ($descriptions as $path => $description) {
+            if (is_array(data_get($properties, $path))) {
+                Arr::set($properties, "{$path}.description", $description);
+            }
+        }
+
         if (data_get($properties, 'smtp.properties.encryption') === null) {
             return;
         }

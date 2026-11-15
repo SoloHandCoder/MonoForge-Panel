@@ -2654,13 +2654,13 @@ export type AdminUpdateGeneralSettingsRequest = {
 
 export type AdminUpdateMailSettingsRequest = {
     /**
-     * The driver.
+     * The mail driver. Defaults to smtp when omitted.
      */
-    driver: 'smtp' | 'resend' | 'log';
+    driver?: 'smtp' | 'resend' | 'log';
     /**
-     * The smtp.
+     * Required when the driver is smtp.
      */
-    smtp: {
+    smtp?: {
         /**
          * The smtp host.
          */
@@ -2682,28 +2682,28 @@ export type AdminUpdateMailSettingsRequest = {
          */
         password?: string | null;
         /**
-         * The smtp from address. Must be a valid email address.
+         * The smtp from address. Must be a valid email address. Legacy: use from_address.
          */
         from_address?: string | null;
         /**
-         * The smtp from name. Must not be greater than 191 characters.
+         * The smtp from name. Must not be greater than 191 characters. Legacy: use from_name.
          */
         from_name?: string | null;
     };
     /**
-     * The from address. Must be a valid email address.
+     * The sender address. Must be a valid email address.
      */
-    from_address: string;
+    from_address?: string;
     /**
-     * The from name. Must not be greater than 191 characters.
+     * The sender name. Must not be greater than 191 characters.
      */
     from_name?: string | null;
     /**
-     * The resend.
+     * Resend settings.
      */
     resend?: {
         /**
-         * The resend api key. Must not be greater than 255 characters.
+         * The Resend API key (write-only). Blank keeps the stored key, "!e" clears it.
          */
         api_key?: string | null;
     };
