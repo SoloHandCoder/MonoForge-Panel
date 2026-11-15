@@ -1,8 +1,10 @@
 User-agent: *
-# Only the public homepage (and what it needs to render) may be crawled; the panel stays out of search.
+# Only the public homepage, public server pages (and what they need to render) may be crawled; the panel stays out of search.
 Allow: /$
 Allow: /assets/
 Allow: /favicons/
 Allow: /locales/
 Allow: /api/public/
+# Public server pages; an owner can still ask for theirs not to be listed (noindex).
+Allow: /s/
 Disallow: /

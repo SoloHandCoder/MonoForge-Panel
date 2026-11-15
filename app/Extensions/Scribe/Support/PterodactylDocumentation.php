@@ -86,6 +86,7 @@ class PterodactylDocumentation
         'server_id' => ['integer', 'The server ID.', 1],
         'server_uuid' => ['string', 'The server UUID.', 'd3aac109-e5a0-4331-b03e-3454f7e02bbe'],
         'server_admin_identifier' => ['string', 'The server ID or UUID.', '1'],
+        'slug' => ['string', 'The part of a public server page address after /s/.', 'skyblock'],
         'subuser' => ['integer', 'The subuser ID.', 1],
         'task' => ['integer', 'The task ID.', 1],
         'payment' => ['integer', 'The ID of the Tebex payment.', 1],

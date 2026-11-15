@@ -130,6 +130,13 @@ return [
             'update' => 'Updated the ":action" task for the :name schedule',
             'delete' => 'Deleted a task for the :name schedule',
         ],
+        'page' => [
+            'update' => 'Updated the public page /s/:slug',
+            'publish' => 'Published the public page /s/:slug',
+            'unpublish' => 'Unpublished the public page /s/:slug',
+            'banner' => 'Uploaded a new banner for the public page /s/:slug',
+            'banner-delete' => 'Removed the banner of the public page /s/:slug',
+        ],
         'settings' => [
             'rename' => 'Renamed the server from :old to :new',
             'description' => 'Changed the server description from :old to :new',

@@ -138,6 +138,14 @@ class Permission extends Model
                 'use' => "Allows a user to chat with the AI assistant on this server. The assistant can only do what the user's other permissions allow, and asks before sensitive actions.",
             ],
         ],
+
+        // Phase 6: the shareable public page at /s/{slug}.
+        'share' => [
+            'description' => "Permissions that control a user's access to the server's public page.",
+            'keys' => [
+                'manage' => 'Allows a user to publish, edit and unpublish the public page of this server, with its address, description and banner.',
+            ],
+        ],
     ];
 
     /**

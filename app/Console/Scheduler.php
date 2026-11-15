@@ -19,6 +19,7 @@ use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Models\Share\ServerPageVote;
 use Pterodactyl\Models\Status\StatusCheck;
 use Pterodactyl\Models\Status\StatusDay;
 use Ramsey\Uuid\Uuid;
@@ -59,6 +60,9 @@ final class Scheduler
         // a minute, and the checks and their daily sums dropped after 90 days.
         $schedule->command(CheckStatusCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
         $schedule->command(PruneCommand::class, ['--model' => [StatusCheck::class, StatusDay::class]])->daily()->withoutOverlapping()->onOneServer();
+
+        // Public server page votes only matter while they block the next one (24 hours).
+        $schedule->command(PruneCommand::class, ['--model' => [ServerPageVote::class]])->daily()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

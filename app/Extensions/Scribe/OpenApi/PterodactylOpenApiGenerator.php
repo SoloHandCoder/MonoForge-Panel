@@ -1196,7 +1196,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
     private function errorResponseSchema(string $status): ?string
     {
         return match ($status) {
-            '400', '401', '402', '403', '404', '409', '413', '429', '500', '502', '503', '504' => 'ErrorEnvelope',
+            '400', '401', '402', '403', '404', '409', '413', '415', '429', '500', '502', '503', '504' => 'ErrorEnvelope',
             '422' => 'ValidationErrorEnvelope',
             default => null,
         };

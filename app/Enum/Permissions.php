@@ -156,4 +156,7 @@ enum Permissions: string
 
     // Phase 4: using the server AI assistant. Owners and root admins always have it.
     case AssistantUse = 'assistant.use';
+
+    // Phase 6: managing the shareable public page at /s/{slug}. Owners and root admins always have it.
+    case ShareManage = 'share.manage';
 }
