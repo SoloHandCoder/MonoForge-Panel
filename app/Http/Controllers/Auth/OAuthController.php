@@ -127,7 +127,9 @@ class OAuthController extends Controller
     {
         $limit = AppServiceProvider::registrationIpLimit($request);
 
-        return ['key' => md5('registration'.'ip:'.$request->ip()), 'max' => $limit->maxAttempts, 'decay' => $limit->decaySeconds];
+        // Same key Laravel's ThrottleRequests builds for the named "registration" limiter, so the
+        // sign-up form and provider sign-ups share one budget (covered by OAuthControllerTest).
+        return ['key' => hash('md5', 'registration'.'ip:'.$request->ip()), 'max' => $limit->maxAttempts, 'decay' => $limit->decaySeconds];
     }
 
     private function enabledProvider(string $provider): OAuthProvider

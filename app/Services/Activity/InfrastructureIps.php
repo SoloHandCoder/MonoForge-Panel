@@ -159,7 +159,7 @@ class InfrastructureIps
             return $this->nodeIps = [];
         }
 
-        $key = self::CACHE_PREFIX.sha1(implode("\n", $fqdns));
+        $key = self::CACHE_PREFIX.hash('sha256', implode("\n", $fqdns));
 
         try {
             $cached = $this->cache->get($key);
