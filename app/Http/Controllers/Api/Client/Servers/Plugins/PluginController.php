@@ -108,6 +108,110 @@ class PluginController extends ClientApiController
         'attributes' => ['file_name' => 'LuckPerms-Bukkit-5.4.150.jar', 'directory' => 'plugins', 'version_number' => '5.4.150'],
     ];
 
+    private const array STRING = ['type' => 'string'];
+
+    private const array NULLABLE_STRING = ['type' => 'string', 'nullable' => true];
+
+    private const array STRINGS = ['type' => 'array', 'items' => ['type' => 'string']];
+
+    private const array PROJECTS_SCHEMA = [
+        'type' => 'array',
+        'items' => [
+            'type' => 'object',
+            'required' => ['source', 'id', 'slug', 'title', 'description', 'author', 'icon_url', 'downloads', 'updated_at', 'url', 'client_only'],
+            'properties' => [
+                'source' => ['type' => 'string', 'enum' => ['modrinth', 'hangar', 'curseforge']],
+                'id' => self::STRING,
+                'slug' => self::STRING,
+                'title' => self::STRING,
+                'description' => self::STRING,
+                'author' => self::NULLABLE_STRING,
+                'icon_url' => self::NULLABLE_STRING,
+                'downloads' => ['type' => 'integer'],
+                'updated_at' => self::NULLABLE_STRING,
+                'url' => self::STRING,
+                'client_only' => ['type' => 'boolean', 'description' => 'Modrinth says the project does not run on servers.'],
+            ],
+        ],
+    ];
+
+    private const array VERSIONS_SCHEMA = [
+        'type' => 'array',
+        'items' => [
+            'type' => 'object',
+            'required' => ['id', 'project_id', 'name', 'version_number', 'game_versions', 'loaders', 'channel', 'published_at', 'file', 'installable'],
+            'properties' => [
+                'id' => self::STRING,
+                'project_id' => self::STRING,
+                'name' => self::STRING,
+                'version_number' => self::STRING,
+                'game_versions' => self::STRINGS,
+                'loaders' => self::STRINGS,
+                'channel' => ['type' => 'string', 'description' => 'release, beta or alpha (Hangar channels by name).'],
+                'published_at' => self::NULLABLE_STRING,
+                'file' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'required' => ['filename', 'size', 'hashes'],
+                    'properties' => [
+                        'filename' => self::STRING,
+                        'size' => ['type' => 'integer'],
+                        'hashes' => ['type' => 'object', 'description' => 'Hex digests by algorithm: sha1, sha256, sha512 or md5.', 'additionalProperties' => ['type' => 'string']],
+                    ],
+                ],
+                'installable' => ['type' => 'boolean'],
+            ],
+        ],
+    ];
+
+    private const array VERSION_REF_SCHEMA = [
+        'type' => 'object',
+        'nullable' => true,
+        'required' => ['id', 'name', 'version_number'],
+        'properties' => ['id' => self::STRING, 'name' => self::STRING, 'version_number' => self::STRING],
+    ];
+
+    private const array INSTALLED_SCHEMA = [
+        'type' => 'array',
+        'items' => [
+            'type' => 'object',
+            'required' => ['file_name', 'size', 'modified_at', 'sha1', 'project', 'version', 'update'],
+            'properties' => [
+                'file_name' => self::STRING,
+                'size' => ['type' => 'integer'],
+                'modified_at' => self::NULLABLE_STRING,
+                'sha1' => self::NULLABLE_STRING,
+                'project' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'The Modrinth project the jar belongs to, or null when Modrinth does not know it.',
+                    'required' => ['source', 'id', 'title', 'slug', 'icon_url', 'url'],
+                    'properties' => ['source' => self::STRING, 'id' => self::STRING, 'title' => self::STRING, 'slug' => self::STRING, 'icon_url' => self::NULLABLE_STRING, 'url' => self::STRING],
+                ],
+                'version' => self::VERSION_REF_SCHEMA,
+                'update' => [...self::VERSION_REF_SCHEMA, 'description' => 'A newer version for the server, or null.'],
+            ],
+        ],
+    ];
+
+    private const array PAGINATION_SCHEMA = [
+        'type' => 'object',
+        'required' => ['pagination'],
+        'properties' => [
+            'pagination' => [
+                'type' => 'object',
+                'required' => ['total', 'count', 'per_page', 'current_page', 'total_pages'],
+                'properties' => [
+                    'total' => ['type' => 'integer'],
+                    'count' => ['type' => 'integer'],
+                    'per_page' => ['type' => 'integer'],
+                    'current_page' => ['type' => 'integer'],
+                    'total_pages' => ['type' => 'integer'],
+                ],
+            ],
+        ],
+    ];
+
     private const array DAEMON_ERROR = [
         'errors' => [['code' => 'DaemonConnectionException', 'status' => '502', 'detail' => 'There was an error while communicating with the machine running this server.']],
     ];
@@ -180,9 +284,9 @@ class PluginController extends ClientApiController
     #[QueryParam('sort', 'string', 'relevance, downloads, updated or newest.', required: false, example: 'relevance')]
     #[QueryParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper')]
     #[QueryParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4')]
-    #[ResponseField('data.*.author', 'string', nullable: true)]
-    #[ResponseField('data.*.icon_url', 'string', nullable: true)]
-    #[ResponseField('data.*.updated_at', 'string', nullable: true)]
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('data', 'object[]', 'The projects found.', required: true, schema: self::PROJECTS_SCHEMA)]
+    #[ResponseField('meta', 'object', required: true, schema: self::PAGINATION_SCHEMA)]
     #[ScribeResponse([
         'object' => 'list',
         'data' => [self::PROJECT_EXAMPLE],
@@ -228,9 +332,8 @@ class PluginController extends ClientApiController
     #[QueryParam('type', 'string', "plugin, mod or modpack. Defaults to what the server's loader runs.", required: false, example: 'plugin')]
     #[QueryParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper')]
     #[QueryParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4')]
-    #[ResponseField('data.*.published_at', 'string', nullable: true)]
-    #[ResponseField('data.*.file', 'object', nullable: true)]
-    #[ResponseField('data.*.file.hashes', 'object', 'Hashes by algorithm.', schema: ['type' => 'object', 'additionalProperties' => ['type' => 'string']])]
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('data', 'object[]', 'The versions, newest first.', required: true, schema: self::VERSIONS_SCHEMA)]
     #[ScribeResponse(['object' => 'list', 'data' => [self::VERSION_EXAMPLE]], description: 'Versions returned.')]
     #[ScribeResponse(self::CATALOG_ERROR, status: 502, description: 'The catalog did not answer.')]
     public function versions(ListPluginVersionsRequest $request, Server $server): array
@@ -299,13 +402,9 @@ class PluginController extends ClientApiController
     #[Endpoint('List installed plugins', "Lists the jars in the server's plugins/ or mods/ folder. Each is matched to its Modrinth project by sha1, with the newest version for the server's platform when there is a newer one.")]
     #[QueryParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper')]
     #[QueryParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4')]
-    #[ResponseField('data.*.modified_at', 'string', nullable: true)]
-    #[ResponseField('data.*.sha1', 'string', nullable: true)]
-    #[ResponseField('data.*.project', 'object', nullable: true)]
-    #[ResponseField('data.*.project.icon_url', 'string', nullable: true)]
-    #[ResponseField('data.*.version', 'object', nullable: true)]
-    #[ResponseField('data.*.update', 'object', nullable: true)]
-    #[ResponseField('meta.directory', 'string', nullable: true)]
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('data', 'object[]', 'The jars, by name.', required: true, schema: self::INSTALLED_SCHEMA)]
+    #[ResponseField('meta', 'object', required: true, schema: ['type' => 'object', 'required' => ['directory'], 'properties' => ['directory' => ['type' => 'string', 'nullable' => true, 'description' => 'plugins or mods, or null while the loader is unknown.']]])]
     #[ScribeResponse(['object' => 'list', 'data' => [self::INSTALLED_EXAMPLE], 'meta' => ['directory' => 'plugins']], description: 'Installed plugins returned.')]
     #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not list the folder.')]
     public function installed(ReadPluginsRequest $request, InstalledPlugins $installed, Server $server): array

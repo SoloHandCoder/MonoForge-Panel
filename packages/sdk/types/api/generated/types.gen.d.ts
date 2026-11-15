@@ -6890,78 +6890,105 @@ export type ClientDenyAnAssistantActionResponseBody = {
     };
 };
 export type ClientSearchPluginsResponseBody = {
-    object?: string;
-    data?: Array<{
-        source?: string;
-        id?: string;
-        slug?: string;
-        title?: string;
-        description?: string;
-        author?: string;
-        icon_url?: string;
-        downloads?: number;
-        updated_at?: string;
-        url?: string;
-        client_only?: boolean;
+    object: string;
+    /**
+     * The projects found.
+     */
+    data: Array<{
+        source: 'modrinth' | 'hangar' | 'curseforge';
+        id: string;
+        slug: string;
+        title: string;
+        description: string;
+        author: string | null;
+        icon_url: string | null;
+        downloads: number;
+        updated_at: string | null;
+        url: string;
+        /**
+         * Modrinth says the project does not run on servers.
+         */
+        client_only: boolean;
     }>;
-    meta?: {
-        pagination?: {
-            total?: number;
-            count?: number;
-            per_page?: number;
-            current_page?: number;
-            total_pages?: number;
+    meta: {
+        pagination: {
+            total: number;
+            count: number;
+            per_page: number;
+            current_page: number;
+            total_pages: number;
         };
     };
 };
 export type ClientListPluginVersionsResponseBody = {
-    object?: string;
-    data?: Array<{
-        id?: string;
-        project_id?: string;
-        name?: string;
-        version_number?: string;
-        game_versions?: Array<string>;
-        loaders?: Array<string>;
-        channel?: string;
-        published_at?: string;
-        file?: {
-            filename?: string;
-            size?: number;
-            hashes?: {
-                sha1?: string;
+    object: string;
+    /**
+     * The versions, newest first.
+     */
+    data: Array<{
+        id: string;
+        project_id: string;
+        name: string;
+        version_number: string;
+        game_versions: Array<string>;
+        loaders: Array<string>;
+        /**
+         * release, beta or alpha (Hangar channels by name).
+         */
+        channel: string;
+        published_at: string | null;
+        file: {
+            filename: string;
+            size: number;
+            /**
+             * Hex digests by algorithm: sha1, sha256, sha512 or md5.
+             */
+            hashes: {
+                [key: string]: string;
             };
-        };
-        installable?: boolean;
+        } | null;
+        installable: boolean;
     }>;
 };
 export type ClientListInstalledPluginsResponseBody = {
-    object?: string;
-    data?: Array<{
-        file_name?: string;
-        size?: number;
-        modified_at?: string;
-        sha1?: string;
-        project?: {
-            source?: string;
-            id?: string;
-            title?: string;
-            slug?: string;
-            icon_url?: string;
-            url?: string;
-        };
-        version?: {
-            id?: string;
-            name?: string;
-            version_number?: string;
-        };
-        update?: {
-            id?: string;
-            name?: string;
-            version_number?: string;
-        };
+    object: string;
+    /**
+     * The jars, by name.
+     */
+    data: Array<{
+        file_name: string;
+        size: number;
+        modified_at: string | null;
+        sha1: string | null;
+        /**
+         * The Modrinth project the jar belongs to, or null when Modrinth does not know it.
+         */
+        project: {
+            source: string;
+            id: string;
+            title: string;
+            slug: string;
+            icon_url: string | null;
+            url: string;
+        } | null;
+        version: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
+        /**
+         * A newer version for the server, or null.
+         */
+        update: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
     }>;
-    meta?: {
+    meta: {
+        /**
+         * plugins or mods, or null while the loader is unknown.
+         */
         directory: string | null;
     };
 };
