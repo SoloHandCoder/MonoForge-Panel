@@ -1,5 +1,4 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { Terminal } from 'ghostty-web';
 import { SocketEvent, SocketRequest } from '@/components/server/events';
 import { normalizeTransferStatus } from '@/components/server/transfer';
 import type { Websocket } from '@/plugins/Websocket';
@@ -13,10 +12,16 @@ const SEND_LOGS_RETRY_MS = 5_000;
 
 const MAX_RETAINED_TRANSFER_LINES = 1_000;
 
+/** Where the output goes: the console's output store, or anything else that takes lines. */
+export interface ConsoleSink {
+    clear(): void;
+    writeln(line: string): void;
+}
+
 const formatLine = (line: string, prelude = false) =>
     `${(prelude ? TERMINAL_PRELUDE : '') + line.replace(/(?:\r\n|\r|\n)$/im, '')}\u001b[0m`;
 
-/** Streams the server's socket output into the terminal, requesting log history on each connection. */
+/** Streams the server's socket output into `terminal`, requesting log history on each connection. */
 export const useConsoleSocketLogs = ({
     connected,
     instance,
@@ -25,7 +30,7 @@ export const useConsoleSocketLogs = ({
 }: {
     connected: boolean;
     instance: Websocket | null;
-    terminal: RefObject<Terminal | null>;
+    terminal: RefObject<ConsoleSink | null>;
     terminalReady: boolean;
 }) => {
     const transferLines = useRef<string[]>([]);

@@ -43,12 +43,17 @@ export function usePersistedState<S = undefined>(
             return;
         }
 
-        const value = JSON.stringify(persisted.value);
+        try {
+            const value = JSON.stringify(persisted.value);
 
-        if (value === undefined) {
-            localStorage.removeItem(key);
-        } else {
-            localStorage.setItem(key, value);
+            if (value === undefined) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, value);
+            }
+        } catch (e) {
+            // Storage can be full, disabled or blocked (private windows); the value still lives in state.
+            console.warn('Failed to persist value to store.', e);
         }
     }, [key, persisted]);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 
-export const CHART_WINDOW_MS = 20_000;
+export const CHART_WINDOW_MS = 60_000;
 
 const RETAIN_MS = CHART_WINDOW_MS + 2_000;
 
@@ -15,6 +15,8 @@ export interface ServerGraphs {
     readonly cpu: readonly ServerGraphPoint[];
     /** Memory in MiB. */
     readonly memory: readonly ServerGraphPoint[];
+    /** Disk usage in MiB. */
+    readonly disk: readonly ServerGraphPoint[];
     /** Bytes received and sent since the previous sample. */
     readonly network: readonly ServerNetworkPoint[];
 }

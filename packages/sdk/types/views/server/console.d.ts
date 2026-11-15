@@ -2,9 +2,11 @@
 import { type ComponentType } from 'react';
 import type { Server } from "../../api/server/types.js";
 import { type ServerGraphPoint, type ServerNetworkPoint } from "../../components/server/console/chart.js";
+import type { ServerPlayers } from "../../components/server/console/consoleGame.js";
+import type { ConsoleLine, ConsoleLineLevel, ConsoleOutput, ConsoleSegment } from "../../components/server/console/consoleOutput.js";
 import { type ServerRunState, type ServerStatMetric } from "./state.js";
 import { type ServerFeatureView } from "./features.js";
-export type { ServerGraphPoint, ServerNetworkPoint, ServerRunState, ServerStatMetric };
+export type { ConsoleLine, ConsoleLineLevel, ConsoleOutput, ConsoleSegment, ServerGraphPoint, ServerNetworkPoint, ServerPlayers, ServerRunState, ServerStatMetric, };
 export interface ServerConsoleModel {
     readonly name: string;
     readonly description: string | null;
@@ -26,6 +28,11 @@ export interface ServerConsoleCommand {
     readonly value: string;
     /** Sent commands, newest first. */
     readonly history: readonly string[];
+    /**
+     * Common commands of the server's game that complete the value, a word at a time ("g" offers
+     * "gamemode" and "give"); empty for an empty value or a game the panel does not know.
+     */
+    readonly suggestions: readonly string[];
     readonly setValue: (value: string) => void;
     /** Puts the previous command of the history into the value. */
     readonly previous: () => void;
@@ -37,6 +44,14 @@ export interface ServerConsoleCommand {
 export interface ServerTerminalModel {
     /** The terminal canvas, drawn with the `--terminal-*` tokens; give it a sized box. */
     readonly Terminal: ComponentType<TerminalCanvasProps>;
+    /**
+     * The output as parsed lines, for a theme that draws the console itself instead of the canvas.
+     * Read it with `useSyncExternalStore(output.subscribe, output.getSnapshot)`; every run is plain
+     * text and every link a checked https URL, so render them as text and anchors, never as HTML.
+     */
+    readonly output: ConsoleOutput;
+    /** The websocket is connected, so output streams and commands can be sent. */
+    readonly connected: boolean;
     /** The terminal or its connection is still starting. */
     readonly loading: boolean;
     /** The terminal could not be loaded; `retry` loads it again. */
@@ -75,8 +90,12 @@ export interface ServerPowerModel {
 }
 export interface ServerStatsModel {
     readonly state: ServerRunState | null;
-    /** The primary allocation as "host:port". */
+    /** The playit.gg address when the server has a live tunnel, otherwise the primary allocation as "host:port". */
     readonly address: string | null;
+    /** `address` is the playit.gg tunnel address. */
+    readonly tunnel: boolean;
+    /** Players online as the console reports them (Minecraft and Terraria); null when unknown or not running. */
+    readonly players: ServerPlayers | null;
     /** Milliseconds since the server started; 0 while it is not running. */
     readonly uptime: number;
     /** Percent of one core. */
@@ -104,6 +123,11 @@ export interface ServerGraphsModel {
     };
     /** Memory in MiB; `limit` is 0 when unlimited. */
     readonly memory: {
+        readonly points: readonly ServerGraphPoint[];
+        readonly limit: number;
+    };
+    /** Disk usage in MiB; `limit` is 0 when unlimited. */
+    readonly disk: {
         readonly points: readonly ServerGraphPoint[];
         readonly limit: number;
     };
