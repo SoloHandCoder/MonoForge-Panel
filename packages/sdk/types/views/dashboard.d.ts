@@ -44,6 +44,11 @@ export interface ServerCardModel {
     };
     /** A power signal is on its way. */
     readonly sending: boolean;
+    /**
+     * For a shop server the user pays for: why it is suspended and when it is deleted, such as
+     * "Suspended — deletes in 6d 23h. Top up and renew". Null or absent while it is paid.
+     */
+    readonly billingNotice?: string | null;
 }
 /** Whose servers the dashboard lists; only root admins can list other users' servers. */
 export type DashboardScope = 'mine' | 'others';

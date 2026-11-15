@@ -21,6 +21,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Notifications\Notifiable;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Exceptions\Http\Server\ServerStateConflictException;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
 use UnexpectedValueException;
 
@@ -165,6 +166,16 @@ class Server extends Model implements Identifiable
     public function subusers(): HasMany
     {
         return $this->hasMany(Subuser::class, 'server_id', 'id');
+    }
+
+    /**
+     * The shop subscription that bills this server, if it was bought in the shop.
+     *
+     * @return HasOne<ServerSubscription, $this>
+     */
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(ServerSubscription::class);
     }
 
     /**

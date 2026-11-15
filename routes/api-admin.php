@@ -49,6 +49,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerBackupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerMountController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\StartupController;
+use Pterodactyl\Http\Controllers\Api\Admin\Servers\SubscriptionController as ServerSubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\SuspensionController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ToggleBackupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ToggleInstallController;
@@ -230,6 +231,11 @@ Route::prefix('/servers')->name('api.admin.servers')->group(function (): void {
     Route::get('/{server:admin_identifier}/transfer/progress', TransferProgressController::class)->name('.transfer-progress');
     Route::post('/{server:admin_identifier}/transfer', TransferController::class)->name('.transfer');
     Route::post('/{server:admin_identifier}/settings/toggle-install', ToggleInstallController::class)->name('.toggle-install');
+
+    // Shop billing (phase 3 Task T).
+    Route::get('/{server:admin_identifier}/subscription', [ServerSubscriptionController::class, 'show'])->name('.subscription');
+    Route::post('/{server:admin_identifier}/subscription/extend', [ServerSubscriptionController::class, 'extend'])->name('.subscription.extend');
+    Route::post('/{server:admin_identifier}/subscription/cancel', [ServerSubscriptionController::class, 'cancel'])->name('.subscription.cancel');
 
     Route::delete('/{server:admin_identifier}', [ServerController::class, 'destroy'])->name('.delete');
     Route::delete('/{server:admin_identifier}/force', [ServerController::class, 'forceDestroy'])->name('.delete.force');

@@ -48,6 +48,10 @@ return [
     ],
     'server' => [
         'reinstall' => 'Reinstalled server',
+        'subscription' => [
+            'renew' => 'Renewed the server subscription for :price_tokens tokens',
+            'auto-renew' => 'Turned automatic renewal :auto_renew',
+        ],
         'console' => [
             'command' => 'Executed ":command" on the server',
         ],
@@ -216,6 +220,8 @@ return [
             'rebuild' => 'Triggered a rebuild of :name',
             'suspend' => 'Suspended :name',
             'unsuspend' => 'Unsuspended :name',
+            'subscription-extend' => 'Extended the subscription of :name by :days days',
+            'subscription-cancel' => 'Cancelled the subscription of :name',
             'toggle-install' => 'Toggled the install status of :name',
             'transfer' => 'Started transferring :name to node :node_id',
             'mount' => 'Added the :name mount to a server',
