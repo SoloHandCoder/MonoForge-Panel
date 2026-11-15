@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useField, useForm, useStore } from '@tanstack/react-form';
 import { useLocation, useSearch } from '@tanstack/react-router';
+import { toast } from 'sonner';
+import { OAUTH_PROVIDER_LABELS, takeOAuthResult, useStartOAuthLogin, type OAuthProviderId } from '@/api/account/oauth';
 import { useLogin, useLoginCheckpoint } from '@/api/auth/queries';
+import { useSiteSettings } from '@/api/settings/queries';
 import { isString } from '@/lib/objects';
 import { parseRedirectSearch } from '@/router/redirect';
 import { useRouteSlotData } from '@/router/routeSlots';
@@ -9,11 +12,46 @@ import { useOpenLoginCheckpoint } from '@/sdk/navigation';
 import { boundField, fixtureField } from '../forms';
 import { implementViews } from '../registry';
 import { useCaptcha } from './captcha';
-import type { CheckpointFormModel, LoginFormModel } from './types';
+import type { CheckpointFormModel, LoginFormModel, SocialLoginProvider } from './types';
 
 const required = (message: string) => ({
     onChange: ({ value }: { value: string }) => (value.length >= 1 ? undefined : message),
 });
+
+const PROVIDER_ORDER: readonly OAuthProviderId[] = ['discord', 'google'];
+
+/**
+ * The Discord/Google buttons, and the outcome of a provider callback that sent the browser back here: an
+ * error is toasted, and an account with two-factor authentication continues to the checkpoint.
+ */
+function useSocialLogin(captcha: () => Promise<string | null>): readonly SocialLoginProvider[] {
+    const enabled = useSiteSettings().oauth?.providers;
+    const openCheckpoint = useOpenLoginCheckpoint();
+    const start = useStartOAuthLogin();
+
+    useEffect(() => {
+        const result = takeOAuthResult();
+
+        if (result?.status === 'checkpoint' && result.token) {
+            void openCheckpoint(result.token);
+        } else if (result?.status === 'error' && result.message) {
+            toast.error(result.message);
+        }
+    }, [openCheckpoint]);
+
+    return PROVIDER_ORDER.filter((id) => enabled?.[id] === true).map((id) => ({
+        id,
+        label: OAUTH_PROVIDER_LABELS[id],
+        pending: start.isPending && start.variables.provider === id,
+        start: () => {
+            void captcha().then((value) => {
+                if (value !== null) {
+                    start.mutate({ provider: id, captcha: value });
+                }
+            });
+        },
+    }));
+}
 
 function useLoginFormModel(): LoginFormModel {
     const { redirect } = parseRedirectSearch(useSearch({ strict: false }));
@@ -21,6 +59,7 @@ function useLoginFormModel(): LoginFormModel {
     const route = useRouteSlotData();
     const login = useLogin();
     const { Captcha, token } = useCaptcha();
+    const providers = useSocialLogin(token);
     const form = useForm({
         defaultValues: { username: '', password: '' },
         onSubmit: async ({ value }) => {
@@ -71,6 +110,7 @@ function useLoginFormModel(): LoginFormModel {
         Captcha,
         forgotPassword: { to: '/auth/password' },
         route,
+        providers,
     };
 }
 
@@ -146,6 +186,7 @@ function loginFixture(
         Captcha: null,
         forgotPassword: { to: '/auth/password' },
         route,
+        providers: [],
         ...overrides,
     };
 }
@@ -178,6 +219,13 @@ implementViews({
                 };
             },
             submitting: () => loginFixture({ username: 'alex', password: 'correct horse' }, { submitting: true }),
+            socialLogin: () =>
+                loginFixture(undefined, {
+                    providers: [
+                        { id: 'discord', label: 'Discord', start: noop, pending: false },
+                        { id: 'google', label: 'Google', start: noop, pending: false },
+                    ],
+                }),
         },
     },
     'page.auth.checkpoint': {

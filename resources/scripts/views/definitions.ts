@@ -12,6 +12,7 @@ const login = { load: () => import('./auth/login') };
 const password = { load: () => import('./auth/password') };
 const overview = { load: () => import('./account/overview') };
 const keys = { load: () => import('./account/keys') };
+const connections = { load: () => import('./account/connections') };
 const activity = { load: () => import('./activity') };
 const backups = { load: () => import('./server/backups') };
 const conflict = { load: () => import('./server/conflict') };
@@ -91,6 +92,7 @@ defineView('page.account.overview', {
 defineView('account.password', { context: 'account', ...overview });
 defineView('account.email', { context: 'account', ...overview });
 defineView('account.twoFactor', { context: 'account', ...overview });
+defineView('account.connections', { context: 'account', ...connections });
 defineView('page.account.api', { ...VIEW_PAGES['page.account.api'], ...keys });
 defineView('page.account.ssh', { ...VIEW_PAGES['page.account.ssh'], ...keys });
 defineView('account.apiKeys.list', { context: 'account', ...keys });

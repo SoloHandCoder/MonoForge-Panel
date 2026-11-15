@@ -1519,7 +1519,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | `page.account.overview` | account | `AccountOverviewModel` |  | `account.overview.before` `account.overview.after` |  | default, twoFactorRequired |
 | `page.account.ssh` | account | `PageStatusModel` |  |  | `account.ssh.before` `account.ssh.after` | default, loading, error |
 | `page.auth.checkpoint` | auth | `CheckpointFormModel` |  |  | `auth.checkpoint.before` `auth.checkpoint.after` | code, recovery |
-| `page.auth.login` | auth | `LoginFormModel` |  | `auth.login.form.after` | `auth.login.before` `auth.login.after` | default, invalid, submitting |
+| `page.auth.login` | auth | `LoginFormModel` |  | `auth.login.form.after` | `auth.login.before` `auth.login.after` | default, invalid, submitting, socialLogin |
 | `page.auth.password` | auth | `ForgotPasswordFormModel` |  |  | `auth.password.before` `auth.password.after` | default, invalid |
 | `page.auth.passwordReset` | auth | `ResetPasswordFormModel` |  |  | `auth.passwordReset.before` `auth.passwordReset.after` | default, mismatch |
 | `page.dashboard` | app | `PageStatusModel` |  |  |  | default, loading, error |
@@ -1543,6 +1543,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | --- | --- | --- | --- | --- | --- |
 | `account.apiKeys.create` | account | `ApiKeyCreateModel` |  |  | default, invalid, created |
 | `account.apiKeys.list` | account | `ApiKeyListModel` |  |  | keys, empty, loading, deleting |
+| `account.connections` | account | `AccountConnectionsModel` |  |  | default, needsPassword, loading |
 | `account.email` | account | `AccountEmailModel` |  |  | default, submitting |
 | `account.password` | account | `AccountPasswordModel` |  |  | default, invalid |
 | `account.sshKeys.create` | account | `SshKeyCreateModel` |  |  | default, submitting |
