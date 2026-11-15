@@ -3526,6 +3526,21 @@ export type AdminUpdateRegistrationSettingsRequest = {
     turnstile_secret_key?: string | null;
 };
 
+export type AdminUpdateLegalDocumentRequest = {
+    /**
+     * The markdown of the document. Blank uses the starter text.
+     */
+    content?: string | null;
+    /**
+     * An https:// page that holds the document instead. Blank hosts it on the panel.
+     */
+    external_url?: string | null;
+    /**
+     * Raise the version so users accept the document again.
+     */
+    reaccept: boolean;
+};
+
 export type AdminCreateDatabaseHostRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -4257,7 +4272,7 @@ export type AuthRegisterRequest = {
      */
     password: string;
     /**
-     * Whether the visitor agrees to the rules. Must be true.
+     * Whether the visitor agrees to the Terms of Service and Privacy Policy. Must be true.
      */
     terms: boolean;
     /**
@@ -4370,6 +4385,17 @@ export type ClientDisableTwoFactorAuthenticationRequest = {
      * The current account password.
      */
     password: string;
+};
+
+export type ClientAcceptLegalDocumentsRequest = {
+    /**
+     * The Terms of Service version the user was shown.
+     */
+    terms_version: number;
+    /**
+     * The Privacy Policy version the user was shown.
+     */
+    privacy_version: number;
 };
 
 export type ClientUpdateAccountEmailRequest = {
@@ -5665,6 +5691,30 @@ export type AdminGetRegistrationSettingsResponseBody = {
     load_environment_only?: boolean;
 };
 
+export type AdminGetLegalDocumentsResponseBody = {
+    data?: Array<{
+        document?: string;
+        title?: string;
+        content?: string;
+        is_default?: boolean;
+        external_url?: string;
+        public_url?: string;
+        version?: number;
+        updated_at?: string;
+    }>;
+};
+
+export type AdminUpdateLegalDocumentResponseBody = {
+    document?: string;
+    title?: string;
+    content?: string;
+    is_default?: boolean;
+    external_url?: string;
+    public_url?: string;
+    version?: number;
+    updated_at?: string;
+};
+
 export type AdminGetUpdateStatusResponseBody = {
     /**
      * off, notify or auto.
@@ -6002,6 +6052,12 @@ export type ClientListTokenPacksResponseBody = {
 
 export type ClientBuyTokenPackResponseBody = {
     url?: string;
+};
+
+export type ClientAcceptLegalDocumentsResponseBody = {
+    terms_accepted_version?: number;
+    privacy_accepted_version?: number;
+    terms_accepted_at?: string;
 };
 
 export type ClientListAccountActivityFilterOptionsResponseBody = {
@@ -6749,6 +6805,8 @@ export type AdminListTagsIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes'
 export type AdminGetTagIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes';
 
 export type AdminGetTagTagIdPathParameter = number;
+
+export type AdminUpdateLegalDocumentDocumentPathParameter = string;
 
 /**
  * Page number to retrieve.
@@ -14552,6 +14610,77 @@ export type AdminUpdateRegistrationSettingsResponses = {
 
 export type AdminUpdateRegistrationSettingsResponse = AdminUpdateRegistrationSettingsResponses[keyof AdminUpdateRegistrationSettingsResponses];
 
+export type AdminGetLegalDocumentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/legal';
+};
+
+export type AdminGetLegalDocumentsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetLegalDocumentsError = AdminGetLegalDocumentsErrors[keyof AdminGetLegalDocumentsErrors];
+
+export type AdminGetLegalDocumentsResponses = {
+    /**
+     * Legal documents returned.
+     */
+    200: AdminGetLegalDocumentsResponseBody;
+};
+
+export type AdminGetLegalDocumentsResponse = AdminGetLegalDocumentsResponses[keyof AdminGetLegalDocumentsResponses];
+
+export type AdminUpdateLegalDocumentData = {
+    body: AdminUpdateLegalDocumentRequest;
+    path: {
+        /**
+         * The legal document: terms, privacy or refunds.
+         */
+        document: AdminUpdateLegalDocumentDocumentPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/legal/{document}';
+};
+
+export type AdminUpdateLegalDocumentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateLegalDocumentError = AdminUpdateLegalDocumentErrors[keyof AdminUpdateLegalDocumentErrors];
+
+export type AdminUpdateLegalDocumentResponses = {
+    /**
+     * Legal document updated.
+     */
+    200: AdminUpdateLegalDocumentResponseBody;
+};
+
+export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
+
 export type AdminListDatabaseHostsData = {
     body?: never;
     path?: never;
@@ -17824,6 +17953,39 @@ export type ClientDisableTwoFactorAuthenticationResponses = {
 };
 
 export type ClientDisableTwoFactorAuthenticationResponse = ClientDisableTwoFactorAuthenticationResponses[keyof ClientDisableTwoFactorAuthenticationResponses];
+
+export type ClientAcceptLegalDocumentsData = {
+    body: ClientAcceptLegalDocumentsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/legal/accept';
+};
+
+export type ClientAcceptLegalDocumentsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientAcceptLegalDocumentsError = ClientAcceptLegalDocumentsErrors[keyof ClientAcceptLegalDocumentsErrors];
+
+export type ClientAcceptLegalDocumentsResponses = {
+    /**
+     * Acceptance recorded.
+     */
+    200: ClientAcceptLegalDocumentsResponseBody;
+};
+
+export type ClientAcceptLegalDocumentsResponse = ClientAcceptLegalDocumentsResponses[keyof ClientAcceptLegalDocumentsResponses];
 
 export type ClientUpdateAccountEmailData = {
     body: ClientUpdateAccountEmailRequest;

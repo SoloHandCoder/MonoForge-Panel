@@ -46,7 +46,7 @@ class LegalController extends AdminApiController
         ]);
     }
 
-    #[Endpoint('Update a legal document', 'Stores the markdown and external URL of a legal document. With reaccept the version goes up, so signed-in users accept the Terms of Service or Privacy Policy again.')]
+    #[Endpoint('Update legal document', 'Stores the markdown and external URL of a legal document. With reaccept the version goes up, so signed-in users accept the Terms of Service or Privacy Policy again.')]
     #[UrlParam('document', 'string', 'The legal document.', example: 'terms', enum: ['terms', 'privacy', 'refunds'])]
     #[BodyParam('content', 'string', 'The markdown of the document. Blank uses the starter text.', required: false, example: "# Terms of Service\n\nThese terms apply to everyone.", nullable: true)]
     #[BodyParam('external_url', 'string', 'An https:// page that holds the document instead. Blank hosts it on the panel.', required: false, example: '', nullable: true)]
