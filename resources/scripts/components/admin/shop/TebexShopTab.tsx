@@ -273,6 +273,7 @@ const statusTones = {
     disputed: 'warning',
     declined: 'neutral',
     unmatched: 'danger',
+    underpaid: 'danger',
 } satisfies Record<TebexPaymentStatus, UiTone>;
 
 function PaymentRow({ payment }: { payment: TebexPayment }) {

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Billing\TebexWebhookTest;
 
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
@@ -61,6 +64,8 @@ function paymentEvent(string $type, string $transactionId, int|string $packageId
                 'id' => $packageId,
                 'name' => 'Pack',
                 'quantity' => $quantity,
+                'base_price' => ['amount' => 4.99, 'currency' => 'EUR'],
+                'paid_price' => ['amount' => 4.99, 'currency' => 'EUR'],
                 'custom' => $custom,
             ]],
         ],
@@ -168,19 +173,85 @@ test('a refund takes the tokens back once, even into a negative balance, and fla
     expect(wallet()->balance($user))->toBe(-80);
 });
 
-test('a lost dispute charges the tokens back', function (): void {
+test('an opened dispute holds the tokens back and a lost one keeps them', function (): void {
     $user = User::factory()->create();
     TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
     sendWebhook(paymentEvent('payment.completed', 'tbx-7', 100, ['user_id' => $user->id]))->assertOk();
-    sendWebhook(paymentEvent('payment.dispute.opened', 'tbx-7', 100, ['user_id' => $user->id]))->assertOk();
+    wallet()->debit($user, 30, 'server_charge', 'Spent');
+    $opened = paymentEvent('payment.dispute.opened', 'tbx-7', 100, ['user_id' => $user->id]);
+    sendWebhook($opened)->assertOk();
+    sendWebhook([...$opened, 'id' => (string) Str::uuid()])->assertOk();
 
-    expect(TebexPayment::query()->where('transaction_id', 'tbx-7')->value('status'))->toBe(TebexPayment::STATUS_DISPUTED)
-        ->and(wallet()->balance($user))->toBe(100);
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-7')->sole();
+    expect($payment->status)->toBe(TebexPayment::STATUS_DISPUTED)
+        ->and($payment->tokens_reversed)->toBe(100)
+        // Into a negative balance, once however often Tebex sends it.
+        ->and(wallet()->balance($user))->toBe(-30)
+        ->and(UserNotice::query()->where('user_id', $user->id)->where('title', 'Payment disputed')->count())->toBe(1);
 
     sendWebhook(paymentEvent('payment.dispute.lost', 'tbx-7', 100, ['user_id' => $user->id], status: 3))->assertOk();
 
+    expect(wallet()->balance($user))->toBe(-30)
+        ->and(TebexPayment::query()->where('transaction_id', 'tbx-7')->value('status'))->toBe(TebexPayment::STATUS_CHARGEBACK);
+});
+
+test('a dispute won by the seller gives the held tokens back once', function (): void {
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    sendWebhook(paymentEvent('payment.completed', 'tbx-9', 100, ['user_id' => $user->id]))->assertOk();
+    sendWebhook(paymentEvent('payment.dispute.opened', 'tbx-9', 100, ['user_id' => $user->id]))->assertOk();
+
+    expect(wallet()->balance($user))->toBe(0);
+
+    $won = paymentEvent('payment.dispute.won', 'tbx-9', 100, ['user_id' => $user->id]);
+    sendWebhook($won)->assertOk();
+    sendWebhook([...$won, 'id' => (string) Str::uuid()])->assertOk();
+
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-9')->sole();
+    expect(wallet()->balance($user))->toBe(100)
+        ->and($payment->status)->toBe(TebexPayment::STATUS_COMPLETED)
+        ->and($payment->tokens_reversed)->toBe(0);
+
+    // A refund afterwards still takes the tokens back.
+    sendWebhook(paymentEvent('payment.refunded', 'tbx-9', 100, ['user_id' => $user->id], status: 2))->assertOk();
+    expect(wallet()->balance($user))->toBe(0);
+});
+
+test('a payment below the package price is not credited, is flagged and root admins are told', function (array $prices): void {
+    $user = User::factory()->create();
+    $admin = User::factory()->create(['root_admin' => true]);
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    $event = paymentEvent('payment.completed', 'tbx-low', 100, ['user_id' => $user->id]);
+    $event['subject'] = array_replace_recursive($event['subject'], $prices);
+    if (array_key_exists('drop', $prices)) {
+        unset($event['subject']['products'][0]['base_price'], $event['subject']['drop']);
+    }
+
+    sendWebhook($event)->assertOk();
+    sendWebhook([...$event, 'id' => (string) Str::uuid()])->assertOk();
+
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-low')->sole();
     expect(wallet()->balance($user))->toBe(0)
-        ->and(wallet()->hasTransaction(TebexPayment::LEDGER_REFERENCE, 'tbx-7', 'chargeback'))->toBeTrue();
+        ->and($payment->status)->toBe(TebexPayment::STATUS_UNDERPAID)
+        ->and($payment->flagged_at)->not->toBeNull()
+        ->and($payment->processed_at)->toBeNull()
+        ->and(UserNotice::query()->where('user_id', $admin->id)->where('title', 'Tebex payment needs a look')->count())->toBe(1)
+        ->and(UserNotice::query()->where('user_id', $user->id)->exists())->toBeFalse();
+})->with([
+    'a coupon' => [['price_paid' => ['amount' => 0.99], 'products' => [['paid_price' => ['amount' => 0.99]]]]],
+    'a product discount with the full total' => [['products' => [['paid_price' => ['amount' => 1.00]]]]],
+    'another currency' => [['price_paid' => ['currency' => 'USD'], 'products' => [['paid_price' => ['currency' => 'USD']]]]],
+    'no package price' => [['drop' => true]],
+]);
+
+test('token amounts beyond 32 bits are stored and credited', function (): void {
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Huge', 'tokens' => 3_000_000_000]);
+
+    sendWebhook(paymentEvent('payment.completed', 'tbx-big', 100, ['user_id' => $user->id], quantity: 2))->assertOk();
+
+    expect(wallet()->balance($user))->toBe(6_000_000_000)
+        ->and(TebexPayment::query()->where('transaction_id', 'tbx-big')->value('tokens'))->toBe(6_000_000_000);
 });
 
 test('reads the user from the basket custom data on the payment when the products carry none', function (): void {
@@ -238,4 +309,40 @@ test('the webhook throttle is per client address', function (): void {
 
     sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '18.209.80.3'])->assertTooManyRequests();
     sendValidationFrom('127.0.0.1', ['HTTP_CF_CONNECTING_IP' => '54.87.231.232'])->assertOk();
+});
+
+test('webhook bodies older than 90 days lose the buyer details, the payments stay', function (): void {
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    $old = paymentEvent('payment.completed', 'tbx-old', 100, ['user_id' => $user->id]);
+
+    $this->travelTo(now()->subDays(91));
+    sendWebhook($old)->assertOk();
+    $this->travelBack();
+    sendWebhook(paymentEvent('payment.completed', 'tbx-new', 100, ['user_id' => $user->id]))->assertOk();
+
+    $this->artisan('p:billing:prune-tebex-payloads')->assertSuccessful();
+
+    $pruned = TebexPayment::query()->where('transaction_id', 'tbx-old')->sole();
+    $kept = TebexPayment::query()->where('transaction_id', 'tbx-new')->sole();
+    expect($pruned->raw)->toBe([['id' => $old['id'], 'type' => 'payment.completed', 'date' => $old['date']]])
+        ->and(json_encode($pruned->raw))->not->toContain('buyer@example.com')
+        ->and($pruned->raw_pruned_at)->not->toBeNull()
+        ->and($pruned->status)->toBe(TebexPayment::STATUS_COMPLETED)
+        ->and($pruned->tokens)->toBe(100)
+        ->and($pruned->toApiArray()['events'])->toBe(['payment.completed'])
+        ->and(json_encode($kept->raw))->toContain('buyer@example.com');
+
+    // The same webhook again is still recognised and credits nothing.
+    sendWebhook($old)->assertOk();
+    expect(wallet()->balance($user))->toBe(200);
+});
+
+test('the payload pruning runs daily', function (): void {
+    $schedule = new Schedule;
+    $this->app->make(Scheduler::class)($schedule);
+    $events = array_values(array_filter($schedule->events(), fn (Event $event): bool => str_contains((string) $event->command, 'p:billing:prune-tebex-payloads')));
+
+    expect($events)->toHaveCount(1)
+        ->and($events[0]->expression)->toBe('0 0 * * *');
 });

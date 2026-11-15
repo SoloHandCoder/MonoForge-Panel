@@ -45,7 +45,8 @@ export type TebexPaymentStatus =
     | 'chargeback'
     | 'disputed'
     | 'declined'
-    | 'unmatched';
+    | 'unmatched'
+    | 'underpaid';
 
 export interface TebexPayment {
     id: number;

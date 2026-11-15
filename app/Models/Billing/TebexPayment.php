@@ -24,13 +24,14 @@ use Pterodactyl\Models\User;
  * @property string $amount
  * @property string $currency
  * @property list<array<array-key, mixed>> $raw
+ * @property CarbonImmutable|null $raw_pruned_at when the webhook bodies were cut down to id, type and date
  * @property CarbonImmutable|null $processed_at
  * @property CarbonImmutable|null $flagged_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property User|null $user
  */
-#[Fillable(['transaction_id', 'user_id', 'status', 'tokens', 'tokens_reversed', 'amount', 'currency', 'raw', 'processed_at', 'flagged_at'])]
+#[Fillable(['transaction_id', 'user_id', 'status', 'tokens', 'tokens_reversed', 'amount', 'currency', 'raw', 'raw_pruned_at', 'processed_at', 'flagged_at'])]
 #[RouteKey('id')]
 class TebexPayment extends Model
 {
@@ -50,8 +51,14 @@ class TebexPayment extends Model
     /** Paid, but no panel user or token pack matched it, so nothing was credited. */
     public const string STATUS_UNMATCHED = 'unmatched';
 
+    /** Paid less than the package price (a coupon, a sale, another currency), so nothing was credited. */
+    public const string STATUS_UNDERPAID = 'underpaid';
+
     /** The reference type of this payment's entries in the token ledger. */
     public const string LEDGER_REFERENCE = 'tebex_payment';
+
+    /** Full webhook bodies (buyer name, email, address, IP) are kept this long after the last one. */
+    public const int PAYLOAD_RETENTION_DAYS = 90;
 
     /**
      * @return array<string, string>
@@ -64,6 +71,7 @@ class TebexPayment extends Model
             'tokens_reversed' => 'integer',
             'amount' => 'decimal:2',
             'raw' => 'array',
+            'raw_pruned_at' => 'immutable_datetime',
             'processed_at' => 'immutable_datetime',
             'flagged_at' => 'immutable_datetime',
         ];
@@ -75,6 +83,24 @@ class TebexPayment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Cuts every stored webhook down to its id, type and date: the duplicate check and the
+     * admin's event list keep working, the buyer's personal details are gone. The payment's
+     * `updated_at` is left alone.
+     */
+    public function pruneRaw(): void
+    {
+        $this->raw = array_map(fn (array $event): array => array_intersect_key($event, array_flip(['id', 'type', 'date'])), $this->raw);
+        $this->raw_pruned_at = CarbonImmutable::now();
+        $this->timestamps = false;
+
+        try {
+            $this->save();
+        } finally {
+            $this->timestamps = true;
+        }
     }
 
     /** Whether a webhook with this ID was already recorded for the transaction. */

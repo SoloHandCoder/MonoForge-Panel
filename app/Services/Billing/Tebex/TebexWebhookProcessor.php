@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
+use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Notices\NoticeService;
@@ -19,11 +20,22 @@ use Pterodactyl\Services\Notices\NoticeService;
  *
  * Tokens come from the token pack whose Tebex package ID matches the paid product, never from
  * anything the player sent. The panel user comes from the `custom` data the panel put on the basket.
+ * A payment that paid less than the package's price (a coupon, a sale, a different currency) is
+ * not credited: it is flagged as underpaid and root administrators get a notice.
+ *
+ * A dispute takes the tokens back as soon as it is opened (into a negative balance if need be),
+ * and a dispute won by the seller gives them back, once each.
  */
 readonly class TebexWebhookProcessor
 {
+    /** Where administrators review Tebex payments. */
+    public const string ADMIN_PAYMENTS_PATH = '/panel/shop/token-packs';
+
     /** Tebex payment status IDs, per the webhook documentation. */
     private const int STATUS_COMPLETE = 1;
+
+    /** Money is compared to the cent. */
+    private const float CENT = 0.005;
 
     public function __construct(private TokenWallet $wallet, private NoticeService $notices) {}
 
@@ -56,6 +68,8 @@ readonly class TebexWebhookProcessor
             }
 
             $payment->raw = [...$payment->raw, $event];
+            // A new full body is kept until it is old enough to prune again.
+            $payment->raw_pruned_at = null;
             $this->recordPrice($payment, $subject);
 
             match ($type) {
@@ -82,8 +96,8 @@ readonly class TebexWebhookProcessor
             return;
         }
 
-        // Already credited, or refunded before the completion arrived.
-        if ($payment->processed_at !== null || in_array($payment->status, [TebexPayment::STATUS_REFUNDED, TebexPayment::STATUS_CHARGEBACK], true)) {
+        // Already credited, refunded before the completion arrived, or already flagged as underpaid.
+        if ($payment->processed_at !== null || in_array($payment->status, [TebexPayment::STATUS_REFUNDED, TebexPayment::STATUS_CHARGEBACK, TebexPayment::STATUS_UNDERPAID], true)) {
             return;
         }
 
@@ -95,6 +109,19 @@ readonly class TebexWebhookProcessor
             $payment->status = TebexPayment::STATUS_UNMATCHED;
             $payment->flagged_at ??= now()->toImmutable();
             Log::warning('A Tebex payment matched no panel user or token pack; nothing was credited.', ['payment' => $payment->id]);
+
+            return;
+        }
+
+        $underpaid = $this->underpaid($subject);
+        if ($underpaid !== null) {
+            $payment->status = TebexPayment::STATUS_UNDERPAID;
+            $payment->flagged_at ??= now()->toImmutable();
+            Log::warning('A Tebex payment paid less than its package price; nothing was credited.', ['payment' => $payment->id, 'reason' => $underpaid]);
+            $this->notifyAdmins(
+                'Tebex payment needs a look',
+                sprintf("Tebex payment %s was not credited: %s. Check it and adjust the player's tokens by hand if it is fine.", $payment->transaction_id, $underpaid),
+            );
 
             return;
         }
@@ -167,18 +194,145 @@ readonly class TebexWebhookProcessor
     private function disputeOpened(TebexPayment $payment, array $subject): void
     {
         $payment->user_id ??= $this->user($subject)?->id;
-        if ($payment->status !== TebexPayment::STATUS_REFUNDED && $payment->status !== TebexPayment::STATUS_CHARGEBACK) {
-            $payment->status = TebexPayment::STATUS_DISPUTED;
+        $payment->flagged_at ??= now()->toImmutable();
+        if ($payment->status === TebexPayment::STATUS_REFUNDED || $payment->status === TebexPayment::STATUS_CHARGEBACK) {
+            return;
         }
 
-        $payment->flagged_at ??= now()->toImmutable();
+        $payment->status = TebexPayment::STATUS_DISPUTED;
+
+        // The tokens are held back while the dispute is open, like a refund.
+        $owed = $payment->tokens - $payment->tokens_reversed;
+        $user = $payment->user_id === null ? null : User::query()->find($payment->user_id);
+        $reference = $this->disputeReference($payment);
+        if ($owed < 1 || ! $user instanceof User || $this->wallet->hasTransaction(TebexPayment::LEDGER_REFERENCE, $reference, TokenTransaction::TYPE_CHARGEBACK)) {
+            return;
+        }
+
+        $this->wallet->debit($user, $owed, TokenTransaction::TYPE_CHARGEBACK, 'Tebex payment disputed: tokens held until the dispute is settled', TebexPayment::LEDGER_REFERENCE, $reference, [], true);
+        $payment->tokens_reversed += $owed;
+
+        $this->notices->notify(
+            $user,
+            'danger',
+            'Payment disputed',
+            number_format($owed).' tokens were held back from your wallet because a Tebex payment is disputed. They come back if the dispute is settled in our favour.',
+            null,
+            'Open wallet',
+            TebexSettings::WALLET_PATH,
+        );
     }
 
     private function disputeWon(TebexPayment $payment): void
     {
-        if ($payment->status === TebexPayment::STATUS_DISPUTED) {
-            $payment->status = $payment->processed_at === null ? TebexPayment::STATUS_PENDING : TebexPayment::STATUS_COMPLETED;
+        if ($payment->status !== TebexPayment::STATUS_DISPUTED) {
+            return;
         }
+
+        $payment->status = $payment->processed_at === null ? TebexPayment::STATUS_PENDING : TebexPayment::STATUS_COMPLETED;
+
+        // Give back what the opened dispute held, once.
+        $reference = $this->disputeReference($payment);
+        $held = TokenTransaction::query()
+            ->where('reference_type', TebexPayment::LEDGER_REFERENCE)
+            ->where('reference_id', $reference)
+            ->where('type', TokenTransaction::TYPE_CHARGEBACK)
+            ->value('amount');
+        $tokens = is_numeric($held) ? -(int) $held : 0;
+        $user = $payment->user_id === null ? null : User::query()->find($payment->user_id);
+        if ($tokens < 1 || ! $user instanceof User || $this->wallet->hasTransaction(TebexPayment::LEDGER_REFERENCE, $reference, TokenTransaction::TYPE_CORRECTION)) {
+            return;
+        }
+
+        $this->wallet->credit($user, $tokens, TokenTransaction::TYPE_CORRECTION, 'Tebex dispute settled in our favour: held tokens returned', TebexPayment::LEDGER_REFERENCE, $reference);
+        $payment->tokens_reversed = max(0, $payment->tokens_reversed - $tokens);
+
+        $this->notices->notify(
+            $user,
+            'success',
+            'Dispute settled',
+            number_format($tokens).' held tokens were returned to your wallet.',
+            null,
+            'Open wallet',
+            TebexSettings::WALLET_PATH,
+        );
+    }
+
+    /** The ledger reference of a dispute's hold and its return, kept apart from a refund or chargeback. */
+    private function disputeReference(TebexPayment $payment): string
+    {
+        return $payment->transaction_id.'#dispute';
+    }
+
+    /**
+     * Why the payment does not cover its packages' price, or null when it does. Each product's
+     * paid price must be at least its base price (the package price on Tebex) in the payment's
+     * currency, and the payment's total must cover the products.
+     *
+     * @param  array<array-key, mixed>  $subject
+     */
+    private function underpaid(array $subject): ?string
+    {
+        $paid = $this->money($subject['price_paid'] ?? null);
+        if ($paid === null) {
+            return 'Tebex did not report the amount paid';
+        }
+
+        $expected = 0.0;
+        foreach (is_array($subject['products'] ?? null) ? $subject['products'] : [] as $product) {
+            if (! is_array($product)) {
+                continue;
+            }
+
+            $base = $this->money($product['base_price'] ?? null);
+            $productPaid = $this->money($product['paid_price'] ?? null);
+            if ($base === null || $productPaid === null) {
+                return 'Tebex did not report the package price';
+            }
+
+            if ($productPaid[1] !== $base[1] || $paid[1] !== $base[1]) {
+                return sprintf('it was paid in %s, but the package is priced in %s', $paid[1] !== $base[1] ? $paid[1] : $productPaid[1], $base[1]);
+            }
+
+            if ($base[0] > $productPaid[0] + self::CENT) {
+                return sprintf('%s %s was paid for a package priced %s %s', number_format($productPaid[0], 2), $productPaid[1], number_format($base[0], 2), $base[1]);
+            }
+
+            $expected += $productPaid[0];
+        }
+
+        if ($expected > $paid[0] + self::CENT) {
+            return sprintf('%s %s was paid in total for packages priced %s %s', number_format($paid[0], 2), $paid[1], number_format($expected, 2), $paid[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * An `{amount, currency}` object of the webhook.
+     *
+     * @return array{float, string}|null
+     */
+    private function money(mixed $price): ?array
+    {
+        if (! is_array($price)) {
+            return null;
+        }
+
+        $amount = $price['amount'] ?? null;
+        $currency = $price['currency'] ?? null;
+        if (! (is_int($amount) || is_float($amount) || (is_string($amount) && is_numeric($amount))) || ! is_string($currency) || $currency === '') {
+            return null;
+        }
+
+        return [(float) $amount, mb_strtoupper($currency)];
+    }
+
+    private function notifyAdmins(string $title, string $body): void
+    {
+        User::query()->where('root_admin', true)->each(function (User $admin) use ($title, $body): void {
+            $this->notices->notify($admin, 'warning', $title, $body, null, 'Open Tebex payments', self::ADMIN_PAYMENTS_PATH);
+        });
     }
 
     /**
