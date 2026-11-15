@@ -80,6 +80,7 @@ import { siteSettingsQueryOptions } from '@/api/settings/queries';
 import { storeCatalogQueryOptions } from '@/api/store/queries';
 import { getBootstrapExtensions, hasBootstrapSession } from '@/bootstrap';
 import { registerClassPrefixes } from '@/lib/cn';
+import AuthenticatedLayout from '@/router/layouts/AuthenticatedLayout';
 import RootLayout from '@/router/layouts/RootLayout';
 import RootNotFound from '@/router/RootNotFound';
 import { RouteAccessDenied } from '@/router/RouteError';
@@ -192,16 +193,21 @@ const authenticatedRoute = createRoute({
     getParentRoute: () => rootRoute,
     id: 'authenticated',
     beforeLoad: ({ location }) => {
-        if (!hasBootstrapSession()) {
+        // A visitor without a session sees the public homepage at "/" (AuthenticatedLayout).
+        if (!hasBootstrapSession() && location.pathname !== '/') {
             throw redirect({ to: '/auth/login', search: parseRedirectSearch({ redirect: location.href }) });
         }
     },
     loader: async ({ context }) => {
+        if (!hasBootstrapSession()) {
+            return;
+        }
+
         await context.queryClient.ensureQueryData({ ...currentUserQueryOptions(), revalidateIfStale: true });
     },
     // Layouts behind the session are lazy so the login screen does not ship the navigation
     // bar, admin sidebar, or server console in the entry chunk.
-    component: layoutRoute('layout.app'),
+    component: AuthenticatedLayout,
 });
 
 const dashboardRoute = createRoute({
@@ -210,6 +216,11 @@ const dashboardRoute = createRoute({
     validateSearch: parseDashboardSearch,
     loaderDeps: ({ search }) => ({ page: search.page ?? 1, type: search.type }),
     loader: async ({ context, deps }) => {
+        // The public homepage stands in for the dashboard without a session.
+        if (!hasBootstrapSession()) {
+            return;
+        }
+
         const user = await context.queryClient.ensureQueryData({
             ...currentUserQueryOptions(),
             revalidateIfStale: true,

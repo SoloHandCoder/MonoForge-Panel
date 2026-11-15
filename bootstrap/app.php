@@ -25,6 +25,7 @@ use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Http\Controllers\Base\PublicNoticeController;
 use Pterodactyl\Http\Controllers\Base\PublicStatusController;
+use Pterodactyl\Http\Controllers\Base\PublicStorePlansController;
 use Pterodactyl\Http\Controllers\Webhooks\TebexWebhookController;
 use Pterodactyl\Http\Middleware\Activity\TrackAPIKey;
 use Pterodactyl\Http\Middleware\Api\Admin\AuthenticateAdmin;
@@ -81,6 +82,11 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
         Route::middleware('throttle:60,1')
             ->get('/api/public/status', PublicStatusController::class)
             ->name('api.public.status');
+
+        // The public homepage's plans: no session or cookies, cached for a minute.
+        Route::middleware('throttle:60,1')
+            ->get('/api/public/store/plans', PublicStorePlansController::class)
+            ->name('api.public.store.plans');
 
         // Tebex payment webhooks: no session, no CSRF, checked by source address and signature instead.
         // The address is $request->ip(): CF-Connecting-IP when the peer is the local tunnel (see

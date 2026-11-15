@@ -1,2 +1,8 @@
 User-agent: *
+# Only the public homepage (and what it needs to render) may be crawled; the panel stays out of search.
+Allow: /$
+Allow: /assets/
+Allow: /favicons/
+Allow: /locales/
+Allow: /api/public/
 Disallow: /

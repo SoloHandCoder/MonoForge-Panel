@@ -2,14 +2,30 @@
 {{-- The theme's scheme class, id and setting attributes (ThemeDocument::htmlAttributes); values are escaped here. --}}
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @foreach ($theme->htmlAttributes() as $attribute => $value){{ $attribute }}="{{ $value }}" @endforeach>
     <head>
-        <title>{{ config('app.name', 'Pterodactyl') }}</title>
+        <title>{{ isset($seo) ? $seo['title'] : config('app.name', 'Pterodactyl') }}</title>
 
         @section('meta')
             <meta charset="utf-8">
             <meta http-equiv="X-UA-Compatible" content="IE=edge">
             <meta content="width=device-width, initial-scale=1" name="viewport">
             <meta name="csrf-token" content="{{ csrf_token() }}">
-            <meta name="robots" content="noindex">
+            {{-- Only the public homepage may be indexed; every panel page stays out of search results. --}}
+            @isset($seo)
+                <meta name="robots" content="index, follow">
+                <meta name="description" content="{{ $seo['description'] }}">
+                <link rel="canonical" href="{{ $seo['url'] }}">
+                <meta property="og:type" content="website">
+                <meta property="og:site_name" content="MonoForge">
+                <meta property="og:title" content="{{ $seo['title'] }}">
+                <meta property="og:description" content="{{ $seo['description'] }}">
+                <meta property="og:url" content="{{ $seo['url'] }}">
+                <meta property="og:image" content="{{ $seo['image'] }}">
+                <meta name="twitter:card" content="summary">
+                <meta name="twitter:title" content="{{ $seo['title'] }}">
+                <meta name="twitter:description" content="{{ $seo['description'] }}">
+            @else
+                <meta name="robots" content="noindex">
+            @endisset
             {{-- An extension that registers one of these elements (registerHeadTags)
                  replaces the panel's default instead of adding a second one. --}}
             @unless ($extensionHead->replaces('link', 'apple-touch-icon'))
