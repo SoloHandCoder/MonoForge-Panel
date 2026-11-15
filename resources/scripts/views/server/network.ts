@@ -13,6 +13,7 @@ import {
 } from '@/api/server/network/queries';
 import { useCurrentServer } from '@/api/server/queries';
 import { ip } from '@/lib/formatters';
+import { playitAddress } from '@/lib/playit';
 import { usePermissions } from '@/plugins/usePermissions';
 import { implementViews } from '../registry';
 import { pageStatus, pageStatusFixtures, type PageStatusModel } from '../pageStatus';
@@ -30,6 +31,8 @@ export interface ServerAllocationItem {
 }
 export interface ServerAllocationsModel {
     readonly allocations: readonly ServerAllocationItem[];
+    /** The playit.gg address players connect to (such as `xyz.joinmc.link`), when the server has a live tunnel. */
+    readonly playitAddress: string | null;
     /** The list has not loaded yet. */
     readonly loading: boolean;
     /** How many allocations the server may have; at 0 they are managed by an administrator. */
@@ -87,6 +90,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
     const { mutateAsync: setNotes } = useUpdateAllocationNotes();
     const { mutateAsync: deleteAllocation } = useDeleteServerAllocation();
     const listed = query.data?.data ?? noAllocations;
+    const tunnel = server ? playitAddress(server.attributes) : null;
     const loading = query.data === undefined;
 
     return useMemo(() => {
@@ -95,6 +99,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
 
         return {
             allocations,
+            playitAddress: tunnel,
             loading,
             limit,
             permissions: { create, update, delete: remove },
@@ -117,6 +122,7 @@ function useServerAllocationsModel(): ServerAllocationsModel {
         };
     }, [
         listed,
+        tunnel,
         loading,
         limit,
         create,
@@ -149,6 +155,7 @@ const allocationsFixture = (options: Partial<ServerAllocationsModel> = {}): Serv
         allocation(2, 25575, { notes: 'RCON' }),
         allocation(3, 8123, { alias: 'play.example.com', address: 'play.example.com' }),
     ],
+    playitAddress: null,
     loading: false,
     limit: 5,
     permissions: { create: true, update: true, delete: true },
@@ -167,6 +174,7 @@ implementViews({
         use: useServerAllocationsModel,
         fixtures: {
             allocations: () => allocationsFixture(),
+            playit: () => allocationsFixture({ playitAddress: 'xyz.joinmc.link' }),
             full: () => allocationsFixture({ limit: 3, canCreate: false }),
             unmanaged: () => allocationsFixture({ limit: 0, canManage: false, canCreate: false }),
             readOnly: () =>

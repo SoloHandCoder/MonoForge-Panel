@@ -713,6 +713,7 @@
         "slots": [],
         "fixtures": [
             "allocations",
+            "playit",
             "full",
             "unmanaged",
             "readOnly",

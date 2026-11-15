@@ -839,6 +839,12 @@ const panelChildren = [
         },
         component: componentRoute(() => import('@/components/admin/announcements/AnnouncementsContainer')),
     }),
+    // The Shop "Tunnels" sub-tab (Task V). Task R's Shop shell can render TunnelsTab in place of this route.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/tunnels',
+        component: componentRoute(() => import('@/components/admin/shop/tunnels/TunnelsContainer')),
+    }),
     createRoute({
         getParentRoute: () => panelRoute,
         path: 'settings',

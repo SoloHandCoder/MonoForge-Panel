@@ -12,6 +12,7 @@ import { useNodeDetail } from '@/components/admin/nodes/useNodeDetail';
 import ExtensionFormFields from '@/components/admin/extensions/ExtensionFormFields';
 import { initialExtensionValues, useExtensionPayload } from '@/extensions/forms';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
+import NodePlayitSettings from '@/components/admin/nodes/NodePlayitSettings';
 
 interface Values extends NodeFormValues {
     resetSecret: boolean;
@@ -241,5 +242,10 @@ const NodeSettingsForm = () => {
 export default function NodeSettingsTab() {
     const { node } = useNodeDetail();
 
-    return <NodeSettingsForm key={node.attributes.id} />;
+    return (
+        <>
+            <NodeSettingsForm key={node.attributes.id} />
+            <NodePlayitSettings nodeId={node.attributes.id} />
+        </>
+    );
 }

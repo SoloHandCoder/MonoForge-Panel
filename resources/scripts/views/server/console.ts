@@ -7,6 +7,7 @@ import { TERMINAL_PRELUDE } from '@/components/server/console/prelude';
 import { createSampleTerminal, useServerTerminal } from '@/components/server/console/useServerTerminal';
 import { SocketRequest } from '@/components/server/events';
 import { ip, mbToBytes } from '@/lib/formatters';
+import { playitAddress } from '@/lib/playit';
 import { usePermissions } from '@/plugins/usePermissions';
 import {
     useServerGraphs,
@@ -190,6 +191,12 @@ function useServerPowerModel(): ServerPowerModel {
 }
 
 function primaryAddress({ attributes }: Server): string | null {
+    const tunnel = playitAddress(attributes);
+
+    if (tunnel) {
+        return tunnel;
+    }
+
     const allocation = relationshipData(attributes.relationships?.allocations).find(
         (candidate) => candidate.attributes.is_default
     )?.attributes;
