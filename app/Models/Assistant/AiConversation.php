@@ -6,10 +6,12 @@ namespace Pterodactyl\Models\Assistant;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\RouteKey;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 use Pterodactyl\Models\Model;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
@@ -28,6 +30,7 @@ use Pterodactyl\Models\User;
  * @property string|null $summary
  * @property int|null $summarized_until_message_id
  * @property string $status
+ * @property string|null $run_token
  * @property string|null $error
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -47,6 +50,7 @@ use Pterodactyl\Models\User;
     'status',
     'error',
 ])]
+#[Hidden(['run_token'])]
 #[RouteKey('uuid')]
 #[Table(name: 'ai_conversations')]
 class AiConversation extends Model
@@ -65,8 +69,12 @@ class AiConversation extends Model
 
     public const string STATUS_ERROR = 'error';
 
-    /** A turn still "running" after this long has crashed; the user may continue. */
-    public const int STALE_AFTER_SECONDS = 180;
+    /**
+     * A turn still "running" without progress for this long has crashed; the user may continue.
+     * The loop touches the conversation before every model call and tool run, so this is longer
+     * than the longest model call with its retries (ChatClient::maxCallSeconds(), 290 s).
+     */
+    public const int STALE_AFTER_SECONDS = 600;
 
     protected $attributes = [
         'status' => self::STATUS_IDLE,
@@ -157,6 +165,80 @@ class AiConversation extends Model
         if ($changed > 0) {
             $this->refresh();
         }
+    }
+
+    /**
+     * Moves the conversation from one of the given states to "running" under a new run token,
+     * in one conditional update. Only the loop holding the token may work on the turn; any
+     * older loop sees the token change and stops. Returns the token, or null when the
+     * conversation was not in one of the states.
+     *
+     * @param  list<string>  $from
+     */
+    public function startRun(array $from): ?string
+    {
+        $token = Str::random(40);
+        $changed = self::query()
+            ->whereKey($this->id)
+            ->whereIn('status', $from)
+            ->update(['status' => self::STATUS_RUNNING, 'run_token' => $token, 'error' => null, 'updated_at' => CarbonImmutable::now()]);
+
+        if ($changed === 0) {
+            return null;
+        }
+
+        $this->refresh();
+
+        return $token;
+    }
+
+    /**
+     * Whether the conversation is still running under this run token.
+     *
+     * @phpstan-impure
+     */
+    public function ownedBy(string $token): bool
+    {
+        return self::query()->whereKey($this->id)->where('status', self::STATUS_RUNNING)->where('run_token', $token)->exists();
+    }
+
+    /**
+     * Ends the run holding the token by moving the conversation to another state. Nothing
+     * changes (false) when another run owns the conversation by now.
+     */
+    public function finishRun(string $token, string $to, ?string $error = null): bool
+    {
+        $changed = self::query()
+            ->whereKey($this->id)
+            ->where('status', self::STATUS_RUNNING)
+            ->where('run_token', $token)
+            ->update(['status' => $to, 'error' => $error, 'updated_at' => CarbonImmutable::now()]);
+
+        if ($changed > 0) {
+            $this->refresh();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Records progress of the run holding the token, so the turn is not seen as stale. Returns
+     * false when the run no longer owns the conversation.
+     *
+     * @phpstan-impure
+     */
+    public function touchRun(string $token): bool
+    {
+        // MySQL counts only changed rows, so a touch within the same second would report 0.
+        self::query()
+            ->whereKey($this->id)
+            ->where('status', self::STATUS_RUNNING)
+            ->where('run_token', $token)
+            ->update(['updated_at' => CarbonImmutable::now()]);
+
+        return $this->ownedBy($token);
     }
 
     /**

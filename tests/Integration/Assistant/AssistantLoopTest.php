@@ -7,9 +7,12 @@ namespace Pterodactyl\Tests\Pest\Integration\Assistant\AssistantLoopTest;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
 use Pterodactyl\Models\Assistant\AiToolCall;
+use Pterodactyl\Services\Assistant\AssistantAgent;
+use Pterodactyl\Services\Assistant\Chat\ChatClient;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 use Pterodactyl\Tests\Support\Assistant\FakeAi;
 
@@ -211,15 +214,18 @@ test('unknown tools and invalid arguments fail without running anything', functi
     expect($this->tools['confirm']->calls)->toBe([]);
 });
 
-test('a provider error ends the turn with a readable error and the user can continue', function (): void {
+test('a provider error ends the turn with a general error for players, logs the details, and the user can continue', function (): void {
+    Log::spy();
     Http::fakeSequence(FakeAi::URL)
-        ->push(['error' => ['message' => 'bad key']], 401)
+        ->push(['error' => ['message' => 'Connection to http://10.0.0.5:11434 failed']], 401)
         ->push(FakeAi::text('Back again.'));
 
     $response = $this->actingAs($this->user)->postJson($this->base, ['message' => 'Hi'])->assertOk();
     $response->assertJsonPath('status', 'error');
 
-    expect($response->json('error'))->toContain('rejected the API key');
+    expect($response->json('error'))->toBe(AssistantAgent::PROVIDER_ERROR)
+        ->not->toContain('10.0.0.5');
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($context['message'], 'rejected the API key') && str_contains($context['message'], '10.0.0.5'))->once();
 
     $conversation = AiConversation::query()->firstOrFail();
     $this->actingAs($this->user)->postJson("{$this->base}/{$conversation->uuid}/messages", ['message' => 'Again'])
@@ -229,7 +235,7 @@ test('a provider error ends the turn with a readable error and the user can cont
         ->assertJsonPath('messages.2.content', 'Back again.');
 });
 
-test('a conversation stuck as running recovers after three minutes', function (): void {
+test('a conversation stuck as running recovers only after the longest model call could have ended', function (): void {
     $conversation = AiConversation::query()->create([
         'uuid' => '0b5c1f3e-1111-4c7a-9b8e-2d5f4a1c0e93',
         'user_id' => $this->user->id,
@@ -241,7 +247,12 @@ test('a conversation stuck as running recovers after three minutes', function ()
 
     $this->actingAs($this->user)->getJson("{$this->base}/{$conversation->uuid}")->assertOk()->assertJsonPath('status', 'running');
 
-    CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinutes(4));
+    // A model call with all its retries can take ChatClient::maxCallSeconds(); a turn that slow is alive.
+    expect(AiConversation::STALE_AFTER_SECONDS)->toBeGreaterThan(ChatClient::maxCallSeconds());
+    CarbonImmutable::setTestNow(CarbonImmutable::now()->addSeconds(ChatClient::maxCallSeconds() + 1));
+    $this->actingAs($this->user)->getJson("{$this->base}/{$conversation->uuid}")->assertOk()->assertJsonPath('status', 'running');
+
+    CarbonImmutable::setTestNow(CarbonImmutable::now()->addSeconds(AiConversation::STALE_AFTER_SECONDS));
     $this->actingAs($this->user)->getJson("{$this->base}/{$conversation->uuid}")
         ->assertOk()
         ->assertJsonPath('status', 'error');

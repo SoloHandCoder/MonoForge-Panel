@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Pterodactyl\Exceptions\Assistant\AssistantUnavailableException;
 use Pterodactyl\Exceptions\Assistant\ChatProviderException;
+use Pterodactyl\Jobs\Assistant\RunAssistantTurn;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
 use Pterodactyl\Models\Assistant\AiToolCall;
 use Pterodactyl\Services\Assistant\Chat\ChatClient;
 use Pterodactyl\Services\Assistant\Chat\ChatResponse;
 use Pterodactyl\Services\Assistant\Chat\ChatToolCall;
+use Pterodactyl\Services\Assistant\Tools\OutputRedactor;
 use Throwable;
 
 /**
@@ -21,9 +25,18 @@ use Throwable;
  * answers without tools, a call needs the user's confirmation (the turn pauses as
  * "awaiting_approval"), or `max_tool_iterations` rounds of tools were used (the model is
  * then asked for a final answer without tools).
+ *
+ * Only one loop works on a conversation at a time (a cache lock), and only the run whose
+ * token the conversation holds: before every model call and tool run the loop checks that the
+ * conversation is still "running" under its token, and stops when it is not.
  */
 class AssistantAgent
 {
+    /** Shown to players when the provider fails; the details go to the log. */
+    public const string PROVIDER_ERROR = 'The assistant could not reach its AI provider. Try again in a moment.';
+
+    public const string CONTEXT_FULL = 'This request needs more context than the assistant allows. Start a new conversation or ask for something smaller.';
+
     public function __construct(
         private readonly ChatClient $client,
         private readonly ConversationContext $context,
@@ -32,35 +45,88 @@ class AssistantAgent
         private readonly AssistantBilling $billing,
     ) {}
 
-    public function run(AiConversation $conversation): void
+    public static function lockKey(int $conversationId): string
     {
-        $conversation->refresh();
-        if ($conversation->status !== AiConversation::STATUS_RUNNING) {
-            return;
+        return "assistant:conversation:{$conversationId}:run";
+    }
+
+    /**
+     * Runs the turn the token belongs to. Returns false when another loop holds the
+     * conversation's lock, so the caller may try again later.
+     */
+    public function run(AiConversation $conversation, string $token): bool
+    {
+        $lock = Cache::lock(self::lockKey($conversation->id), RunAssistantTurn::TIMEOUT + 60);
+        if (! $lock->get()) {
+            return false;
         }
 
         try {
-            $this->loop($conversation);
-        } catch (AssistantUnavailableException|ChatProviderException $exception) {
-            $this->fail($conversation, $exception->getMessage());
+            $conversation->refresh();
+            if ($conversation->ownedBy($token)) {
+                $this->guarded($conversation, $token);
+            }
+        } finally {
+            $lock->release();
+        }
+
+        return true;
+    }
+
+    /**
+     * Marks the run as failed, unless another run owns the conversation by now.
+     */
+    public function fail(AiConversation $conversation, string $message, string $token): void
+    {
+        $conversation->finishRun($token, AiConversation::STATUS_ERROR, $message);
+    }
+
+    private function guarded(AiConversation $conversation, string $token): void
+    {
+        try {
+            $this->loop($conversation, $token);
+        } catch (AssistantUnavailableException $exception) {
+            $this->fail($conversation, $exception->getMessage(), $token);
+        } catch (ChatProviderException $exception) {
+            $this->failProvider($conversation, $exception, $token);
         } catch (Throwable $exception) {
             report($exception);
-            $this->fail($conversation, 'The assistant ran into an unexpected error. Try again.');
+            $this->fail($conversation, 'The assistant ran into an unexpected error. Try again.', $token);
         }
     }
 
-    public function fail(AiConversation $conversation, string $message): void
+    /**
+     * Provider errors can name internal addresses or accounts, so players get a general
+     * message. The details are logged, and root admins see them in the admin assistant.
+     */
+    private function failProvider(AiConversation $conversation, ChatProviderException $exception, string $token): void
     {
-        $conversation->transition([AiConversation::STATUS_RUNNING], AiConversation::STATUS_ERROR, $message);
+        Log::warning('The AI assistant provider failed.', [
+            'conversation_id' => $conversation->id,
+            'provider_id' => $conversation->provider_id,
+            'scope' => $conversation->scope,
+            'message' => $exception->getMessage(),
+        ]);
+
+        $message = $conversation->scope === AiConversation::SCOPE_ADMIN
+            ? (new OutputRedactor)->redact($exception->getMessage())
+            : self::PROVIDER_ERROR;
+
+        $this->fail($conversation, $message, $token);
     }
 
-    private function loop(AiConversation $conversation): void
+    private function loop(AiConversation $conversation, string $token): void
     {
         while (true) {
             throw_unless(AssistantSettings::scopeEnabled($conversation->scope), AssistantUnavailableException::class, 'The AI assistant is turned off.');
 
-            if (! $this->runReadyCalls($conversation)) {
-                $conversation->transition([AiConversation::STATUS_RUNNING], AiConversation::STATUS_AWAITING_APPROVAL);
+            $ready = $this->runReadyCalls($conversation, $token);
+            if ($ready === null) {
+                return;
+            }
+
+            if (! $ready) {
+                $conversation->finishRun($token, AiConversation::STATUS_AWAITING_APPROVAL);
 
                 return;
             }
@@ -69,19 +135,32 @@ class AssistantAgent
 
             $this->billing->assertCanSpend($conversation->user, $conversation->scope);
             $provider = AssistantProviders::resolve($conversation);
-            $conversation->touch();
 
             $tools = $final ? [] : $this->registry->for($conversation->scope, ToolExecutor::context($conversation));
             $messages = $this->context->build($conversation, $final ? 'You have used the most tool calls allowed for this request. Answer the user now with what you found, without calling tools.' : null);
+            if (! $this->context->fits($messages)) {
+                $this->fail($conversation, self::CONTEXT_FULL, $token);
+
+                return;
+            }
+
+            // The last check before the provider is paid: a run that lost the turn stops here.
+            if (! $conversation->touchRun($token)) {
+                return;
+            }
 
             $response = $this->client->complete($provider, $messages, ToolRegistry::definitions($tools), AssistantSettings::maxOutputTokens());
-            $calls = $tools === [] ? [] : $this->uniqueIds($conversation, $response->toolCalls);
-
-            $message = $this->store($conversation, $response, $calls);
             $this->billing->record($conversation->user, $conversation, $conversation->scope, $response->usage->total());
 
+            if (! $conversation->touchRun($token)) {
+                return;
+            }
+
+            $calls = $tools === [] ? [] : $this->uniqueIds($conversation, $response->toolCalls);
+            $message = $this->store($conversation, $response, $calls);
+
             if ($calls === []) {
-                $conversation->transition([AiConversation::STATUS_RUNNING], AiConversation::STATUS_IDLE);
+                $conversation->finishRun($token, AiConversation::STATUS_IDLE);
 
                 return;
             }
@@ -92,9 +171,10 @@ class AssistantAgent
 
     /**
      * Runs the latest assistant message's calls that need no decision (or were allowed), in
-     * order. Returns false when a call waits for the user's confirmation.
+     * order. Returns false when a call waits for the user's confirmation, and null when this
+     * run no longer owns the conversation.
      */
-    private function runReadyCalls(AiConversation $conversation): bool
+    private function runReadyCalls(AiConversation $conversation, string $token): ?bool
     {
         $latest = $conversation->messages()->where('role', AiMessage::ROLE_ASSISTANT)->latest('id')->first();
         if (! $latest instanceof AiMessage) {
@@ -111,11 +191,14 @@ class AssistantAgent
                 return false;
             }
 
+            if (! $conversation->touchRun($token)) {
+                return null;
+            }
+
             $this->executor->run($conversation, $call);
-            $conversation->touch();
         }
 
-        return true;
+        return $conversation->touchRun($token) ? true : null;
     }
 
     /** How many times the model called tools since the user's last message. */

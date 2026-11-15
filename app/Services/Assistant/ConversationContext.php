@@ -21,6 +21,9 @@ class ConversationContext
     /** Tool results are cut to 4 KB in the context. */
     public const int TOOL_RESULT_BYTES = 4096;
 
+    /** What an older tool result becomes when a long turn outgrows the context. */
+    public const string OMITTED = '[This older tool result was left out to stay within the context limit. Call the tool again if you still need it.]';
+
     /** How much of each message the summariser reads. */
     private const int SUMMARY_MESSAGE_CHARS = 2000;
 
@@ -39,6 +42,16 @@ class ConversationContext
     }
 
     /**
+     * The estimated tokens of chat messages.
+     *
+     * @param  list<array<string, mixed>>  $messages
+     */
+    public static function estimateMessages(array $messages): int
+    {
+        return ChatClient::estimateTokens((string) json_encode($messages, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function build(AiConversation $conversation, ?string $instruction = null): array
@@ -46,10 +59,69 @@ class ConversationContext
         $this->summarizeIfNeeded($conversation);
         $system = SystemPrompt::for($conversation).($instruction === null ? '' : "\n\n".$instruction);
 
-        return [
+        return $this->compact([
             ['role' => 'system', 'content' => $system],
             ...$this->format($this->history($conversation)),
-        ];
+        ]);
+    }
+
+    /**
+     * Whether the messages fit in `context_tokens`.
+     *
+     * @param  list<array<string, mixed>>  $messages
+     */
+    public function fits(array $messages): bool
+    {
+        return self::estimateMessages($messages) <= AssistantSettings::contextTokens();
+    }
+
+    /**
+     * Inside one long turn there is no earlier user message to summarise up to, so tool results
+     * and tool call arguments (a file the model wrote, say) are left out of the context, oldest
+     * first, until it fits. The newest assistant message and its results are kept as they are;
+     * when they alone are too large the turn stops (see fits()).
+     *
+     * @param  list<array<string, mixed>>  $messages
+     * @return list<array<string, mixed>>
+     */
+    public function compact(array $messages): array
+    {
+        if ($this->fits($messages)) {
+            return $messages;
+        }
+
+        $lastAssistant = null;
+        foreach ($messages as $index => $message) {
+            if (($message['role'] ?? null) === 'assistant') {
+                $lastAssistant = $index;
+            }
+        }
+
+        foreach ($messages as $index => $message) {
+            if ($lastAssistant === null || $index >= $lastAssistant) {
+                break;
+            }
+
+            if (($message['role'] ?? null) === 'tool' && ($message['content'] ?? '') !== self::OMITTED) {
+                $messages[$index]['content'] = self::OMITTED;
+            } elseif (($message['role'] ?? null) === 'assistant' && is_array($message['tool_calls'] ?? null)) {
+                $messages[$index]['tool_calls'] = array_map(function (mixed $call): mixed {
+                    if (is_array($call) && is_array($call['function'] ?? null)) {
+                        $call['function']['arguments'] = '{}';
+                    }
+
+                    return $call;
+                }, $message['tool_calls']);
+            } else {
+                continue;
+            }
+
+            if ($this->fits($messages)) {
+                break;
+            }
+        }
+
+        return $messages;
     }
 
     /**

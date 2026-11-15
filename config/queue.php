@@ -2,6 +2,52 @@
 
 declare(strict_types=1);
 
+$default = env('QUEUE_CONNECTION', env('QUEUE_DRIVER', 'redis'));
+
+$connections = [
+    'sync' => [
+        'driver' => 'sync',
+    ],
+
+    'database' => [
+        'driver' => 'database',
+        'connection' => env('DB_QUEUE_CONNECTION'),
+        'table' => env('DB_QUEUE_TABLE', 'jobs'),
+        'queue' => env('DB_QUEUE', 'standard'),
+        'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+        'after_commit' => false,
+    ],
+
+    'beanstalkd' => [
+        'driver' => 'beanstalkd',
+        'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),
+        'queue' => env('BEANSTALKD_QUEUE', 'default'),
+        'retry_after' => (int) env('BEANSTALKD_QUEUE_RETRY_AFTER', 90),
+        'block_for' => 0,
+        'after_commit' => false,
+    ],
+
+    'sqs' => [
+        'driver' => 'sqs',
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
+        'queue' => env('SQS_QUEUE', 'default'),
+        'suffix' => env('SQS_SUFFIX'),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'after_commit' => false,
+    ],
+
+    'redis' => [
+        'driver' => 'redis',
+        'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+        'queue' => env('REDIS_QUEUE', env('QUEUE_STANDARD', 'standard')),
+        'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+        'block_for' => null,
+        'after_commit' => false,
+    ],
+];
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -14,7 +60,7 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', env('QUEUE_DRIVER', 'redis')),
+    'default' => $default,
 
     /*
     |--------------------------------------------------------------------------
@@ -30,46 +76,18 @@ return [
     */
 
     'connections' => [
-        'sync' => [
-            'driver' => 'sync',
-        ],
+        ...$connections,
 
-        'database' => [
-            'driver' => 'database',
-            'connection' => env('DB_QUEUE_CONNECTION'),
-            'table' => env('DB_QUEUE_TABLE', 'jobs'),
-            'queue' => env('DB_QUEUE', 'standard'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
-            'after_commit' => false,
-        ],
-
-        'beanstalkd' => [
-            'driver' => 'beanstalkd',
-            'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),
-            'queue' => env('BEANSTALKD_QUEUE', 'default'),
-            'retry_after' => (int) env('BEANSTALKD_QUEUE_RETRY_AFTER', 90),
-            'block_for' => 0,
-            'after_commit' => false,
-        ],
-
-        'sqs' => [
-            'driver' => 'sqs',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
-            'queue' => env('SQS_QUEUE', 'default'),
-            'suffix' => env('SQS_SUFFIX'),
-            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-            'after_commit' => false,
-        ],
-
-        'redis' => [
-            'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue' => env('REDIS_QUEUE', env('QUEUE_STANDARD', 'standard')),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
-            'after_commit' => false,
+        /*
+         * The AI assistant's turns: the default connection's backend on its own "assistant"
+         * queue, with its own worker (`queue:work assistant --queue=assistant`). A turn may run
+         * for up to 15 minutes (RunAssistantTurn::$timeout), so a job is only handed out again
+         * after retry_after, which must stay above that timeout.
+         */
+        'assistant' => [
+            ...($connections[$default] ?? $connections['sync']),
+            'queue' => env('ASSISTANT_QUEUE', 'assistant'),
+            'retry_after' => (int) env('ASSISTANT_QUEUE_RETRY_AFTER', 960),
         ],
     ],
 

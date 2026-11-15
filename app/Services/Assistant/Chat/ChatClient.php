@@ -34,7 +34,16 @@ class ChatClient
     public const int MAX_RETRIES = 2;
 
     /** The longest Retry-After the client waits for, in seconds. */
-    private const int MAX_RETRY_AFTER = 10;
+    public const int MAX_RETRY_AFTER = 10;
+
+    /**
+     * The longest one complete() call can take, in seconds: every attempt timing out, with
+     * the longest wait between attempts.
+     */
+    public static function maxCallSeconds(): int
+    {
+        return (self::MAX_RETRIES + 1) * self::TIMEOUT_SECONDS + self::MAX_RETRIES * self::MAX_RETRY_AFTER;
+    }
 
     /** Four characters a token: a rough estimate that errs on the high side for code. */
     public static function estimateTokens(string $text): int
