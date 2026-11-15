@@ -1367,6 +1367,25 @@ export type ClientFriendListResource = {
     object: string;
     attributes: ClientFriendListAttributes;
 };
+export type ClientModpackInstallAttributes = {
+    status: string;
+    step: string;
+    message: string | null;
+    project_title: string;
+    version_name: string;
+    files_done: number;
+    files_total: number;
+    /**
+     * created, skipped, or null before the backup step.
+     */
+    backup: string | null;
+    started_at: string;
+    finished_at: string | null;
+};
+export type ClientModpackInstallResource = {
+    object: string;
+    attributes: ClientModpackInstallAttributes;
+};
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
         id: number;
@@ -1374,8 +1393,14 @@ export type ClientNoticeFeedAttributes = {
         body: string;
         level: string;
         dismissible: boolean;
-        starts_at: string;
-        ends_at: string;
+        /**
+         * When the announcement starts showing; null shows it from now.
+         */
+        starts_at: string | null;
+        /**
+         * When the announcement stops showing; null keeps it until removed.
+         */
+        ends_at: string | null;
         updated_at: string;
     }>;
     notices: Array<{
@@ -1383,9 +1408,18 @@ export type ClientNoticeFeedAttributes = {
         level: string;
         title: string;
         body: string;
-        action_label: string;
-        action_url: string;
-        kind: string;
+        /**
+         * The label of the notice button, or null without one.
+         */
+        action_label: string | null;
+        /**
+         * Where the notice button leads, or null without one.
+         */
+        action_url: string | null;
+        /**
+         * What raised the notice (one unread notice per kind), or null.
+         */
+        kind: string | null;
         created_at: string;
     }>;
 };
@@ -1416,6 +1450,45 @@ export type ClientPermissionTemplateListResource = {
 export type ClientPermissionTemplateResource = {
     object: string;
     attributes: ClientPermissionTemplateAttributes;
+};
+export type ClientPluginEnvironmentAttributes = {
+    platform: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    detected: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    /**
+     * Searchable catalogs by project type.
+     */
+    sources: {
+        plugin: Array<string>;
+        mod: Array<string>;
+        modpack: Array<string>;
+    };
+    loaders: Array<string>;
+    curseforge_enabled: boolean;
+};
+export type ClientPluginEnvironmentResource = {
+    object: string;
+    attributes: ClientPluginEnvironmentAttributes;
+};
+export type ClientPluginInstallAttributes = {
+    file_name: string;
+    directory: string;
+    version_number: string;
+};
+export type ClientPluginInstallResource = {
+    object: string;
+    attributes: ClientPluginInstallAttributes;
 };
 export type ClientRecoveryTokensAttributes = {
     tokens: Array<string>;
@@ -1485,6 +1558,10 @@ export type ClientServerAttributes = {
      * The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.
      */
     playit_address: string | null;
+    /**
+     * True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
+     */
+    address_pending: boolean;
     relationships?: {
         allocations?: ClientAllocationListResponse | NullResource;
         variables?: ClientEggVariableListResponse | NullResource;
@@ -1591,6 +1668,36 @@ export type ClientServerScheduleResource = {
     object: string;
     attributes: ClientServerScheduleAttributes;
 };
+export type ClientServerSleepAttributes = {
+    /**
+     * The plan allows auto-sleep and the game is supported.
+     */
+    available: boolean;
+    /**
+     * The game tells who is online (Minecraft Java for now).
+     */
+    supported: boolean;
+    /**
+     * The owner turned auto-sleep on.
+     */
+    enabled: boolean;
+    /**
+     * Auto-sleep stopped the server and nobody has started it since.
+     */
+    sleeping: boolean;
+    /**
+     * When it fell asleep (ISO 8601), or null.
+     */
+    sleep_started_at?: string | null;
+    /**
+     * The viewer may wake it (needs control.start).
+     */
+    can_wake: boolean;
+};
+export type ClientServerSleepResource = {
+    object: string;
+    attributes: ClientServerSleepAttributes;
+};
 export type ClientServerSubscriptionAttributes = {
     server_identifier: string;
     server_name: string;
@@ -1606,6 +1713,18 @@ export type ClientServerSubscriptionAttributes = {
     suspended_at: string | null;
     delete_at: string | null;
     can_renew_now: boolean;
+    sleep: {
+        allowed: boolean;
+        supported: boolean;
+        enabled: boolean;
+        sleeping: boolean;
+        sleep_started_at: string | null;
+        idle_minutes: number;
+        discount_percent: number;
+        slept_seconds_this_period: number;
+        saved_this_period: number;
+        last_saved_tokens: number;
+    };
 };
 export type ClientServerSubscriptionListResponse = {
     object: string;
@@ -1623,7 +1742,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type ClientServerSubuserListResponse = {
     object: string;
@@ -2046,6 +2165,18 @@ export type AdminCreateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
+    /**
+     * The sleep allowed.
+     */
+    sleep_allowed?: boolean;
+    /**
+     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
+     */
+    sleep_discount_percent?: number;
+    /**
+     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
+     */
+    sleep_idle_minutes?: number;
 };
 export type AdminUpdateShopPlanRequest = {
     /**
@@ -2112,6 +2243,18 @@ export type AdminUpdateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
+    /**
+     * The sleep allowed.
+     */
+    sleep_allowed?: boolean;
+    /**
+     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
+     */
+    sleep_discount_percent?: number;
+    /**
+     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
+     */
+    sleep_idle_minutes?: number;
 };
 export type AdminCreateBillingPeriodRequest = {
     /**
@@ -2469,6 +2612,10 @@ export type AdminUpdateAiAssistantSettingsRequest = {
      * The admin enabled.
      */
     admin_enabled: boolean;
+    /**
+     * Whether the AI crash doctor is offered when a server crashes or fails to start.
+     */
+    crash_doctor_enabled?: boolean;
     /**
      * The default provider id. Must match an existing stored value.
      */
@@ -3585,6 +3732,16 @@ export type AdminUpdateLegalDocumentRequest = {
      */
     reaccept: boolean;
 };
+export type AdminUpdatePluginSettingsRequest = {
+    /**
+     * A new CurseForge API key, or blank to keep the stored one.
+     */
+    curseforge_key?: string | null;
+    /**
+     * Remove the stored key.
+     */
+    clear_curseforge_key?: boolean;
+};
 export type AdminUpdateStatusPageSettingsRequest = {
     /**
      * Whether the public status page is on.
@@ -3616,7 +3773,7 @@ export type AdminCreateGlobalPermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type AdminUpdateGlobalPermissionTemplateRequest = {
     /**
@@ -3626,7 +3783,7 @@ export type AdminUpdateGlobalPermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type AdminCreateDatabaseHostRequest = {
     /**
@@ -4466,9 +4623,13 @@ export type ClientBuyTokenPackRequest = {
 };
 export type ClientUpdateServerSubscriptionRequest = {
     /**
-     * Renew automatically from the token balance.
+     * Renew automatically from the token balance. Required without auto_sleep.
      */
-    auto_renew: boolean;
+    auto_renew?: boolean;
+    /**
+     * Let the server sleep while nobody plays. Required without auto_renew.
+     */
+    auto_sleep?: boolean;
 };
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
@@ -4541,7 +4702,7 @@ export type ClientCreatePermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type ClientUpdatePermissionTemplateRequest = {
     /**
@@ -4551,7 +4712,7 @@ export type ClientUpdatePermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type ClientCreateSshKeyRequest = {
     /**
@@ -4834,7 +4995,7 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
     /**
      * The UUID of a friend of the authenticated user to invite instead of an email.
      */
@@ -4844,7 +5005,7 @@ export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
 };
 export type ClientCreateServerBackupRequest = {
     /**
@@ -4887,6 +5048,106 @@ export type ClientSendAnAssistantMessageRequest = {
      * The message. Must be at least 1 character. Must not be greater than 8000 characters.
      */
     message: string;
+};
+export type ClientUpdateServerPublicPageRequest = {
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown, at most 2000 characters, or null for none.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string;
+};
+export type ClientUploadServerPublicPageBannerRequest = {
+    /**
+     * The banner image.
+     */
+    banner: Blob | File;
+};
+export type ClientReportACrashFromTheConsoleRequest = {
+    /**
+     * What the console saw: crashed (the server went offline without stopping first) or start_failed (it went offline while starting).
+     */
+    kind: 'crashed' | 'start_failed';
+};
+export type ClientDiagnoseWithTheCrashDoctorRequest = {
+    /**
+     * The crash to diagnose, from the crash doctor status; null for a check without a crash. Must be at least 1.
+     */
+    crash_id?: number | null;
+};
+export type ClientInstallPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The catalog: modrinth, hangar or curseforge.
+     */
+    source: string;
+    /**
+     * The project's ID.
+     */
+    project: string;
+    /**
+     * The version's ID from the versions list.
+     */
+    version: string;
+};
+export type ClientUpdateInstalledPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+export type ClientRemoveInstalledPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+export type ClientInstallModpackRequest = {
+    /**
+     * The modpack's Modrinth project ID.
+     */
+    project: string;
+    /**
+     * The modpack version's ID.
+     */
+    version: string;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -5364,6 +5625,9 @@ export type AdminListShopPlansResponseBody = {
         };
         egg_ids?: Array<number>;
         node_ids?: string | null;
+        sleep_allowed?: boolean;
+        sleep_discount_percent?: number;
+        sleep_idle_minutes?: number;
     }>;
 };
 export type AdminCreateShopPlanResponseBody = {
@@ -5386,6 +5650,9 @@ export type AdminCreateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminGetShopPlanResponseBody = {
     id?: number;
@@ -5407,6 +5674,9 @@ export type AdminGetShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminUpdateShopPlanResponseBody = {
     id?: number;
@@ -5428,6 +5698,9 @@ export type AdminUpdateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
+    sleep_allowed?: boolean;
+    sleep_discount_percent?: number;
+    sleep_idle_minutes?: number;
 };
 export type AdminListBillingPeriodsResponseBody = {
     data?: Array<{
@@ -5669,6 +5942,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -5676,6 +5950,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
 export type AdminStartAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5728,6 +6003,7 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
 export type AdminGetAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5780,6 +6056,7 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
 export type AdminSendAnAdminAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5832,6 +6109,7 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
 export type AdminAllowAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5884,6 +6162,7 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
 export type AdminDenyAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6006,6 +6285,7 @@ export type AdminGetAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -6018,6 +6298,7 @@ export type AdminUpdateAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -6203,10 +6484,12 @@ export type AdminDisableExtensionResponseBody = {
 export type AdminGetNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
+    read_only?: boolean;
 };
 export type AdminUpdateNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
+    read_only?: boolean;
 };
 export type AdminTestNodePlayitGgAgentResponseBody = {
     success?: boolean;
@@ -6232,6 +6515,23 @@ export type AdminImportExistingTunnelsResponseBody = {
         result?: string;
         reason?: string;
         server_ids?: Array<number>;
+    }>;
+};
+export type AdminListServersWithoutATunnelResponseBody = {
+    nodes?: Array<{
+        id?: number;
+        name?: string;
+        read_only?: boolean;
+    }>;
+    servers?: Array<{
+        server_id?: number;
+        server_name?: string;
+        server_identifier?: string;
+        node_id?: number;
+        node_name?: string;
+        local_ip?: string;
+        local_port?: number;
+        tunnel_status?: string;
     }>;
 };
 export type AdminGetTunnelSettingsResponseBody = {
@@ -6537,6 +6837,10 @@ export type AdminUpdateLegalDocumentResponseBody = {
     version?: number;
     updated_at?: string;
 };
+export type AdminGetPluginSettingsResponseBody = {
+    curseforge_key_set?: boolean;
+    set_in_env?: boolean;
+};
 export type AdminGetStatusPageSettingsResponseBody = {
     enabled?: boolean;
     public_url?: string;
@@ -6790,6 +7094,7 @@ export type ClientGetExtensionJobProgressResponseBody = {
 export type ClientGetAssistantStatusResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     free_limit?: number;
     free_used?: number;
     ratio?: number;
@@ -7288,6 +7593,7 @@ export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -7295,6 +7601,7 @@ export type ClientListAssistantConversationsResponseBody = {
 export type ClientStartAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7347,6 +7654,7 @@ export type ClientStartAnAssistantConversationResponseBody = {
 export type ClientGetAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7399,6 +7707,7 @@ export type ClientGetAnAssistantConversationResponseBody = {
 export type ClientSendAnAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7451,6 +7760,7 @@ export type ClientSendAnAssistantMessageResponseBody = {
 export type ClientAllowAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7503,6 +7813,7 @@ export type ClientAllowAnAssistantActionResponseBody = {
 export type ClientDenyAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7552,6 +7863,377 @@ export type ClientDenyAnAssistantActionResponseBody = {
         charged_this_month?: number;
     };
 };
+export type ClientGetServerPublicPageResponseBody = {
+    /**
+     * Whether the page has been saved before.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/, or null before the page is saved.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page, or null before the page is saved.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown; links, bold, italics, lists and headings are shown, HTML is shown as text.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the panel's default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the banner image, or null when there is none.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address: only a live playit tunnel address is ever shown.
+     */
+    has_address: boolean;
+};
+export type ClientUpdateServerPublicPageResponseBody = {
+    /**
+     * Always true after a save.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the banner image, or null when there is none.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+export type ClientUploadServerPublicPageBannerResponseBody = {
+    /**
+     * Always true.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the new banner image.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+export type ClientDeleteServerPublicPageBannerResponseBody = {
+    /**
+     * Whether the page has been saved before.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * Always null after the delete.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+export type ClientGetCrashDoctorStatusResponseBody = {
+    /**
+     * Whether the crash doctor can be used. When false, crash is always null.
+     */
+    enabled: boolean;
+    /**
+     * The newest crash of the last 24 hours that was not dismissed, or null.
+     */
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
+};
+export type ClientReportACrashFromTheConsoleResponseBody = {
+    /**
+     * Whether the crash doctor can be used.
+     */
+    enabled: boolean;
+    /**
+     * The newest crash of the last 24 hours that was not dismissed, or null.
+     */
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
+};
+export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
+    /**
+     * The conversation UUID; open it in the server assistant.
+     */
+    uuid: string;
+    /**
+     * The conversation title.
+     */
+    title: string;
+    /**
+     * The conversation mode: crash_doctor.
+     */
+    mode: 'chat' | 'crash_doctor';
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientSearchPluginsResponseBody = {
+    object: string;
+    /**
+     * The projects found.
+     */
+    data: Array<{
+        source: 'modrinth' | 'hangar' | 'curseforge';
+        id: string;
+        slug: string;
+        title: string;
+        description: string;
+        author: string | null;
+        icon_url: string | null;
+        downloads: number;
+        updated_at: string | null;
+        url: string;
+        /**
+         * Modrinth says the project does not run on servers.
+         */
+        client_only: boolean;
+    }>;
+    meta: {
+        pagination: {
+            total: number;
+            count: number;
+            per_page: number;
+            current_page: number;
+            total_pages: number;
+        };
+    };
+};
+export type ClientListPluginVersionsResponseBody = {
+    object: string;
+    /**
+     * The versions, newest first.
+     */
+    data: Array<{
+        id: string;
+        project_id: string;
+        name: string;
+        version_number: string;
+        game_versions: Array<string>;
+        loaders: Array<string>;
+        /**
+         * release, beta or alpha (Hangar channels by name).
+         */
+        channel: string;
+        published_at: string | null;
+        file: {
+            filename: string;
+            size: number;
+            /**
+             * Hex digests by algorithm: sha1, sha256, sha512 or md5.
+             */
+            hashes: {
+                [key: string]: string;
+            };
+        } | null;
+        installable: boolean;
+    }>;
+};
+export type ClientListInstalledPluginsResponseBody = {
+    object: string;
+    /**
+     * The jars, by name.
+     */
+    data: Array<{
+        file_name: string;
+        size: number;
+        modified_at: string | null;
+        sha1: string | null;
+        /**
+         * The Modrinth project the jar belongs to, or null when Modrinth does not know it.
+         */
+        project: {
+            source: string;
+            id: string;
+            title: string;
+            slug: string;
+            icon_url: string | null;
+            url: string;
+        } | null;
+        version: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
+        /**
+         * A newer version for the server, or null.
+         */
+        update: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
+    }>;
+    meta: {
+        /**
+         * plugins or mods, or null while the loader is unknown.
+         */
+        directory: string | null;
+    };
+};
 export type ApiListThePublicStorePlansResponseBody = {
     /**
      * Whether the store is open. When it is closed the lists are empty.
@@ -7596,6 +8278,92 @@ export type ApiListThePublicStorePlansResponseBody = {
             }>;
         }>;
     }>;
+};
+export type ApiGetAPublicServerPageResponseBody = {
+    /**
+     * The part of the page address after /s/.
+     */
+    slug: string;
+    /**
+     * The server name.
+     */
+    name: string;
+    /**
+     * The description in markdown, to be shown with a safe renderer; empty for none.
+     */
+    description: string;
+    /**
+     * The banner colour and image.
+     */
+    banner: {
+        /**
+         * The banner colour as #rrggbb, or null for the default.
+         */
+        color: string | null;
+        /**
+         * The path of the banner image, or null for none.
+         */
+        image_url: string | null;
+    };
+    /**
+     * The game, such as Minecraft, or null when it is not one the panel knows.
+     */
+    game: string | null;
+    /**
+     * The server type, such as Paper.
+     */
+    software: string | null;
+    /**
+     * The game version, from the game itself or the server's settings, or null.
+     */
+    version: string | null;
+    /**
+     * The current state of the server.
+     */
+    status: 'online' | 'offline' | 'starting' | 'sleeping' | 'unknown';
+    /**
+     * The players online and the limit.
+     */
+    players: {
+        online: number;
+        max: number;
+    } | null;
+    /**
+     * The playit address to join with, or null when the server has none.
+     */
+    address: string | null;
+    /**
+     * A link that adds the server in the game (Minecraft Bedrock), or null.
+     */
+    join_url: string | null;
+    /**
+     * The total votes.
+     */
+    votes: number;
+};
+export type ApiVoteForAPublicServerPageResponseBody = {
+    /**
+     * Whether this vote was counted.
+     */
+    counted: boolean;
+    /**
+     * The total votes now.
+     */
+    votes: number;
+    /**
+     * When this visitor can vote for the page again.
+     */
+    next_vote_at: string;
+};
+export type ApiWakeASleepingServerResponseBody = {
+    /**
+     * Whether the server was started.
+     */
+    woken: boolean;
+    /**
+     * Whether the server is still sleeping.
+     */
+    sleeping: boolean;
 };
 export type ApiGetPublicStatusResponseBody = {
     /**
@@ -8678,6 +9446,8 @@ export type ClientListServerActivityServerUuidPathParameter = string;
 export type ClientListServerActivityFilterOptionsServerUuidPathParameter = string;
 export type ClientSendServerCommandServerUuidPathParameter = string;
 export type ClientSendPowerActionServerUuidPathParameter = string;
+export type ClientGetServerSleepStateServerUuidPathParameter = string;
+export type ClientWakeServerServerUuidPathParameter = string;
 /**
  * Comma-separated relationships to include. Supports "password" when the user can view database passwords.
  */
@@ -8789,9 +9559,91 @@ export type ClientAllowAnAssistantActionToolCallIdPathParameter = number;
 export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
+export type ClientGetServerPublicPageServerUuidPathParameter = string;
+export type ClientUploadServerPublicPageBannerServerUuidPathParameter = string;
+export type ClientGetCrashDoctorStatusServerUuidPathParameter = string;
+export type ClientReportACrashFromTheConsoleServerUuidPathParameter = string;
+export type ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter = string;
+export type ClientDismissACrashServerUuidPathParameter = string;
+export type ClientDismissACrashCrashIdPathParameter = number;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentGameVersionQueryParameter = string;
+export type ClientGetPluginEnvironmentServerUuidPathParameter = string;
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientSearchPluginsSourceQueryParameter = string;
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientSearchPluginsTypeQueryParameter = string;
+/**
+ * Search text.
+ */
+export type ClientSearchPluginsQueryQueryParameter = string;
+/**
+ * Result page, 20 per page.
+ */
+export type ClientSearchPluginsPageQueryParameter = number;
+/**
+ * relevance, downloads, updated or newest.
+ */
+export type ClientSearchPluginsSortQueryParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientSearchPluginsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientSearchPluginsGameVersionQueryParameter = string;
+export type ClientSearchPluginsServerUuidPathParameter = string;
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientListPluginVersionsSourceQueryParameter = string;
+/**
+ * The project's ID from the search results.
+ */
+export type ClientListPluginVersionsProjectQueryParameter = string;
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientListPluginVersionsTypeQueryParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListPluginVersionsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListPluginVersionsGameVersionQueryParameter = string;
+export type ClientListPluginVersionsServerUuidPathParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListInstalledPluginsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListInstalledPluginsGameVersionQueryParameter = string;
+export type ClientListInstalledPluginsServerUuidPathParameter = string;
+export type ClientInstallPluginServerUuidPathParameter = string;
+export type ClientUpdateInstalledPluginServerUuidPathParameter = string;
+export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
+export type ClientInstallModpackServerUuidPathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
+export type ApiGetAPublicServerPageSlugPathParameter = string;
+export type ApiVoteForAPublicServerPageSlugPathParameter = string;
+export type ApiWakeASleepingServerSlugPathParameter = string;
 export type AdminListLanguagesData = {
     body?: never;
     path?: never;
@@ -12379,6 +13231,30 @@ export type AdminImportExistingTunnelsResponses = {
     200: AdminImportExistingTunnelsResponseBody;
 };
 export type AdminImportExistingTunnelsResponse = AdminImportExistingTunnelsResponses[keyof AdminImportExistingTunnelsResponses];
+export type AdminListServersWithoutATunnelData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/tunnels/unlinked';
+};
+export type AdminListServersWithoutATunnelErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListServersWithoutATunnelError = AdminListServersWithoutATunnelErrors[keyof AdminListServersWithoutATunnelErrors];
+export type AdminListServersWithoutATunnelResponses = {
+    /**
+     * Servers without a tunnel returned.
+     */
+    200: AdminListServersWithoutATunnelResponseBody;
+};
+export type AdminListServersWithoutATunnelResponse = AdminListServersWithoutATunnelResponses[keyof AdminListServersWithoutATunnelResponses];
 export type AdminGetTunnelSettingsData = {
     body?: never;
     path?: never;
@@ -15976,6 +16852,58 @@ export type AdminUpdateLegalDocumentResponses = {
     200: AdminUpdateLegalDocumentResponseBody;
 };
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
+export type AdminGetPluginSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+export type AdminGetPluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetPluginSettingsError = AdminGetPluginSettingsErrors[keyof AdminGetPluginSettingsErrors];
+export type AdminGetPluginSettingsResponses = {
+    /**
+     * Plugin settings returned.
+     */
+    200: AdminGetPluginSettingsResponseBody;
+};
+export type AdminGetPluginSettingsResponse = AdminGetPluginSettingsResponses[keyof AdminGetPluginSettingsResponses];
+export type AdminUpdatePluginSettingsData = {
+    body?: AdminUpdatePluginSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+export type AdminUpdatePluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdatePluginSettingsError = AdminUpdatePluginSettingsErrors[keyof AdminUpdatePluginSettingsErrors];
+export type AdminUpdatePluginSettingsResponses = {
+    /**
+     * Plugin settings updated.
+     */
+    204: void;
+};
+export type AdminUpdatePluginSettingsResponse = AdminUpdatePluginSettingsResponses[keyof AdminUpdatePluginSettingsResponses];
 export type AdminGetStatusPageSettingsData = {
     body?: never;
     path?: never;
@@ -19104,7 +20032,7 @@ export type ClientListServerSubscriptionsResponses = {
 };
 export type ClientListServerSubscriptionsResponse = ClientListServerSubscriptionsResponses[keyof ClientListServerSubscriptionsResponses];
 export type ClientUpdateServerSubscriptionData = {
-    body: ClientUpdateServerSubscriptionRequest;
+    body?: ClientUpdateServerSubscriptionRequest;
     path: {
         /**
          * The server UUID.
@@ -20502,6 +21430,80 @@ export type ClientSendPowerActionResponses = {
     204: void;
 };
 export type ClientSendPowerActionResponse = ClientSendPowerActionResponses[keyof ClientSendPowerActionResponses];
+export type ClientGetServerSleepStateData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerSleepStateServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/sleep';
+};
+export type ClientGetServerSleepStateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetServerSleepStateError = ClientGetServerSleepStateErrors[keyof ClientGetServerSleepStateErrors];
+export type ClientGetServerSleepStateResponses = {
+    /**
+     * Sleep state returned.
+     */
+    200: ClientServerSleepResource;
+};
+export type ClientGetServerSleepStateResponse = ClientGetServerSleepStateResponses[keyof ClientGetServerSleepStateResponses];
+export type ClientWakeServerData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientWakeServerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/sleep/wake';
+};
+export type ClientWakeServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The server is not sleeping.
+     */
+    409: ErrorEnvelope;
+    /**
+     * Wings did not accept the start; try again later.
+     */
+    503: ErrorEnvelope;
+};
+export type ClientWakeServerError = ClientWakeServerErrors[keyof ClientWakeServerErrors];
+export type ClientWakeServerResponses = {
+    /**
+     * The server is starting.
+     */
+    204: void;
+};
+export type ClientWakeServerResponse = ClientWakeServerResponses[keyof ClientWakeServerResponses];
 export type ClientListServerDatabasesData = {
     body?: never;
     path: {
@@ -22653,6 +23655,743 @@ export type ClientDenyAnAssistantActionResponses = {
     200: ClientDenyAnAssistantActionResponseBody;
 };
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
+export type ClientGetServerPublicPageData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page';
+};
+export type ClientGetServerPublicPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetServerPublicPageError = ClientGetServerPublicPageErrors[keyof ClientGetServerPublicPageErrors];
+export type ClientGetServerPublicPageResponses = {
+    /**
+     * Public page returned.
+     */
+    200: ClientGetServerPublicPageResponseBody;
+};
+export type ClientGetServerPublicPageResponse = ClientGetServerPublicPageResponses[keyof ClientGetServerPublicPageResponses];
+export type ClientUpdateServerPublicPageData = {
+    body: ClientUpdateServerPublicPageRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page';
+};
+export type ClientUpdateServerPublicPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUpdateServerPublicPageError = ClientUpdateServerPublicPageErrors[keyof ClientUpdateServerPublicPageErrors];
+export type ClientUpdateServerPublicPageResponses = {
+    /**
+     * Public page saved.
+     */
+    200: ClientUpdateServerPublicPageResponseBody;
+};
+export type ClientUpdateServerPublicPageResponse = ClientUpdateServerPublicPageResponses[keyof ClientUpdateServerPublicPageResponses];
+export type ClientDeleteServerPublicPageBannerData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page/banner';
+};
+export type ClientDeleteServerPublicPageBannerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientDeleteServerPublicPageBannerError = ClientDeleteServerPublicPageBannerErrors[keyof ClientDeleteServerPublicPageBannerErrors];
+export type ClientDeleteServerPublicPageBannerResponses = {
+    /**
+     * Banner deleted.
+     */
+    200: ClientDeleteServerPublicPageBannerResponseBody;
+};
+export type ClientDeleteServerPublicPageBannerResponse = ClientDeleteServerPublicPageBannerResponses[keyof ClientDeleteServerPublicPageBannerResponses];
+export type ClientUploadServerPublicPageBannerData = {
+    body: ClientUploadServerPublicPageBannerRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page/banner';
+};
+export type ClientUploadServerPublicPageBannerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The page has not been saved yet.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUploadServerPublicPageBannerError = ClientUploadServerPublicPageBannerErrors[keyof ClientUploadServerPublicPageBannerErrors];
+export type ClientUploadServerPublicPageBannerResponses = {
+    /**
+     * Banner stored.
+     */
+    200: ClientUploadServerPublicPageBannerResponseBody;
+};
+export type ClientUploadServerPublicPageBannerResponse = ClientUploadServerPublicPageBannerResponses[keyof ClientUploadServerPublicPageBannerResponses];
+export type ClientGetCrashDoctorStatusData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetCrashDoctorStatusServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor';
+};
+export type ClientGetCrashDoctorStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetCrashDoctorStatusError = ClientGetCrashDoctorStatusErrors[keyof ClientGetCrashDoctorStatusErrors];
+export type ClientGetCrashDoctorStatusResponses = {
+    /**
+     * Crash doctor status returned.
+     */
+    200: ClientGetCrashDoctorStatusResponseBody;
+};
+export type ClientGetCrashDoctorStatusResponse = ClientGetCrashDoctorStatusResponses[keyof ClientGetCrashDoctorStatusResponses];
+export type ClientReportACrashFromTheConsoleData = {
+    body: ClientReportACrashFromTheConsoleRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientReportACrashFromTheConsoleServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/report';
+};
+export type ClientReportACrashFromTheConsoleErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The crash doctor or the assistant is turned off.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientReportACrashFromTheConsoleError = ClientReportACrashFromTheConsoleErrors[keyof ClientReportACrashFromTheConsoleErrors];
+export type ClientReportACrashFromTheConsoleResponses = {
+    /**
+     * Crash recorded, or already known; status returned.
+     */
+    200: ClientReportACrashFromTheConsoleResponseBody;
+};
+export type ClientReportACrashFromTheConsoleResponse = ClientReportACrashFromTheConsoleResponses[keyof ClientReportACrashFromTheConsoleResponses];
+export type ClientDiagnoseWithTheCrashDoctorData = {
+    body?: ClientDiagnoseWithTheCrashDoctorRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/diagnose';
+};
+export type ClientDiagnoseWithTheCrashDoctorErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No free AI tokens and no token balance left.
+     */
+    402: ErrorEnvelope;
+    /**
+     * The crash doctor or the assistant is turned off.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The assistant is already working on another of your conversations.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientDiagnoseWithTheCrashDoctorError = ClientDiagnoseWithTheCrashDoctorErrors[keyof ClientDiagnoseWithTheCrashDoctorErrors];
+export type ClientDiagnoseWithTheCrashDoctorResponses = {
+    /**
+     * Diagnosis started.
+     */
+    200: ClientDiagnoseWithTheCrashDoctorResponseBody;
+};
+export type ClientDiagnoseWithTheCrashDoctorResponse = ClientDiagnoseWithTheCrashDoctorResponses[keyof ClientDiagnoseWithTheCrashDoctorResponses];
+export type ClientDismissACrashData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDismissACrashServerUuidPathParameter;
+        /**
+         * The server crash ID.
+         */
+        crash_id: ClientDismissACrashCrashIdPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/crashes/{crash_id}/dismiss';
+};
+export type ClientDismissACrashErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientDismissACrashError = ClientDismissACrashErrors[keyof ClientDismissACrashErrors];
+export type ClientDismissACrashResponses = {
+    /**
+     * Crash dismissed.
+     */
+    204: void;
+};
+export type ClientDismissACrashResponse = ClientDismissACrashResponses[keyof ClientDismissACrashResponses];
+export type ClientGetPluginEnvironmentData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetPluginEnvironmentServerUuidPathParameter;
+    };
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientGetPluginEnvironmentLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientGetPluginEnvironmentGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins';
+};
+export type ClientGetPluginEnvironmentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetPluginEnvironmentError = ClientGetPluginEnvironmentErrors[keyof ClientGetPluginEnvironmentErrors];
+export type ClientGetPluginEnvironmentResponses = {
+    /**
+     * Plugin environment returned.
+     */
+    200: ClientPluginEnvironmentResource;
+};
+export type ClientGetPluginEnvironmentResponse = ClientGetPluginEnvironmentResponses[keyof ClientGetPluginEnvironmentResponses];
+export type ClientSearchPluginsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientSearchPluginsServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientSearchPluginsSourceQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientSearchPluginsTypeQueryParameter;
+        /**
+         * Search text.
+         */
+        query?: ClientSearchPluginsQueryQueryParameter;
+        /**
+         * Result page, 20 per page.
+         */
+        page?: ClientSearchPluginsPageQueryParameter;
+        /**
+         * relevance, downloads, updated or newest.
+         */
+        sort?: ClientSearchPluginsSortQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientSearchPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientSearchPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/search';
+};
+export type ClientSearchPluginsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientSearchPluginsError = ClientSearchPluginsErrors[keyof ClientSearchPluginsErrors];
+export type ClientSearchPluginsResponses = {
+    /**
+     * Search results returned.
+     */
+    200: ClientSearchPluginsResponseBody;
+};
+export type ClientSearchPluginsResponse = ClientSearchPluginsResponses[keyof ClientSearchPluginsResponses];
+export type ClientListPluginVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListPluginVersionsServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientListPluginVersionsSourceQueryParameter;
+        /**
+         * The project's ID from the search results.
+         */
+        project: ClientListPluginVersionsProjectQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientListPluginVersionsTypeQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListPluginVersionsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListPluginVersionsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/versions';
+};
+export type ClientListPluginVersionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientListPluginVersionsError = ClientListPluginVersionsErrors[keyof ClientListPluginVersionsErrors];
+export type ClientListPluginVersionsResponses = {
+    /**
+     * Versions returned.
+     */
+    200: ClientListPluginVersionsResponseBody;
+};
+export type ClientListPluginVersionsResponse = ClientListPluginVersionsResponses[keyof ClientListPluginVersionsResponses];
+export type ClientListInstalledPluginsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListInstalledPluginsServerUuidPathParameter;
+    };
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListInstalledPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListInstalledPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/installed';
+};
+export type ClientListInstalledPluginsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not list the folder.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientListInstalledPluginsError = ClientListInstalledPluginsErrors[keyof ClientListInstalledPluginsErrors];
+export type ClientListInstalledPluginsResponses = {
+    /**
+     * Installed plugins returned.
+     */
+    200: ClientListInstalledPluginsResponseBody;
+};
+export type ClientListInstalledPluginsResponse = ClientListInstalledPluginsResponses[keyof ClientListInstalledPluginsResponses];
+export type ClientInstallPluginData = {
+    body: ClientInstallPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/install';
+};
+export type ClientInstallPluginErrors = {
+    /**
+     * The file could not be installed: not allowed, no file, or a failed hash check.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientInstallPluginError = ClientInstallPluginErrors[keyof ClientInstallPluginErrors];
+export type ClientInstallPluginResponses = {
+    /**
+     * Plugin installed.
+     */
+    200: ClientPluginInstallResource;
+};
+export type ClientInstallPluginResponse = ClientInstallPluginResponses[keyof ClientInstallPluginResponses];
+export type ClientUpdateInstalledPluginData = {
+    body: ClientUpdateInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUpdateInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/update';
+};
+export type ClientUpdateInstalledPluginErrors = {
+    /**
+     * There is no update, or the new file could not be installed.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientUpdateInstalledPluginError = ClientUpdateInstalledPluginErrors[keyof ClientUpdateInstalledPluginErrors];
+export type ClientUpdateInstalledPluginResponses = {
+    /**
+     * Plugin updated.
+     */
+    200: ClientPluginInstallResource;
+};
+export type ClientUpdateInstalledPluginResponse = ClientUpdateInstalledPluginResponses[keyof ClientUpdateInstalledPluginResponses];
+export type ClientRemoveInstalledPluginData = {
+    body: ClientRemoveInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientRemoveInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/remove';
+};
+export type ClientRemoveInstalledPluginErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not delete the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientRemoveInstalledPluginError = ClientRemoveInstalledPluginErrors[keyof ClientRemoveInstalledPluginErrors];
+export type ClientRemoveInstalledPluginResponses = {
+    /**
+     * Plugin removed.
+     */
+    204: void;
+};
+export type ClientRemoveInstalledPluginResponse = ClientRemoveInstalledPluginResponses[keyof ClientRemoveInstalledPluginResponses];
+export type ClientGetModpackInstallProgressData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
+};
+export type ClientGetModpackInstallProgressErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetModpackInstallProgressError = ClientGetModpackInstallProgressErrors[keyof ClientGetModpackInstallProgressErrors];
+export type ClientGetModpackInstallProgressResponses = {
+    /**
+     * Progress returned.
+     */
+    200: ClientModpackInstallResource;
+};
+export type ClientGetModpackInstallProgressResponse = ClientGetModpackInstallProgressResponses[keyof ClientGetModpackInstallProgressResponses];
+export type ClientInstallModpackData = {
+    body: ClientInstallModpackRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
+};
+export type ClientInstallModpackErrors = {
+    /**
+     * The version is not a modpack the panel can install.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * Another modpack install is running.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientInstallModpackError = ClientInstallModpackErrors[keyof ClientInstallModpackErrors];
+export type ClientInstallModpackResponses = {
+    /**
+     * Install started.
+     */
+    202: ClientModpackInstallResource;
+};
+export type ClientInstallModpackResponse = ClientInstallModpackResponses[keyof ClientInstallModpackResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {
@@ -22796,6 +24535,105 @@ export type ApiListThePublicStorePlansResponses = {
     200: ApiListThePublicStorePlansResponseBody;
 };
 export type ApiListThePublicStorePlansResponse = ApiListThePublicStorePlansResponses[keyof ApiListThePublicStorePlansResponses];
+export type ApiGetAPublicServerPageData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiGetAPublicServerPageSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}';
+};
+export type ApiGetAPublicServerPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+};
+export type ApiGetAPublicServerPageError = ApiGetAPublicServerPageErrors[keyof ApiGetAPublicServerPageErrors];
+export type ApiGetAPublicServerPageResponses = {
+    /**
+     * Page returned.
+     */
+    200: ApiGetAPublicServerPageResponseBody;
+};
+export type ApiGetAPublicServerPageResponse = ApiGetAPublicServerPageResponses[keyof ApiGetAPublicServerPageResponses];
+export type ApiVoteForAPublicServerPageData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiVoteForAPublicServerPageSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}/vote';
+};
+export type ApiVoteForAPublicServerPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The request was neither JSON nor marked with X-Requested-With.
+     */
+    415: ErrorEnvelope;
+};
+export type ApiVoteForAPublicServerPageError = ApiVoteForAPublicServerPageErrors[keyof ApiVoteForAPublicServerPageErrors];
+export type ApiVoteForAPublicServerPageResponses = {
+    /**
+     * Vote handled.
+     */
+    200: ApiVoteForAPublicServerPageResponseBody;
+};
+export type ApiVoteForAPublicServerPageResponse = ApiVoteForAPublicServerPageResponses[keyof ApiVoteForAPublicServerPageResponses];
+export type ApiWakeASleepingServerData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiWakeASleepingServerSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}/wake';
+};
+export type ApiWakeASleepingServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The request was neither JSON nor marked with X-Requested-With.
+     */
+    415: ErrorEnvelope;
+    /**
+     * Woken too recently; the Retry-After header says when to try again.
+     */
+    429: ErrorEnvelope;
+};
+export type ApiWakeASleepingServerError = ApiWakeASleepingServerErrors[keyof ApiWakeASleepingServerErrors];
+export type ApiWakeASleepingServerResponses = {
+    /**
+     * Wake handled.
+     */
+    200: ApiWakeASleepingServerResponseBody;
+};
+export type ApiWakeASleepingServerResponse = ApiWakeASleepingServerResponses[keyof ApiWakeASleepingServerResponses];
 export type ApiGetPublicStatusData = {
     body?: never;
     path?: never;
