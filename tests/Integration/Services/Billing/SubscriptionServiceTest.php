@@ -293,3 +293,94 @@ test('the billing command runs every five minutes and is safe to repeat', functi
     expect($this->wallet->balance($user))->toBe(100)
         ->and($subscription->fresh()->next_renewal_at)->toEqual(CarbonImmutable::now()->addDays(30));
 });
+
+test('a renewal paid after the scheduler loaded the subscription is never suspended', function (): void {
+    config()->set('monoforge.shop.grace_days', 0);
+    [$user, $server, $subscription] = dueSubscription($this, 500);
+    // The scheduler's copy, loaded while the renewal was due and unpaid.
+    $stale = ServerSubscription::query()->findOrFail($subscription->id);
+
+    // Meanwhile the player clicks "Renew now".
+    $this->service->renewNow($subscription);
+    expect($this->wallet->balance($user))->toBe(0);
+
+    // The scheduler's suspension step now runs with its stale copy.
+    $this->service->suspend($stale);
+
+    expect($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and(Server::query()->find($server->id))->not->toBeNull()
+        ->and($server->refresh()->isSuspended())->toBeFalse();
+});
+
+test('a due period that was already charged is not suspended', function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 500);
+    $this->wallet->debit($user, 500, SubscriptionService::CHARGE_TYPE, 'Renewal', SubscriptionService::REFERENCE_TYPE, $subscription->periodKey());
+
+    $this->service->suspend($subscription);
+
+    expect($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and($server->refresh()->isSuspended())->toBeFalse();
+});
+
+test('auto-renew is read under the lock: a stale "off" copy does not suspend a server set to renew', function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 500, ['auto_renew' => false]);
+    $stale = ServerSubscription::query()->findOrFail($subscription->id);
+    // The player turns auto-renew back on before the scheduler acts on its copy.
+    $subscription->forceFill(['auto_renew' => true])->save();
+
+    expect($this->service->renew($stale))->toBeTrue()
+        ->and($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and($this->wallet->balance($user))->toBe(0)
+        ->and($server->refresh()->isSuspended())->toBeFalse();
+
+    // And with auto-renew off in the database, renew() suspends without charging.
+    [$other, , $off] = dueSubscription($this, 500, ['auto_renew' => false]);
+    expect($this->service->renew($off))->toBeFalse()
+        ->and($off->fresh()->status)->toBe(ServerSubscription::STATUS_SUSPENDED)
+        ->and($this->wallet->balance($other))->toBe(500);
+});
+
+test('billing does not claim, and so never lifts, a suspension an admin made', function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 0);
+    // An admin suspended the server for abuse before the renewal was due.
+    $this->app->make(TogglesServerSuspension::class)->toggle($server, TogglesServerSuspension::ACTION_SUSPEND);
+
+    $this->service->renewDue();
+    expect($subscription->fresh())
+        ->status->toBe(ServerSubscription::STATUS_SUSPENDED)
+        ->suspended_by_billing->toBeFalse();
+
+    // The player tops up: the renewal is paid, but the admin's suspension stays.
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    expect($this->service->collectOverdue())->toBe(1)
+        ->and($subscription->fresh()->status)->toBe(ServerSubscription::STATUS_ACTIVE)
+        ->and($subscription->fresh()->suspended_at)->toBeNull()
+        ->and($server->refresh()->isSuspended())->toBeTrue();
+
+    // Extend and cancel do not lift it either.
+    $subscription->refresh()->forceFill(['next_renewal_at' => CarbonImmutable::now()])->save();
+    $this->service->renewDue();
+    $this->service->extend($subscription->fresh(), 5);
+
+    expect($server->refresh()->isSuspended())->toBeTrue();
+
+    $subscription->refresh()->forceFill(['next_renewal_at' => CarbonImmutable::now()])->save();
+    $this->service->renewDue();
+    $this->service->cancel($subscription->fresh());
+
+    expect($server->refresh()->isSuspended())->toBeTrue();
+});
+
+test('a server billing itself suspended is unsuspended once paid', function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 0);
+
+    $this->service->renewDue();
+    expect($subscription->fresh()->suspended_by_billing)->toBeTrue()
+        ->and($server->refresh()->isSuspended())->toBeTrue();
+
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    $this->service->collectOverdue();
+
+    expect($server->refresh()->isSuspended())->toBeFalse()
+        ->and($subscription->fresh()->suspended_by_billing)->toBeFalse();
+});

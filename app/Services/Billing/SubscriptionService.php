@@ -50,6 +50,8 @@ class SubscriptionService
 
     private const string INSUFFICIENT = 'insufficient';
 
+    private const string SUSPENDED = 'suspended';
+
     /** The renewal at `next_renewal_at` is due. */
     private const string MODE_DUE = 'due';
 
@@ -96,15 +98,34 @@ class SubscriptionService
     }
 
     /**
-     * Charges the renewal that is due. Returns true when it is paid (or nothing is due yet), and
-     * false when the balance is short, in which case the subscription is suspended.
+     * Charges the renewal that is due, or suspends the subscription when the balance is short or
+     * auto-renew is off. The charge and the suspension happen under the same row lock, so a
+     * "Renew now" paid in between is seen and a paid server is never suspended.
+     * Returns true when it is paid (or nothing is due yet), false when it was suspended.
      */
     public function renew(ServerSubscription $s): bool
     {
-        $result = $this->charge($s, self::MODE_DUE);
+        $grace = ShopSettings::graceDays();
 
-        if ($result === self::INSUFFICIENT) {
-            $this->suspend($s);
+        $result = DB::transaction(function () use ($s, $grace): string {
+            $locked = $this->lock($s);
+            if (! $locked instanceof ServerSubscription || ! $this->chargeable($locked, self::MODE_DUE)) {
+                return self::SKIPPED;
+            }
+
+            // auto_renew is read from the locked row, not from the model the scheduler loaded.
+            if ($locked->auto_renew) {
+                $result = $this->chargeLocked($s, $locked, self::MODE_DUE);
+                if ($result !== self::INSUFFICIENT) {
+                    return $result;
+                }
+            }
+
+            return $this->markSuspended($s, $locked, $grace) ? self::SUSPENDED : self::SKIPPED;
+        });
+
+        if ($result === self::SUSPENDED) {
+            $this->afterSuspension($s, $grace);
 
             return false;
         }
@@ -144,34 +165,17 @@ class SubscriptionService
 
         $suspended = DB::transaction(function () use ($s, $grace): bool {
             $locked = $this->lock($s);
-            if (! $locked instanceof ServerSubscription || ! $locked->isActive()) {
-                return false;
-            }
 
-            $now = CarbonImmutable::now();
-            $locked->fill([
-                'status' => ServerSubscription::STATUS_SUSPENDED,
-                'suspended_at' => $now,
-                'server_suspended_at' => null,
-                'delete_at' => $now->addDays($grace),
-            ])->save();
-            $s->setRawAttributes($locked->getAttributes(), true);
-
-            return true;
+            // Re-checked under the lock: a renewal paid since the caller loaded the model has
+            // moved `next_renewal_at` on (or charged this period), and then the server stays.
+            return $locked instanceof ServerSubscription
+                && $this->chargeable($locked, self::MODE_DUE)
+                && $this->markSuspended($s, $locked, $grace);
         });
 
-        if (! $suspended) {
-            return;
+        if ($suspended) {
+            $this->afterSuspension($s, $grace);
         }
-
-        if ($grace === 0) {
-            $this->deleteOne($s);
-
-            return;
-        }
-
-        $this->suspendServer($s);
-        $this->notifier->suspended($s);
     }
 
     /**
@@ -280,11 +284,8 @@ class SubscriptionService
                 ->where('status', ServerSubscription::STATUS_ACTIVE)
                 ->where('next_renewal_at', '<=', CarbonImmutable::now()),
             function (ServerSubscription $subscription) use (&$processed): void {
-                if ($subscription->auto_renew) {
-                    $this->renew($subscription);
-                } else {
-                    $this->suspend($subscription);
-                }
+                // renew() reads auto_renew under the row lock and suspends when it is off.
+                $this->renew($subscription);
 
                 $processed++;
             },
@@ -446,37 +447,85 @@ class SubscriptionService
                 return self::SKIPPED;
             }
 
-            $now = CarbonImmutable::now();
-            $key = $locked->periodKey();
-
-            // The period was charged already (a run that died before saving): only move on.
-            if (! $this->wallet->hasTransaction(self::REFERENCE_TYPE, $key, self::CHARGE_TYPE)) {
-                try {
-                    $this->wallet->debit(
-                        $locked->user,
-                        $locked->price_tokens,
-                        self::CHARGE_TYPE,
-                        "Renewal of {$locked->server->name} ({$locked->period_days} days)",
-                        self::REFERENCE_TYPE,
-                        $key,
-                        ['server_id' => $locked->server_id, 'period_days' => $locked->period_days],
-                    );
-                } catch (InsufficientTokensException) {
-                    return self::INSUFFICIENT;
-                }
-            }
-
-            $next = $mode === self::MODE_OVERDUE ? $now->addDays($locked->period_days) : $locked->next_renewal_at->addDays($locked->period_days);
-            // A scheduler that was down for longer than a period charges once, from now on.
-            if ($next->lessThanOrEqualTo($now)) {
-                $next = $now->addDays($locked->period_days);
-            }
-
-            $locked->fill(['status' => ServerSubscription::STATUS_ACTIVE, 'next_renewal_at' => $next, 'delete_at' => null])->save();
-            $s->setRawAttributes($locked->getAttributes(), true);
-
-            return self::PAID;
+            return $this->chargeLocked($s, $locked, $mode);
         });
+    }
+
+    /**
+     * Charges one period of a subscription row that the caller holds locked in its transaction.
+     */
+    private function chargeLocked(ServerSubscription $s, ServerSubscription $locked, string $mode): string
+    {
+        $now = CarbonImmutable::now();
+        $key = $locked->periodKey();
+
+        // The period was charged already (a run that died before saving): only move on.
+        if (! $this->wallet->hasTransaction(self::REFERENCE_TYPE, $key, self::CHARGE_TYPE)) {
+            try {
+                $this->wallet->debit(
+                    $locked->user,
+                    $locked->price_tokens,
+                    self::CHARGE_TYPE,
+                    "Renewal of {$locked->server->name} ({$locked->period_days} days)",
+                    self::REFERENCE_TYPE,
+                    $key,
+                    ['server_id' => $locked->server_id, 'period_days' => $locked->period_days],
+                );
+            } catch (InsufficientTokensException) {
+                return self::INSUFFICIENT;
+            }
+        }
+
+        $next = $mode === self::MODE_OVERDUE ? $now->addDays($locked->period_days) : $locked->next_renewal_at->addDays($locked->period_days);
+        // A scheduler that was down for longer than a period charges once, from now on.
+        if ($next->lessThanOrEqualTo($now)) {
+            $next = $now->addDays($locked->period_days);
+        }
+
+        $locked->fill(['status' => ServerSubscription::STATUS_ACTIVE, 'next_renewal_at' => $next, 'delete_at' => null])->save();
+        $s->setRawAttributes($locked->getAttributes(), true);
+
+        return self::PAID;
+    }
+
+    /**
+     * Marks a locked, due subscription as suspended, unless its current period was charged
+     * already. The server itself is suspended (or deleted) by afterSuspension() once the
+     * transaction has committed.
+     */
+    private function markSuspended(ServerSubscription $s, ServerSubscription $locked, int $grace): bool
+    {
+        if ($this->wallet->hasTransaction(self::REFERENCE_TYPE, $locked->periodKey(), self::CHARGE_TYPE)) {
+            return false;
+        }
+
+        $now = CarbonImmutable::now();
+        $locked->fill([
+            'status' => ServerSubscription::STATUS_SUSPENDED,
+            'suspended_at' => $now,
+            'server_suspended_at' => null,
+            'suspended_by_billing' => false,
+            'delete_at' => $now->addDays($grace),
+        ])->save();
+        $s->setRawAttributes($locked->getAttributes(), true);
+
+        return true;
+    }
+
+    /**
+     * Suspends the server of a subscription that was just marked suspended and tells the user,
+     * or deletes it right away with a grace period of 0 days.
+     */
+    private function afterSuspension(ServerSubscription $s, int $grace): void
+    {
+        if ($grace === 0) {
+            $this->deleteOne($s);
+
+            return;
+        }
+
+        $this->suspendServer($s);
+        $this->notifier->suspended($s);
     }
 
     private function chargeable(ServerSubscription $s, string $mode): bool
@@ -539,12 +588,20 @@ class SubscriptionService
     /**
      * Suspends the server in the panel and on Wings. A refusal (node offline, transfer running)
      * is reported and retried by syncServerStates().
+     *
+     * A server that is already suspended (an administrator suspended it, for abuse say) is not
+     * claimed: `suspended_by_billing` stays false, so a later payment never lifts that suspension.
      */
     private function suspendServer(ServerSubscription $s): bool
     {
         try {
-            $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_SUSPEND);
-            $s->forceFill(['server_suspended_at' => CarbonImmutable::now()])->save();
+            $server = $s->server()->firstOrFail();
+            $claimed = ! $server->isSuspended();
+            if ($claimed) {
+                $this->suspension->toggle($server, TogglesServerSuspension::ACTION_SUSPEND);
+            }
+
+            $s->forceFill(['server_suspended_at' => CarbonImmutable::now(), 'suspended_by_billing' => $claimed])->save();
 
             return true;
         } catch (Throwable $throwable) {
@@ -555,7 +612,9 @@ class SubscriptionService
     }
 
     /**
-     * Unsuspends a server that billing suspended (`suspended_at` is set until this succeeds).
+     * Ends billing's suspension (`suspended_at` is set until this succeeds). The server is only
+     * unsuspended when billing's own suspension changed it (`suspended_by_billing`); a server
+     * someone else suspended stays suspended.
      */
     private function restoreServer(ServerSubscription $s): bool
     {
@@ -564,8 +623,11 @@ class SubscriptionService
         }
 
         try {
-            $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_UNSUSPEND);
-            $s->forceFill(['suspended_at' => null, 'server_suspended_at' => null])->save();
+            if ($s->suspended_by_billing) {
+                $this->suspension->toggle($s->server()->firstOrFail(), TogglesServerSuspension::ACTION_UNSUSPEND);
+            }
+
+            $s->forceFill(['suspended_at' => null, 'server_suspended_at' => null, 'suspended_by_billing' => false])->save();
 
             return true;
         } catch (Throwable $throwable) {
