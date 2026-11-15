@@ -49,6 +49,7 @@ import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
+import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
 import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
@@ -1030,6 +1031,43 @@ const panelChildren = [
             () => import('@/components/admin/servers/CreateServerForm'),
             ['panel.servers.create.before', 'panel.servers.create.after']
         ),
+    }),
+    // Phase 3 Task R: the Shop tab. Every sub-tab path renders ShopContainer, which picks the tab from the
+    // path (see components/admin/shop/shopTabs.ts). token-packs (Task P) and tunnels (Task V) are slots.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop',
+        staticData: { nav: { label: 'Shop', icon: 'store' } },
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminShopCategoriesQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminShopPlansQueryOptions(), revalidateIfStale: true }),
+            ]);
+        },
+        component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
+    }),
+    ...(['periods', 'multipliers', 'addons', 'limits', 'token-packs', 'tunnels'] as const).map((tab) =>
+        createRoute({
+            getParentRoute: () => panelRoute,
+            path: `shop/${tab}`,
+            component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
+        })
+    ),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/plans/new',
+        validateSearch: (search: { category?: string | number | boolean | null }): { category?: number } => {
+            const category = Number(search.category);
+
+            return Number.isInteger(category) && category > 0 ? { category } : {};
+        },
+        component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/plans/$id',
+        params: idParam,
+        component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,
