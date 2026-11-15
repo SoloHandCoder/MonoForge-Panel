@@ -7,17 +7,27 @@ namespace Pterodactyl\Services\Extensions;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Pterodactyl\Events\Extensions\ExtensionLoadFailed;
 use Pterodactyl\Exceptions\Extensions\InvalidExtensionException;
 use Pterodactyl\Models\Extension;
+use Pterodactyl\Services\Themes\ThemeDefinition;
+use Pterodactyl\Services\Themes\ThemeSetting;
+use ReflectionClass;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 
 class ExtensionRepository
 {
+    /** Cache keys of validated manifests, one per extension directory. */
+    private const string MANIFEST_CACHE_PREFIX = 'extensions:manifest:';
+
+    /** Set once the extensions table is known to exist. */
+    private const string TABLE_CACHE_KEY = 'extensions:records-table';
+
     /** @var Collection<string, ExtensionManifest>|null */
     private ?Collection $discovered = null;
 
@@ -29,6 +39,9 @@ class ExtensionRepository
 
     /** @var array<string, ExtensionSettings> */
     private array $settings = [];
+
+    /** @var Collection<string, Extension>|null the records last read, which clearErrors() checks before querying */
+    private ?Collection $lastRecords = null;
 
     /** @var array<string, true> Provider failures in this application instance, retained across discovery refreshes. */
     private array $failedProviders = [];
@@ -60,7 +73,7 @@ class ExtensionRepository
             $directory = dirname($file);
 
             try {
-                $manifest = $this->validator->fromDirectory($directory);
+                $manifest = $this->manifest($directory);
                 if ($manifest->id !== basename($directory)) {
                     throw new InvalidExtensionException(sprintf('Extension directory "%s" must match its manifest id "%s".', basename($directory), $manifest->id));
                 }
@@ -95,8 +108,8 @@ class ExtensionRepository
      */
     public function records(): Collection
     {
-        return rescue(function (): Collection {
-            if (! Schema::hasTable('extensions')) {
+        return $this->lastRecords = rescue(function (): Collection {
+            if (! $this->hasRecordsTable()) {
                 return $this->recordCollection([]);
             }
 
@@ -200,6 +213,9 @@ class ExtensionRepository
 
     public function recordFailure(string $identifier, string $reason, ?Throwable $exception = null, string $phase = 'runtime'): void
     {
+        // The records read earlier no longer show this failure.
+        $this->lastRecords = null;
+
         if (in_array($phase, ['register', 'boot'], true)) {
             $this->failedProviders[$identifier] = true;
             $this->enabled = null;
@@ -240,6 +256,14 @@ class ExtensionRepository
             $this->enabled = null;
         }
 
+        // The records this request read while booting already show whether there is a load
+        // failure to clear; without them, ask the database.
+        if ($this->lastRecords instanceof Collection && $this->lastRecords->doesntContain(fn (Extension $record): bool => in_array($record->identifier, $identifiers, true)
+            && $record->error !== null
+            && ($record->error_phase === null || in_array($record->error_phase, Extension::LOAD_PHASES, true)))) {
+            return;
+        }
+
         // Runs on every boot, so it only writes when there is a load failure to clear.
         rescue(function () use ($identifiers): void {
             $loadFailures = Extension::query()
@@ -258,6 +282,79 @@ class ExtensionRepository
         // One instance per extension per request so the per-instance row cache
         // in ExtensionSettings actually coalesces reads.
         return $this->settings[$identifier] ??= new ExtensionSettings($identifier);
+    }
+
+    /**
+     * The manifest of an extension directory. Validating a manifest runs the full validator,
+     * which costs milliseconds on every request, so a valid one is kept in the cache store
+     * under a fingerprint of everything it was built from: its manifest and composer.json
+     * contents and the panel code that parses them. Changing any of these validates it again.
+     *
+     * @throws InvalidExtensionException
+     */
+    private function manifest(string $directory): ExtensionManifest
+    {
+        $fingerprint = $this->manifestFingerprint($directory);
+        $key = self::MANIFEST_CACHE_PREFIX.hash('xxh128', $directory);
+
+        if ($fingerprint !== null) {
+            $cached = rescue(fn (): mixed => Cache::get($key), report: false);
+            if (is_array($cached) && ($cached['fingerprint'] ?? null) === $fingerprint && ($cached['manifest'] ?? null) instanceof ExtensionManifest) {
+                return $cached['manifest'];
+            }
+        }
+
+        $manifest = $this->validator->fromDirectory($directory);
+
+        // Root path prefixes are also checked against the files in public/, which the fingerprint does not cover.
+        if ($fingerprint !== null && $manifest->rootPrefixes === []) {
+            rescue(fn (): bool => Cache::put($key, ['fingerprint' => $fingerprint, 'manifest' => $manifest], now()->addDay()), report: false);
+        }
+
+        return $manifest;
+    }
+
+    /**
+     * Null when the manifest cannot be read, which leaves reporting that to the validator.
+     */
+    private function manifestFingerprint(string $directory): ?string
+    {
+        $manifest = @file_get_contents($directory.DIRECTORY_SEPARATOR.ExtensionManifest::FILENAME);
+        if ($manifest === false) {
+            return null;
+        }
+
+        $composer = $directory.DIRECTORY_SEPARATOR.'composer.json';
+        $code = array_map(function (string $class): string {
+            $file = (new ReflectionClass($class))->getFileName();
+
+            return $file === false ? $class : $file.':'.@filemtime($file).':'.@filesize($file);
+        }, [ExtensionManifest::class, ExtensionManifestValidator::class, ThemeDefinition::class, ThemeSetting::class]);
+
+        return hash('xxh128', implode("\0", [
+            config()->string('app.version', ''),
+            ...$code,
+            $manifest,
+            is_file($composer) ? (string) @file_get_contents($composer) : '',
+        ]));
+    }
+
+    /**
+     * Every request reads the extension records while it boots, so once the table exists
+     * that is remembered in the cache store rather than asked of the database each time.
+     */
+    private function hasRecordsTable(): bool
+    {
+        if (rescue(fn (): mixed => Cache::get(self::TABLE_CACHE_KEY), report: false) === true) {
+            return true;
+        }
+
+        $exists = Schema::hasTable('extensions');
+        if ($exists) {
+            rescue(fn (): bool => Cache::put(self::TABLE_CACHE_KEY, true, now()->addDay()), report: false);
+        }
+
+        return $exists;
     }
 
     /**

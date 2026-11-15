@@ -118,7 +118,7 @@ class SettingsServiceProvider extends ServiceProvider
     public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log): void
     {
         try {
-            $values = Setting::query()->pluck('value', 'key')->all();
+            $values = Setting::values();
         } catch (QueryException $queryException) {
             $log->notice('A query exception was encountered while trying to load settings from the database: '.$queryException->getMessage());
 

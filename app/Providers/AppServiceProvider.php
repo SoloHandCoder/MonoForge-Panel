@@ -86,8 +86,10 @@ class AppServiceProvider extends ServiceProvider
         // mutation of a shared timestamp is never something we want.
         Date::use(CarbonImmutable::class);
 
-        View::share('appVersion', $this->versionData()['version']);
-        View::share('appIsGit', $this->versionData()['is_git']);
+        // Read once: every request boots through here, and each read is a cache store round trip.
+        $version = $this->versionData();
+        View::share('appVersion', $version['version']);
+        View::share('appIsGit', $version['is_git']);
 
         Paginator::useBootstrap();
 
