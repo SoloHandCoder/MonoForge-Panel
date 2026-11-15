@@ -49,6 +49,7 @@ return [
                     'api/application*',
                     'api/client*',
                     'api/admin*',
+                    'api/public*',
                 ],
 
                 // Match only routes whose domains match this pattern (use * as a wildcard to match any characters). Example: 'api.*'.

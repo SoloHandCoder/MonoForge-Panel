@@ -32,7 +32,7 @@ class StoreCatalogService
     /** @var array{memory: int, disk: int, cpu: int}|null */
     private ?array $used = null;
 
-    public function __construct(private readonly CapacityService $capacity) {}
+    public function __construct(private readonly CapacityService $capacity, private readonly PricingService $pricing) {}
 
     /**
      * @return array<string, mixed>
@@ -89,6 +89,75 @@ class StoreCatalogService
                     'price_tokens' => $addon->price_tokens,
                     'max_units' => $addon->max_units,
                 ])->all(),
+        ];
+    }
+
+    /**
+     * What the public homepage shows: the plans on sale with their resources, the games they run
+     * and what they cost per enabled period on their cheapest node. Nothing about where a plan runs
+     * (no node, location, address or capacity figure) is included.
+     *
+     * @return array{enabled: bool, periods: array<int, array{id: int, name: string, days: int}>, categories: list<array{name: string, slug: string, description: string|null, plans: list<array<string, mixed>>}>}
+     */
+    public function publicPlans(): array
+    {
+        if (! ShopSettings::enabled()) {
+            return ['enabled' => false, 'periods' => [], 'categories' => []];
+        }
+
+        $periods = ShopPeriod::query()->ordered()->where('enabled', true)->get();
+        $categories = ShopCategory::query()->ordered()->where('visible', true)->get();
+        $plans = ShopPlan::query()
+            ->where('visible', true)
+            ->whereIn('category_id', $categories->modelKeys())
+            ->cheapestFirst()
+            ->get();
+
+        $eggIds = $plans->flatMap(fn (ShopPlan $plan): array => $plan->eggIds())->unique()->values()->all();
+        $eggs = Egg::query()->whereIn('id', $eggIds)->orderBy('name')->pluck('name', 'id');
+
+        $presented = [];
+        foreach ($categories as $category) {
+            $list = [];
+            foreach ($plans->where('category_id', $category->id) as $plan) {
+                $nodes = $this->nodesFor($plan);
+                $games = collect($plan->eggIds())->map(fn (int $id): mixed => $eggs->get($id))->filter(fn (mixed $name): bool => is_string($name))->values()->all();
+                if ($nodes->isEmpty() || $games === []) {
+                    continue;
+                }
+
+                $multiplier = $this->multiplierOf($nodes->first());
+                $resources = $plan->resources();
+                $list[] = [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'description' => $plan->description,
+                    'resources' => [
+                        'memory' => $resources['memory'],
+                        'disk' => $resources['disk'],
+                        'cpu' => $resources['cpu'],
+                        'databases' => $resources['databases'],
+                        'backups' => $resources['backups'],
+                    ],
+                    'games' => $games,
+                    'available' => CapacityService::fits(ShopSettings::limits(), $this->used ??= $this->capacity->used(), $resources),
+                    'prices' => $periods->map(fn (ShopPeriod $period): array => [
+                        'period_id' => $period->id,
+                        'days' => $period->days,
+                        'tokens' => $this->pricing->calculate($plan, $period, $multiplier, [])->totalPerPeriod,
+                    ])->values()->all(),
+                ];
+            }
+
+            if ($list !== []) {
+                $presented[] = ['name' => $category->name, 'slug' => $category->slug, 'description' => $category->description, 'plans' => $list];
+            }
+        }
+
+        return [
+            'enabled' => true,
+            'periods' => $periods->map(fn (ShopPeriod $period): array => ['id' => $period->id, 'name' => $period->name, 'days' => $period->days])->values()->all(),
+            'categories' => $presented,
         ];
     }
 
