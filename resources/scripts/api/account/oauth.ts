@@ -66,6 +66,27 @@ export const useStartOAuthLogin = () =>
         onError: (error) => notifyHttpError(error, 'Unable to start signing in'),
     });
 
+/**
+ * Creates the account of a Discord/Google sign-up waiting on the consent screen, once the visitor
+ * agrees to the Terms of Service and Privacy Policy, and sends the signed-in browser on.
+ */
+export const useCompleteOAuthSignUp = () =>
+    useMutation({
+        mutationFn: async (terms: boolean) => {
+            await authGetCsrfCookie();
+
+            return (
+                await http.post<{ data: { complete: boolean; intended: string | null } }>('/auth/modules/register', {
+                    terms,
+                })
+            ).data.data;
+        },
+        onSuccess: ({ intended }) => {
+            window.location.assign(intended || '/');
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to create your account'),
+    });
+
 /** Starts linking a provider to the signed-in account. */
 export const useLinkOAuthAccount = () =>
     useMutation({

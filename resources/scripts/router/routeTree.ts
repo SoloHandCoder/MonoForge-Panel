@@ -48,6 +48,7 @@ import { adminThemesQueryOptions } from '@/api/admin/themes/queries';
 import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags/queries';
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
+import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
@@ -162,7 +163,22 @@ const authChildren = [
             }
         },
     }),
+    // A Discord/Google sign-up accepts the Terms of Service and Privacy Policy here before its
+    // account is created.
+    createRoute({
+        getParentRoute: () => authRoute,
+        path: 'register/consent',
+        component: componentRoute(() => import('@/components/auth/ProviderSignUpConsent')),
+    }),
 ];
+
+// The Terms of Service, Privacy Policy and Refund Policy: public, outside the sign-in layout. The
+// server renders each document into its page (or redirects to the external page).
+const legalRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'legal/$document',
+    component: componentRoute(() => import('@/components/legal/LegalPage')),
+});
 
 const authenticatedRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -933,6 +949,20 @@ const panelChildren = [
     }),
     createRoute({
         getParentRoute: () => panelRoute,
+        path: 'settings/legal',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminLegalDocumentsQueryOptions(), revalidateIfStale: true }),
+            ]);
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
         path: 'users',
         staticData: { nav: { label: 'Users', icon: 'users' } },
         validateSearch: parseUserListSearch,
@@ -1319,6 +1349,7 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
 
     return rootRoute.addChildren([
         authRoute.addChildren(authChildren),
+        legalRoute,
         authenticatedRoute.addChildren([
             dashboardRoute,
             storeRoute,
