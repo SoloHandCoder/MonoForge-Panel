@@ -12,8 +12,10 @@ import {
 } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as OAuthApi from '@/api/account/oauth';
 import { queryClient } from '@/api/queryClient';
 import { siteSettingsQueryKey } from '@/api/settings/queries';
+import type { SiteSettings } from '@/api/settings/types';
 import { renderView } from '@/sdk/testing';
 import { View } from '../View';
 
@@ -22,6 +24,8 @@ const mocks = vi.hoisted(() => ({
     checkpoint: vi.fn(),
     requestReset: vi.fn(),
     reset: vi.fn(),
+    register: vi.fn(),
+    startOAuth: vi.fn(),
     execute: vi.fn<() => Promise<string | null>>(),
 }));
 
@@ -30,6 +34,12 @@ vi.mock('@/api/auth/queries', () => ({
     useLoginCheckpoint: () => ({ mutateAsync: mocks.checkpoint, isPending: false }),
     useRequestPasswordResetEmail: () => ({ mutateAsync: mocks.requestReset, isPending: false }),
     usePerformPasswordReset: () => ({ mutateAsync: mocks.reset, isPending: false }),
+    useRegister: () => ({ mutateAsync: mocks.register, isPending: false }),
+}));
+
+vi.mock('@/api/account/oauth', async (importOriginal) => ({
+    ...(await importOriginal<typeof OAuthApi>()),
+    useStartOAuthLogin: () => ({ mutate: mocks.startOAuth, isPending: false, variables: undefined }),
 }));
 
 vi.mock('@/components/elements/InvisibleRecaptcha', () => ({
@@ -40,11 +50,26 @@ vi.mock('@/components/elements/InvisibleRecaptcha', () => ({
     },
 }));
 
+vi.mock('@/components/elements/Turnstile', () => ({
+    default: function Turnstile({
+        ref,
+        action,
+    }: {
+        ref: Ref<{ execute: () => Promise<string | null> }>;
+        action?: string;
+    }) {
+        useImperativeHandle(ref, () => ({ execute: mocks.execute }));
+
+        return <div data-testid='turnstile' data-action={action} />;
+    },
+}));
+
 const views = {
     '/auth/login': 'page.auth.login',
     '/auth/login/checkpoint': 'page.auth.checkpoint',
     '/auth/password': 'page.auth.password',
     '/auth/password/reset/$token': 'page.auth.passwordReset',
+    '/auth/register': 'page.auth.register',
 } as const;
 
 let router: ReturnType<typeof createAuthRouter> | undefined;
@@ -62,11 +87,12 @@ function createAuthRouter(path: string) {
     });
 }
 
-async function renderAuth(path: string, recaptcha = false) {
-    queryClient.setQueryData(siteSettingsQueryKey, {
+async function renderAuth(path: string, recaptcha = false, extra: Partial<SiteSettings> = {}) {
+    queryClient.setQueryData<SiteSettings>(siteSettingsQueryKey, {
         name: 'Panel',
         locale: 'en',
         recaptcha: { enabled: recaptcha, siteKey: recaptcha ? 'site-key' : '' },
+        ...extra,
     });
     router = createAuthRouter(path);
 
@@ -212,6 +238,21 @@ describe('page.auth.login', () => {
             body: { user: 'alex', password: 'secret', 'g-recaptcha-response': 'captcha-token' },
         });
     });
+    it('sends the login Turnstile token when continuing with Discord', async () => {
+        mocks.execute.mockResolvedValue('turnstile-token');
+        await renderAuth('/auth/login', false, {
+            captcha: { provider: 'turnstile', siteKey: 'site-key' },
+            oauth: { providers: { discord: true }, result: null },
+        });
+
+        // The start endpoint verifies with the "login" action, like the password form.
+        expect(screen.getByTestId('turnstile')).toHaveAttribute('data-action', 'login');
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Continue with Discord' }));
+        });
+
+        expect(mocks.startOAuth).toHaveBeenCalledWith({ provider: 'discord', captcha: 'turnstile-token' });
+    });
 });
 
 describe('page.auth.checkpoint', () => {
@@ -281,6 +322,58 @@ describe('password reset forms', () => {
                 password: 'correct horse',
                 password_confirmation: 'correct horse',
                 'g-recaptcha-response': '',
+            },
+        });
+    });
+});
+
+describe('sign-up', () => {
+    it('links to sign-up from the login page only while the panel allows it', async () => {
+        await renderAuth('/auth/login');
+
+        expect(screen.queryByRole('link', { name: 'Create an account' })).toBeNull();
+        cleanup();
+
+        await renderAuth('/auth/login', false, { registration: { enabled: true } });
+
+        expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/auth/register');
+    });
+
+    it('creates the account with a Turnstile token once the rules are accepted', async () => {
+        mocks.register.mockReturnValue(new Promise(() => {}));
+        mocks.execute.mockResolvedValue('turnstile-token');
+        await renderAuth('/auth/register', false, {
+            captcha: { provider: 'turnstile', siteKey: 'site-key' },
+            registration: { enabled: true },
+        });
+
+        // The widget names its form, which the panel checks when verifying the token.
+        expect(screen.getByTestId('turnstile')).toHaveAttribute('data-action', 'register');
+        expect(screen.getByRole('link', { name: 'Already have an account? Sign in' })).toHaveAttribute(
+            'href',
+            '/auth/login'
+        );
+
+        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alex' } });
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'alex@example.test' } });
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct horse' } });
+        fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'correct horse' } });
+
+        expect(screen.getByRole('button', { name: 'Create Account' })).toBeDisabled();
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'I agree to the rules' }));
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+        });
+
+        expect(mocks.register).toHaveBeenCalledWith({
+            body: {
+                username: 'alex',
+                email: 'alex@example.test',
+                password: 'correct horse',
+                password_confirmation: 'correct horse',
+                terms: true,
+                'g-recaptcha-response': 'turnstile-token',
             },
         });
     });

@@ -14,9 +14,12 @@ interface CreatesUsers
      * email. Pass a password in plain text; the model hashes it. The input is validated here.
      * Extension field values go under `extensions` as ValidatedExtensionValues.
      *
+     * Pass `$notify: false` when the person creating the account is its owner (self
+     * sign-up), so no "account created" email is sent.
+     *
      * @param  array<string, mixed>  $input  email, username, name_first, name_last, and optionally external_id, password, root_admin and language
      *
      * @throws Throwable
      */
-    public function create(array $input): User;
+    public function create(array $input, bool $notify = true): User;
 }

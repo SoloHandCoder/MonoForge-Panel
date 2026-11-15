@@ -10,8 +10,10 @@ const search = { load: () => import('./search') };
 const dashboard = { load: () => import('./dashboard') };
 const login = { load: () => import('./auth/login') };
 const password = { load: () => import('./auth/password') };
+const register = { load: () => import('./auth/register') };
 const overview = { load: () => import('./account/overview') };
 const keys = { load: () => import('./account/keys') };
+const connections = { load: () => import('./account/connections') };
 const activity = { load: () => import('./activity') };
 const backups = { load: () => import('./server/backups') };
 const conflict = { load: () => import('./server/conflict') };
@@ -82,6 +84,7 @@ defineView('page.auth.login', {
 defineView('page.auth.checkpoint', { ...VIEW_PAGES['page.auth.checkpoint'], ...login });
 defineView('page.auth.password', { ...VIEW_PAGES['page.auth.password'], ...password });
 defineView('page.auth.passwordReset', { ...VIEW_PAGES['page.auth.passwordReset'], ...password });
+defineView('page.auth.register', { ...VIEW_PAGES['page.auth.register'], ...register });
 
 defineView('page.account.overview', {
     ...VIEW_PAGES['page.account.overview'],
@@ -91,6 +94,7 @@ defineView('page.account.overview', {
 defineView('account.password', { context: 'account', ...overview });
 defineView('account.email', { context: 'account', ...overview });
 defineView('account.twoFactor', { context: 'account', ...overview });
+defineView('account.connections', { context: 'account', ...connections });
 defineView('page.account.api', { ...VIEW_PAGES['page.account.api'], ...keys });
 defineView('page.account.ssh', { ...VIEW_PAGES['page.account.ssh'], ...keys });
 defineView('account.apiKeys.list', { context: 'account', ...keys });

@@ -17,6 +17,25 @@ export default function LoginPage({ model, className }: ViewProps<'page.auth.log
                     Login
                 </Button>
             </div>
+            {model.providers.length > 0 && (
+                <div className='mt-6 flex flex-col gap-3'>
+                    <p className='text-center text-xs text-muted-foreground uppercase tracking-wide'>or</p>
+                    {model.providers.map((provider) => (
+                        <Button
+                            key={provider.id}
+                            type='button'
+                            size='xlarge'
+                            color='grey'
+                            isSecondary
+                            onClick={provider.start}
+                            disabled={model.submitting || provider.pending}
+                            isLoading={provider.pending}
+                        >
+                            Continue with {provider.label}
+                        </Button>
+                    ))}
+                </div>
+            )}
             <Slot name='auth.login.form.after' data={model.route} />
             {Captcha && <Captcha />}
             <div className='mt-6 text-center'>
@@ -24,6 +43,13 @@ export default function LoginPage({ model, className }: ViewProps<'page.auth.log
                     Forgot password?
                 </PanelLink>
             </div>
+            {model.register && (
+                <div className='mt-3 text-center'>
+                    <PanelLink destination={model.register} className={authLinkClass}>
+                        Create an account
+                    </PanelLink>
+                </div>
+            )}
         </AuthCard>
     );
 }

@@ -15,6 +15,14 @@ use Pterodactyl\Models\Setting;
 
 class SettingsServiceProvider extends ServiceProvider
 {
+    // --- Phase 2 Task H (Resend email) ---
+    /**
+     * Mail drivers the admin Email settings can select through `mail:default`.
+     *
+     * @var list<string>
+     */
+    public const array MAIL_DRIVERS = ['smtp', 'resend', 'log'];
+
     /**
      * An array of configuration keys to override with database values
      * if they exist.
@@ -36,6 +44,18 @@ class SettingsServiceProvider extends ServiceProvider
         'pterodactyl:client_features:allocations:range_start',
         'pterodactyl:client_features:allocations:range_end',
         'monoforge:update:mode',
+        // Phase 2 Task G: Discord and Google login providers.
+        'monoforge:auth:discord:enabled',
+        'monoforge:auth:discord:client_id',
+        'monoforge:auth:discord:client_secret',
+        'monoforge:auth:google:enabled',
+        'monoforge:auth:google:client_id',
+        'monoforge:auth:google:client_secret',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:auth:registration:enabled',
+        'monoforge:captcha:provider',
+        'monoforge:captcha:turnstile:site_key',
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**
@@ -55,6 +75,19 @@ class SettingsServiceProvider extends ServiceProvider
     ];
 
     /**
+     * Keys only grabbed from the database when Resend is the mail driver.
+     *
+     * @var list<string>
+     */
+    protected array $resendKeys = [
+        'services:resend:key',
+        'mail:from:address',
+        'mail:from:name',
+    ];
+
+    // --- end Task H ---
+
+    /**
      * Keys that are encrypted and should be decrypted when set in the
      * configuration array.
      *
@@ -62,6 +95,13 @@ class SettingsServiceProvider extends ServiceProvider
      */
     protected static array $encrypted = [
         'mail:mailers:smtp:password',
+        // Phase 2 Task H (Resend email).
+        'services:resend:key',
+        // Phase 2 Task G: Discord and Google login providers.
+        'monoforge:auth:discord:client_secret',
+        'monoforge:auth:google:client_secret',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**
@@ -77,18 +117,28 @@ class SettingsServiceProvider extends ServiceProvider
      */
     public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log): void
     {
-        // Only set the email driver settings from the database if we
-        // are configured using SMTP as the driver.
-        if ($config->get('mail.default') === 'smtp') {
-            $this->keys = array_merge($this->keys, $this->emailKeys);
-        }
-
         try {
             $values = Setting::query()->pluck('value', 'key')->all();
         } catch (QueryException $queryException) {
             $log->notice('A query exception was encountered while trying to load settings from the database: '.$queryException->getMessage());
 
             return;
+        }
+
+        // Phase 2 Task H: the driver chosen in the admin Email settings
+        // (`mail:default`) is applied first, because it decides which of the
+        // driver-specific keys below are loaded.
+        $driver = Arr::get($values, 'settings::mail:default');
+        if (is_string($driver) && in_array($driver, self::MAIL_DRIVERS, true)) {
+            $config->set('mail.default', $driver);
+        }
+
+        // Only set the email driver settings from the database if we
+        // are configured using SMTP (or, for Task H, Resend) as the driver.
+        if ($config->get('mail.default') === 'smtp') {
+            $this->keys = array_merge($this->keys, $this->emailKeys);
+        } elseif ($config->get('mail.default') === 'resend') {
+            $this->keys = array_merge($this->keys, $this->resendKeys);
         }
 
         foreach ($this->keys as $key) {
@@ -98,6 +148,10 @@ class SettingsServiceProvider extends ServiceProvider
                 try {
                     $value = $encrypter->decrypt($value);
                 } catch (DecryptException) {
+                    // Task H: never hand ciphertext to the Resend transport as a key.
+                    if ($key === 'services:resend:key') {
+                        $value = null;
+                    }
                 }
             }
 

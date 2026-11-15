@@ -26,7 +26,7 @@ type AdminMailSettingsBody = NonNullable<AdminUpdateMailSettingsData['body']>;
 type AdminMailSmtpSettingsBody = NonNullable<AdminMailSettingsBody['smtp']>;
 type AdminAdvancedSettingsBody = AdminUpdateAdvancedSettingsData['body'];
 type UpdateAdminMailSettingsOptions = { successNotification?: boolean };
-type AdminSettingsSection = 'Advanced' | 'General' | 'Mail';
+type AdminSettingsSection = 'Advanced' | 'General' | 'Email';
 
 export interface GeneralSettingsValues {
     name: string;
@@ -34,7 +34,19 @@ export interface GeneralSettingsValues {
     locale: string;
 }
 
+export type MailDriver = NonNullable<AdminMailSettingsBody['driver']>;
+
+export const mailDrivers: { value: MailDriver; label: string }[] = [
+    { value: 'smtp', label: 'SMTP' },
+    { value: 'resend', label: 'Resend' },
+    { value: 'log', label: 'Log only (no email is sent)' },
+];
+
+export const isMailDriver = (driver: string): driver is MailDriver =>
+    mailDrivers.some((option) => option.value === driver);
+
 export interface MailSettingsValues {
+    driver: MailDriver;
     host: string;
     port: number;
     encryption: NonNullable<AdminMailSmtpSettingsBody['encryption']> | '';
@@ -43,6 +55,8 @@ export interface MailSettingsValues {
     password: string;
     fromAddress: string;
     fromName: string;
+    // Write-only. Blank keeps the existing key; "!e" clears it.
+    resendApiKey: string;
 }
 
 export interface AdvancedSettingsValues {
@@ -60,17 +74,30 @@ export interface AdvancedSettingsValues {
         | '';
 }
 
-const adminMailSettingsBody = (values: MailSettingsValues): AdminMailSettingsBody => ({
-    smtp: {
-        host: values.host,
-        port: values.port,
-        encryption: values.encryption === '' ? null : values.encryption,
-        username: values.username,
-        password: values.password,
+const adminMailSettingsBody = (values: MailSettingsValues): AdminMailSettingsBody => {
+    const body: AdminMailSettingsBody = {
+        driver: values.driver,
         from_address: values.fromAddress,
         from_name: values.fromName,
-    },
-});
+    };
+
+    // SMTP settings are only sent (and validated) while SMTP is selected.
+    if (values.driver === 'smtp') {
+        body.smtp = {
+            host: values.host,
+            port: values.port,
+            encryption: values.encryption === '' ? null : values.encryption,
+            username: values.username,
+            password: values.password,
+        };
+    }
+
+    if (values.resendApiKey !== '') {
+        body.resend = { api_key: values.resendApiKey };
+    }
+
+    return body;
+};
 
 export const updateAdminGeneralSettingsInput = (
     values: GeneralSettingsValues
@@ -144,12 +171,12 @@ export const useUpdateAdminMailSettings = ({ successNotification = true }: Updat
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: adminGetSettingsQueryKey() });
             if (successNotification) {
-                const notification = adminSettingsUpdateToast('Mail');
+                const notification = adminSettingsUpdateToast('Email');
 
                 toast.success(notification.title, { description: notification.description });
             }
         },
-        onError: (error) => notifyHttpError(error, 'Unable to update mail settings'),
+        onError: (error) => notifyHttpError(error, 'Unable to update email settings'),
     });
 };
 
@@ -157,10 +184,10 @@ export const useSendTestAdminMail = () =>
     useMutation({
         ...adminSendTestMailMutation(),
         onSuccess: () =>
-            toast.success('Mail settings tested', {
-                description: 'Mail settings have been saved and a test email has been sent to your account.',
+            toast.success('Email settings tested', {
+                description: 'Email settings have been saved and a test email has been sent to your account.',
             }),
-        onError: (error) => notifyHttpError(error, 'Unable to test mail settings'),
+        onError: (error) => notifyHttpError(error, 'Unable to send the test email'),
     });
 
 export const useUpdateAdminAdvancedSettings = () => {
@@ -169,13 +196,22 @@ export const useUpdateAdminAdvancedSettings = () => {
     return useMutation({
         ...adminUpdateAdvancedSettingsMutation(),
         onSuccess: async (_data, { body }) => {
-            setSiteSettingsQueryData(queryClient, (settings) => ({
-                ...settings,
-                recaptcha: {
-                    enabled: body['recaptcha:enabled'] === 'true',
-                    siteKey: body['recaptcha:website_key'],
-                },
-            }));
+            setSiteSettingsQueryData(queryClient, (settings) => {
+                const enabled = body['recaptcha:enabled'] === 'true';
+                const siteKey = body['recaptcha:website_key'];
+                const recaptcha = { enabled, siteKey };
+
+                // Turning reCAPTCHA on makes it the captcha provider; turning it off leaves Turnstile alone.
+                if (enabled) {
+                    return { ...settings, recaptcha, captcha: { provider: 'recaptcha', siteKey } };
+                }
+
+                if (settings.captcha?.provider === 'turnstile') {
+                    return { ...settings, recaptcha };
+                }
+
+                return { ...settings, recaptcha, captcha: { provider: 'none', siteKey: '' } };
+            });
             await queryClient.invalidateQueries({ queryKey: adminGetSettingsQueryKey() });
             const notification = adminSettingsUpdateToast('Advanced');
 

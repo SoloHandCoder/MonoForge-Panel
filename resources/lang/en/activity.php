@@ -29,6 +29,9 @@ return [
         'account' => [
             'email-changed' => 'Changed email from :old to :new',
             'password-changed' => 'Changed password',
+            'oauth-linked' => 'Linked a :provider account',
+            'oauth-unlinked' => 'Unlinked a :provider account',
+            'password-set' => 'Set a password',
         ],
         'api-key' => [
             'create' => 'Created new API key :identifier',

@@ -28,6 +28,20 @@
             "export": "default"
         }
     },
+    "account.connections": {
+        "kind": "block",
+        "context": "account",
+        "slots": [],
+        "fixtures": [
+            "default",
+            "needsPassword",
+            "loading"
+        ],
+        "classic": {
+            "file": "views/account/ConnectionsCard.tsx",
+            "export": "default"
+        }
+    },
     "account.email": {
         "kind": "block",
         "context": "account",
@@ -394,7 +408,8 @@
         "fixtures": [
             "default",
             "invalid",
-            "submitting"
+            "submitting",
+            "socialLogin"
         ],
         "classic": {
             "file": "views/auth/LoginPage.tsx",
@@ -432,6 +447,19 @@
         ],
         "classic": {
             "file": "views/auth/ResetPasswordPage.tsx",
+            "export": "default"
+        }
+    },
+    "page.auth.register": {
+        "kind": "page",
+        "context": "auth",
+        "slots": [],
+        "fixtures": [
+            "default",
+            "invalid"
+        ],
+        "classic": {
+            "file": "views/auth/RegisterPage.tsx",
             "export": "default"
         }
     },

@@ -8,9 +8,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Request;
+use Illuminate\Mail\MailManager;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Routing\Route as IlluminateRoute;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +26,10 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Knuckles\Scribe\Scribe;
+use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Enum\ResourceLimit;
 use Pterodactyl\Extensions\Illuminate\Auth\Passwords\PasswordBrokerManager;
+use Pterodactyl\Extensions\Mail\ResendTransport;
 use Pterodactyl\Extensions\Scribe\Support\PathParameterNames;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ApiKey;
@@ -42,9 +47,11 @@ use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserSSHKey;
+use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
 use ReflectionFunctionAbstract;
+use Symfony\Component\HttpFoundation\Response;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -121,11 +128,23 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(DaemonManager::class);
 
+        $this->app->bind(VerifiesCaptcha::class, HttpCaptchaVerifier::class);
+
         // Keys registered through setEnvironmentKey() must survive to every consumer,
         // so the service is shared rather than rebuilt on each resolve.
         $this->app->singleton(EnvironmentService::class);
 
         $this->app->extend('auth.password', fn (): PasswordBrokerManager => new PasswordBrokerManager($this->app));
+
+        // Resend over its HTTP API without the Resend SDK. The key is read when the
+        // transport is built, after SettingsServiceProvider has applied stored settings.
+        $this->callAfterResolving('mail.manager', function (MailManager $manager): void {
+            $manager->extend('resend', function (array $config): ResendTransport {
+                $key = $config['key'] ?? config('services.resend.key');
+
+                return new ResendTransport($this->app->make(HttpFactory::class), is_string($key) ? $key : '');
+            });
+        });
 
         // Only load the settings service provider if the environment
         // is configured to allow it.
@@ -185,11 +204,48 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip());
         });
 
+        // Sign-up: 3 accounts an hour per IP and 1 attempt an hour per submitted email.
+        // Runs after the captcha, so failed captchas do not use anyone's attempts. Forms
+        // the validation rejects do not count either, so a taken username or a typo does
+        // not lock anyone out, except rejections of the email itself (probing for
+        // registered addresses), which count against that email.
+        RateLimiter::for('registration', function (Request $request): array {
+            $email = mb_strtolower(mb_trim($request->string('email')->toString()));
+
+            return [
+                Limit::perHour(3)->by('ip:'.$request->ip())
+                    ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY),
+                Limit::perHour(1)->by('email:'.$email)
+                    ->after(fn (Response $response): bool => $response->getStatusCode() !== Response::HTTP_UNPROCESSABLE_ENTITY
+                        || $this->rejectsField($response, 'email')),
+            ];
+        });
+
         RateLimiter::for('api.client', fn (Request $request): Limit => $this->apiLimit($request, 'client'));
         RateLimiter::for('api.application', fn (Request $request): Limit => $this->apiLimit($request, 'application'));
         RateLimiter::for('api.admin', fn (Request $request): Limit => $this->apiLimit($request, 'admin'));
 
         ResourceLimit::boot();
+    }
+
+    /**
+     * Whether a validation error response names the given field.
+     */
+    private function rejectsField(Response $response, string $field): bool
+    {
+        $body = json_decode((string) $response->getContent(), true);
+        $errors = is_array($body) ? ($body['errors'] ?? null) : null;
+        if (! is_array($errors)) {
+            return false;
+        }
+
+        foreach ($errors as $error) {
+            if (is_array($error) && Arr::get($error, 'meta.source_field') === $field) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function apiLimit(Request $request, string $name): Limit

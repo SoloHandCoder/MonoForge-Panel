@@ -2,6 +2,7 @@ export { default as AccountOverview } from './AccountOverview';
 export { default as PasswordCard } from './PasswordCard';
 export { default as EmailCard } from './EmailCard';
 export { default as TwoFactorCard } from './TwoFactorCard';
+export { default as ConnectionsCard } from './ConnectionsCard';
 export { default as ApiKeysPage } from './ApiKeysPage';
 export { default as ApiKeyList } from './ApiKeyList';
 export { default as ApiKeyCreate } from './ApiKeyCreate';

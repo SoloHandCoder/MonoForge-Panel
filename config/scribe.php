@@ -63,6 +63,7 @@ return [
                 'POST /auth/logout',
                 'POST /auth/password',
                 'POST /auth/password/reset',
+                'POST /auth/register',
             ],
 
             // Exclude these routes even if they matched the rules above.

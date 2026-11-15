@@ -165,6 +165,7 @@ describe('session queries', () => {
                 name: 'Renamed Panel',
                 locale: 'de',
                 recaptcha: { enabled: true, siteKey: 'site-key' },
+                captcha: { provider: 'recaptcha', siteKey: 'site-key' },
             })
         );
         expect(adapter.mock.calls.every(([config]) => config.method === 'put')).toBe(true);

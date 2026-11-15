@@ -26,4 +26,52 @@ return [
         // How many code and database backups to keep in storage/app/updates.
         'keep_backups' => 3,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sign-up and login providers
+    |--------------------------------------------------------------------------
+    |
+    | Whether visitors may create their own account at /auth/register. The admin
+    | Settings page stores it as "monoforge:auth:registration:enabled".
+    |
+    | Discord and Google sign in (Settings > Login providers, stored as
+    | "monoforge:auth:{provider}:*"). A provider is offered only while it is
+    | enabled and has both a client ID and a client secret.
+    |
+    */
+    'auth' => [
+        'registration' => [
+            'enabled' => (bool) env('MONOFORGE_REGISTRATION_ENABLED', false),
+        ],
+        'discord' => [
+            'enabled' => (bool) env('DISCORD_LOGIN_ENABLED', false),
+            'client_id' => env('DISCORD_CLIENT_ID', ''),
+            'client_secret' => env('DISCORD_CLIENT_SECRET', ''),
+        ],
+        'google' => [
+            'enabled' => (bool) env('GOOGLE_LOGIN_ENABLED', false),
+            'client_id' => env('GOOGLE_CLIENT_ID', ''),
+            'client_secret' => env('GOOGLE_CLIENT_SECRET', ''),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Captcha
+    |--------------------------------------------------------------------------
+    |
+    | provider: "none", "recaptcha" or "turnstile" (Cloudflare). Left empty, the
+    | legacy "recaptcha.enabled" switch decides between reCAPTCHA and none. The
+    | reCAPTCHA keys live in config/recaptcha.php.
+    |
+    */
+    'captcha' => [
+        'provider' => env('MONOFORGE_CAPTCHA_PROVIDER'),
+        'turnstile' => [
+            'site_key' => env('TURNSTILE_SITE_KEY', ''),
+            'secret_key' => env('TURNSTILE_SECRET_KEY', ''),
+            'domain' => env('TURNSTILE_DOMAIN', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
+        ],
+    ],
 ];
