@@ -958,7 +958,11 @@ export const adminListUserTokenTransactions = <ThrowOnError extends boolean = tr
  */
 export const adminAdjustUserTokens = <ThrowOnError extends boolean = true>(options: Options<AdminAdjustUserTokensData, ThrowOnError>): RequestResult<AdminAdjustUserTokensResponses, AdminAdjustUserTokensErrors, ThrowOnError> => (options.client ?? client).post<AdminAdjustUserTokensResponses, AdminAdjustUserTokensErrors, ThrowOnError>({
     responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [{
+            in: 'cookie',
+            name: 'pterodactyl_session',
+            type: 'apiKey'
+        }],
     url: '/api/admin/users/{user_id}/tokens',
     ...options,
     headers: {
