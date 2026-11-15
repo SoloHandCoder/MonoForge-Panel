@@ -81,6 +81,16 @@ describe('SidebarNav on the dashboard', () => {
         expect(screen.getByRole('link', { name: 'Join our Discord' })).toHaveAttribute('rel', 'noopener noreferrer');
     });
 
+    it('offers the Store only while the shop is open', async () => {
+        await renderNav(fixture('user'));
+        expect(screen.getByRole('link', { name: 'Store' })).toHaveAttribute('href', '/store');
+        cleanup();
+        host?.dispose();
+
+        await renderNav({ ...fixture('user'), storeEnabled: false });
+        expect(screen.queryByRole('link', { name: 'Store' })).not.toBeInTheDocument();
+    });
+
     it('shows the server count once it has loaded', async () => {
         await renderNav(fixture('user'));
         expect(screen.queryByTestId('server-count')).not.toBeInTheDocument();
@@ -225,6 +235,7 @@ describe('SidebarNav categories', () => {
         expect(categories('Administration')).toEqual([
             ['General', ['Overview', 'Activity', 'Announcements', 'Settings']],
             ['Users & servers', ['Users', 'Servers']],
+            ['Billing', ['Shop']],
             ['Infrastructure', ['Locations', 'Nodes', 'Live usage', 'Storage', 'Database Hosts', 'Mounts']],
             ['Game config', ['Eggs', 'Tags']],
             ['System', ['Extensions', 'Themes', 'API Keys']],
@@ -234,13 +245,10 @@ describe('SidebarNav categories', () => {
     it('files extension screens it does not know under More', async () => {
         const model = fixture('adminArea');
         const area = model.area.kind === 'admin' ? model.area : null;
-        const shop = { ...area!.nav.items[4]!, id: 'shop', label: 'Shop', order: 50 };
+        // The fixture already has the Shop, filed under Billing.
         const assistant = { ...area!.nav.items[4]!, id: 'assistant', label: 'AI Assistant', order: 51 };
 
-        await renderNav(
-            { ...model, area: { ...area!, nav: { items: [...area!.nav.items, shop, assistant] } } },
-            '/panel'
-        );
+        await renderNav({ ...model, area: { ...area!, nav: { items: [...area!.nav.items, assistant] } } }, '/panel');
 
         const labels = categories('Administration');
 

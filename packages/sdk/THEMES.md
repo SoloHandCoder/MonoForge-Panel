@@ -414,7 +414,7 @@ set of pages:
 
 | Layout | Frames | Its model has |
 | --- | --- | --- |
-| `layout.app` | Every signed-in page | `brand`, `links`, `area`, `serverCount`, `user`, the scheme, `signOut` |
+| `layout.app` | Every signed-in page | `brand`, `links`, `area`, `serverCount`, `storeEnabled`, `user`, the scheme, `signOut` |
 | `layout.account` | The account pages, inside `layout.app` | `nav` |
 | `layout.server` | A server's pages, inside `layout.app` | `name`, `state`, `nav`, `conflict`, `server` |
 | `layout.admin` | The admin area, inside `layout.app` | `nav`, `user` |

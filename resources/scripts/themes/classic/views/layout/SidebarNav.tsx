@@ -372,10 +372,12 @@ function PanelNav({ model, area }: { model: AppLayoutModel; area: AccountArea | 
                     )}
                 </AppLink>
             )}
-            <PanelLink destination={{ to: '/store' }} className={sidebarItemClass}>
-                <Glyph name='store' />
-                <span className='min-w-0 flex-1 truncate'>Store</span>
-            </PanelLink>
+            {model.storeEnabled && (
+                <PanelLink destination={{ to: '/store' }} className={sidebarItemClass}>
+                    <Glyph name='store' />
+                    <span className='min-w-0 flex-1 truncate'>Store</span>
+                </PanelLink>
+            )}
             {area && <AreaSlot area={area} at='before' />}
             <AccountItems items={area?.nav.items ?? published.items} accountLink={link('account')} />
             {area && <AreaSlot area={area} at='after' />}
