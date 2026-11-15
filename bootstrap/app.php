@@ -24,6 +24,7 @@ use Pterodactyl\Exceptions\ApiErrorResponse;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Http\Controllers\Base\PublicNoticeController;
+use Pterodactyl\Http\Controllers\Base\PublicServerPageController;
 use Pterodactyl\Http\Controllers\Base\PublicStatusController;
 use Pterodactyl\Http\Controllers\Base\PublicStorePlansController;
 use Pterodactyl\Http\Controllers\Webhooks\TebexWebhookController;
@@ -44,6 +45,7 @@ use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Http\Middleware\SetSecurityHeaders;
 use Pterodactyl\Http\Middleware\TrustProxies;
 use Pterodactyl\Http\Middleware\VerifyCaptcha;
+use Pterodactyl\Services\ServerPages\ServerPageSlug;
 use Pterodactyl\Services\Themes\ThemeResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -87,6 +89,21 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
         Route::middleware('throttle:60,1')
             ->get('/api/public/store/plans', PublicStorePlansController::class)
             ->name('api.public.store.plans');
+
+        // The shareable public server pages at /s/{slug}: no session, cached for 30 seconds. Votes
+        // and the wake button set or read only the visitor cookie, kept as a keyed hash.
+        Route::middleware('throttle:60,1')
+            ->get('/api/public/servers/{slug}', [PublicServerPageController::class, 'show'])
+            ->where('slug', ServerPageSlug::PATTERN)
+            ->name('api.public.servers.show');
+        Route::middleware('throttle:10,1')
+            ->post('/api/public/servers/{slug}/vote', [PublicServerPageController::class, 'vote'])
+            ->where('slug', ServerPageSlug::PATTERN)
+            ->name('api.public.servers.vote');
+        Route::middleware('throttle:10,1')
+            ->post('/api/public/servers/{slug}/wake', [PublicServerPageController::class, 'wake'])
+            ->where('slug', ServerPageSlug::PATTERN)
+            ->name('api.public.servers.wake');
 
         // Tebex payment webhooks: no session, no CSRF, checked by source address and signature instead.
         // The address is $request->ip(): CF-Connecting-IP when the peer is the local tunnel (see

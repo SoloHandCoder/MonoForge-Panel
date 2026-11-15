@@ -1774,7 +1774,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
 };
 
 export type ClientServerSubuserListResponse = {
@@ -5021,14 +5021,14 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
 };
 
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
 };
 
 export type ClientCreateServerBackupRequest = {
@@ -5076,6 +5076,36 @@ export type ClientSendAnAssistantMessageRequest = {
      * The message. Must be at least 1 character. Must not be greater than 8000 characters.
      */
     message: string;
+};
+
+export type ClientUpdateServerPublicPageRequest = {
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown, at most 2000 characters, or null for none.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string;
+};
+
+export type ClientUploadServerPublicPageBannerRequest = {
+    /**
+     * The banner image.
+     */
+    banner: Blob | File;
 };
 
 export type ClientRenameServerRequest = {
@@ -7288,6 +7318,178 @@ export type ClientDenyAnAssistantActionResponseBody = {
     };
 };
 
+export type ClientGetServerPublicPageResponseBody = {
+    /**
+     * Whether the page has been saved before.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/, or null before the page is saved.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page, or null before the page is saved.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown; links, bold, italics, lists and headings are shown, HTML is shown as text.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the panel's default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the banner image, or null when there is none.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address: only a live playit tunnel address is ever shown.
+     */
+    has_address: boolean;
+};
+
+export type ClientUpdateServerPublicPageResponseBody = {
+    /**
+     * Always true after a save.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the banner image, or null when there is none.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+
+export type ClientUploadServerPublicPageBannerResponseBody = {
+    /**
+     * Always true.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * The path of the new banner image.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+
+export type ClientDeleteServerPublicPageBannerResponseBody = {
+    /**
+     * Whether the page has been saved before.
+     */
+    exists: boolean;
+    /**
+     * The part of the address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether search engines are asked not to list the page.
+     */
+    noindex: boolean;
+    /**
+     * The description in markdown.
+     */
+    description: string;
+    /**
+     * The banner colour as #rrggbb, or null for the default.
+     */
+    banner_color: string | null;
+    /**
+     * Always null after the delete.
+     */
+    banner_image_url: string | null;
+    /**
+     * The total votes the page has received.
+     */
+    votes: number;
+    /**
+     * Whether the page shows a join address.
+     */
+    has_address: boolean;
+};
+
 export type ApiListThePublicStorePlansResponseBody = {
     /**
      * Whether the store is open. When it is closed the lists are empty.
@@ -7332,6 +7534,95 @@ export type ApiListThePublicStorePlansResponseBody = {
             }>;
         }>;
     }>;
+};
+
+export type ApiGetAPublicServerPageResponseBody = {
+    /**
+     * The part of the page address after /s/.
+     */
+    slug: string;
+    /**
+     * The server name.
+     */
+    name: string;
+    /**
+     * The description in markdown, to be shown with a safe renderer; empty for none.
+     */
+    description: string;
+    /**
+     * The banner colour and image.
+     */
+    banner: {
+        /**
+         * The banner colour as #rrggbb, or null for the default.
+         */
+        color: string | null;
+        /**
+         * The path of the banner image, or null for none.
+         */
+        image_url: string | null;
+    };
+    /**
+     * The game, such as Minecraft, or null when it is not one the panel knows.
+     */
+    game: string | null;
+    /**
+     * The server type, such as Paper.
+     */
+    software: string | null;
+    /**
+     * The game version, from the game itself or the server's settings, or null.
+     */
+    version: string | null;
+    /**
+     * The current state of the server.
+     */
+    status: 'online' | 'offline' | 'starting' | 'sleeping' | 'unknown';
+    /**
+     * The players online and the limit.
+     */
+    players: {
+        online: number;
+        max: number;
+    } | null;
+    /**
+     * The playit address to join with, or null when the server has none.
+     */
+    address: string | null;
+    /**
+     * A link that adds the server in the game (Minecraft Bedrock), or null.
+     */
+    join_url: string | null;
+    /**
+     * The total votes.
+     */
+    votes: number;
+};
+
+export type ApiVoteForAPublicServerPageResponseBody = {
+    /**
+     * Whether this vote was counted.
+     */
+    counted: boolean;
+    /**
+     * The total votes now.
+     */
+    votes: number;
+    /**
+     * When this visitor can vote for the page again.
+     */
+    next_vote_at: string;
+};
+
+export type ApiWakeASleepingServerResponseBody = {
+    /**
+     * Whether the server was started.
+     */
+    woken: boolean;
+    /**
+     * Whether the server is still sleeping.
+     */
+    sleeping: boolean;
 };
 
 export type ApiGetPublicStatusResponseBody = {
@@ -8900,11 +9191,21 @@ export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
 
+export type ClientGetServerPublicPageServerUuidPathParameter = string;
+
+export type ClientUploadServerPublicPageBannerServerUuidPathParameter = string;
+
 export type ClientRenameServerServerUuidPathParameter = string;
 
 export type ClientReinstallServerServerUuidPathParameter = string;
 
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
+
+export type ApiGetAPublicServerPageSlugPathParameter = string;
+
+export type ApiVoteForAPublicServerPageSlugPathParameter = string;
+
+export type ApiWakeASleepingServerSlugPathParameter = string;
 
 export type AdminListLanguagesData = {
     body?: never;
@@ -23511,6 +23812,170 @@ export type ClientDenyAnAssistantActionResponses = {
 
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
 
+export type ClientGetServerPublicPageData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page';
+};
+
+export type ClientGetServerPublicPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientGetServerPublicPageError = ClientGetServerPublicPageErrors[keyof ClientGetServerPublicPageErrors];
+
+export type ClientGetServerPublicPageResponses = {
+    /**
+     * Public page returned.
+     */
+    200: ClientGetServerPublicPageResponseBody;
+};
+
+export type ClientGetServerPublicPageResponse = ClientGetServerPublicPageResponses[keyof ClientGetServerPublicPageResponses];
+
+export type ClientUpdateServerPublicPageData = {
+    body: ClientUpdateServerPublicPageRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page';
+};
+
+export type ClientUpdateServerPublicPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientUpdateServerPublicPageError = ClientUpdateServerPublicPageErrors[keyof ClientUpdateServerPublicPageErrors];
+
+export type ClientUpdateServerPublicPageResponses = {
+    /**
+     * Public page saved.
+     */
+    200: ClientUpdateServerPublicPageResponseBody;
+};
+
+export type ClientUpdateServerPublicPageResponse = ClientUpdateServerPublicPageResponses[keyof ClientUpdateServerPublicPageResponses];
+
+export type ClientDeleteServerPublicPageBannerData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page/banner';
+};
+
+export type ClientDeleteServerPublicPageBannerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientDeleteServerPublicPageBannerError = ClientDeleteServerPublicPageBannerErrors[keyof ClientDeleteServerPublicPageBannerErrors];
+
+export type ClientDeleteServerPublicPageBannerResponses = {
+    /**
+     * Banner deleted.
+     */
+    200: ClientDeleteServerPublicPageBannerResponseBody;
+};
+
+export type ClientDeleteServerPublicPageBannerResponse = ClientDeleteServerPublicPageBannerResponses[keyof ClientDeleteServerPublicPageBannerResponses];
+
+export type ClientUploadServerPublicPageBannerData = {
+    body: ClientUploadServerPublicPageBannerRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/page/banner';
+};
+
+export type ClientUploadServerPublicPageBannerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The page has not been saved yet.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientUploadServerPublicPageBannerError = ClientUploadServerPublicPageBannerErrors[keyof ClientUploadServerPublicPageBannerErrors];
+
+export type ClientUploadServerPublicPageBannerResponses = {
+    /**
+     * Banner stored.
+     */
+    200: ClientUploadServerPublicPageBannerResponseBody;
+};
+
+export type ClientUploadServerPublicPageBannerResponse = ClientUploadServerPublicPageBannerResponses[keyof ClientUploadServerPublicPageBannerResponses];
+
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {
@@ -23675,6 +24140,120 @@ export type ApiListThePublicStorePlansResponses = {
 };
 
 export type ApiListThePublicStorePlansResponse = ApiListThePublicStorePlansResponses[keyof ApiListThePublicStorePlansResponses];
+
+export type ApiGetAPublicServerPageData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiGetAPublicServerPageSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}';
+};
+
+export type ApiGetAPublicServerPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ApiGetAPublicServerPageError = ApiGetAPublicServerPageErrors[keyof ApiGetAPublicServerPageErrors];
+
+export type ApiGetAPublicServerPageResponses = {
+    /**
+     * Page returned.
+     */
+    200: ApiGetAPublicServerPageResponseBody;
+};
+
+export type ApiGetAPublicServerPageResponse = ApiGetAPublicServerPageResponses[keyof ApiGetAPublicServerPageResponses];
+
+export type ApiVoteForAPublicServerPageData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiVoteForAPublicServerPageSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}/vote';
+};
+
+export type ApiVoteForAPublicServerPageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The request was neither JSON nor marked with X-Requested-With.
+     */
+    415: ErrorEnvelope;
+};
+
+export type ApiVoteForAPublicServerPageError = ApiVoteForAPublicServerPageErrors[keyof ApiVoteForAPublicServerPageErrors];
+
+export type ApiVoteForAPublicServerPageResponses = {
+    /**
+     * Vote handled.
+     */
+    200: ApiVoteForAPublicServerPageResponseBody;
+};
+
+export type ApiVoteForAPublicServerPageResponse = ApiVoteForAPublicServerPageResponses[keyof ApiVoteForAPublicServerPageResponses];
+
+export type ApiWakeASleepingServerData = {
+    body?: never;
+    path: {
+        /**
+         * The part of a public server page address after /s/.
+         */
+        slug: ApiWakeASleepingServerSlugPathParameter;
+    };
+    query?: never;
+    url: '/api/public/servers/{slug}/wake';
+};
+
+export type ApiWakeASleepingServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No published page has that address.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The request was neither JSON nor marked with X-Requested-With.
+     */
+    415: ErrorEnvelope;
+    /**
+     * Woken too recently; the Retry-After header says when to try again.
+     */
+    429: ErrorEnvelope;
+};
+
+export type ApiWakeASleepingServerError = ApiWakeASleepingServerErrors[keyof ApiWakeASleepingServerErrors];
+
+export type ApiWakeASleepingServerResponses = {
+    /**
+     * Wake handled.
+     */
+    200: ApiWakeASleepingServerResponseBody;
+};
+
+export type ApiWakeASleepingServerResponse = ApiWakeASleepingServerResponses[keyof ApiWakeASleepingServerResponses];
 
 export type ApiGetPublicStatusData = {
     body?: never;

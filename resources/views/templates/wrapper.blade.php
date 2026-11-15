@@ -9,9 +9,9 @@
             <meta http-equiv="X-UA-Compatible" content="IE=edge">
             <meta content="width=device-width, initial-scale=1" name="viewport">
             <meta name="csrf-token" content="{{ csrf_token() }}">
-            {{-- Only the public homepage may be indexed; every panel page stays out of search results. --}}
+            {{-- Only the public homepage and public server pages may be indexed; every panel page stays out of search results. --}}
             @isset($seo)
-                <meta name="robots" content="index, follow">
+                <meta name="robots" content="{{ $seo['robots'] ?? 'index, follow' }}">
                 <meta name="description" content="{{ $seo['description'] }}">
                 <link rel="canonical" href="{{ $seo['url'] }}">
                 <meta property="og:type" content="website">
@@ -20,7 +20,7 @@
                 <meta property="og:description" content="{{ $seo['description'] }}">
                 <meta property="og:url" content="{{ $seo['url'] }}">
                 <meta property="og:image" content="{{ $seo['image'] }}">
-                <meta name="twitter:card" content="summary">
+                <meta name="twitter:card" content="{{ $seo['card'] ?? 'summary' }}">
                 <meta name="twitter:title" content="{{ $seo['title'] }}">
                 <meta name="twitter:description" content="{{ $seo['description'] }}">
             @else
@@ -51,7 +51,7 @@
             {{-- data-theme-token: the SPA keeps this tag equal to the --theme-color token.
                  A theme-color registered by an extension is left exactly as rendered. --}}
             @unless ($extensionHead->replaces('meta', 'theme-color'))
-                <meta name="theme-color" content="#0e0d15" data-theme-token>
+                <meta name="theme-color" content="{{ $seo['theme_color'] ?? '#0e0d15' }}" data-theme-token>
             @endunless
             {{ $extensionHead }}
         @show

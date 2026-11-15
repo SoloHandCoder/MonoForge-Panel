@@ -15,6 +15,8 @@ use Pterodactyl\Events\Server\OperationCompleted;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Share\ServerPage;
+use Pterodactyl\Services\ServerPages\ServerPageBanners;
 use Throwable;
 
 final class DeleteServer implements DeletesServers
@@ -23,6 +25,7 @@ final class DeleteServer implements DeletesServers
 
     public function __construct(
         private readonly DeletesDatabases $deleteDatabase,
+        private readonly ServerPageBanners $banners,
     ) {}
 
     public function withForce(bool $bool = true): self
@@ -42,6 +45,9 @@ final class DeleteServer implements DeletesServers
             throw_if(! $this->force && $daemonConnectionException->getStatusCode() !== Response::HTTP_NOT_FOUND, $daemonConnectionException);
             Log::warning($daemonConnectionException->getMessage(), ['exception' => $daemonConnectionException]);
         }
+
+        // The public page row goes with the server (foreign key); its banner file is removed below.
+        $banner = ServerPage::query()->where('server_id', $server->id)->value('banner_image');
 
         // The remote databases are dropped only after the Panel records are gone. Dropping
         // them inside the transaction could not be undone if the deletion later rolled back.
@@ -68,6 +74,8 @@ final class DeleteServer implements DeletesServers
                 report($throwable);
             }
         }
+
+        $this->banners->delete(is_string($banner) ? $banner : null);
 
         // The row is gone, so only the uuid travels. Dispatched after any outer transaction commits.
         Event::dispatch(new OperationCompleted($server->uuid, 'delete', true, $server->uuid));

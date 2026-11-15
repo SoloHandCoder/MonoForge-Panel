@@ -29,6 +29,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\ResourceUtilizationControlle
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleTaskController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ServerController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\ServerPageController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SleepController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\StartupController;
@@ -248,6 +249,14 @@ Route::group([
         Route::post('/{conversation}/tool-calls/{toolCall}/approve', [AssistantConversationController::class, 'approve'])->middleware(RequireSessionAuthentication::class)->withoutScopedBindings();
         Route::post('/{conversation}/tool-calls/{toolCall}/deny', [AssistantConversationController::class, 'deny'])->middleware(RequireSessionAuthentication::class)->withoutScopedBindings();
         Route::delete('/{conversation}', [AssistantConversationController::class, 'destroy'])->withoutScopedBindings();
+    });
+
+    // Phase 6: the shareable public page at /s/{slug}.
+    Route::group(['prefix' => '/page'], function (): void {
+        Route::get('/', [ServerPageController::class, 'show']);
+        Route::put('/', [ServerPageController::class, 'update']);
+        Route::middleware('throttle:10,1')->post('/banner', [ServerPageController::class, 'uploadBanner']);
+        Route::delete('/banner', [ServerPageController::class, 'deleteBanner']);
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

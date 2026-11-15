@@ -8,8 +8,11 @@ use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
 use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
+use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
+use Pterodactyl\Services\ServerPages\ServerPageBanners;
+use Pterodactyl\Services\ServerPages\ServerPageSlug;
 
 Route::get('/', [IndexController::class, 'index'])->name('index')->fallback();
 Route::get('/account', [IndexController::class, 'index'])
@@ -31,6 +34,20 @@ Route::get('/legal/{document}', LegalPageController::class)
 Route::get('/status', [IndexController::class, 'index'])
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->name('status');
+
+// The shareable public server pages, readable without signing in. The SPA renders the page; the
+// server adds its title and Open Graph tags for link previews.
+Route::get('/s/{slug}', [IndexController::class, 'serverPage'])
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->where('slug', ServerPageSlug::PATTERN)
+    ->name('server-page');
+
+// A public server page's banner image. Stateless, like the extension files below.
+Route::get('/s/{slug}/banner/{file}', ServerPageBannerController::class)
+    ->withoutMiddleware(['web', 'auth.session', RequireTwoFactorAuthentication::class])
+    ->where('slug', ServerPageSlug::PATTERN)
+    ->where('file', ServerPageBanners::NAME_PATTERN)
+    ->name('server-page.banner');
 
 // Files uploaded through extension `file` settings. Public and stateless: no
 // session, no cookies, so the immutable cache headers are safe behind a proxy.

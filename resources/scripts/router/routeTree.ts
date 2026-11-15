@@ -190,6 +190,13 @@ const statusRoute = createRoute({
     component: componentRoute(() => import('@/components/status/StatusPage')),
 });
 
+// A server's shareable public page: readable without signing in; the server adds its link preview tags.
+const serverPageRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 's/$slug',
+    component: componentRoute(() => import('@/components/serverPage/PublicServerPage')),
+});
+
 const authenticatedRoute = createRoute({
     getParentRoute: () => rootRoute,
     id: 'authenticated',
@@ -481,6 +488,16 @@ const serverChildren = [
         staticData: { nav: { label: 'Settings', permission: ['settings.*', 'file.sftp'], icon: 'settings' } },
         beforeLoad: requireServerPermission(['settings.*', 'file.sftp']),
         component: pageRoute('page.server.settings', ['settings.*', 'file.sftp']),
+    }),
+    // Phase 6: the shareable public page at /s/$slug.
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'share',
+        staticData: {
+            nav: { label: 'Public page', permission: 'share.manage', icon: 'share-2', group: 'access' },
+        },
+        beforeLoad: requireServerPermission('share.manage'),
+        component: componentRoute(() => import('@/components/server/share/ServerShareContainer')),
     }),
     // Phase 4: the AI assistant. Its link also needs the assistant switched on (see useNavigation).
     createRoute({
@@ -1427,6 +1444,7 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
         authRoute.addChildren(authChildren),
         legalRoute,
         statusRoute,
+        serverPageRoute,
         authenticatedRoute.addChildren([
             dashboardRoute,
             storeRoute,
