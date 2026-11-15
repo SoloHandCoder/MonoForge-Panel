@@ -186,18 +186,29 @@ describe('public homepage', () => {
         expect(screen.getAllByText('Plans coming soon')).toHaveLength(2);
     });
 
-    it('lists the AI assistant only when it is enabled', () => {
+    it('lists the AI assistant only when it is enabled, always with six cards so the grid has no gap', () => {
         const { rerender } = render(<HomePage />);
         const features = () => within(screen.getByRole('region', { name: 'Everything you need, nothing to install' }));
 
         expect(features().queryByRole('heading', { name: 'AI assistant' })).toBeNull();
-        for (const name of ['Instant setup', 'Ready-made addresses', 'Web file editor', 'Backups', 'Discord support']) {
+        for (const name of [
+            'Instant setup',
+            'Ready-made addresses',
+            'Live console',
+            'Web file editor',
+            'Backups',
+            'Discord support',
+        ]) {
             expect(features().getByRole('heading', { name })).toBeVisible();
         }
+
+        expect(features().getAllByRole('listitem')).toHaveLength(6);
 
         state.plans = { data: catalog({ assistantEnabled: true }), isPending: false };
         rerender(<HomePage />);
         expect(features().getByRole('heading', { name: 'AI assistant' })).toBeVisible();
+        expect(features().queryByRole('heading', { name: 'Live console' })).toBeNull();
+        expect(features().getAllByRole('listitem')).toHaveLength(6);
     });
 
     it('answers the common questions and links the legal pages and Discord in the footer', () => {

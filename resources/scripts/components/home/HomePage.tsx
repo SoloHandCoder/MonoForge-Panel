@@ -10,6 +10,7 @@ import {
     Globe,
     MessagesSquare,
     Sparkles,
+    SquareTerminal,
     Zap,
     type LucideIcon,
 } from 'lucide-react';
@@ -337,6 +338,10 @@ interface Feature {
     text: string;
 }
 
+/**
+ * The feature cards: six in either case, so the two and three column grids never end on a gap.
+ * Without the AI assistant, the live console takes its place.
+ */
 function features(assistant: boolean): Feature[] {
     return [
         {
@@ -349,15 +354,17 @@ function features(assistant: boolean): Feature[] {
             title: 'Ready-made addresses',
             text: 'Every server gets a playit.gg address, so friends join without port forwarding or an IP to share.',
         },
-        ...(assistant
-            ? [
-                  {
-                      icon: Sparkles,
-                      title: 'AI assistant',
-                      text: 'Ask for help in plain words, right inside the panel, when a config or a crash has you stuck.',
-                  },
-              ]
-            : []),
+        assistant
+            ? {
+                  icon: Sparkles,
+                  title: 'AI assistant',
+                  text: 'Ask for help in plain words, right inside the panel, when a config or a crash has you stuck.',
+              }
+            : {
+                  icon: SquareTerminal,
+                  title: 'Live console',
+                  text: 'Colour-coded logs you can search, command history and live CPU, memory and network graphs.',
+              },
         {
             icon: FileCode2,
             title: 'Web file editor',
