@@ -16,8 +16,8 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Task;
-use Pterodactyl\Services\Sleep\ServerSleep;
 use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
+use Pterodactyl\Services\Sleep\ServerSleep;
 use Throwable;
 
 class RunTaskJob implements ShouldQueue

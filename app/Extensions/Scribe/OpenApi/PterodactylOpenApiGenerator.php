@@ -340,6 +340,22 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
     {
         $name = array_shift($segments);
         $properties = $schema['properties'] ?? null;
+
+        // `list[].field` reaches into the items of an array property.
+        if ($name !== null && $segments !== [] && str_ends_with($name, '[]')) {
+            $name = mb_substr($name, 0, -2);
+            $list = is_array($properties) ? ($properties[$name] ?? null) : null;
+            if (! is_array($properties) || ! is_array($list) || ! is_array($list['items'] ?? null)) {
+                return $schema;
+            }
+
+            $list['items'] = $this->applyPropertyMetadata($list['items'], $segments, $meta);
+            $properties[$name] = $list;
+            $schema['properties'] = $properties;
+
+            return $schema;
+        }
+
         if ($name === null || ! is_array($properties) || ! is_array($properties[$name] ?? null)) {
             return $schema;
         }

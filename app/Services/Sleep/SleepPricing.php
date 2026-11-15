@@ -29,6 +29,33 @@ final class SleepPricing
         return min($price, self::mulDivFloor($price, $sleptMinutes * $discount, 100 * $periodMinutes));
     }
 
+    /**
+     * Tokens saved when parts of the period slept at different (locked-in) discounts:
+     * floor(price × Σ(slept minutes × discount) / (100 × period minutes)). With one discount it
+     * equals saved().
+     *
+     * @param  array<int, int>  $sleptSecondsByDiscount  seconds slept, keyed by discount percent
+     */
+    public static function savedAtDiscounts(int $price, int $periodSeconds, array $sleptSecondsByDiscount): int
+    {
+        $periodMinutes = max(1, intdiv($periodSeconds, 60));
+        if ($price <= 0) {
+            return 0;
+        }
+
+        $weighted = 0;
+        foreach ($sleptSecondsByDiscount as $discount => $seconds) {
+            $weighted += max(0, intdiv($seconds, 60)) * max(0, min(100, $discount));
+        }
+
+        $weighted = min($weighted, 100 * $periodMinutes);
+        if ($weighted === 0) {
+            return 0;
+        }
+
+        return min($price, self::mulDivFloor($price, $weighted, 100 * $periodMinutes));
+    }
+
     /** The tokens charged for the period. */
     public static function charge(int $price, int $periodSeconds, int $sleptSeconds, int $discountPercent): int
     {

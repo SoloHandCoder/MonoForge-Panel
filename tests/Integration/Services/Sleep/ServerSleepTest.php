@@ -118,9 +118,12 @@ function tick(object $test): array
     return $test->sleep->check();
 }
 
-function session(Server $server, string $from, ?string $to): void
+/** A recorded sleep, at the discount given or (like a real sleep) the server's plan's discount now. */
+function session(Server $server, string $from, ?string $to, ?int $discount = null): void
 {
-    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => CarbonImmutable::parse($from), 'ended_at' => $to === null ? null : CarbonImmutable::parse($to)]);
+    $discount ??= ServerSubscription::query()->where('server_id', $server->id)->first()?->plan?->sleepDiscountPercent() ?? 0;
+
+    ServerSleepSession::query()->create(['server_id' => $server->id, 'started_at' => CarbonImmutable::parse($from), 'ended_at' => $to === null ? null : CarbonImmutable::parse($to), 'discount_percent' => $discount]);
 }
 
 // ServerQuery
@@ -130,13 +133,13 @@ test('ServerQuery pings the main allocation, or the node when it listens on ever
     $server->allocation->forceFill(['ip' => '10.0.0.5', 'port' => 25570])->save();
     $this->minecraft->online(2, ['Alex', 'Steve']);
 
-    expect(ServerQuery::status($server->fresh()))->toEqual(new QueryStatus(2, 20, 'A Minecraft Server', 'Paper 1.21.4', ['Alex', 'Steve']))
+    expect(resolve(ServerQuery::class)->status($server->fresh()))->toEqual(new QueryStatus(2, 20, 'A Minecraft Server', 'Paper 1.21.4', ['Alex', 'Steve']))
         ->and($this->minecraft->connections[0])->toBe(['host' => '10.0.0.5', 'port' => 25570, 'timeout' => 2.0]);
 
     Cache::flush();
     $server->allocation->forceFill(['ip' => '0.0.0.0'])->save();
     $server->node->forceFill(['fqdn' => 'node1.example.test'])->save();
-    resolve(ServerQuery::class)->query($server->fresh());
+    resolve(ServerQuery::class)->status($server->fresh());
 
     expect($this->minecraft->connections[1]['host'])->toBe('node1.example.test');
 });
@@ -145,14 +148,14 @@ test('ServerQuery caches answers, and no answer, for 30 seconds per server', fun
     [, $server] = sleepyServer($this);
     $this->minecraft->accepts = false;
 
-    expect(ServerQuery::status($server))->toBeNull()
-        ->and(ServerQuery::status($server))->toBeNull()
+    expect(resolve(ServerQuery::class)->status($server))->toBeNull()
+        ->and(resolve(ServerQuery::class)->status($server))->toBeNull()
         ->and($this->minecraft->connections)->toHaveCount(1);
 
     $this->travel(31)->seconds();
     $this->minecraft->accepts = true;
 
-    expect(ServerQuery::status($server)?->online)->toBe(0)
+    expect(resolve(ServerQuery::class)->status($server)?->online)->toBe(0)
         ->and($this->minecraft->connections)->toHaveCount(2);
 });
 
@@ -163,7 +166,7 @@ test('ServerQuery answers null without connecting for games it does not support'
     $server->forceFill(['egg_id' => $egg->id])->save();
 
     expect(ServerQuery::supports($server->fresh()))->toBeFalse()
-        ->and(ServerQuery::status($server->fresh()))->toBeNull()
+        ->and(resolve(ServerQuery::class)->status($server->fresh()))->toBeNull()
         ->and($this->minecraft->connections)->toBe([]);
 });
 
@@ -185,7 +188,7 @@ test('a running server nobody plays on sleeps after the idle minutes', function 
         ->and($fresh->idle_checks)->toBe(0)
         ->and($fresh->isSleeping())->toBeTrue()
         ->and($this->sleep->isSleeping($server))->toBeTrue()
-        ->and(ServerSleepSession::query()->where('server_id', $server->id)->whereNull('ended_at')->count())->toBe(1)
+        ->and(ServerSleepSession::query()->where('server_id', $server->id)->whereNull('ended_at')->sole()->discount_percent)->toBe(50)
         ->and(ActivityLog::query()->where('event', 'server:sleep.asleep')->firstOrFail()->properties->get('minutes'))->toBe(3);
 
     // Sleeping (Wings says it is stopping, then offline): nothing more is sent.
@@ -411,6 +414,43 @@ test('the renewal discounts the time the server slept in the period, once', func
         ->and($this->subscriptions->renew($stale))->toBeTrue()
         ->and($this->subscriptions->renewDue())->toBe(0)
         ->and($this->wallet->balance($user))->toBe(625);
+});
+
+test('each sleep keeps the discount it started with, whatever the plan says at the renewal', function (): void {
+    [$user, $server, $subscription] = sleepyServer($this, attributes: ['next_renewal_at' => CarbonImmutable::now()->addDays(10)], balance: 1000);
+    $plan = $subscription->plan;
+
+    // The server falls asleep while the plan gives 50% (3 idle checks), and sleeps 6 days.
+    tick($this);
+    tick($this);
+    tick($this);
+    expect(ServerSleepSession::query()->where('server_id', $server->id)->sole()->discount_percent)->toBe(50);
+    $this->travelTo(CarbonImmutable::now()->addDays(6));
+    expect($this->sleep->markAwake($server))->toBeTrue();
+
+    // The admin lowers the discount to 10%: the next sleep (3 days) is recorded at 10%.
+    $plan->forceFill(['sleep_discount_percent' => 10])->save();
+    $this->daemon->details['state'] = 'running';
+    $subscription->refresh();
+    tick($this);
+    tick($this);
+    tick($this);
+    expect(ServerSleepSession::query()->where('server_id', $server->id)->latest('id')->firstOrFail()->discount_percent)->toBe(10);
+    $this->travelTo(CarbonImmutable::now()->addDays(3));
+    $this->sleep->markAwake($server);
+
+    // The admin then turns the discount off entirely before the renewal.
+    $plan->forceFill(['sleep_discount_percent' => 0])->save();
+    $this->travelTo($subscription->fresh()->next_renewal_at);
+    $subscription->refresh();
+
+    // 6 days at 50% and 3 days at 10% of a 30-day period: 500 × (6 × 50 + 3 × 10) / 3000 = 55 saved.
+    expect($this->subscriptions->renew($subscription))->toBeTrue()
+        ->and($this->wallet->balance($user))->toBe(1000 - 445)
+        ->and($subscription->fresh()->last_sleep_saved_tokens)->toBe(55);
+
+    $charge = TokenTransaction::query()->where('reference_type', SubscriptionService::REFERENCE_TYPE)->sole();
+    expect($charge->meta)->toMatchArray(['full_price' => 500, 'sleep_seconds' => 9 * 86_400, 'sleep_discount_percent' => 37, 'sleep_saved_tokens' => 55]);
 });
 
 test('the discount rounds the charge up to whole tokens', function (): void {

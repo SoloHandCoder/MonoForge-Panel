@@ -7,8 +7,8 @@ namespace Pterodactyl\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
-use Pterodactyl\Console\Commands\Billing\AutoSleepCommand;
 use Pterodactyl\Console\Commands\Assistant\DetectCrashesCommand;
+use Pterodactyl\Console\Commands\Billing\AutoSleepCommand;
 use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
@@ -20,6 +20,7 @@ use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Billing\TebexCheckout;
+use Pterodactyl\Models\FriendRequest;
 use Pterodactyl\Models\ServerCrash;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\Share\ServerPageVote;
@@ -73,6 +74,8 @@ final class Scheduler
         // pool per node) and record crashes; crashes go after 30 days.
         $schedule->command(DetectCrashesCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
         $schedule->command(PruneCommand::class, ['--model' => [ServerCrash::class]])->daily()->withoutOverlapping()->onOneServer();
+        // Friend requests nobody answered within 30 days.
+        $schedule->command(PruneCommand::class, ['--model' => [FriendRequest::class]])->daily()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

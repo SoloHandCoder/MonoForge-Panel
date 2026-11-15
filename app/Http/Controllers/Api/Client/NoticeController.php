@@ -10,6 +10,7 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Knuckles\Scribe\Attributes\UrlParam;
+use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 use Pterodactyl\Http\Resources\Api\Client\NoticeFeedResource;
 use Pterodactyl\Models\Announcement;
@@ -49,6 +50,11 @@ class NoticeController extends ClientApiController
      */
     #[Endpoint('List notices', 'Returns the active announcements and the unread notices of the authenticated user.')]
     #[ScribeResponse(self::FEED_EXAMPLE, description: 'Notices returned.')]
+    #[ResponseField('attributes.announcements[].starts_at', 'string', 'When the announcement starts showing; null shows it from now.', nullable: true)]
+    #[ResponseField('attributes.announcements[].ends_at', 'string', 'When the announcement stops showing; null keeps it until removed.', nullable: true)]
+    #[ResponseField('attributes.notices[].action_label', 'string', 'The label of the notice button, or null without one.', nullable: true)]
+    #[ResponseField('attributes.notices[].action_url', 'string', 'Where the notice button leads, or null without one.', nullable: true)]
+    #[ResponseField('attributes.notices[].kind', 'string', 'What raised the notice (one unread notice per kind), or null.', nullable: true)]
     public function index(ClientApiRequest $request): NoticeFeedResource
     {
         return NoticeFeedResource::make([

@@ -17,19 +17,14 @@ use Pterodactyl\Services\Tunnels\TunnelProfile;
  * from the panel host, 2 s timeout). Answers, including "no answer", are cached for 30 seconds
  * per server, so a busy page never pings a server more than twice a minute.
  *
- * `ServerQuery::status($server)` works statically and on an injected instance.
+ * Inject it (or resolve it from the container) and call `status()`: it is a plain, non-final
+ * service so callers and tests can swap it. `supports()` and `cacheKey()` are static, pure helpers.
  */
 class ServerQuery
 {
     public const int CACHE_SECONDS = 30;
 
     public function __construct(private readonly MinecraftJavaPing $minecraftJava) {}
-
-    /** The server's status, or null when the game does not answer or is not supported. */
-    public static function status(Server $server): ?QueryStatus
-    {
-        return resolve(self::class)->query($server);
-    }
 
     /** Whether the server's game can be asked for its players. */
     public static function supports(Server $server): bool
@@ -42,7 +37,8 @@ class ServerQuery
         return "server-query:{$server->uuid}";
     }
 
-    public function query(Server $server): ?QueryStatus
+    /** The server's status, or null when the game does not answer or is not supported. */
+    public function status(Server $server): ?QueryStatus
     {
         if (! self::supports($server)) {
             return null;

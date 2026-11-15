@@ -36,6 +36,9 @@ return new class extends Migration
             $table->unsignedInteger('server_id');
             $table->dateTime('started_at');
             $table->dateTime('ended_at')->nullable();
+            // The plan's discount when the sleep started: a renewal uses it, so a later change to
+            // the plan never alters the price of sleep that already happened.
+            $table->unsignedTinyInteger('discount_percent')->default(0);
 
             $table->foreign('server_id')->references('id')->on('servers')->cascadeOnDelete();
             $table->index(['server_id', 'started_at']);

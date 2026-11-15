@@ -60,3 +60,16 @@ test('never charges more than the price or less than nothing', function (): void
         }
     }
 });
+
+test('sleeps at different locked-in discounts add up, and one discount matches saved()', function (): void {
+    // 6 days at 50% and 3 days at 10% of 30 days: 500 × (6 × 50 + 3 × 10) / 3000 = 55.
+    expect(SleepPricing::savedAtDiscounts(500, 30 * DAY, [50 => 6 * DAY, 10 => 3 * DAY]))->toBe(55)
+        ->and(SleepPricing::savedAtDiscounts(500, 30 * DAY, []))->toBe(0)
+        ->and(SleepPricing::savedAtDiscounts(500, 30 * DAY, [0 => 30 * DAY]))->toBe(0)
+        // More sleep than the period (overlaps already removed upstream) is still capped at the price.
+        ->and(SleepPricing::savedAtDiscounts(500, 30 * DAY, [100 => 40 * DAY]))->toBe(500);
+
+    foreach ([[7, 10 * DAY, 33], [500, 15 * DAY, 50], [123_456, 29 * DAY + 59, 77], [1, DAY, 100]] as [$price, $slept, $discount]) {
+        expect(SleepPricing::savedAtDiscounts($price, 30 * DAY, [$discount => $slept]))->toBe(SleepPricing::saved($price, 30 * DAY, $slept, $discount));
+    }
+});

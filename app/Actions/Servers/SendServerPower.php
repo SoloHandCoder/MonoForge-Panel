@@ -8,8 +8,8 @@ use Pterodactyl\Contracts\Servers\SendsServerPower;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Services\Sleep\ServerSleep;
 use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
+use Pterodactyl\Services\Sleep\ServerSleep;
 
 final readonly class SendServerPower implements SendsServerPower
 {

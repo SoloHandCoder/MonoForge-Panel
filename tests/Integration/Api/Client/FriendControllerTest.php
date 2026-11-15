@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\FriendControllerTest;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
+use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\FriendRequest;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Friends\FriendService;
@@ -168,4 +172,26 @@ test('a request needs a username or email', function (): void {
     $this->actingAs(User::factory()->create())
         ->postJson('/api/client/account/friends/requests', ['user' => ''])
         ->assertUnprocessable();
+});
+
+test('requests nobody answered for 30 days are pruned daily; declined ones stay', function (): void {
+    $sender = User::factory()->create();
+    $old = FriendRequest::query()->create(['sender_id' => $sender->id, 'identifier' => 'old']);
+    $old->forceFill(['created_at' => CarbonImmutable::now()->subDays(31)])->save();
+    $recent = FriendRequest::query()->create(['sender_id' => $sender->id, 'identifier' => 'recent']);
+    $recent->forceFill(['created_at' => CarbonImmutable::now()->subDays(29)])->save();
+    $declined = FriendRequest::query()->create(['sender_id' => $sender->id, 'identifier' => 'declined', 'declined_at' => CarbonImmutable::now()->subDays(40)]);
+    $declined->forceFill(['created_at' => CarbonImmutable::now()->subDays(45)])->save();
+
+    $this->artisan('model:prune', ['--model' => [FriendRequest::class]])->assertSuccessful();
+
+    expect(FriendRequest::query()->orderBy('identifier')->pluck('identifier')->all())->toBe(['declined', 'recent']);
+
+    $schedule = resolve(Schedule::class);
+    (new Scheduler)($schedule);
+    $event = collect($schedule->events())->first(fn (Event $event): bool => str_contains((string) $event->command, 'model:prune') && str_contains((string) $event->command, 'FriendRequest'));
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('0 0 * * *')
+        ->and($event->onOneServer)->toBeTrue()
+        ->and($event->withoutOverlapping)->toBeTrue();
 });

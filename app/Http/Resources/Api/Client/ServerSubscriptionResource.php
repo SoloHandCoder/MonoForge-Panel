@@ -47,7 +47,8 @@ class ServerSubscriptionResource extends ClientResource
                 'sleeping' => $subscription->isSleeping(),
                 'sleep_started_at' => $subscription->isSleeping() ? $subscription->sleep_started_at?->toAtomString() : null,
                 'idle_minutes' => $subscription->plan?->sleepIdleMinutes() ?? 0,
-                'discount_percent' => $bill->discountPercent,
+                // The plan's terms for sleep from now on; sleep already recorded keeps its own percent.
+                'discount_percent' => $subscription->plan?->sleepDiscountPercent() ?? 0,
                 'slept_seconds_this_period' => $bill->sleptSeconds,
                 'saved_this_period' => $bill->saved,
                 'last_saved_tokens' => $subscription->last_sleep_saved_tokens,
