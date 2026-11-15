@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
@@ -308,4 +309,27 @@ test('a link request is refused when someone else is signed in by the time it re
 
     expect(UserOAuthAccount::query()->count())->toBe(0);
     Http::assertNothingSent();
+});
+
+test('an API key cannot set the first password, unlink or start a link', function (): void {
+    $user = User::factory()->create();
+    $user->forceFill(['has_password' => false])->save();
+    linkAccount($user);
+    linkAccount($user, 'google', 'google-sub');
+    $key = ApiKey::factory()->create(['user_id' => $user->id, 'key_type' => ApiKey::TYPE_ACCOUNT]);
+    $this->app['auth']->forgetGuards();
+
+    $api = fn () => $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
+        ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token));
+
+    $api()->postJson('/api/client/account/oauth/password', ['password' => 'A-new-password-123', 'password_confirmation' => 'A-new-password-123'])
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', 'This action can only be performed from the panel in your browser, not with an API key.');
+    $api()->deleteJson('/api/client/account/oauth/google')->assertForbidden();
+    $api()->postJson('/api/client/account/oauth/discord/link')->assertForbidden();
+    // A spoofed panel Origin makes Sanctum start a session, but the request is still a key.
+    $api()->withHeader('Referer', 'http://localhost')->postJson('/api/client/account/oauth/discord/link')->assertForbidden();
+
+    expect(User::query()->whereKey($user->id)->value('has_password'))->toBeFalsy()
+        ->and(UserOAuthAccount::query()->where('user_id', $user->id)->count())->toBe(2);
 });
