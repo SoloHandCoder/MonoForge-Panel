@@ -156,6 +156,16 @@ return [
         'assistant' => [
             'tool' => ':decision the assistant action ":label"',
         ],
+        'plugin' => [
+            'install' => 'Installed :file (:version) from :source',
+            'update' => 'Updated :old to :file (:version)',
+            'remove' => 'Removed :file',
+        ],
+        'modpack' => [
+            'install' => 'Started installing the :name modpack (:version)',
+            'installed' => 'Installed the :name modpack (:version)',
+            'failed' => 'Could not install the :name modpack (:version): :reason',
+        ],
         'subuser' => [
             'create' => 'Added :email as a subuser',
             'update' => 'Updated the subuser permissions for :email',

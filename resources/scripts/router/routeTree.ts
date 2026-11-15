@@ -50,6 +50,7 @@ import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
 import { adminStatusPageSettingsQueryOptions } from '@/api/admin/settings/status';
+import { adminPluginSettingsQueryOptions } from '@/api/admin/settings/plugins';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
@@ -377,6 +378,15 @@ const serverChildren = [
         validateSearch: parseEditorSearch,
         beforeLoad: requireServerPermission(['file.read', 'file.read-content']),
         component: componentRoute(() => import('@/components/server/files/ide/EditorPage')),
+    }),
+    // Phase 6: one-click plugins, mods and Modrinth modpacks. Browsing needs file.read;
+    // installing needs plugins.manage, which the page checks itself.
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'plugins',
+        staticData: { nav: { label: 'Plugins & mods', permission: 'file.read', icon: 'puzzle' } },
+        beforeLoad: requireServerPermission('file.read'),
+        component: componentRoute(() => import('@/components/server/plugins/PluginsPage')),
     }),
     createRoute({
         getParentRoute: () => serverRoute,
@@ -976,6 +986,20 @@ const panelChildren = [
         path: 'settings/advanced',
         loader: async ({ context }) => {
             await context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'settings/plugins',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminPluginSettingsQueryOptions(), revalidateIfStale: true }),
+            ]);
         },
         component: componentRoute(
             () => import('@/components/admin/settings/SettingsContainer'),

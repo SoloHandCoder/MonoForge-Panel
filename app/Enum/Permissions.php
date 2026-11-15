@@ -159,4 +159,7 @@ enum Permissions: string
 
     // Phase 6: managing the shareable public page at /s/{slug}. Owners and root admins always have it.
     case ShareManage = 'share.manage';
+
+    // Phase 6: installing, updating and removing plugins, mods and modpacks from the catalogs.
+    case PluginsManage = 'plugins.manage';
 }

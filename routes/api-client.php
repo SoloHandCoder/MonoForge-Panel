@@ -25,6 +25,8 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\FileController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileUploadController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\LogController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\NetworkAllocationController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\ModpackController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\PluginController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\PowerController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ResourceUtilizationController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleController;
@@ -266,6 +268,23 @@ Route::group([
         Route::post('/report', [CrashDoctorController::class, 'report'])->middleware('throttle:6,1');
         Route::post('/diagnose', [CrashDoctorController::class, 'diagnose'])->middleware('throttle:20,1');
         Route::post('/crashes/{crash}/dismiss', [CrashDoctorController::class, 'dismiss'])->withoutScopedBindings();
+    });
+
+    // Phase 6: one-click plugins, mods and Modrinth modpacks.
+    Route::prefix('/plugins')->group(function (): void {
+        Route::get('/', [PluginController::class, 'environment'])->name('api:client:server.plugins');
+        Route::middleware('throttle:plugins.browse')->group(function (): void {
+            Route::get('/search', [PluginController::class, 'search']);
+            Route::get('/versions', [PluginController::class, 'versions']);
+            Route::get('/installed', [PluginController::class, 'installed']);
+        });
+        Route::middleware('throttle:plugins.manage')->group(function (): void {
+            Route::post('/install', [PluginController::class, 'install']);
+            Route::post('/installed/update', [PluginController::class, 'update']);
+            Route::post('/installed/remove', [PluginController::class, 'remove']);
+            Route::post('/modpack', [ModpackController::class, 'store']);
+        });
+        Route::get('/modpack', [ModpackController::class, 'progress']);
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

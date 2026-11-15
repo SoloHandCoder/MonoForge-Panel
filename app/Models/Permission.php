@@ -146,6 +146,14 @@ class Permission extends Model
                 'manage' => 'Allows a user to publish, edit and unpublish the public page of this server, with its address, description and banner.',
             ],
         ],
+
+        // Phase 6: one-click plugins, mods and modpacks.
+        'plugins' => [
+            'description' => "Permissions that control a user's access to one-click plugins, mods and modpacks for this server.",
+            'keys' => [
+                'manage' => 'Allows a user to install, update and remove plugins, mods and modpacks from Modrinth, Hangar and CurseForge. Browsing them needs the file read permission.',
+            ],
+        ],
     ];
 
     /**

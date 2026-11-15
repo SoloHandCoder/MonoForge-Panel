@@ -1329,6 +1329,25 @@ export type ClientFileSearchResultResource = {
     object: string;
     attributes: ClientFileSearchResultAttributes;
 };
+export type ClientModpackInstallAttributes = {
+    status: string;
+    step: string;
+    message: string | null;
+    project_title: string;
+    version_name: string;
+    files_done: number;
+    files_total: number;
+    /**
+     * created, skipped, or null before the backup step.
+     */
+    backup: string | null;
+    started_at: string;
+    finished_at: string | null;
+};
+export type ClientModpackInstallResource = {
+    object: string;
+    attributes: ClientModpackInstallAttributes;
+};
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
         id: number;
@@ -1354,6 +1373,45 @@ export type ClientNoticeFeedAttributes = {
 export type ClientNoticeFeedResource = {
     object: string;
     attributes: ClientNoticeFeedAttributes;
+};
+export type ClientPluginEnvironmentAttributes = {
+    platform: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    detected: {
+        loader: string | null;
+        game_version: string | null;
+        type: string | null;
+        directory: string | null;
+        detected_from: Array<string>;
+    };
+    /**
+     * Searchable catalogs by project type.
+     */
+    sources: {
+        plugin: Array<string>;
+        mod: Array<string>;
+        modpack: Array<string>;
+    };
+    loaders: Array<string>;
+    curseforge_enabled: boolean;
+};
+export type ClientPluginEnvironmentResource = {
+    object: string;
+    attributes: ClientPluginEnvironmentAttributes;
+};
+export type ClientPluginInstallAttributes = {
+    file_name: string;
+    directory: string;
+    version_number: string;
+};
+export type ClientPluginInstallResource = {
+    object: string;
+    attributes: ClientPluginInstallAttributes;
 };
 export type ClientRecoveryTokensAttributes = {
     tokens: Array<string>;
@@ -1561,7 +1619,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 export type ClientServerSubuserListResponse = {
     object: string;
@@ -2339,10 +2397,6 @@ export type AdminUpdateAiAssistantSettingsRequest = {
      * The admin enabled.
      */
     admin_enabled: boolean;
-    /**
-     * Whether the AI crash doctor is offered when a server crashes or fails to start.
-     */
-    crash_doctor_enabled?: boolean;
     /**
      * The default provider id. Must match an existing stored value.
      */
@@ -3458,6 +3512,16 @@ export type AdminUpdateLegalDocumentRequest = {
      * Raise the version so users accept the document again.
      */
     reaccept: boolean;
+};
+export type AdminUpdatePluginSettingsRequest = {
+    /**
+     * A new CurseForge API key, or blank to keep the stored one.
+     */
+    curseforge_key?: string | null;
+    /**
+     * Remove the stored key.
+     */
+    clear_curseforge_key?: boolean;
 };
 export type AdminUpdateStatusPageSettingsRequest = {
     /**
@@ -4630,13 +4694,13 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
 };
 export type ClientCreateServerBackupRequest = {
     /**
@@ -4680,17 +4744,65 @@ export type ClientSendAnAssistantMessageRequest = {
      */
     message: string;
 };
-export type ClientReportACrashFromTheConsoleRequest = {
+export type ClientInstallPluginRequest = {
     /**
-     * What the console saw: crashed (the server went offline without stopping first) or start_failed (it went offline while starting).
+     * Use this loader instead of the detected one.
      */
-    kind: 'crashed' | 'start_failed';
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The catalog: modrinth, hangar or curseforge.
+     */
+    source: string;
+    /**
+     * The project's ID.
+     */
+    project: string;
+    /**
+     * The version's ID from the versions list.
+     */
+    version: string;
 };
-export type ClientDiagnoseWithTheCrashDoctorRequest = {
+export type ClientUpdateInstalledPluginRequest = {
     /**
-     * The crash to diagnose, from the crash doctor status; null for a check without a crash. Must be at least 1.
+     * Use this loader instead of the detected one.
      */
-    crash_id?: number | null;
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+export type ClientRemoveInstalledPluginRequest = {
+    /**
+     * Use this loader instead of the detected one.
+     */
+    loader?: string | null;
+    /**
+     * Use this Minecraft version instead of the detected one.
+     */
+    game_version?: string | null;
+    /**
+     * The installed jar's file name.
+     */
+    file: string;
+};
+export type ClientInstallModpackRequest = {
+    /**
+     * The modpack's Modrinth project ID.
+     */
+    project: string;
+    /**
+     * The modpack version's ID.
+     */
+    version: string;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -5137,7 +5249,6 @@ export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
-        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -5145,7 +5256,6 @@ export type AdminListAdminAssistantConversationsResponseBody = {
 export type AdminStartAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5198,7 +5308,6 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
 export type AdminGetAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5251,7 +5360,6 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
 export type AdminSendAnAdminAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5304,7 +5412,6 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
 export type AdminAllowAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5357,7 +5464,6 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
 export type AdminDenyAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5480,7 +5586,6 @@ export type AdminGetAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
-    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -5493,7 +5598,6 @@ export type AdminUpdateAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
-    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -6013,6 +6117,10 @@ export type AdminUpdateLegalDocumentResponseBody = {
     version?: number;
     updated_at?: string;
 };
+export type AdminGetPluginSettingsResponseBody = {
+    curseforge_key_set?: boolean;
+    set_in_env?: boolean;
+};
 export type AdminGetStatusPageSettingsResponseBody = {
     enabled?: boolean;
     public_url?: string;
@@ -6266,7 +6374,6 @@ export type ClientGetExtensionJobProgressResponseBody = {
 export type ClientGetAssistantStatusResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
-    crash_doctor_enabled?: boolean;
     free_limit?: number;
     free_used?: number;
     ratio?: number;
@@ -6518,7 +6625,6 @@ export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
-        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -6526,7 +6632,6 @@ export type ClientListAssistantConversationsResponseBody = {
 export type ClientStartAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6579,7 +6684,6 @@ export type ClientStartAnAssistantConversationResponseBody = {
 export type ClientGetAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6632,7 +6736,6 @@ export type ClientGetAnAssistantConversationResponseBody = {
 export type ClientSendAnAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6685,7 +6788,6 @@ export type ClientSendAnAssistantMessageResponseBody = {
 export type ClientAllowAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6738,7 +6840,6 @@ export type ClientAllowAnAssistantActionResponseBody = {
 export type ClientDenyAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
-    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -6788,104 +6889,107 @@ export type ClientDenyAnAssistantActionResponseBody = {
         charged_this_month?: number;
     };
 };
-export type ClientGetCrashDoctorStatusResponseBody = {
+export type ClientSearchPluginsResponseBody = {
+    object: string;
     /**
-     * Whether the crash doctor can be used. When false, crash is always null.
+     * The projects found.
      */
-    enabled: boolean;
-    /**
-     * The newest crash of the last 24 hours that was not dismissed, or null.
-     */
-    crash: {
-        id: number;
-        kind: 'crashed' | 'start_failed';
-        status: 'open' | 'diagnosing';
-        detected_at: string;
+    data: Array<{
+        source: 'modrinth' | 'hangar' | 'curseforge';
+        id: string;
+        slug: string;
+        title: string;
+        description: string;
+        author: string | null;
+        icon_url: string | null;
+        downloads: number;
+        updated_at: string | null;
+        url: string;
         /**
-         * The crash doctor conversation, once one was started.
+         * Modrinth says the project does not run on servers.
          */
-        conversation_uuid: string | null;
-    } | null;
-};
-export type ClientReportACrashFromTheConsoleResponseBody = {
-    /**
-     * Whether the crash doctor can be used.
-     */
-    enabled: boolean;
-    /**
-     * The newest crash of the last 24 hours that was not dismissed, or null.
-     */
-    crash: {
-        id: number;
-        kind: 'crashed' | 'start_failed';
-        status: 'open' | 'diagnosing';
-        detected_at: string;
-        /**
-         * The crash doctor conversation, once one was started.
-         */
-        conversation_uuid: string | null;
-    } | null;
-};
-export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
-    /**
-     * The conversation UUID; open it in the server assistant.
-     */
-    uuid: string;
-    /**
-     * The conversation title.
-     */
-    title: string;
-    /**
-     * The conversation mode: crash_doctor.
-     */
-    mode: 'chat' | 'crash_doctor';
-    /**
-     * The conversation status: idle, running, awaiting_approval or error.
-     */
-    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
-    error?: string | null;
-    /**
-     * The messages, oldest first. Tool results are part of their tool call.
-     */
-    messages: Array<{
-        id: number;
-        role: 'user' | 'assistant';
-        content: string | null;
-        created_at: string | null;
-        tool_calls: Array<{
-            id: number;
-            name: string;
-            label: string;
-            arguments: {
-                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
-                    [key: string]: string | number | boolean | null;
-                }> | {
-                    [key: string]: string | number | boolean | null;
-                } | null;
-            };
-            /**
-             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
-             */
-            details: Array<{
-                label: string;
-                value: string;
-            }>;
-            needs_confirmation: boolean;
-            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
-            result_preview: string | null;
-            display: {
-                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
-                    [key: string]: string | number | boolean | null;
-                }> | {
-                    [key: string]: string | number | boolean | null;
-                } | null;
-            } | null;
-        }>;
+        client_only: boolean;
     }>;
-    usage?: {
-        free_used?: number;
-        free_limit?: number;
-        charged_this_month?: number;
+    meta: {
+        pagination: {
+            total: number;
+            count: number;
+            per_page: number;
+            current_page: number;
+            total_pages: number;
+        };
+    };
+};
+export type ClientListPluginVersionsResponseBody = {
+    object: string;
+    /**
+     * The versions, newest first.
+     */
+    data: Array<{
+        id: string;
+        project_id: string;
+        name: string;
+        version_number: string;
+        game_versions: Array<string>;
+        loaders: Array<string>;
+        /**
+         * release, beta or alpha (Hangar channels by name).
+         */
+        channel: string;
+        published_at: string | null;
+        file: {
+            filename: string;
+            size: number;
+            /**
+             * Hex digests by algorithm: sha1, sha256, sha512 or md5.
+             */
+            hashes: {
+                [key: string]: string;
+            };
+        } | null;
+        installable: boolean;
+    }>;
+};
+export type ClientListInstalledPluginsResponseBody = {
+    object: string;
+    /**
+     * The jars, by name.
+     */
+    data: Array<{
+        file_name: string;
+        size: number;
+        modified_at: string | null;
+        sha1: string | null;
+        /**
+         * The Modrinth project the jar belongs to, or null when Modrinth does not know it.
+         */
+        project: {
+            source: string;
+            id: string;
+            title: string;
+            slug: string;
+            icon_url: string | null;
+            url: string;
+        } | null;
+        version: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
+        /**
+         * A newer version for the server, or null.
+         */
+        update: {
+            id: string;
+            name: string;
+            version_number: string;
+        } | null;
+    }>;
+    meta: {
+        /**
+         * plugins or mods, or null while the loader is unknown.
+         */
+        directory: string | null;
     };
 };
 export type ApiListThePublicStorePlansResponseBody = {
@@ -8076,11 +8180,78 @@ export type ClientAllowAnAssistantActionToolCallIdPathParameter = number;
 export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
-export type ClientGetCrashDoctorStatusServerUuidPathParameter = string;
-export type ClientReportACrashFromTheConsoleServerUuidPathParameter = string;
-export type ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter = string;
-export type ClientDismissACrashServerUuidPathParameter = string;
-export type ClientDismissACrashCrashIdPathParameter = number;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientGetPluginEnvironmentGameVersionQueryParameter = string;
+export type ClientGetPluginEnvironmentServerUuidPathParameter = string;
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientSearchPluginsSourceQueryParameter = string;
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientSearchPluginsTypeQueryParameter = string;
+/**
+ * Search text.
+ */
+export type ClientSearchPluginsQueryQueryParameter = string;
+/**
+ * Result page, 20 per page.
+ */
+export type ClientSearchPluginsPageQueryParameter = number;
+/**
+ * relevance, downloads, updated or newest.
+ */
+export type ClientSearchPluginsSortQueryParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientSearchPluginsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientSearchPluginsGameVersionQueryParameter = string;
+export type ClientSearchPluginsServerUuidPathParameter = string;
+/**
+ * The catalog: modrinth, hangar or curseforge.
+ */
+export type ClientListPluginVersionsSourceQueryParameter = string;
+/**
+ * The project's ID from the search results.
+ */
+export type ClientListPluginVersionsProjectQueryParameter = string;
+/**
+ * plugin, mod or modpack. Defaults to what the server's loader runs.
+ */
+export type ClientListPluginVersionsTypeQueryParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListPluginVersionsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListPluginVersionsGameVersionQueryParameter = string;
+export type ClientListPluginVersionsServerUuidPathParameter = string;
+/**
+ * Use this loader instead of the detected one.
+ */
+export type ClientListInstalledPluginsLoaderQueryParameter = string;
+/**
+ * Use this Minecraft version instead of the detected one.
+ */
+export type ClientListInstalledPluginsGameVersionQueryParameter = string;
+export type ClientListInstalledPluginsServerUuidPathParameter = string;
+export type ClientInstallPluginServerUuidPathParameter = string;
+export type ClientUpdateInstalledPluginServerUuidPathParameter = string;
+export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
+export type ClientInstallModpackServerUuidPathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
@@ -14779,6 +14950,58 @@ export type AdminUpdateLegalDocumentResponses = {
     200: AdminUpdateLegalDocumentResponseBody;
 };
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
+export type AdminGetPluginSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+export type AdminGetPluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetPluginSettingsError = AdminGetPluginSettingsErrors[keyof AdminGetPluginSettingsErrors];
+export type AdminGetPluginSettingsResponses = {
+    /**
+     * Plugin settings returned.
+     */
+    200: AdminGetPluginSettingsResponseBody;
+};
+export type AdminGetPluginSettingsResponse = AdminGetPluginSettingsResponses[keyof AdminGetPluginSettingsResponses];
+export type AdminUpdatePluginSettingsData = {
+    body?: AdminUpdatePluginSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/plugins';
+};
+export type AdminUpdatePluginSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdatePluginSettingsError = AdminUpdatePluginSettingsErrors[keyof AdminUpdatePluginSettingsErrors];
+export type AdminUpdatePluginSettingsResponses = {
+    /**
+     * Plugin settings updated.
+     */
+    204: void;
+};
+export type AdminUpdatePluginSettingsResponse = AdminUpdatePluginSettingsResponses[keyof AdminUpdatePluginSettingsResponses];
 export type AdminGetStatusPageSettingsData = {
     body?: never;
     path?: never;
@@ -20783,18 +21006,27 @@ export type ClientDenyAnAssistantActionResponses = {
     200: ClientDenyAnAssistantActionResponseBody;
 };
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
-export type ClientGetCrashDoctorStatusData = {
+export type ClientGetPluginEnvironmentData = {
     body?: never;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientGetCrashDoctorStatusServerUuidPathParameter;
+        server_uuid: ClientGetPluginEnvironmentServerUuidPathParameter;
     };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/crash-doctor';
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientGetPluginEnvironmentLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientGetPluginEnvironmentGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins';
 };
-export type ClientGetCrashDoctorStatusErrors = {
+export type ClientGetPluginEnvironmentErrors = {
     /**
      * Authentication credentials were missing or invalid.
      */
@@ -20807,33 +21039,350 @@ export type ClientGetCrashDoctorStatusErrors = {
      * The requested resource could not be found.
      */
     404: ErrorEnvelope;
-};
-export type ClientGetCrashDoctorStatusError = ClientGetCrashDoctorStatusErrors[keyof ClientGetCrashDoctorStatusErrors];
-export type ClientGetCrashDoctorStatusResponses = {
     /**
-     * Crash doctor status returned.
+     * The submitted data is invalid.
      */
-    200: ClientGetCrashDoctorStatusResponseBody;
+    422: ValidationErrorEnvelope;
 };
-export type ClientGetCrashDoctorStatusResponse = ClientGetCrashDoctorStatusResponses[keyof ClientGetCrashDoctorStatusResponses];
-export type ClientReportACrashFromTheConsoleData = {
-    body: ClientReportACrashFromTheConsoleRequest;
+export type ClientGetPluginEnvironmentError = ClientGetPluginEnvironmentErrors[keyof ClientGetPluginEnvironmentErrors];
+export type ClientGetPluginEnvironmentResponses = {
+    /**
+     * Plugin environment returned.
+     */
+    200: ClientPluginEnvironmentResource;
+};
+export type ClientGetPluginEnvironmentResponse = ClientGetPluginEnvironmentResponses[keyof ClientGetPluginEnvironmentResponses];
+export type ClientSearchPluginsData = {
+    body?: never;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientReportACrashFromTheConsoleServerUuidPathParameter;
+        server_uuid: ClientSearchPluginsServerUuidPathParameter;
     };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/crash-doctor/report';
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientSearchPluginsSourceQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientSearchPluginsTypeQueryParameter;
+        /**
+         * Search text.
+         */
+        query?: ClientSearchPluginsQueryQueryParameter;
+        /**
+         * Result page, 20 per page.
+         */
+        page?: ClientSearchPluginsPageQueryParameter;
+        /**
+         * relevance, downloads, updated or newest.
+         */
+        sort?: ClientSearchPluginsSortQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientSearchPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientSearchPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/search';
 };
-export type ClientReportACrashFromTheConsoleErrors = {
+export type ClientSearchPluginsErrors = {
     /**
      * Authentication credentials were missing or invalid.
      */
     401: ErrorEnvelope;
     /**
-     * The crash doctor or the assistant is turned off.
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientSearchPluginsError = ClientSearchPluginsErrors[keyof ClientSearchPluginsErrors];
+export type ClientSearchPluginsResponses = {
+    /**
+     * Search results returned.
+     */
+    200: ClientSearchPluginsResponseBody;
+};
+export type ClientSearchPluginsResponse = ClientSearchPluginsResponses[keyof ClientSearchPluginsResponses];
+export type ClientListPluginVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListPluginVersionsServerUuidPathParameter;
+    };
+    query: {
+        /**
+         * The catalog: modrinth, hangar or curseforge.
+         */
+        source: ClientListPluginVersionsSourceQueryParameter;
+        /**
+         * The project's ID from the search results.
+         */
+        project: ClientListPluginVersionsProjectQueryParameter;
+        /**
+         * plugin, mod or modpack. Defaults to what the server's loader runs.
+         */
+        type?: ClientListPluginVersionsTypeQueryParameter;
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListPluginVersionsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListPluginVersionsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/versions';
+};
+export type ClientListPluginVersionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The catalog did not answer.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientListPluginVersionsError = ClientListPluginVersionsErrors[keyof ClientListPluginVersionsErrors];
+export type ClientListPluginVersionsResponses = {
+    /**
+     * Versions returned.
+     */
+    200: ClientListPluginVersionsResponseBody;
+};
+export type ClientListPluginVersionsResponse = ClientListPluginVersionsResponses[keyof ClientListPluginVersionsResponses];
+export type ClientListInstalledPluginsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListInstalledPluginsServerUuidPathParameter;
+    };
+    query?: {
+        /**
+         * Use this loader instead of the detected one.
+         */
+        loader?: ClientListInstalledPluginsLoaderQueryParameter;
+        /**
+         * Use this Minecraft version instead of the detected one.
+         */
+        game_version?: ClientListInstalledPluginsGameVersionQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/plugins/installed';
+};
+export type ClientListInstalledPluginsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not list the folder.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientListInstalledPluginsError = ClientListInstalledPluginsErrors[keyof ClientListInstalledPluginsErrors];
+export type ClientListInstalledPluginsResponses = {
+    /**
+     * Installed plugins returned.
+     */
+    200: ClientListInstalledPluginsResponseBody;
+};
+export type ClientListInstalledPluginsResponse = ClientListInstalledPluginsResponses[keyof ClientListInstalledPluginsResponses];
+export type ClientInstallPluginData = {
+    body: ClientInstallPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/install';
+};
+export type ClientInstallPluginErrors = {
+    /**
+     * The file could not be installed: not allowed, no file, or a failed hash check.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientInstallPluginError = ClientInstallPluginErrors[keyof ClientInstallPluginErrors];
+export type ClientInstallPluginResponses = {
+    /**
+     * Plugin installed.
+     */
+    200: ClientPluginInstallResource;
+};
+export type ClientInstallPluginResponse = ClientInstallPluginResponses[keyof ClientInstallPluginResponses];
+export type ClientUpdateInstalledPluginData = {
+    body: ClientUpdateInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUpdateInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/update';
+};
+export type ClientUpdateInstalledPluginErrors = {
+    /**
+     * There is no update, or the new file could not be installed.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not download the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientUpdateInstalledPluginError = ClientUpdateInstalledPluginErrors[keyof ClientUpdateInstalledPluginErrors];
+export type ClientUpdateInstalledPluginResponses = {
+    /**
+     * Plugin updated.
+     */
+    200: ClientPluginInstallResource;
+};
+export type ClientUpdateInstalledPluginResponse = ClientUpdateInstalledPluginResponses[keyof ClientUpdateInstalledPluginResponses];
+export type ClientRemoveInstalledPluginData = {
+    body: ClientRemoveInstalledPluginRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientRemoveInstalledPluginServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/installed/remove';
+};
+export type ClientRemoveInstalledPluginErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Wings could not delete the file.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientRemoveInstalledPluginError = ClientRemoveInstalledPluginErrors[keyof ClientRemoveInstalledPluginErrors];
+export type ClientRemoveInstalledPluginResponses = {
+    /**
+     * Plugin removed.
+     */
+    204: void;
+};
+export type ClientRemoveInstalledPluginResponse = ClientRemoveInstalledPluginResponses[keyof ClientRemoveInstalledPluginResponses];
+export type ClientGetModpackInstallProgressData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
+};
+export type ClientGetModpackInstallProgressErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
      */
     403: ErrorEnvelope;
     /**
@@ -20845,36 +21394,36 @@ export type ClientReportACrashFromTheConsoleErrors = {
      */
     422: ValidationErrorEnvelope;
 };
-export type ClientReportACrashFromTheConsoleError = ClientReportACrashFromTheConsoleErrors[keyof ClientReportACrashFromTheConsoleErrors];
-export type ClientReportACrashFromTheConsoleResponses = {
+export type ClientGetModpackInstallProgressError = ClientGetModpackInstallProgressErrors[keyof ClientGetModpackInstallProgressErrors];
+export type ClientGetModpackInstallProgressResponses = {
     /**
-     * Crash recorded, or already known; status returned.
+     * Progress returned.
      */
-    200: ClientReportACrashFromTheConsoleResponseBody;
+    200: ClientModpackInstallResource;
 };
-export type ClientReportACrashFromTheConsoleResponse = ClientReportACrashFromTheConsoleResponses[keyof ClientReportACrashFromTheConsoleResponses];
-export type ClientDiagnoseWithTheCrashDoctorData = {
-    body?: ClientDiagnoseWithTheCrashDoctorRequest;
+export type ClientGetModpackInstallProgressResponse = ClientGetModpackInstallProgressResponses[keyof ClientGetModpackInstallProgressResponses];
+export type ClientInstallModpackData = {
+    body: ClientInstallModpackRequest;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter;
+        server_uuid: ClientInstallModpackServerUuidPathParameter;
     };
     query?: never;
-    url: '/api/client/servers/{server_uuid}/crash-doctor/diagnose';
+    url: '/api/client/servers/{server_uuid}/plugins/modpack';
 };
-export type ClientDiagnoseWithTheCrashDoctorErrors = {
+export type ClientInstallModpackErrors = {
+    /**
+     * The version is not a modpack the panel can install.
+     */
+    400: ErrorEnvelope;
     /**
      * Authentication credentials were missing or invalid.
      */
     401: ErrorEnvelope;
     /**
-     * No free AI tokens and no token balance left.
-     */
-    402: ErrorEnvelope;
-    /**
-     * The crash doctor or the assistant is turned off.
+     * The API key does not have permission to perform this action.
      */
     403: ErrorEnvelope;
     /**
@@ -20882,7 +21431,7 @@ export type ClientDiagnoseWithTheCrashDoctorErrors = {
      */
     404: ErrorEnvelope;
     /**
-     * The assistant is already working on another of your conversations.
+     * Another modpack install is running.
      */
     409: ErrorEnvelope;
     /**
@@ -20890,51 +21439,14 @@ export type ClientDiagnoseWithTheCrashDoctorErrors = {
      */
     422: ValidationErrorEnvelope;
 };
-export type ClientDiagnoseWithTheCrashDoctorError = ClientDiagnoseWithTheCrashDoctorErrors[keyof ClientDiagnoseWithTheCrashDoctorErrors];
-export type ClientDiagnoseWithTheCrashDoctorResponses = {
+export type ClientInstallModpackError = ClientInstallModpackErrors[keyof ClientInstallModpackErrors];
+export type ClientInstallModpackResponses = {
     /**
-     * Diagnosis started.
+     * Install started.
      */
-    200: ClientDiagnoseWithTheCrashDoctorResponseBody;
+    202: ClientModpackInstallResource;
 };
-export type ClientDiagnoseWithTheCrashDoctorResponse = ClientDiagnoseWithTheCrashDoctorResponses[keyof ClientDiagnoseWithTheCrashDoctorResponses];
-export type ClientDismissACrashData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientDismissACrashServerUuidPathParameter;
-        /**
-         * The server crash ID.
-         */
-        crash_id: ClientDismissACrashCrashIdPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/crash-doctor/crashes/{crash_id}/dismiss';
-};
-export type ClientDismissACrashErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-};
-export type ClientDismissACrashError = ClientDismissACrashErrors[keyof ClientDismissACrashErrors];
-export type ClientDismissACrashResponses = {
-    /**
-     * Crash dismissed.
-     */
-    204: void;
-};
-export type ClientDismissACrashResponse = ClientDismissACrashResponses[keyof ClientDismissACrashResponses];
+export type ClientInstallModpackResponse = ClientInstallModpackResponses[keyof ClientInstallModpackResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {

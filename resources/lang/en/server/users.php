@@ -33,5 +33,6 @@ return [
         'schedule_delete' => 'Allows a user to delete a schedule for the server.',
         'assistant_use' => 'Allows a user to chat with the AI assistant on this server, limited to what their other permissions allow.',
         'share_manage' => 'Allows a user to publish, edit and unpublish the public page of this server.',
+        'plugins_manage' => 'Allows a user to install, update and remove plugins, mods and modpacks.',
     ],
 ];

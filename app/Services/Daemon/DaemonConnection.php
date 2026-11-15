@@ -47,6 +47,24 @@ final readonly class DaemonConnection
     }
 
     /**
+     * A GET whose body is streamed instead of read into memory, for large files.
+     *
+     * @param  array<string, int|string>  $query
+     */
+    public function stream(string $path, array $query, int $timeout): Response
+    {
+        $request = $this->prepare(Http::withOptions(['stream' => true]))
+            ->timeout($timeout)
+            ->connectTimeout(config()->integer('pterodactyl.guzzle.connect_timeout', 5));
+
+        try {
+            return $request->get($path, $query)->throw();
+        } catch (ConnectionException|RequestException $exception) {
+            throw new DaemonConnectionException($exception);
+        }
+    }
+
+    /**
      * Points a request at this node and authenticates it, for callers that send it
      * themselves, such as a request in an HTTP pool.
      */
