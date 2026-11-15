@@ -208,3 +208,21 @@ test('the catalog and quotes carry the balance, and subdomains follow the Tunnel
         'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'location_id' => $this->home->location_id,
     ])->assertOk()->assertJsonPath('balance', 750);
 });
+
+test('a private node is never listed or quoted, even when a plan names it', function (): void {
+    $plan = ($this->plan)(['node_ids' => [$this->hidden->id, $this->home->id]]);
+    $user = User::factory()->create();
+
+    $nodes = $this->actingAs($user)->getJson(route('api:client.store.catalog'))->assertOk()
+        ->json('categories.0.plans.0.locations.0.nodes');
+    expect(array_column($nodes, 'name'))->toBe(['Home']);
+
+    $this->actingAs($user)->postJson(route('api:client.store.quote'), [
+        'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'node_id' => $this->hidden->id,
+    ])->assertStatus(400);
+
+    // The cheapest node in the location is the public one.
+    $this->actingAs($user)->postJson(route('api:client.store.quote'), [
+        'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'location_id' => $this->location->id,
+    ])->assertOk()->assertJsonPath('node_id', $this->home->id);
+});

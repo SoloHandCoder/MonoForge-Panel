@@ -168,11 +168,14 @@ class StoreCatalogService
     }
 
     /**
+     * Public nodes only: a plan that names a private node never shows (or quotes) it, like the
+     * purchase, which refuses it.
+     *
      * @return Collection<int, Node>
      */
     private function nodes(): Collection
     {
-        return $this->nodes ??= Node::query()->with('location')->orderBy('id')->get();
+        return $this->nodes ??= Node::query()->with('location')->where('public', true)->orderBy('id')->get();
     }
 
     /**
