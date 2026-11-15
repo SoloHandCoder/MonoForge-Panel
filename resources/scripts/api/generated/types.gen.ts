@@ -548,6 +548,24 @@ export type AdminNodeUtilizationResponse = {
     };
 };
 
+export type AdminPermissionTemplateAttributes = {
+    id: number;
+    name: string;
+    permissions: Array<string>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type AdminPermissionTemplateListResponse = {
+    object: string;
+    data: Array<AdminPermissionTemplateResource>;
+};
+
+export type AdminPermissionTemplateResource = {
+    object: string;
+    attributes: AdminPermissionTemplateAttributes;
+};
+
 export type AdminServerAttributes = {
     id: number;
     external_id: string | null;
@@ -1471,6 +1489,31 @@ export type ClientFileSearchResultResource = {
     attributes: ClientFileSearchResultAttributes;
 };
 
+export type ClientFriendListAttributes = {
+    friends: Array<{
+        uuid: string;
+        username: string;
+        image: string;
+        since: string;
+    }>;
+    incoming: Array<{
+        id: number;
+        username: string;
+        image: string;
+        created_at: string;
+    }>;
+    outgoing: Array<{
+        id: number;
+        identifier: string;
+        created_at: string;
+    }>;
+};
+
+export type ClientFriendListResource = {
+    object: string;
+    attributes: ClientFriendListAttributes;
+};
+
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
         id: number;
@@ -1497,6 +1540,35 @@ export type ClientNoticeFeedAttributes = {
 export type ClientNoticeFeedResource = {
     object: string;
     attributes: ClientNoticeFeedAttributes;
+};
+
+export type ClientPermissionTemplateAttributes = {
+    key: string;
+    id: number;
+    source: 'builtin' | 'global' | 'personal';
+    name: string;
+    permissions: Array<string>;
+};
+
+export type ClientPermissionTemplateListAttributes = {
+    templates: Array<{
+        key: string;
+        id: string | null;
+        source: string;
+        name: string;
+        permissions: Array<string>;
+    }>;
+    personal_limit: number;
+};
+
+export type ClientPermissionTemplateListResource = {
+    object: string;
+    attributes: ClientPermissionTemplateListAttributes;
+};
+
+export type ClientPermissionTemplateResource = {
+    object: string;
+    attributes: ClientPermissionTemplateAttributes;
 };
 
 export type ClientRecoveryTokensAttributes = {
@@ -3745,6 +3817,28 @@ export type AdminUpdateStatusPageSettingsRequest = {
     }>;
 };
 
+export type AdminCreateGlobalPermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+
+export type AdminUpdateGlobalPermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+
 export type AdminCreateDatabaseHostRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -4644,6 +4738,35 @@ export type ClientCreateAccountApiKeyRequest = {
     allowed_ips?: Array<string>;
 };
 
+export type ClientSendFriendRequestRequest = {
+    /**
+     * The user ID. Must be at least 1 character. Must not be greater than 191 characters.
+     */
+    user: string;
+};
+
+export type ClientCreatePermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+
+export type ClientUpdatePermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+
 export type ClientCreateSshKeyRequest = {
     /**
      * The display name.
@@ -4939,13 +5062,17 @@ export type ClientUpdateAllocationNotesRequest = {
 
 export type ClientCreateServerSubuserRequest = {
     /**
-     * The user email address. Must be a valid email address. Must be between 1 and 191 characters.
+     * The user email address. This field is required when <code>friend</code> is not present. Must be a valid email address. Must be between 1 and 191 characters.
      */
-    email: string;
+    email?: string;
     /**
      * Permissions granted to the user.
      */
     permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    /**
+     * The friend. Must be a valid UUID.
+     */
+    friend?: string;
 };
 
 export type ClientUpdateServerSubuserRequest = {
@@ -6832,6 +6959,10 @@ export type ClientGetTokenPurchaseResponseBody = {
     };
 };
 
+export type ClientSendFriendRequestResponseBody = {
+    message?: string;
+};
+
 export type ClientListConnectedAccountsResponseBody = {
     has_password?: boolean;
     providers?: Array<{
@@ -7994,6 +8125,8 @@ export type AdminGetTagTagIdPathParameter = number;
 
 export type AdminUpdateLegalDocumentDocumentPathParameter = string;
 
+export type AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter = number;
+
 /**
  * Page number to retrieve.
  */
@@ -8533,6 +8666,16 @@ export type ClientGetWalletPerPageQueryParameter = number;
 export type ClientGetTokenPurchaseCheckoutPathParameter = string;
 
 export type ClientDeleteAccountApiKeyIdentifierPathParameter = string;
+
+export type ClientAcceptFriendRequestFriendRequestPathParameter = number;
+
+export type ClientDeclineFriendRequestFriendRequestPathParameter = number;
+
+export type ClientCancelFriendRequestFriendRequestPathParameter = number;
+
+export type ClientRemoveFriendFriendPathParameter = string;
+
+export type ClientUpdatePermissionTemplateTemplatePathParameter = number;
 
 export type ClientStartLinkingAnAccountProviderPathParameter = string;
 
@@ -16525,6 +16668,152 @@ export type AdminUpdateStatusPageSettingsResponses = {
 
 export type AdminUpdateStatusPageSettingsResponse = AdminUpdateStatusPageSettingsResponses[keyof AdminUpdateStatusPageSettingsResponses];
 
+export type AdminListGlobalPermissionTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/permission-templates';
+};
+
+export type AdminListGlobalPermissionTemplatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminListGlobalPermissionTemplatesError = AdminListGlobalPermissionTemplatesErrors[keyof AdminListGlobalPermissionTemplatesErrors];
+
+export type AdminListGlobalPermissionTemplatesResponses = {
+    /**
+     * Global templates returned.
+     */
+    200: AdminPermissionTemplateListResponse;
+};
+
+export type AdminListGlobalPermissionTemplatesResponse = AdminListGlobalPermissionTemplatesResponses[keyof AdminListGlobalPermissionTemplatesResponses];
+
+export type AdminCreateGlobalPermissionTemplateData = {
+    body: AdminCreateGlobalPermissionTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/permission-templates';
+};
+
+export type AdminCreateGlobalPermissionTemplateErrors = {
+    /**
+     * The panel already has the most global templates it may keep.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminCreateGlobalPermissionTemplateError = AdminCreateGlobalPermissionTemplateErrors[keyof AdminCreateGlobalPermissionTemplateErrors];
+
+export type AdminCreateGlobalPermissionTemplateResponses = {
+    /**
+     * Global template created.
+     */
+    201: AdminPermissionTemplateResource;
+};
+
+export type AdminCreateGlobalPermissionTemplateResponse = AdminCreateGlobalPermissionTemplateResponses[keyof AdminCreateGlobalPermissionTemplateResponses];
+
+export type AdminDeleteGlobalPermissionTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the global permission template.
+         */
+        permissionTemplate_id: AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/permission-templates/{permissionTemplate_id}';
+};
+
+export type AdminDeleteGlobalPermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type AdminDeleteGlobalPermissionTemplateError = AdminDeleteGlobalPermissionTemplateErrors[keyof AdminDeleteGlobalPermissionTemplateErrors];
+
+export type AdminDeleteGlobalPermissionTemplateResponses = {
+    /**
+     * Global template deleted.
+     */
+    204: void;
+};
+
+export type AdminDeleteGlobalPermissionTemplateResponse = AdminDeleteGlobalPermissionTemplateResponses[keyof AdminDeleteGlobalPermissionTemplateResponses];
+
+export type AdminUpdateGlobalPermissionTemplateData = {
+    body: AdminUpdateGlobalPermissionTemplateRequest;
+    path: {
+        /**
+         * The ID of the global permission template.
+         */
+        permissionTemplate_id: AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/permission-templates/{permissionTemplate_id}';
+};
+
+export type AdminUpdateGlobalPermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateGlobalPermissionTemplateError = AdminUpdateGlobalPermissionTemplateErrors[keyof AdminUpdateGlobalPermissionTemplateErrors];
+
+export type AdminUpdateGlobalPermissionTemplateResponses = {
+    /**
+     * Global template updated.
+     */
+    200: AdminPermissionTemplateResource;
+};
+
+export type AdminUpdateGlobalPermissionTemplateResponse = AdminUpdateGlobalPermissionTemplateResponses[keyof AdminUpdateGlobalPermissionTemplateResponses];
+
 export type AdminListDatabaseHostsData = {
     body?: never;
     path?: never;
@@ -20225,6 +20514,370 @@ export type ClientDeleteAccountApiKeyResponses = {
 
 export type ClientDeleteAccountApiKeyResponse = ClientDeleteAccountApiKeyResponses[keyof ClientDeleteAccountApiKeyResponses];
 
+export type ClientListFriendsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/friends';
+};
+
+export type ClientListFriendsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type ClientListFriendsError = ClientListFriendsErrors[keyof ClientListFriendsErrors];
+
+export type ClientListFriendsResponses = {
+    /**
+     * Friends and requests returned.
+     */
+    200: ClientFriendListResource;
+};
+
+export type ClientListFriendsResponse = ClientListFriendsResponses[keyof ClientListFriendsResponses];
+
+export type ClientSendFriendRequestData = {
+    body: ClientSendFriendRequestRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/friends/requests';
+};
+
+export type ClientSendFriendRequestErrors = {
+    /**
+     * Too many requests are waiting.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientSendFriendRequestError = ClientSendFriendRequestErrors[keyof ClientSendFriendRequestErrors];
+
+export type ClientSendFriendRequestResponses = {
+    /**
+     * Request recorded; the user gets it if they exist.
+     */
+    202: ClientSendFriendRequestResponseBody;
+};
+
+export type ClientSendFriendRequestResponse = ClientSendFriendRequestResponses[keyof ClientSendFriendRequestResponses];
+
+export type ClientAcceptFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientAcceptFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}/accept';
+};
+
+export type ClientAcceptFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientAcceptFriendRequestError = ClientAcceptFriendRequestErrors[keyof ClientAcceptFriendRequestErrors];
+
+export type ClientAcceptFriendRequestResponses = {
+    /**
+     * Request accepted.
+     */
+    204: void;
+};
+
+export type ClientAcceptFriendRequestResponse = ClientAcceptFriendRequestResponses[keyof ClientAcceptFriendRequestResponses];
+
+export type ClientDeclineFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientDeclineFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}/decline';
+};
+
+export type ClientDeclineFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientDeclineFriendRequestError = ClientDeclineFriendRequestErrors[keyof ClientDeclineFriendRequestErrors];
+
+export type ClientDeclineFriendRequestResponses = {
+    /**
+     * Request declined.
+     */
+    204: void;
+};
+
+export type ClientDeclineFriendRequestResponse = ClientDeclineFriendRequestResponses[keyof ClientDeclineFriendRequestResponses];
+
+export type ClientCancelFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientCancelFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}';
+};
+
+export type ClientCancelFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientCancelFriendRequestError = ClientCancelFriendRequestErrors[keyof ClientCancelFriendRequestErrors];
+
+export type ClientCancelFriendRequestResponses = {
+    /**
+     * Request cancelled.
+     */
+    204: void;
+};
+
+export type ClientCancelFriendRequestResponse = ClientCancelFriendRequestResponses[keyof ClientCancelFriendRequestResponses];
+
+export type ClientRemoveFriendData = {
+    body?: never;
+    path: {
+        /**
+         * The friend's user UUID.
+         */
+        friend: ClientRemoveFriendFriendPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/{friend}';
+};
+
+export type ClientRemoveFriendErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientRemoveFriendError = ClientRemoveFriendErrors[keyof ClientRemoveFriendErrors];
+
+export type ClientRemoveFriendResponses = {
+    /**
+     * Friend removed.
+     */
+    204: void;
+};
+
+export type ClientRemoveFriendResponse = ClientRemoveFriendResponses[keyof ClientRemoveFriendResponses];
+
+export type ClientListPermissionTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/permission-templates';
+};
+
+export type ClientListPermissionTemplatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type ClientListPermissionTemplatesError = ClientListPermissionTemplatesErrors[keyof ClientListPermissionTemplatesErrors];
+
+export type ClientListPermissionTemplatesResponses = {
+    /**
+     * Templates returned.
+     */
+    200: ClientPermissionTemplateListResource;
+};
+
+export type ClientListPermissionTemplatesResponse = ClientListPermissionTemplatesResponses[keyof ClientListPermissionTemplatesResponses];
+
+export type ClientCreatePermissionTemplateData = {
+    body: ClientCreatePermissionTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/permission-templates';
+};
+
+export type ClientCreatePermissionTemplateErrors = {
+    /**
+     * The account already has the most templates it may keep.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientCreatePermissionTemplateError = ClientCreatePermissionTemplateErrors[keyof ClientCreatePermissionTemplateErrors];
+
+export type ClientCreatePermissionTemplateResponses = {
+    /**
+     * Template created.
+     */
+    201: ClientPermissionTemplateResource;
+};
+
+export type ClientCreatePermissionTemplateResponse = ClientCreatePermissionTemplateResponses[keyof ClientCreatePermissionTemplateResponses];
+
+export type ClientDeletePermissionTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the permission template.
+         */
+        template: ClientUpdatePermissionTemplateTemplatePathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/permission-templates/{template}';
+};
+
+export type ClientDeletePermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientDeletePermissionTemplateError = ClientDeletePermissionTemplateErrors[keyof ClientDeletePermissionTemplateErrors];
+
+export type ClientDeletePermissionTemplateResponses = {
+    /**
+     * Template deleted.
+     */
+    204: void;
+};
+
+export type ClientDeletePermissionTemplateResponse = ClientDeletePermissionTemplateResponses[keyof ClientDeletePermissionTemplateResponses];
+
+export type ClientUpdatePermissionTemplateData = {
+    body: ClientUpdatePermissionTemplateRequest;
+    path: {
+        /**
+         * The ID of the permission template.
+         */
+        template: ClientUpdatePermissionTemplateTemplatePathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/permission-templates/{template}';
+};
+
+export type ClientUpdatePermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientUpdatePermissionTemplateError = ClientUpdatePermissionTemplateErrors[keyof ClientUpdatePermissionTemplateErrors];
+
+export type ClientUpdatePermissionTemplateResponses = {
+    /**
+     * Template updated.
+     */
+    200: ClientPermissionTemplateResource;
+};
+
+export type ClientUpdatePermissionTemplateResponse = ClientUpdatePermissionTemplateResponses[keyof ClientUpdatePermissionTemplateResponses];
+
 export type ClientListSshKeysData = {
     body?: never;
     path?: never;
@@ -22390,7 +23043,7 @@ export type ClientListServerSubusersResponses = {
 export type ClientListServerSubusersResponse = ClientListServerSubusersResponses[keyof ClientListServerSubusersResponses];
 
 export type ClientCreateServerSubuserData = {
-    body: ClientCreateServerSubuserRequest;
+    body?: ClientCreateServerSubuserRequest;
     path: {
         /**
          * The server UUID.
