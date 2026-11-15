@@ -1,11 +1,14 @@
-import type { ComponentProps } from 'react';
+import { useId, useState, type ComponentProps } from 'react';
 import {
+    Button,
     Card,
     Checkbox,
     cn,
     Dialog,
     Form,
+    Input,
     Label,
+    Select,
     setPermissionsSelected,
     SpinnerOverlay,
     useAppForm,
@@ -13,10 +16,12 @@ import {
     type SubuserFormModel,
     type SubuserPermission,
     type SubuserPermissionGroup,
+    type SubuserTemplateOption,
 } from '@/sdk';
 import { Slot, type ViewProps } from '@/sdk/theme';
 
-type Values = { email: string; permissions: string[] };
+/** `friend` is the UUID of the friend picked in place of an email, or empty. */
+type Values = { email: string; permissions: string[]; friend: string };
 type SubuserAppForm = AppForm<Values>;
 
 interface Selection {
@@ -144,6 +149,135 @@ function PermissionGroup({
     );
 }
 
+const TEMPLATE_SOURCES: readonly [SubuserTemplateOption['source'], string][] = [
+    ['builtin', 'Built-in'],
+    ['global', 'From your host'],
+    ['personal', 'Your templates'],
+];
+
+/** Picks a friend to invite in place of typing their email. */
+function FriendPicker({ form, model }: { form: SubuserAppForm; model: SubuserFormModel }) {
+    const id = useId();
+
+    if (model.friends.length === 0) {
+        return null;
+    }
+
+    return (
+        <form.Subscribe selector={(state) => state.values.friend}>
+            {(friend) => (
+                <div className='mt-6'>
+                    <Label htmlFor={id}>Invite a friend</Label>
+                    <div className='mt-1 max-w-md'>
+                        <Select
+                            id={id}
+                            options={[
+                                { value: '', label: 'Someone else, by email' },
+                                ...model.friends.map((item) => ({ value: item.uuid, label: item.username })),
+                            ]}
+                            value={friend}
+                            placeholder='Someone else, by email'
+                            searchPlaceholder='Search friends'
+                            emptyMessage='No friend has that name.'
+                            onChange={(value) => form.setFieldValue('friend', String(value))}
+                        />
+                    </div>
+                </div>
+            )}
+        </form.Subscribe>
+    );
+}
+
+/** Fills the checkboxes from a template. The checkboxes stay editable afterwards. */
+function TemplatePicker({
+    model,
+    selection,
+}: {
+    model: SubuserFormModel;
+    selection: { selected: readonly string[]; select: (permissions: string[]) => void; enabled: boolean };
+}) {
+    const id = useId();
+    const [picked, setPicked] = useState('');
+    const template = model.templates.find((item) => item.key === picked);
+
+    if (model.templates.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className='mt-6'>
+            <Label htmlFor={id}>Start from a template</Label>
+            <div className='mt-1 max-w-md'>
+                <Select
+                    id={id}
+                    groups={TEMPLATE_SOURCES.flatMap(([source, label]) => {
+                        const options = model.templates
+                            .filter((item) => item.source === source)
+                            .map((item) => ({ value: item.key, label: item.name }));
+
+                        return options.length > 0 ? [{ label, options }] : [];
+                    })}
+                    value={picked}
+                    disabled={!selection.enabled}
+                    placeholder='Choose a template'
+                    searchPlaceholder='Search templates'
+                    emptyMessage='No template has that name.'
+                    onChange={(value) => {
+                        const key = String(value);
+
+                        setPicked(key);
+                        selection.select(model.applyTemplate(selection.selected, key));
+                    }}
+                />
+            </div>
+            <p className='mt-1 text-xs text-muted-foreground' aria-live='polite'>
+                {template && template.withheld > 0
+                    ? `${template.withheld} of this template's permissions are ones you do not hold, so they were left out.`
+                    : 'A template only fills in the checkboxes below; you can still change them.'}
+            </p>
+        </div>
+    );
+}
+
+/** Saves the checked permissions as one of the viewer's own templates. */
+function SaveAsTemplate({ model, selected }: { model: SubuserFormModel; selected: readonly string[] }) {
+    const id = useId();
+    const [name, setName] = useState('');
+    const trimmed = name.trim();
+
+    return (
+        <div className='mt-4 flex flex-col gap-2 sm:flex-row sm:items-end'>
+            <div className='min-w-0 flex-1 sm:max-w-xs'>
+                <Label htmlFor={id}>Save these permissions as a template</Label>
+                <Input
+                    id={id}
+                    className='mt-1'
+                    value={name}
+                    maxLength={64}
+                    placeholder='Template name'
+                    onChange={(event) => setName(event.currentTarget.value)}
+                />
+            </div>
+            <Button
+                type='button'
+                color='grey'
+                isSecondary
+                disabled={trimmed.length === 0 || model.savingTemplate}
+                isLoading={model.savingTemplate}
+                onClick={() => {
+                    void model.saveTemplate(trimmed, selected).then((saved) => {
+                        if (saved) {
+                            setName('');
+                        }
+                    });
+                }}
+            >
+                Save template
+            </Button>
+        </div>
+    );
+}
+
 function SubmitButton({ form, model }: { form: SubuserAppForm; model: SubuserFormModel }) {
     return (
         <form.AppForm>
@@ -198,21 +332,35 @@ function FormContent({
                                 </p>
                             </div>
                         )}
+                        {!model.subuser && <FriendPicker form={form} model={model} />}
                         {!model.subuser && (
-                            <div className='mt-6'>
-                                <form.AppField
-                                    name='email'
-                                    validators={{ onChange: ({ value }) => model.validateEmail(value) }}
-                                >
-                                    {(field) => (
-                                        <field.TextField
-                                            label='User Email'
-                                            description='Enter the email address of the user you wish to invite as a subuser for this server.'
-                                        />
-                                    )}
-                                </form.AppField>
-                            </div>
+                            <form.Subscribe selector={(state) => state.values.friend}>
+                                {(friend) =>
+                                    friend === '' && (
+                                        <div className='mt-6'>
+                                            <form.AppField
+                                                name='email'
+                                                validators={{
+                                                    onChangeListenTo: ['friend'],
+                                                    onChange: ({ value, fieldApi }) =>
+                                                        fieldApi.form.getFieldValue('friend') === ''
+                                                            ? model.validateEmail(value)
+                                                            : undefined,
+                                                }}
+                                            >
+                                                {(field) => (
+                                                    <field.TextField
+                                                        label='User Email'
+                                                        description='Enter the email address of the user you wish to invite as a subuser for this server.'
+                                                    />
+                                                )}
+                                            </form.AppField>
+                                        </div>
+                                    )
+                                }
+                            </form.Subscribe>
                         )}
+                        {model.canEdit && <TemplatePicker model={model} selection={selection} />}
                         <Slot
                             name='server.users.permissions.before'
                             data={model.permissionSlot(selected, submitting, selection.select)}
@@ -251,6 +399,7 @@ function FormContent({
                                 />
                             ))}
                         </div>
+                        {model.canEdit && <SaveAsTemplate model={model} selected={selected} />}
                         {model.canEdit && (
                             <div className='pb-6 flex justify-end'>
                                 <SubmitButton form={form} model={model} />
@@ -265,11 +414,15 @@ function FormContent({
 
 /** Invites a subuser, or edits one in a dialog when the view is given `onClose`. */
 export default function SubuserForm({ model, onClose, className }: ViewProps<'server.subuserForm'>) {
-    const defaultValues: Values = { email: model.values.email, permissions: [...model.values.permissions] };
+    const defaultValues: Values = {
+        email: model.values.email,
+        permissions: [...model.values.permissions],
+        friend: model.values.friend ?? '',
+    };
     const form = useAppForm({
         defaultValues,
         onSubmit: async ({ value }) => {
-            await model.save(value);
+            await model.save({ ...value, friend: value.friend === '' ? null : value.friend });
         },
     });
 

@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { friendsQueryOptions } from '@/api/account/friends/queries';
+import {
+    permissionTemplatesQueryOptions,
+    useCreatePermissionTemplate,
+} from '@/api/account/permission-templates/queries';
 import { useCurrentUser } from '@/api/account/queries';
 import { useCurrentServerPermissions } from '@/api/server/queries';
 import {
@@ -69,6 +75,26 @@ export interface SubuserPermissionGroup {
 export interface SubuserFormValues {
     readonly email: string;
     readonly permissions: readonly string[];
+    /** The UUID of the friend to invite in place of an email; null or unset to invite by email. */
+    readonly friend?: string | null;
+}
+/** A friend the invite form can pick in place of typing an email. */
+export interface SubuserFriendOption {
+    readonly uuid: string;
+    readonly username: string;
+    /** The friend's avatar. */
+    readonly image: string;
+}
+/** A permission template the form can fill the checkboxes from. */
+export interface SubuserTemplateOption {
+    /** Unique across sources, such as `builtin:viewer` or `personal:3`. */
+    readonly key: string;
+    readonly name: string;
+    readonly source: 'builtin' | 'global' | 'personal';
+    /** The template's permissions the viewer may grant; connecting to the console aside. */
+    readonly permissions: readonly string[];
+    /** How many of the template's permissions the viewer does not hold, so cannot grant. */
+    readonly withheld: number;
 }
 export interface SubuserFormModel {
     readonly mode: 'create' | 'edit';
@@ -90,6 +116,18 @@ export interface SubuserFormModel {
     readonly values: SubuserFormValues;
     readonly saving: boolean;
     readonly validateEmail: (email: string) => string | undefined;
+    /** The viewer's friends, offered in place of an email while inviting. */
+    readonly friends: readonly SubuserFriendOption[];
+    /** The built-in, global and own templates, kept to what the viewer may grant. */
+    readonly templates: readonly SubuserTemplateOption[];
+    /**
+     * The selection with a template applied: the permissions the viewer may grant become the
+     * template's, the others stay as they are. Changing a template later never changes a subuser.
+     */
+    readonly applyTemplate: (selected: readonly string[], key: string) => string[];
+    /** Saves the selection as one of the viewer's own templates; resolves whether it was saved. */
+    readonly saveTemplate: (name: string, permissions: readonly string[]) => Promise<boolean>;
+    readonly savingTemplate: boolean;
     /**
      * Saves the subuser and resolves whether it was saved, a failure having been reported. An invite
      * returns to the user list; an edit calls the view's `onClose`.
@@ -130,6 +168,9 @@ const subuserSummary = ({ attributes }: Subuser, viewer: string): SubuserSummary
     permissionCount: attributes.permissions.filter((permission) => permission !== 'websocket.connect').length,
     self: attributes.uuid === viewer,
 });
+
+const templateSource = (source: string): SubuserTemplateOption['source'] =>
+    source === 'global' || source === 'personal' ? source : 'builtin';
 
 const validateEmail = (value: string): string | undefined => {
     if (value.length > 191) {
@@ -197,6 +238,9 @@ function useSubuserFormModel({ subuser, onClose }: SubuserFormInput): SubuserFor
     const [canEdit] = usePermissions(subuser ? 'user.update' : 'user.create');
     const { mutateAsync: invite, isPending: inviting } = useCreateSubuser();
     const { mutateAsync: update, isPending: updating } = useUpdateSubuser();
+    const { mutateAsync: createTemplate, isPending: savingTemplate } = useCreatePermissionTemplate();
+    const { data: friendList } = useQuery({ ...friendsQueryOptions(), enabled: !subuser });
+    const { data: templateList } = useQuery({ ...permissionTemplatesQueryOptions(), enabled: canEdit });
     const permissions = catalogue?.attributes.permissions;
 
     const { groups, editable } = useMemo(() => {
@@ -226,9 +270,60 @@ function useSubuserFormModel({ subuser, onClose }: SubuserFormInput): SubuserFor
         };
     }, [permissions, granted, rootAdmin]);
 
+    const friends = useMemo(
+        (): SubuserFriendOption[] =>
+            (friendList?.attributes?.friends ?? []).map(({ uuid: friend, username, image }) => ({
+                uuid: friend,
+                username,
+                image,
+            })),
+        [friendList]
+    );
+
+    const templates = useMemo(
+        (): SubuserTemplateOption[] =>
+            (templateList?.attributes?.templates ?? []).map((template) => {
+                const granted = template.permissions.filter((permission) => permission !== 'websocket.connect');
+                const kept = granted.filter((permission) => editable.has(permission));
+
+                return {
+                    key: template.key,
+                    name: template.name,
+                    source: templateSource(template.source),
+                    permissions: kept,
+                    withheld: granted.length - kept.length,
+                };
+            }),
+        [templateList, editable]
+    );
+
+    const applyTemplate = useCallback(
+        (selected: readonly string[], key: string) => {
+            const template = templates.find((item) => item.key === key);
+
+            return template ? replaceEditablePermissions(selected, template.permissions, editable) : [...selected];
+        },
+        [templates, editable]
+    );
+
+    const saveTemplate = useCallback(
+        (name: string, selected: readonly string[]) =>
+            attempt(async () => {
+                await createTemplate({
+                    body: {
+                        name: name.trim(),
+                        permissions: selected.filter((permission) => permission !== 'websocket.connect'),
+                    },
+                });
+            }),
+        [createTemplate]
+    );
+
     const save = useCallback(
         (values: SubuserFormValues) => {
-            const body = { email: values.email, permissions: [...values.permissions] };
+            const body = values.friend
+                ? { friend: values.friend, permissions: [...values.permissions] }
+                : { email: values.email, permissions: [...values.permissions] };
 
             return attempt(async () => {
                 if (subuser) {
@@ -240,7 +335,9 @@ function useSubuserFormModel({ subuser, onClose }: SubuserFormInput): SubuserFor
 
                 const invited = await invite(createServerSubuserInput(uuid, body));
 
-                toast.success('Subuser invited', { description: `${invited.attributes.email} has been invited.` });
+                const who = values.friend ? invited.attributes.username : invited.attributes.email;
+
+                toast.success('Subuser invited', { description: `${who} has been invited.` });
                 void navigate({ to: '/server/$id/users', params: { id: identifier } });
             });
         },
@@ -284,13 +381,35 @@ function useSubuserFormModel({ subuser, onClose }: SubuserFormInput): SubuserFor
             restricted,
             groups,
             editable: [...editable],
-            values: { email: subuser?.email ?? '', permissions: subuser?.permissions ?? [] },
+            values: { email: subuser?.email ?? '', permissions: subuser?.permissions ?? [], friend: null },
             saving,
             validateEmail,
+            friends,
+            templates,
+            applyTemplate,
+            saveTemplate,
+            savingTemplate,
             save,
             permissionSlot,
         }),
-        [mode, subuser, loading, failed, canEdit, restricted, groups, editable, saving, save, permissionSlot]
+        [
+            mode,
+            subuser,
+            loading,
+            failed,
+            canEdit,
+            restricted,
+            groups,
+            editable,
+            saving,
+            friends,
+            templates,
+            applyTemplate,
+            saveTemplate,
+            savingTemplate,
+            save,
+            permissionSlot,
+        ]
     );
 }
 
@@ -383,6 +502,24 @@ const groupsFixture = (held?: ReadonlySet<string>): SubuserPermissionGroup[] =>
         })),
     }));
 
+const friendFixtures: readonly SubuserFriendOption[] = [
+    { uuid: '44444444-4444-4444-8444-444444444444', username: 'riley', image: 'https://www.gravatar.com/avatar/3' },
+    { uuid: '55555555-5555-4555-8555-555555555555', username: 'casey', image: 'https://www.gravatar.com/avatar/4' },
+];
+
+const templateFixtures = (editable: readonly string[]): SubuserTemplateOption[] =>
+    (
+        [
+            ['builtin:moderator', 'Moderator', 'builtin', ['control.console', 'control.start', 'control.restart']],
+            ['builtin:builder', 'Builder', 'builtin', ['backup.read', 'backup.create']],
+            ['personal:1', 'Event staff', 'personal', ['control.console', 'user.read']],
+        ] as const
+    ).map(([key, name, source, granted]) => {
+        const kept = granted.filter((permission) => editable.includes(permission));
+
+        return { key, name, source, permissions: kept, withheld: granted.length - kept.length };
+    });
+
 const formFixture = (options: Partial<SubuserFormModel> = {}): SubuserFormModel => {
     const groups = options.groups ?? groupsFixture();
     const editable = groups.flatMap((group) => group.permissions.filter((row) => row.editable).map((row) => row.key));
@@ -399,6 +536,16 @@ const formFixture = (options: Partial<SubuserFormModel> = {}): SubuserFormModel 
         values: { email: '', permissions: [] },
         saving: false,
         validateEmail,
+        friends: friendFixtures,
+        templates: templateFixtures(editable),
+        applyTemplate: (selected, key) => [
+            ...new Set([
+                ...selected.filter((permission) => !editable.includes(permission)),
+                ...(templateFixtures(editable).find((template) => template.key === key)?.permissions ?? []),
+            ]),
+        ],
+        saveTemplate: saved,
+        savingTemplate: false,
         save: saved,
         permissionSlot: (selected, submitting) => ({
             mode: options.mode ?? 'create',

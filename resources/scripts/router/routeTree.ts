@@ -13,6 +13,8 @@ import {
 import { extensionScreenComponent } from '@/extensions/screen';
 import { accountApiKeysQueryOptions } from '@/api/account/api-keys/queries';
 import { accountActivityFacetsQueryOptions, accountActivityLogsQueryOptions } from '@/api/account/activity/queries';
+import { friendsQueryOptions } from '@/api/account/friends/queries';
+import { permissionTemplatesQueryOptions } from '@/api/account/permission-templates/queries';
 import { currentUserQueryOptions } from '@/api/account/queries';
 import { accountServersQueryOptions } from '@/api/account/servers/queries';
 import { accountSshKeysQueryOptions } from '@/api/account/ssh-keys/queries';
@@ -49,6 +51,7 @@ import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
+import { adminPermissionTemplatesQueryOptions } from '@/api/admin/settings/permissionTemplates';
 import { adminStatusPageSettingsQueryOptions } from '@/api/admin/settings/status';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
@@ -306,6 +309,27 @@ const accountChildren = [
             ]);
         },
         component: pageRoute('page.account.activity'),
+    }),
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'friends',
+        staticData: { nav: { label: 'Friends', icon: 'users' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...friendsQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/account/friends/FriendsContainer')),
+    }),
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'templates',
+        staticData: { nav: { label: 'Permission Templates', icon: 'user-cog' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({
+                ...permissionTemplatesQueryOptions(),
+                revalidateIfStale: true,
+            });
+        },
+        component: componentRoute(() => import('@/components/account/templates/PermissionTemplatesContainer')),
     }),
     createRoute({
         getParentRoute: () => accountRoute,
@@ -1013,6 +1037,23 @@ const panelChildren = [
                 context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
                 context.queryClient.ensureQueryData({
                     ...adminStatusPageSettingsQueryOptions(),
+                    revalidateIfStale: true,
+                }),
+            ]);
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'settings/templates',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({
+                    ...adminPermissionTemplatesQueryOptions(),
                     revalidateIfStale: true,
                 }),
             ]);

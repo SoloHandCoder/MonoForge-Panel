@@ -7,6 +7,7 @@ import GeneralSettingsForm from '@/components/admin/settings/GeneralSettingsForm
 import LegalSettings from '@/components/admin/settings/LegalSettingsForm';
 import LoginProvidersForm from '@/components/admin/settings/LoginProvidersForm';
 import MailSettingsForm from '@/components/admin/settings/MailSettingsForm';
+import PermissionTemplateSettings from '@/components/admin/settings/PermissionTemplateSettings';
 import RegistrationSettings from '@/components/admin/settings/RegistrationSettingsForm';
 import StatusPageSettings from '@/components/admin/settings/StatusPageSettingsForm';
 import SettingsTabButton from '@/components/admin/settings/SettingsTabButton';
@@ -15,7 +16,7 @@ import { httpErrorToHuman } from '@/api/http';
 import { ServerError } from '@/components/elements/ScreenBlock';
 import { Alert } from '@/components/elements/alert';
 
-type Tab = 'general' | 'mail' | 'advanced' | 'login-providers' | 'registration' | 'legal' | 'status';
+type Tab = 'general' | 'mail' | 'advanced' | 'login-providers' | 'registration' | 'legal' | 'status' | 'templates';
 type SettingsSearch = {
     tab?: string;
 };
@@ -28,6 +29,7 @@ const tabs: { key: Tab; label: string }[] = [
     { key: 'registration', label: 'Registration' },
     { key: 'legal', label: 'Legal' },
     { key: 'status', label: 'Status page' },
+    { key: 'templates', label: 'Templates' },
 ];
 
 const tabPaths = {
@@ -38,6 +40,7 @@ const tabPaths = {
     registration: '/panel/settings/registration',
     legal: '/panel/settings/legal',
     status: '/panel/settings/status',
+    templates: '/panel/settings/templates',
 } as const satisfies Record<Tab, string>;
 
 const tabFromPath = (pathname: string): Tab | undefined => {
@@ -65,6 +68,10 @@ const tabFromPath = (pathname: string): Tab | undefined => {
         return 'status';
     }
 
+    if (pathname.endsWith('/templates')) {
+        return 'templates';
+    }
+
     return undefined;
 };
 
@@ -75,7 +82,8 @@ const parseTab = (tab: string | undefined): Tab =>
     tab === 'login-providers' ||
     tab === 'registration' ||
     tab === 'legal' ||
-    tab === 'status'
+    tab === 'status' ||
+    tab === 'templates'
         ? tab
         : 'general';
 
@@ -138,6 +146,7 @@ export default function SettingsContainer() {
                     {tab === 'registration' && <RegistrationSettings />}
                     {tab === 'legal' && <LegalSettings />}
                     {tab === 'status' && <StatusPageSettings />}
+                    {tab === 'templates' && <PermissionTemplateSettings />}
                 </div>
             ) : (
                 <Spinner size='large' centered />

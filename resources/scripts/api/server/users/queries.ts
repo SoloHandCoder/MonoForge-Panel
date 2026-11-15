@@ -24,7 +24,10 @@ export type SubuserPermission = ClientServerSubuserAttributes['permissions'][num
 export type Subuser = ClientServerSubuserResource;
 
 export interface CreateOrUpdateSubuserValues {
-    email: string;
+    /** The invitee's email; leave it out when inviting a friend. */
+    email?: string;
+    /** The UUID of a friend to invite in place of an email. */
+    friend?: string;
     permissions: SubuserPermission[];
 }
 
