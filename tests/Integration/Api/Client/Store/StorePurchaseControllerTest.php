@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Contracts\Servers\CreatesServers;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Billing\ServerSubscription;
@@ -28,6 +29,7 @@ use Pterodactyl\Models\UserNotice;
 use Pterodactyl\Services\Billing\CapacityService;
 use Pterodactyl\Services\Billing\StorePurchaseService;
 use Pterodactyl\Services\Billing\TokenWallet;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
@@ -128,6 +130,15 @@ test('buys a server: charges the first period, creates it with the egg defaults 
         ->and($input['environment'])->toHaveKey('SERVER_JARFILE')
         ->and($input['external_id'])->toBe(StorePurchaseService::reference($this->user, order()['idempotency_key']))
         ->and(ServerSubscription::query()->where('server_id', $server->id)->value('price_tokens'))->toBe(500);
+});
+
+test('the subscription keeps the Terms of Service version the purchase accepted', function (): void {
+    LegalSettings::save(LegalDocument::Terms, '# Terms', '', reaccept: true);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertCreated();
+
+    $server = Server::query()->where('owner_id', $this->user->id)->sole();
+    expect(ServerSubscription::query()->where('server_id', $server->id)->sole()->terms_version)->toBe(2);
 });
 
 test('the same idempotency key never buys twice', function (): void {
