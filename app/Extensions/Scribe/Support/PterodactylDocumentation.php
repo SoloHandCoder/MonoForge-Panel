@@ -91,6 +91,14 @@ class PterodactylDocumentation
         'user_id' => ['integer', 'The user ID.', 1],
         'variable' => ['integer', 'The variable ID.', 1],
         'variable_id' => ['integer', 'The variable ID.', 1],
+        // Phase 3: the token shop and playit.gg tunnels.
+        'category_id' => ['integer', 'The shop category ID.', 1],
+        'plan_id' => ['integer', 'The shop plan ID.', 1],
+        'period_id' => ['integer', 'The billing period ID.', 1],
+        'multiplier_id' => ['integer', 'The price multiplier ID.', 1],
+        'addon_id' => ['integer', 'The shop add-on ID.', 1],
+        'tokenPack_id' => ['integer', 'The token pack ID.', 1],
+        'tunnel_id' => ['integer', 'The server tunnel ID.', 1],
     ];
 
     private const array FIELD_DESCRIPTIONS = [

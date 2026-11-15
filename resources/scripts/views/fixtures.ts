@@ -43,6 +43,7 @@ export function createTestServer(options: TestServerOptions = {}): Server {
             is_installing: options.status === 'installing',
             is_transferring: false,
             skip_scripts: false,
+            playit_address: null,
         },
         meta: { is_server_owner: owner, user_permissions: options.permissions ?? [] },
     };
