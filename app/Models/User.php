@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -172,6 +173,46 @@ class User extends Authenticatable implements Identifiable
     public function notices(): HasMany
     {
         return $this->hasMany(UserNotice::class);
+    }
+
+    /**
+     * The users who accepted a friend request from this user, or whose request this user accepted.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function friends(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'friendships', 'user_id', 'friend_id')->withTimestamps();
+    }
+
+    /**
+     * The friend requests this user sent, whether or not a user matched them.
+     *
+     * @return HasMany<FriendRequest, $this>
+     */
+    public function sentFriendRequests(): HasMany
+    {
+        return $this->hasMany(FriendRequest::class, 'sender_id');
+    }
+
+    /**
+     * The friend requests sent to this user, declined ones included.
+     *
+     * @return HasMany<FriendRequest, $this>
+     */
+    public function receivedFriendRequests(): HasMany
+    {
+        return $this->hasMany(FriendRequest::class, 'recipient_id');
+    }
+
+    /**
+     * The subuser permission templates this user made for their account.
+     *
+     * @return HasMany<PermissionTemplate, $this>
+     */
+    public function permissionTemplates(): HasMany
+    {
+        return $this->hasMany(PermissionTemplate::class);
     }
 
     /**

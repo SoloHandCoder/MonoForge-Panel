@@ -493,6 +493,21 @@ export type AdminNodeUtilizationResponse = {
         css: string;
     };
 };
+export type AdminPermissionTemplateAttributes = {
+    id: number;
+    name: string;
+    permissions: Array<string>;
+    created_at: string;
+    updated_at: string;
+};
+export type AdminPermissionTemplateListResponse = {
+    object: string;
+    data: Array<AdminPermissionTemplateResource>;
+};
+export type AdminPermissionTemplateResource = {
+    object: string;
+    attributes: AdminPermissionTemplateAttributes;
+};
 export type AdminServerAttributes = {
     id: number;
     external_id: string | null;
@@ -1329,24 +1344,28 @@ export type ClientFileSearchResultResource = {
     object: string;
     attributes: ClientFileSearchResultAttributes;
 };
-export type ClientModpackInstallAttributes = {
-    status: string;
-    step: string;
-    message: string | null;
-    project_title: string;
-    version_name: string;
-    files_done: number;
-    files_total: number;
-    /**
-     * created, skipped, or null before the backup step.
-     */
-    backup: string | null;
-    started_at: string;
-    finished_at: string | null;
+export type ClientFriendListAttributes = {
+    friends: Array<{
+        uuid: string;
+        username: string;
+        image: string;
+        since: string;
+    }>;
+    incoming: Array<{
+        id: number;
+        username: string;
+        image: string;
+        created_at: string;
+    }>;
+    outgoing: Array<{
+        id: number;
+        identifier: string;
+        created_at: string;
+    }>;
 };
-export type ClientModpackInstallResource = {
+export type ClientFriendListResource = {
     object: string;
-    attributes: ClientModpackInstallAttributes;
+    attributes: ClientFriendListAttributes;
 };
 export type ClientNoticeFeedAttributes = {
     announcements: Array<{
@@ -1374,44 +1393,29 @@ export type ClientNoticeFeedResource = {
     object: string;
     attributes: ClientNoticeFeedAttributes;
 };
-export type ClientPluginEnvironmentAttributes = {
-    platform: {
-        loader: string | null;
-        game_version: string | null;
-        type: string | null;
-        directory: string | null;
-        detected_from: Array<string>;
-    };
-    detected: {
-        loader: string | null;
-        game_version: string | null;
-        type: string | null;
-        directory: string | null;
-        detected_from: Array<string>;
-    };
-    /**
-     * Searchable catalogs by project type.
-     */
-    sources: {
-        plugin: Array<string>;
-        mod: Array<string>;
-        modpack: Array<string>;
-    };
-    loaders: Array<string>;
-    curseforge_enabled: boolean;
+export type ClientPermissionTemplateAttributes = {
+    id: number;
+    key: string;
+    source: 'builtin' | 'global' | 'personal';
+    name: string;
+    permissions: Array<string>;
 };
-export type ClientPluginEnvironmentResource = {
+export type ClientPermissionTemplateListAttributes = {
+    templates: Array<{
+        key: string;
+        source: string;
+        name: string;
+        permissions: Array<string>;
+    }>;
+    personal_limit: number;
+};
+export type ClientPermissionTemplateListResource = {
     object: string;
-    attributes: ClientPluginEnvironmentAttributes;
+    attributes: ClientPermissionTemplateListAttributes;
 };
-export type ClientPluginInstallAttributes = {
-    file_name: string;
-    directory: string;
-    version_number: string;
-};
-export type ClientPluginInstallResource = {
+export type ClientPermissionTemplateResource = {
     object: string;
-    attributes: ClientPluginInstallAttributes;
+    attributes: ClientPermissionTemplateAttributes;
 };
 export type ClientRecoveryTokensAttributes = {
     tokens: Array<string>;
@@ -1619,7 +1623,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type ClientServerSubuserListResponse = {
     object: string;
@@ -3513,16 +3517,6 @@ export type AdminUpdateLegalDocumentRequest = {
      */
     reaccept: boolean;
 };
-export type AdminUpdatePluginSettingsRequest = {
-    /**
-     * A new CurseForge API key, or blank to keep the stored one.
-     */
-    curseforge_key?: string | null;
-    /**
-     * Remove the stored key.
-     */
-    clear_curseforge_key?: boolean;
-};
 export type AdminUpdateStatusPageSettingsRequest = {
     /**
      * Whether the public status page is on.
@@ -3545,6 +3539,26 @@ export type AdminUpdateStatusPageSettingsRequest = {
          */
         display_name?: string | null;
     }>;
+};
+export type AdminCreateGlobalPermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+export type AdminUpdateGlobalPermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type AdminCreateDatabaseHostRequest = {
     /**
@@ -4413,6 +4427,32 @@ export type ClientCreateAccountApiKeyRequest = {
     description: string;
     allowed_ips?: Array<string>;
 };
+export type ClientSendFriendRequestRequest = {
+    /**
+     * The username or email of the user to ask.
+     */
+    user: string;
+};
+export type ClientCreatePermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
+export type ClientUpdatePermissionTemplateRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * Permissions granted to the user.
+     */
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+};
 export type ClientCreateSshKeyRequest = {
     /**
      * The display name.
@@ -4688,19 +4728,23 @@ export type ClientUpdateAllocationNotesRequest = {
 };
 export type ClientCreateServerSubuserRequest = {
     /**
-     * The user email address. Must be a valid email address. Must be between 1 and 191 characters.
+     * The user email address. This field is required when <code>friend</code> is not present. Must be a valid email address. Must be between 1 and 191 characters.
      */
-    email: string;
+    email?: string;
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
+    /**
+     * The UUID of a friend of the authenticated user to invite instead of an email.
+     */
+    friend?: string;
 };
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type ClientCreateServerBackupRequest = {
     /**
@@ -4743,66 +4787,6 @@ export type ClientSendAnAssistantMessageRequest = {
      * The message. Must be at least 1 character. Must not be greater than 8000 characters.
      */
     message: string;
-};
-export type ClientInstallPluginRequest = {
-    /**
-     * Use this loader instead of the detected one.
-     */
-    loader?: string | null;
-    /**
-     * Use this Minecraft version instead of the detected one.
-     */
-    game_version?: string | null;
-    /**
-     * The catalog: modrinth, hangar or curseforge.
-     */
-    source: string;
-    /**
-     * The project's ID.
-     */
-    project: string;
-    /**
-     * The version's ID from the versions list.
-     */
-    version: string;
-};
-export type ClientUpdateInstalledPluginRequest = {
-    /**
-     * Use this loader instead of the detected one.
-     */
-    loader?: string | null;
-    /**
-     * Use this Minecraft version instead of the detected one.
-     */
-    game_version?: string | null;
-    /**
-     * The installed jar's file name.
-     */
-    file: string;
-};
-export type ClientRemoveInstalledPluginRequest = {
-    /**
-     * Use this loader instead of the detected one.
-     */
-    loader?: string | null;
-    /**
-     * Use this Minecraft version instead of the detected one.
-     */
-    game_version?: string | null;
-    /**
-     * The installed jar's file name.
-     */
-    file: string;
-};
-export type ClientInstallModpackRequest = {
-    /**
-     * The modpack's Modrinth project ID.
-     */
-    project: string;
-    /**
-     * The modpack version's ID.
-     */
-    version: string;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -6117,10 +6101,6 @@ export type AdminUpdateLegalDocumentResponseBody = {
     version?: number;
     updated_at?: string;
 };
-export type AdminGetPluginSettingsResponseBody = {
-    curseforge_key_set?: boolean;
-    set_in_env?: boolean;
-};
 export type AdminGetStatusPageSettingsResponseBody = {
     enabled?: boolean;
     public_url?: string;
@@ -6553,6 +6533,9 @@ export type ClientGetTokenPurchaseResponseBody = {
         created_at: string;
     };
 };
+export type ClientSendFriendRequestResponseBody = {
+    message?: string;
+};
 export type ClientListConnectedAccountsResponseBody = {
     has_password?: boolean;
     providers?: Array<{
@@ -6887,109 +6870,6 @@ export type ClientDenyAnAssistantActionResponseBody = {
         free_used?: number;
         free_limit?: number;
         charged_this_month?: number;
-    };
-};
-export type ClientSearchPluginsResponseBody = {
-    object: string;
-    /**
-     * The projects found.
-     */
-    data: Array<{
-        source: 'modrinth' | 'hangar' | 'curseforge';
-        id: string;
-        slug: string;
-        title: string;
-        description: string;
-        author: string | null;
-        icon_url: string | null;
-        downloads: number;
-        updated_at: string | null;
-        url: string;
-        /**
-         * Modrinth says the project does not run on servers.
-         */
-        client_only: boolean;
-    }>;
-    meta: {
-        pagination: {
-            total: number;
-            count: number;
-            per_page: number;
-            current_page: number;
-            total_pages: number;
-        };
-    };
-};
-export type ClientListPluginVersionsResponseBody = {
-    object: string;
-    /**
-     * The versions, newest first.
-     */
-    data: Array<{
-        id: string;
-        project_id: string;
-        name: string;
-        version_number: string;
-        game_versions: Array<string>;
-        loaders: Array<string>;
-        /**
-         * release, beta or alpha (Hangar channels by name).
-         */
-        channel: string;
-        published_at: string | null;
-        file: {
-            filename: string;
-            size: number;
-            /**
-             * Hex digests by algorithm: sha1, sha256, sha512 or md5.
-             */
-            hashes: {
-                [key: string]: string;
-            };
-        } | null;
-        installable: boolean;
-    }>;
-};
-export type ClientListInstalledPluginsResponseBody = {
-    object: string;
-    /**
-     * The jars, by name.
-     */
-    data: Array<{
-        file_name: string;
-        size: number;
-        modified_at: string | null;
-        sha1: string | null;
-        /**
-         * The Modrinth project the jar belongs to, or null when Modrinth does not know it.
-         */
-        project: {
-            source: string;
-            id: string;
-            title: string;
-            slug: string;
-            icon_url: string | null;
-            url: string;
-        } | null;
-        version: {
-            id: string;
-            name: string;
-            version_number: string;
-        } | null;
-        /**
-         * A newer version for the server, or null.
-         */
-        update: {
-            id: string;
-            name: string;
-            version_number: string;
-        } | null;
-    }>;
-    meta: {
-        /**
-         * plugins or mods, or null while the loader is unknown.
-         */
-        directory: string | null;
     };
 };
 export type ApiListThePublicStorePlansResponseBody = {
@@ -7609,6 +7489,7 @@ export type AdminListTagsIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes'
 export type AdminGetTagIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes';
 export type AdminGetTagTagIdPathParameter = number;
 export type AdminUpdateLegalDocumentDocumentPathParameter = string;
+export type AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter = number;
 /**
  * Page number to retrieve.
  */
@@ -8020,6 +7901,11 @@ export type ClientGetWalletPageQueryParameter = number;
 export type ClientGetWalletPerPageQueryParameter = number;
 export type ClientGetTokenPurchaseCheckoutPathParameter = string;
 export type ClientDeleteAccountApiKeyIdentifierPathParameter = string;
+export type ClientAcceptFriendRequestFriendRequestPathParameter = number;
+export type ClientDeclineFriendRequestFriendRequestPathParameter = number;
+export type ClientCancelFriendRequestFriendRequestPathParameter = number;
+export type ClientRemoveFriendFriendPathParameter = string;
+export type ClientUpdatePermissionTemplateTemplatePathParameter = number;
 export type ClientStartLinkingAnAccountProviderPathParameter = string;
 export type ClientUnlinkAnAccountProviderPathParameter = string;
 export type ClientGetServerServerUuidPathParameter = string;
@@ -8180,78 +8066,6 @@ export type ClientAllowAnAssistantActionToolCallIdPathParameter = number;
 export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
-/**
- * Use this loader instead of the detected one.
- */
-export type ClientGetPluginEnvironmentLoaderQueryParameter = string;
-/**
- * Use this Minecraft version instead of the detected one.
- */
-export type ClientGetPluginEnvironmentGameVersionQueryParameter = string;
-export type ClientGetPluginEnvironmentServerUuidPathParameter = string;
-/**
- * The catalog: modrinth, hangar or curseforge.
- */
-export type ClientSearchPluginsSourceQueryParameter = string;
-/**
- * plugin, mod or modpack. Defaults to what the server's loader runs.
- */
-export type ClientSearchPluginsTypeQueryParameter = string;
-/**
- * Search text.
- */
-export type ClientSearchPluginsQueryQueryParameter = string;
-/**
- * Result page, 20 per page.
- */
-export type ClientSearchPluginsPageQueryParameter = number;
-/**
- * relevance, downloads, updated or newest.
- */
-export type ClientSearchPluginsSortQueryParameter = string;
-/**
- * Use this loader instead of the detected one.
- */
-export type ClientSearchPluginsLoaderQueryParameter = string;
-/**
- * Use this Minecraft version instead of the detected one.
- */
-export type ClientSearchPluginsGameVersionQueryParameter = string;
-export type ClientSearchPluginsServerUuidPathParameter = string;
-/**
- * The catalog: modrinth, hangar or curseforge.
- */
-export type ClientListPluginVersionsSourceQueryParameter = string;
-/**
- * The project's ID from the search results.
- */
-export type ClientListPluginVersionsProjectQueryParameter = string;
-/**
- * plugin, mod or modpack. Defaults to what the server's loader runs.
- */
-export type ClientListPluginVersionsTypeQueryParameter = string;
-/**
- * Use this loader instead of the detected one.
- */
-export type ClientListPluginVersionsLoaderQueryParameter = string;
-/**
- * Use this Minecraft version instead of the detected one.
- */
-export type ClientListPluginVersionsGameVersionQueryParameter = string;
-export type ClientListPluginVersionsServerUuidPathParameter = string;
-/**
- * Use this loader instead of the detected one.
- */
-export type ClientListInstalledPluginsLoaderQueryParameter = string;
-/**
- * Use this Minecraft version instead of the detected one.
- */
-export type ClientListInstalledPluginsGameVersionQueryParameter = string;
-export type ClientListInstalledPluginsServerUuidPathParameter = string;
-export type ClientInstallPluginServerUuidPathParameter = string;
-export type ClientUpdateInstalledPluginServerUuidPathParameter = string;
-export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
-export type ClientInstallModpackServerUuidPathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
@@ -14950,58 +14764,6 @@ export type AdminUpdateLegalDocumentResponses = {
     200: AdminUpdateLegalDocumentResponseBody;
 };
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
-export type AdminGetPluginSettingsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/admin/settings/plugins';
-};
-export type AdminGetPluginSettingsErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-};
-export type AdminGetPluginSettingsError = AdminGetPluginSettingsErrors[keyof AdminGetPluginSettingsErrors];
-export type AdminGetPluginSettingsResponses = {
-    /**
-     * Plugin settings returned.
-     */
-    200: AdminGetPluginSettingsResponseBody;
-};
-export type AdminGetPluginSettingsResponse = AdminGetPluginSettingsResponses[keyof AdminGetPluginSettingsResponses];
-export type AdminUpdatePluginSettingsData = {
-    body?: AdminUpdatePluginSettingsRequest;
-    path?: never;
-    query?: never;
-    url: '/api/admin/settings/plugins';
-};
-export type AdminUpdatePluginSettingsErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-};
-export type AdminUpdatePluginSettingsError = AdminUpdatePluginSettingsErrors[keyof AdminUpdatePluginSettingsErrors];
-export type AdminUpdatePluginSettingsResponses = {
-    /**
-     * Plugin settings updated.
-     */
-    204: void;
-};
-export type AdminUpdatePluginSettingsResponse = AdminUpdatePluginSettingsResponses[keyof AdminUpdatePluginSettingsResponses];
 export type AdminGetStatusPageSettingsData = {
     body?: never;
     path?: never;
@@ -15054,6 +14816,132 @@ export type AdminUpdateStatusPageSettingsResponses = {
     200: AdminUpdateStatusPageSettingsResponseBody;
 };
 export type AdminUpdateStatusPageSettingsResponse = AdminUpdateStatusPageSettingsResponses[keyof AdminUpdateStatusPageSettingsResponses];
+export type AdminListGlobalPermissionTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/permission-templates';
+};
+export type AdminListGlobalPermissionTemplatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListGlobalPermissionTemplatesError = AdminListGlobalPermissionTemplatesErrors[keyof AdminListGlobalPermissionTemplatesErrors];
+export type AdminListGlobalPermissionTemplatesResponses = {
+    /**
+     * Global templates returned.
+     */
+    200: AdminPermissionTemplateListResponse;
+};
+export type AdminListGlobalPermissionTemplatesResponse = AdminListGlobalPermissionTemplatesResponses[keyof AdminListGlobalPermissionTemplatesResponses];
+export type AdminCreateGlobalPermissionTemplateData = {
+    body: AdminCreateGlobalPermissionTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/permission-templates';
+};
+export type AdminCreateGlobalPermissionTemplateErrors = {
+    /**
+     * The panel already has the most global templates it may keep.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateGlobalPermissionTemplateError = AdminCreateGlobalPermissionTemplateErrors[keyof AdminCreateGlobalPermissionTemplateErrors];
+export type AdminCreateGlobalPermissionTemplateResponses = {
+    /**
+     * Global template created.
+     */
+    201: AdminPermissionTemplateResource;
+};
+export type AdminCreateGlobalPermissionTemplateResponse = AdminCreateGlobalPermissionTemplateResponses[keyof AdminCreateGlobalPermissionTemplateResponses];
+export type AdminDeleteGlobalPermissionTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the global permission template.
+         */
+        permissionTemplate_id: AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/permission-templates/{permissionTemplate_id}';
+};
+export type AdminDeleteGlobalPermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteGlobalPermissionTemplateError = AdminDeleteGlobalPermissionTemplateErrors[keyof AdminDeleteGlobalPermissionTemplateErrors];
+export type AdminDeleteGlobalPermissionTemplateResponses = {
+    /**
+     * Global template deleted.
+     */
+    204: void;
+};
+export type AdminDeleteGlobalPermissionTemplateResponse = AdminDeleteGlobalPermissionTemplateResponses[keyof AdminDeleteGlobalPermissionTemplateResponses];
+export type AdminUpdateGlobalPermissionTemplateData = {
+    body: AdminUpdateGlobalPermissionTemplateRequest;
+    path: {
+        /**
+         * The ID of the global permission template.
+         */
+        permissionTemplate_id: AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/permission-templates/{permissionTemplate_id}';
+};
+export type AdminUpdateGlobalPermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateGlobalPermissionTemplateError = AdminUpdateGlobalPermissionTemplateErrors[keyof AdminUpdateGlobalPermissionTemplateErrors];
+export type AdminUpdateGlobalPermissionTemplateResponses = {
+    /**
+     * Global template updated.
+     */
+    200: AdminPermissionTemplateResource;
+};
+export type AdminUpdateGlobalPermissionTemplateResponse = AdminUpdateGlobalPermissionTemplateResponses[keyof AdminUpdateGlobalPermissionTemplateResponses];
 export type AdminListDatabaseHostsData = {
     body?: never;
     path?: never;
@@ -18289,6 +18177,320 @@ export type ClientDeleteAccountApiKeyResponses = {
     204: void;
 };
 export type ClientDeleteAccountApiKeyResponse = ClientDeleteAccountApiKeyResponses[keyof ClientDeleteAccountApiKeyResponses];
+export type ClientListFriendsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/friends';
+};
+export type ClientListFriendsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListFriendsError = ClientListFriendsErrors[keyof ClientListFriendsErrors];
+export type ClientListFriendsResponses = {
+    /**
+     * Friends and requests returned.
+     */
+    200: ClientFriendListResource;
+};
+export type ClientListFriendsResponse = ClientListFriendsResponses[keyof ClientListFriendsResponses];
+export type ClientSendFriendRequestData = {
+    body: ClientSendFriendRequestRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/friends/requests';
+};
+export type ClientSendFriendRequestErrors = {
+    /**
+     * Too many requests are waiting.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientSendFriendRequestError = ClientSendFriendRequestErrors[keyof ClientSendFriendRequestErrors];
+export type ClientSendFriendRequestResponses = {
+    /**
+     * Request recorded; the user gets it if they exist.
+     */
+    202: ClientSendFriendRequestResponseBody;
+};
+export type ClientSendFriendRequestResponse = ClientSendFriendRequestResponses[keyof ClientSendFriendRequestResponses];
+export type ClientAcceptFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientAcceptFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}/accept';
+};
+export type ClientAcceptFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientAcceptFriendRequestError = ClientAcceptFriendRequestErrors[keyof ClientAcceptFriendRequestErrors];
+export type ClientAcceptFriendRequestResponses = {
+    /**
+     * Request accepted.
+     */
+    204: void;
+};
+export type ClientAcceptFriendRequestResponse = ClientAcceptFriendRequestResponses[keyof ClientAcceptFriendRequestResponses];
+export type ClientDeclineFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientDeclineFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}/decline';
+};
+export type ClientDeclineFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientDeclineFriendRequestError = ClientDeclineFriendRequestErrors[keyof ClientDeclineFriendRequestErrors];
+export type ClientDeclineFriendRequestResponses = {
+    /**
+     * Request declined.
+     */
+    204: void;
+};
+export type ClientDeclineFriendRequestResponse = ClientDeclineFriendRequestResponses[keyof ClientDeclineFriendRequestResponses];
+export type ClientCancelFriendRequestData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the friend request.
+         */
+        friendRequest: ClientCancelFriendRequestFriendRequestPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/requests/{friendRequest}';
+};
+export type ClientCancelFriendRequestErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientCancelFriendRequestError = ClientCancelFriendRequestErrors[keyof ClientCancelFriendRequestErrors];
+export type ClientCancelFriendRequestResponses = {
+    /**
+     * Request cancelled.
+     */
+    204: void;
+};
+export type ClientCancelFriendRequestResponse = ClientCancelFriendRequestResponses[keyof ClientCancelFriendRequestResponses];
+export type ClientRemoveFriendData = {
+    body?: never;
+    path: {
+        /**
+         * The friend's user UUID.
+         */
+        friend: ClientRemoveFriendFriendPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/friends/{friend}';
+};
+export type ClientRemoveFriendErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientRemoveFriendError = ClientRemoveFriendErrors[keyof ClientRemoveFriendErrors];
+export type ClientRemoveFriendResponses = {
+    /**
+     * Friend removed.
+     */
+    204: void;
+};
+export type ClientRemoveFriendResponse = ClientRemoveFriendResponses[keyof ClientRemoveFriendResponses];
+export type ClientListPermissionTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/permission-templates';
+};
+export type ClientListPermissionTemplatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListPermissionTemplatesError = ClientListPermissionTemplatesErrors[keyof ClientListPermissionTemplatesErrors];
+export type ClientListPermissionTemplatesResponses = {
+    /**
+     * Templates returned.
+     */
+    200: ClientPermissionTemplateListResource;
+};
+export type ClientListPermissionTemplatesResponse = ClientListPermissionTemplatesResponses[keyof ClientListPermissionTemplatesResponses];
+export type ClientCreatePermissionTemplateData = {
+    body: ClientCreatePermissionTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/permission-templates';
+};
+export type ClientCreatePermissionTemplateErrors = {
+    /**
+     * The account already has the most templates it may keep.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientCreatePermissionTemplateError = ClientCreatePermissionTemplateErrors[keyof ClientCreatePermissionTemplateErrors];
+export type ClientCreatePermissionTemplateResponses = {
+    /**
+     * Template created.
+     */
+    201: ClientPermissionTemplateResource;
+};
+export type ClientCreatePermissionTemplateResponse = ClientCreatePermissionTemplateResponses[keyof ClientCreatePermissionTemplateResponses];
+export type ClientDeletePermissionTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the permission template.
+         */
+        template: ClientUpdatePermissionTemplateTemplatePathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/permission-templates/{template}';
+};
+export type ClientDeletePermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientDeletePermissionTemplateError = ClientDeletePermissionTemplateErrors[keyof ClientDeletePermissionTemplateErrors];
+export type ClientDeletePermissionTemplateResponses = {
+    /**
+     * Template deleted.
+     */
+    204: void;
+};
+export type ClientDeletePermissionTemplateResponse = ClientDeletePermissionTemplateResponses[keyof ClientDeletePermissionTemplateResponses];
+export type ClientUpdatePermissionTemplateData = {
+    body: ClientUpdatePermissionTemplateRequest;
+    path: {
+        /**
+         * The ID of the permission template.
+         */
+        template: ClientUpdatePermissionTemplateTemplatePathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/permission-templates/{template}';
+};
+export type ClientUpdatePermissionTemplateErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUpdatePermissionTemplateError = ClientUpdatePermissionTemplateErrors[keyof ClientUpdatePermissionTemplateErrors];
+export type ClientUpdatePermissionTemplateResponses = {
+    /**
+     * Template updated.
+     */
+    200: ClientPermissionTemplateResource;
+};
+export type ClientUpdatePermissionTemplateResponse = ClientUpdatePermissionTemplateResponses[keyof ClientUpdatePermissionTemplateResponses];
 export type ClientListSshKeysData = {
     body?: never;
     path?: never;
@@ -20210,7 +20412,7 @@ export type ClientListServerSubusersResponses = {
 };
 export type ClientListServerSubusersResponse = ClientListServerSubusersResponses[keyof ClientListServerSubusersResponses];
 export type ClientCreateServerSubuserData = {
-    body: ClientCreateServerSubuserRequest;
+    body?: ClientCreateServerSubuserRequest;
     path: {
         /**
          * The server UUID.
@@ -21006,447 +21208,6 @@ export type ClientDenyAnAssistantActionResponses = {
     200: ClientDenyAnAssistantActionResponseBody;
 };
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
-export type ClientGetPluginEnvironmentData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientGetPluginEnvironmentServerUuidPathParameter;
-    };
-    query?: {
-        /**
-         * Use this loader instead of the detected one.
-         */
-        loader?: ClientGetPluginEnvironmentLoaderQueryParameter;
-        /**
-         * Use this Minecraft version instead of the detected one.
-         */
-        game_version?: ClientGetPluginEnvironmentGameVersionQueryParameter;
-    };
-    url: '/api/client/servers/{server_uuid}/plugins';
-};
-export type ClientGetPluginEnvironmentErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-};
-export type ClientGetPluginEnvironmentError = ClientGetPluginEnvironmentErrors[keyof ClientGetPluginEnvironmentErrors];
-export type ClientGetPluginEnvironmentResponses = {
-    /**
-     * Plugin environment returned.
-     */
-    200: ClientPluginEnvironmentResource;
-};
-export type ClientGetPluginEnvironmentResponse = ClientGetPluginEnvironmentResponses[keyof ClientGetPluginEnvironmentResponses];
-export type ClientSearchPluginsData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientSearchPluginsServerUuidPathParameter;
-    };
-    query: {
-        /**
-         * The catalog: modrinth, hangar or curseforge.
-         */
-        source: ClientSearchPluginsSourceQueryParameter;
-        /**
-         * plugin, mod or modpack. Defaults to what the server's loader runs.
-         */
-        type?: ClientSearchPluginsTypeQueryParameter;
-        /**
-         * Search text.
-         */
-        query?: ClientSearchPluginsQueryQueryParameter;
-        /**
-         * Result page, 20 per page.
-         */
-        page?: ClientSearchPluginsPageQueryParameter;
-        /**
-         * relevance, downloads, updated or newest.
-         */
-        sort?: ClientSearchPluginsSortQueryParameter;
-        /**
-         * Use this loader instead of the detected one.
-         */
-        loader?: ClientSearchPluginsLoaderQueryParameter;
-        /**
-         * Use this Minecraft version instead of the detected one.
-         */
-        game_version?: ClientSearchPluginsGameVersionQueryParameter;
-    };
-    url: '/api/client/servers/{server_uuid}/plugins/search';
-};
-export type ClientSearchPluginsErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * The catalog did not answer.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientSearchPluginsError = ClientSearchPluginsErrors[keyof ClientSearchPluginsErrors];
-export type ClientSearchPluginsResponses = {
-    /**
-     * Search results returned.
-     */
-    200: ClientSearchPluginsResponseBody;
-};
-export type ClientSearchPluginsResponse = ClientSearchPluginsResponses[keyof ClientSearchPluginsResponses];
-export type ClientListPluginVersionsData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientListPluginVersionsServerUuidPathParameter;
-    };
-    query: {
-        /**
-         * The catalog: modrinth, hangar or curseforge.
-         */
-        source: ClientListPluginVersionsSourceQueryParameter;
-        /**
-         * The project's ID from the search results.
-         */
-        project: ClientListPluginVersionsProjectQueryParameter;
-        /**
-         * plugin, mod or modpack. Defaults to what the server's loader runs.
-         */
-        type?: ClientListPluginVersionsTypeQueryParameter;
-        /**
-         * Use this loader instead of the detected one.
-         */
-        loader?: ClientListPluginVersionsLoaderQueryParameter;
-        /**
-         * Use this Minecraft version instead of the detected one.
-         */
-        game_version?: ClientListPluginVersionsGameVersionQueryParameter;
-    };
-    url: '/api/client/servers/{server_uuid}/plugins/versions';
-};
-export type ClientListPluginVersionsErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * The catalog did not answer.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientListPluginVersionsError = ClientListPluginVersionsErrors[keyof ClientListPluginVersionsErrors];
-export type ClientListPluginVersionsResponses = {
-    /**
-     * Versions returned.
-     */
-    200: ClientListPluginVersionsResponseBody;
-};
-export type ClientListPluginVersionsResponse = ClientListPluginVersionsResponses[keyof ClientListPluginVersionsResponses];
-export type ClientListInstalledPluginsData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientListInstalledPluginsServerUuidPathParameter;
-    };
-    query?: {
-        /**
-         * Use this loader instead of the detected one.
-         */
-        loader?: ClientListInstalledPluginsLoaderQueryParameter;
-        /**
-         * Use this Minecraft version instead of the detected one.
-         */
-        game_version?: ClientListInstalledPluginsGameVersionQueryParameter;
-    };
-    url: '/api/client/servers/{server_uuid}/plugins/installed';
-};
-export type ClientListInstalledPluginsErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * Wings could not list the folder.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientListInstalledPluginsError = ClientListInstalledPluginsErrors[keyof ClientListInstalledPluginsErrors];
-export type ClientListInstalledPluginsResponses = {
-    /**
-     * Installed plugins returned.
-     */
-    200: ClientListInstalledPluginsResponseBody;
-};
-export type ClientListInstalledPluginsResponse = ClientListInstalledPluginsResponses[keyof ClientListInstalledPluginsResponses];
-export type ClientInstallPluginData = {
-    body: ClientInstallPluginRequest;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientInstallPluginServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/plugins/install';
-};
-export type ClientInstallPluginErrors = {
-    /**
-     * The file could not be installed: not allowed, no file, or a failed hash check.
-     */
-    400: ErrorEnvelope;
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * Wings could not download the file.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientInstallPluginError = ClientInstallPluginErrors[keyof ClientInstallPluginErrors];
-export type ClientInstallPluginResponses = {
-    /**
-     * Plugin installed.
-     */
-    200: ClientPluginInstallResource;
-};
-export type ClientInstallPluginResponse = ClientInstallPluginResponses[keyof ClientInstallPluginResponses];
-export type ClientUpdateInstalledPluginData = {
-    body: ClientUpdateInstalledPluginRequest;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientUpdateInstalledPluginServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/plugins/installed/update';
-};
-export type ClientUpdateInstalledPluginErrors = {
-    /**
-     * There is no update, or the new file could not be installed.
-     */
-    400: ErrorEnvelope;
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * Wings could not download the file.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientUpdateInstalledPluginError = ClientUpdateInstalledPluginErrors[keyof ClientUpdateInstalledPluginErrors];
-export type ClientUpdateInstalledPluginResponses = {
-    /**
-     * Plugin updated.
-     */
-    200: ClientPluginInstallResource;
-};
-export type ClientUpdateInstalledPluginResponse = ClientUpdateInstalledPluginResponses[keyof ClientUpdateInstalledPluginResponses];
-export type ClientRemoveInstalledPluginData = {
-    body: ClientRemoveInstalledPluginRequest;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientRemoveInstalledPluginServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/plugins/installed/remove';
-};
-export type ClientRemoveInstalledPluginErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-    /**
-     * Wings could not delete the file.
-     */
-    502: ErrorEnvelope;
-};
-export type ClientRemoveInstalledPluginError = ClientRemoveInstalledPluginErrors[keyof ClientRemoveInstalledPluginErrors];
-export type ClientRemoveInstalledPluginResponses = {
-    /**
-     * Plugin removed.
-     */
-    204: void;
-};
-export type ClientRemoveInstalledPluginResponse = ClientRemoveInstalledPluginResponses[keyof ClientRemoveInstalledPluginResponses];
-export type ClientGetModpackInstallProgressData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientInstallModpackServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/plugins/modpack';
-};
-export type ClientGetModpackInstallProgressErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-};
-export type ClientGetModpackInstallProgressError = ClientGetModpackInstallProgressErrors[keyof ClientGetModpackInstallProgressErrors];
-export type ClientGetModpackInstallProgressResponses = {
-    /**
-     * Progress returned.
-     */
-    200: ClientModpackInstallResource;
-};
-export type ClientGetModpackInstallProgressResponse = ClientGetModpackInstallProgressResponses[keyof ClientGetModpackInstallProgressResponses];
-export type ClientInstallModpackData = {
-    body: ClientInstallModpackRequest;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientInstallModpackServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/plugins/modpack';
-};
-export type ClientInstallModpackErrors = {
-    /**
-     * The version is not a modpack the panel can install.
-     */
-    400: ErrorEnvelope;
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * Another modpack install is running.
-     */
-    409: ErrorEnvelope;
-    /**
-     * The submitted data is invalid.
-     */
-    422: ValidationErrorEnvelope;
-};
-export type ClientInstallModpackError = ClientInstallModpackErrors[keyof ClientInstallModpackErrors];
-export type ClientInstallModpackResponses = {
-    /**
-     * Install started.
-     */
-    202: ClientModpackInstallResource;
-};
-export type ClientInstallModpackResponse = ClientInstallModpackResponses[keyof ClientInstallModpackResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {

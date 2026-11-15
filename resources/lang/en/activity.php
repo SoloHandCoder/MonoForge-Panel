@@ -48,6 +48,16 @@ return [
         'store' => [
             'purchase' => 'Bought the server ":name" for :tokens tokens',
         ],
+        'friend' => [
+            'request' => 'Sent a friend request to :identifier',
+            'accept' => 'Became friends with :username',
+            'remove' => 'Removed :username from friends',
+        ],
+        'permission-template' => [
+            'create' => 'Created the permission template ":name"',
+            'update' => 'Updated the permission template ":name"',
+            'delete' => 'Deleted the permission template ":name"',
+        ],
     ],
     'server' => [
         'reinstall' => 'Reinstalled server',
@@ -177,6 +187,11 @@ return [
             'create' => 'Created the ":title" announcement',
             'update' => 'Updated the ":title" announcement',
             'delete' => 'Deleted the ":title" announcement',
+        ],
+        'permission-template' => [
+            'create' => 'Created the global permission template ":name"',
+            'update' => 'Updated the global permission template ":name"',
+            'delete' => 'Deleted the global permission template ":name"',
         ],
         'assistant' => [
             'tool' => ':decision the admin assistant action ":label"',

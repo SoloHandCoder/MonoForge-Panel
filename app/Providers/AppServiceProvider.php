@@ -304,6 +304,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(3)->by('store-purchase:'.($user instanceof User ? $user->id : (string) $request->ip()));
         });
 
+        // Friend requests: 5 a minute and 20 an hour per user, so nobody can probe many names
+        // or flood other users with requests.
+        RateLimiter::for('friend.request', function (Request $request): array {
+            $user = $request->user();
+            $key = 'friend-request:'.($user instanceof User ? $user->id : (string) $request->ip());
+
+            return [Limit::perMinute(5)->by($key.':minute'), Limit::perHour(20)->by($key.':hour')];
+        });
+
         ResourceLimit::boot();
     }
 

@@ -67,6 +67,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\LegalController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\PluginSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\PermissionTemplateController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\StatusPageController;
@@ -630,6 +631,12 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     // The public status page and the nodes it shows.
     Route::get('/status', [StatusPageController::class, 'index'])->name('.status');
     Route::put('/status', [StatusPageController::class, 'update'])->name('.status.update');
+
+    // Global subuser permission templates (phase 6 Task F).
+    Route::get('/permission-templates', [PermissionTemplateController::class, 'index'])->name('.permission-templates');
+    Route::post('/permission-templates', [PermissionTemplateController::class, 'store'])->name('.permission-templates.store');
+    Route::put('/permission-templates/{permissionTemplate:id}', [PermissionTemplateController::class, 'update'])->name('.permission-templates.update');
+    Route::delete('/permission-templates/{permissionTemplate:id}', [PermissionTemplateController::class, 'destroy'])->name('.permission-templates.delete');
 });
 
 /*

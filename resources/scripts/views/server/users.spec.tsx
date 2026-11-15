@@ -1,9 +1,12 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import type { AxiosAdapter } from 'axios';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { friendsQueryOptions } from '@/api/account/friends/queries';
+import { permissionTemplatesQueryOptions } from '@/api/account/permission-templates/queries';
 import http from '@/api/http';
 import { serverSubusersQueryOptions, type Subuser } from '@/api/server/users/queries';
 import { systemPermissionsQueryOptions } from '@/api/system/queries';
@@ -79,6 +82,41 @@ async function renderInServer(children: ReactNode, options: TestServerOptions = 
     host.queryClient.setQueryData(systemPermissionsQueryOptions.queryKey, {
         object: 'system_permissions',
         attributes: { permissions },
+    });
+    host.queryClient.setQueryData(friendsQueryOptions().queryKey, {
+        object: 'friend_list',
+        attributes: {
+            friends: [
+                {
+                    uuid: '44444444-4444-4444-8444-444444444444',
+                    username: 'riley',
+                    image: 'https://gravatar.com/avatar/3',
+                    since: '2026-11-01T00:00:00Z',
+                },
+            ],
+            incoming: [],
+            outgoing: [],
+        },
+    });
+    host.queryClient.setQueryData(permissionTemplatesQueryOptions().queryKey, {
+        object: 'permission_template_list',
+        attributes: {
+            templates: [
+                {
+                    key: 'builtin:moderator',
+                    source: 'builtin',
+                    name: 'Moderator',
+                    permissions: ['websocket.connect', 'control.console', 'control.start'],
+                },
+                {
+                    key: 'personal:1',
+                    source: 'personal',
+                    name: 'Backups',
+                    permissions: ['websocket.connect', 'backup.create', 'backup.read'],
+                },
+            ],
+            personal_limit: 25,
+        },
     });
     host.queryClient.setQueryData(serverSubusersQueryOptions(server.attributes.uuid).queryKey, {
         object: 'list',
@@ -203,5 +241,70 @@ describe('server.subuserForm', () => {
             body: { email: 'new@example.test', permissions: ['control.console', 'control.start', 'control.stop'] },
         });
         expect(success).toHaveBeenCalledWith('Subuser invited', { description: 'new@example.test has been invited.' });
+    });
+
+    it('invites a friend without asking for their email', async () => {
+        const user = userEvent.setup();
+        const server = await renderInServer(<View name='server.subuserForm' />, {}, '/server/a1b2c3d4/users/new');
+
+        await user.click(screen.getByLabelText('Invite a friend'));
+        await user.click(await screen.findByRole('option', { name: 'riley' }));
+
+        expect(screen.queryByLabelText('User Email')).not.toBeInTheDocument();
+        await act(async () => {
+            fireEvent.click(screen.getAllByRole('button', { name: 'Invite User' })[0]);
+        });
+
+        await waitFor(() => expect(host!.location().pathname).toBe('/server/a1b2c3d4/users'));
+        expect(requests).toContainEqual({
+            method: 'post',
+            url: `/api/client/servers/${server.attributes.uuid}/users`,
+            body: { friend: '44444444-4444-4444-8444-444444444444', permissions: [] },
+        });
+    });
+
+    it('fills the checkboxes from a template, kept to what the viewer holds', async () => {
+        const user = userEvent.setup();
+
+        await renderInServer(
+            <View name='server.subuserForm' />,
+            { owner: false, permissions: ['user.create', 'control.start', 'backup.read'] },
+            '/server/a1b2c3d4/users/new'
+        );
+
+        await user.click(screen.getByLabelText('Start from a template'));
+        await user.click(await screen.findByRole('option', { name: 'Moderator' }));
+
+        expect(screen.getByRole('checkbox', { name: /^start/ })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /^console/ })).not.toBeChecked();
+        expect(screen.getByText(/1 of this template's permissions are ones you do not hold/)).toBeVisible();
+
+        // Switching templates replaces the selection the viewer may change; it stays editable.
+        await user.click(screen.getByLabelText('Start from a template'));
+        await user.click(await screen.findByRole('option', { name: 'Backups' }));
+
+        expect(screen.getByRole('checkbox', { name: /^start/ })).not.toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /^read/ })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /^create/ })).not.toBeChecked();
+    });
+
+    it('saves the checked permissions as a template', async () => {
+        await renderInServer(<View name='server.subuserForm' />, {}, '/server/a1b2c3d4/users/new');
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Select all control permissions' }));
+        fireEvent.change(screen.getByLabelText('Save these permissions as a template'), {
+            target: { value: 'Operators' },
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+        });
+
+        await waitFor(() =>
+            expect(requests).toContainEqual({
+                method: 'post',
+                url: '/api/client/account/permission-templates',
+                body: { name: 'Operators', permissions: ['control.console', 'control.start', 'control.stop'] },
+            })
+        );
     });
 });

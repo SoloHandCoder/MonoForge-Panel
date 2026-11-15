@@ -46,6 +46,26 @@ export interface SubuserPermissionGroup {
 export interface SubuserFormValues {
     readonly email: string;
     readonly permissions: readonly string[];
+    /** The UUID of the friend to invite in place of an email; null or unset to invite by email. */
+    readonly friend?: string | null;
+}
+/** A friend the invite form can pick in place of typing an email. */
+export interface SubuserFriendOption {
+    readonly uuid: string;
+    readonly username: string;
+    /** The friend's avatar. */
+    readonly image: string;
+}
+/** A permission template the form can fill the checkboxes from. */
+export interface SubuserTemplateOption {
+    /** Unique across sources, such as `builtin:viewer` or `personal:3`. */
+    readonly key: string;
+    readonly name: string;
+    readonly source: 'builtin' | 'global' | 'personal';
+    /** The template's permissions the viewer may grant; connecting to the console aside. */
+    readonly permissions: readonly string[];
+    /** How many of the template's permissions the viewer does not hold, so cannot grant. */
+    readonly withheld: number;
 }
 export interface SubuserFormModel {
     readonly mode: 'create' | 'edit';
@@ -67,6 +87,18 @@ export interface SubuserFormModel {
     readonly values: SubuserFormValues;
     readonly saving: boolean;
     readonly validateEmail: (email: string) => string | undefined;
+    /** The viewer's friends, offered in place of an email while inviting. */
+    readonly friends: readonly SubuserFriendOption[];
+    /** The built-in, global and own templates, kept to what the viewer may grant. */
+    readonly templates: readonly SubuserTemplateOption[];
+    /**
+     * The selection with a template applied: the permissions the viewer may grant become the
+     * template's, the others stay as they are. Changing a template later never changes a subuser.
+     */
+    readonly applyTemplate: (selected: readonly string[], key: string) => string[];
+    /** Saves the selection as one of the viewer's own templates; resolves whether it was saved. */
+    readonly saveTemplate: (name: string, permissions: readonly string[]) => Promise<boolean>;
+    readonly savingTemplate: boolean;
     /**
      * Saves the subuser and resolves whether it was saved, a failure having been reported. An invite
      * returns to the user list; an edit calls the view's `onClose`.
