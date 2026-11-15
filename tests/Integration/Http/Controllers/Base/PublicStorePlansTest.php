@@ -121,6 +121,23 @@ test('a plan the store has no capacity left for is shown as unavailable', functi
     $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonPath('categories.0.plans.0.available', false);
 });
 
+test('a plan stays on sale while one of its shop nodes has room under its own shop limits', function (): void {
+    ($this->plan)();
+    $this->cheap->forceFill(['shop_limit_memory_mb' => 1024])->save();
+
+    $this->getJson(route('api.public.store.plans'))->assertOk()->assertJsonPath('categories.0.plans.0.available', true);
+});
+
+test('a plan whose every shop node is full under its own shop limits is shown as unavailable', function (): void {
+    $plan = ($this->plan)();
+    $this->cheap->forceFill(['shop_limit_memory_mb' => 1024])->save();
+    $this->pro->forceFill(['shop_limit_memory_mb' => 1024])->save();
+
+    $this->getJson(route('api.public.store.plans'))->assertOk()
+        ->assertJsonPath('categories.0.plans.0.id', $plan->id)
+        ->assertJsonPath('categories.0.plans.0.available', false);
+});
+
 test('a closed store returns empty lists', function (): void {
     config()->set('monoforge.shop.enabled', false);
     config()->set('monoforge.ai.enabled', true);
