@@ -15,6 +15,7 @@ import { selectServerPermissions } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
 import { relationshipData } from '@/api/relationships';
 import { ip, mbToBytes } from '@/lib/formatters';
+import { playitAddress } from '@/lib/playit';
 import { useNow } from '@/plugins/useNow';
 import { hasPermission } from '@/plugins/usePermissions';
 import { getPageSearch, useDashboardSearch } from '@/router/pageSearch';
@@ -193,11 +194,14 @@ function cardPermissions(server: Server, rootAdmin = false): ServerCardPermissio
     };
 }
 
+// The playit.gg address when the server has a live tunnel, else its primary allocation.
 const primaryAddress = ({ attributes }: Server): string | null =>
-    relationshipData(attributes.relationships?.allocations)
+    playitAddress(attributes) ??
+    (relationshipData(attributes.relationships?.allocations)
         .filter((allocation) => allocation.attributes.is_default)
         .map(({ attributes: allocation }) => `${allocation.ip_alias || ip(allocation.ip)}:${allocation.port}`)
-        .join('') || null;
+        .join('') ||
+        null);
 
 interface PowerSender {
     send(uuid: string, signal: ServerPowerSignal): void;

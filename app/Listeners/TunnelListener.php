@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Pterodactyl\Listeners;
+
+use Illuminate\Contracts\Events\Dispatcher;
+use Pterodactyl\Events\Server\Created;
+use Pterodactyl\Events\Server\Deleting;
+use Pterodactyl\Events\Server\Updated;
+use Pterodactyl\Extensions\Illuminate\Events\Contracts\SubscribesToEvents;
+use Pterodactyl\Models\Billing\ServerTunnel;
+use Pterodactyl\Services\Tunnels\TunnelService;
+use Throwable;
+
+/**
+ * Keeps playit.gg tunnels in step with servers however they are created or deleted: the admin
+ * area, the application API or the shop. A tunnel problem is reported but never stops the
+ * server change it follows.
+ */
+class TunnelListener implements SubscribesToEvents
+{
+    public function __construct(private readonly TunnelService $tunnels) {}
+
+    public function created(Created $event): void
+    {
+        $this->safely(function () use ($event): void {
+            $event->server->loadMissing('node');
+            if ($event->server->node->hasPlayitAgent()) {
+                $this->tunnels->provision($event->server);
+            }
+        });
+    }
+
+    public function deleting(Deleting $event): void
+    {
+        $this->safely(fn () => $this->tunnels->release($event->server));
+    }
+
+    /** A new primary port needs a new tunnel pointing at it. */
+    public function updated(Updated $event): void
+    {
+        if (! $event->server->wasChanged('allocation_id')) {
+            return;
+        }
+
+        $this->safely(function () use ($event): void {
+            $tunnel = ServerTunnel::query()->where('server_id', $event->server->id)->first();
+            if ($tunnel instanceof ServerTunnel && $tunnel->allocation_id !== $event->server->allocation_id) {
+                $this->tunnels->recreate($tunnel);
+            }
+        });
+    }
+
+    public function subscribe(Dispatcher $events): void
+    {
+        $events->listen(Created::class, $this->created(...));
+        $events->listen(Deleting::class, $this->deleting(...));
+        $events->listen(Updated::class, $this->updated(...));
+    }
+
+    private function safely(callable $callback): void
+    {
+        try {
+            $callback();
+        } catch (Throwable $throwable) {
+            report($throwable);
+        }
+    }
+}

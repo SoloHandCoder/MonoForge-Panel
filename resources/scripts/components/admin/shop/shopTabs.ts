@@ -2,9 +2,7 @@
  * The Shop tab's sub-tabs, in order. Each has a route at /panel/shop[/<key>] (see routeTree.ts)
  * that renders ShopContainer, which shows the tab matching the path.
  *
- * "Token packs & Tebex" (phase 3 Task P) and "Tunnels" (Task V) are slots: their routes and
- * tab buttons already exist and render TokenPacksTab.tsx and TunnelsTab.tsx, which those tasks
- * replace with their real pages.
+ * "Token packs & Tebex" renders TebexShopTab.tsx (Task P) and "Tunnels" renders tunnels/TunnelsTab.tsx (Task V).
  */
 export const shopTabs = [
     { key: 'plans', label: 'Plans', path: '/panel/shop' },

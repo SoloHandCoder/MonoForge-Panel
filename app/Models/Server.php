@@ -22,6 +22,7 @@ use Illuminate\Notifications\Notifiable;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Exceptions\Http\Server\ServerStateConflictException;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
 use UnexpectedValueException;
 
@@ -194,6 +195,16 @@ class Server extends Model implements Identifiable
     public function allocations(): HasMany
     {
         return $this->hasMany(Allocation::class, 'server_id')->chaperone('server');
+    }
+
+    /**
+     * The playit.gg tunnel that gives the server its public address, if one was created.
+     *
+     * @return HasOne<ServerTunnel, $this>
+     */
+    public function tunnel(): HasOne
+    {
+        return $this->hasOne(ServerTunnel::class);
     }
 
     /**

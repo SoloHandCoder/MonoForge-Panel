@@ -8,7 +8,7 @@ import PeriodsTab from '@/components/admin/shop/periods/PeriodsTab';
 import PlansTab from '@/components/admin/shop/plans/PlansTab';
 import { shopTabFromPath, shopTabs, type ShopTab } from '@/components/admin/shop/shopTabs';
 import TebexShopTab from '@/components/admin/shop/TebexShopTab';
-import TunnelsTab from '@/components/admin/shop/TunnelsTab';
+import TunnelsTab from '@/components/admin/shop/tunnels/TunnelsTab';
 
 const tabContent = {
     plans: () => <PlansTab />,

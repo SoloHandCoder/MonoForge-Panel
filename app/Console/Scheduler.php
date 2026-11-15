@@ -12,6 +12,7 @@ use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
+use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Setting;
@@ -40,6 +41,9 @@ final class Scheduler
         // Shop billing: renewals, suspensions, warnings and deletions after the grace period. Every
         // step is safe to repeat, so a missed or overlapping run only delays it.
         $schedule->command(ProcessSubscriptionsCommand::class)->everyFiveMinutes()->withoutOverlapping(30)->onOneServer();
+
+        // Retry failed playit.gg tunnels and pick up addresses for pending ones.
+        $schedule->command(SyncTunnelsCommand::class)->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

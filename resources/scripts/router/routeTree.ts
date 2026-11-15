@@ -1043,7 +1043,7 @@ const panelChildren = [
         ),
     }),
     // Phase 3 Task R: the Shop tab. Every sub-tab path renders ShopContainer, which picks the tab from the
-    // path (see components/admin/shop/shopTabs.ts). token-packs (Task P) and tunnels (Task V) are slots.
+    // path (see components/admin/shop/shopTabs.ts), including token-packs (Task P) and tunnels (Task V).
     createRoute({
         getParentRoute: () => panelRoute,
         path: 'shop',
