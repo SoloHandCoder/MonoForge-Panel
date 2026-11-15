@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useCurrentUser } from '@/api/account/queries';
+import { billingNotice, useServerSubscription } from '@/api/billing/subscriptions';
 import {
     serverResourceUsageQueryOptions,
     serverResourceUsageRefetchInterval,
@@ -14,6 +15,7 @@ import { selectServerPermissions } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
 import { relationshipData } from '@/api/relationships';
 import { ip, mbToBytes } from '@/lib/formatters';
+import { useNow } from '@/plugins/useNow';
 import { hasPermission } from '@/plugins/usePermissions';
 import { getPageSearch, useDashboardSearch } from '@/router/pageSearch';
 import { createTestServer, createTestServerCard } from './fixtures';
@@ -64,6 +66,11 @@ export interface ServerCardModel {
     readonly actions: { readonly start: () => void; readonly stop: () => void; readonly restart: () => void };
     /** A power signal is on its way. */
     readonly sending: boolean;
+    /**
+     * For a shop server the user pays for: why it is suspended and when it is deleted, such as
+     * "Suspended — deletes in 6d 23h. Top up and renew". Null or absent while it is paid.
+     */
+    readonly billingNotice?: string | null;
 }
 
 /** Whose servers the dashboard lists; only root admins can list other users' servers. */
@@ -321,8 +328,14 @@ function useServerCardModel({ server }: { readonly server: Server }): ServerCard
     const stats = useServerResourceUsage(server.attributes.uuid, tracksResources(server)).data?.attributes;
     const power = usePowerSender();
     const rootAdmin = useCurrentUser().rootAdmin;
+    const subscription = useServerSubscription(server.attributes.identifier);
+    const now = useNow(60_000);
+    const notice = billingNotice(subscription, now);
 
-    return useMemo(() => cardModel(server, stats, power, rootAdmin), [server, stats, power, rootAdmin]);
+    return useMemo(
+        () => ({ ...cardModel(server, stats, power, rootAdmin), billingNotice: notice }),
+        [server, stats, power, rootAdmin, notice]
+    );
 }
 
 /** The cards of the list fixtures' rows, so a card placed in a row shows that row's state. */
@@ -445,7 +458,11 @@ implementViews({
                         disk: statMetric(512 * 1024 ** 2, 0),
                     },
                 }),
-            suspended: () => createTestServerCard({ state: { kind: 'unavailable', reason: 'suspended' } }),
+            suspended: () =>
+                createTestServerCard({
+                    state: { kind: 'unavailable', reason: 'suspended' },
+                    billingNotice: 'Suspended — deletes in 6d 23h. Top up and renew',
+                }),
             loading: () => createTestServerCard({ address: null, state: { kind: 'loading' } }),
         },
     },

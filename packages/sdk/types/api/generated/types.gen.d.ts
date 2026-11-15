@@ -15191,3 +15191,272 @@ export type AuthGetCsrfCookieResponses = {
     204: void;
 };
 export type AuthGetCsrfCookieResponse = AuthGetCsrfCookieResponses[keyof AuthGetCsrfCookieResponses];
+export type AdminServerSubscriptionAttributes = {
+    id: number;
+    server_id: number;
+    user_id: number;
+    plan_id: number;
+    period_id: number;
+    server_identifier: string;
+    server_name: string;
+    status: string;
+    price_tokens: number;
+    period_days: number;
+    addons: Array<{
+        key: string;
+        units: number;
+    }>;
+    auto_renew: boolean;
+    next_renewal_at: string;
+    suspended_at: string | null;
+    delete_at: string | null;
+    can_renew_now: boolean;
+    created_at: string;
+    updated_at: string;
+};
+export type AdminServerSubscriptionResource = {
+    object: string;
+    attributes: AdminServerSubscriptionAttributes;
+};
+export type ClientServerSubscriptionAttributes = {
+    server_identifier: string;
+    server_name: string;
+    status: string;
+    price_tokens: number;
+    period_days: number;
+    addons: Array<{
+        key: string;
+        units: number;
+    }>;
+    auto_renew: boolean;
+    next_renewal_at: string;
+    suspended_at: string | null;
+    delete_at: string | null;
+    can_renew_now: boolean;
+};
+export type ClientServerSubscriptionListResponse = {
+    object: string;
+    data: Array<ClientServerSubscriptionResource>;
+};
+export type ClientServerSubscriptionResource = {
+    object: string;
+    attributes: ClientServerSubscriptionAttributes;
+};
+export type AdminExtendServerSubscriptionRequest = {
+    /**
+     * Free days to add, 1 to 365.
+     */
+    days: number;
+};
+export type ClientUpdateServerSubscriptionRequest = {
+    /**
+     * Renew automatically from the token balance.
+     */
+    auto_renew: boolean;
+};
+export type AdminGetServerSubscriptionServerAdminIdentifierPathParameter = string;
+export type AdminExtendServerSubscriptionServerAdminIdentifierPathParameter = string;
+export type AdminCancelServerSubscriptionServerAdminIdentifierPathParameter = string;
+export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
+export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
+export type AdminGetServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminGetServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription';
+};
+export type AdminGetServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The server has no subscription.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetServerSubscriptionError = AdminGetServerSubscriptionErrors[keyof AdminGetServerSubscriptionErrors];
+export type AdminGetServerSubscriptionResponses = {
+    /**
+     * Subscription returned.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminGetServerSubscriptionResponse = AdminGetServerSubscriptionResponses[keyof AdminGetServerSubscriptionResponses];
+export type AdminExtendServerSubscriptionData = {
+    body: AdminExtendServerSubscriptionRequest;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminExtendServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription/extend';
+};
+export type AdminExtendServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminExtendServerSubscriptionError = AdminExtendServerSubscriptionErrors[keyof AdminExtendServerSubscriptionErrors];
+export type AdminExtendServerSubscriptionResponses = {
+    /**
+     * Subscription extended.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminExtendServerSubscriptionResponse = AdminExtendServerSubscriptionResponses[keyof AdminExtendServerSubscriptionResponses];
+export type AdminCancelServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminCancelServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription/cancel';
+};
+export type AdminCancelServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminCancelServerSubscriptionError = AdminCancelServerSubscriptionErrors[keyof AdminCancelServerSubscriptionErrors];
+export type AdminCancelServerSubscriptionResponses = {
+    /**
+     * Subscription cancelled.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminCancelServerSubscriptionResponse = AdminCancelServerSubscriptionResponses[keyof AdminCancelServerSubscriptionResponses];
+export type ClientListServerSubscriptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/subscriptions';
+};
+export type ClientListServerSubscriptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListServerSubscriptionsError = ClientListServerSubscriptionsErrors[keyof ClientListServerSubscriptionsErrors];
+export type ClientListServerSubscriptionsResponses = {
+    /**
+     * Subscriptions returned.
+     */
+    200: ClientServerSubscriptionListResponse;
+};
+export type ClientListServerSubscriptionsResponse = ClientListServerSubscriptionsResponses[keyof ClientListServerSubscriptionsResponses];
+export type ClientUpdateServerSubscriptionData = {
+    body: ClientUpdateServerSubscriptionRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUpdateServerSubscriptionServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}';
+};
+export type ClientUpdateServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUpdateServerSubscriptionError = ClientUpdateServerSubscriptionErrors[keyof ClientUpdateServerSubscriptionErrors];
+export type ClientUpdateServerSubscriptionResponses = {
+    /**
+     * Subscription updated.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientUpdateServerSubscriptionResponse = ClientUpdateServerSubscriptionResponses[keyof ClientUpdateServerSubscriptionResponses];
+export type ClientRenewServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientRenewServerSubscriptionServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}/renew';
+};
+export type ClientRenewServerSubscriptionErrors = {
+    /**
+     * The balance is too low, or the next period is already paid.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientRenewServerSubscriptionError = ClientRenewServerSubscriptionErrors[keyof ClientRenewServerSubscriptionErrors];
+export type ClientRenewServerSubscriptionResponses = {
+    /**
+     * Subscription renewed.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientRenewServerSubscriptionResponse = ClientRenewServerSubscriptionResponses[keyof ClientRenewServerSubscriptionResponses];

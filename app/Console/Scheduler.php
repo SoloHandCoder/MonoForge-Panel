@@ -7,6 +7,7 @@ namespace Pterodactyl\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
+use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
@@ -35,6 +36,10 @@ final class Scheduler
         if (config('activity.prune_days')) {
             $schedule->command(PruneCommand::class, ['--model' => [ActivityLog::class]])->daily()->withoutOverlapping();
         }
+
+        // Shop billing: renewals, suspensions, warnings and deletions after the grace period. Every
+        // step is safe to repeat, so a missed or overlapping run only delays it.
+        $schedule->command(ProcessSubscriptionsCommand::class)->everyFiveMinutes()->withoutOverlapping(30)->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

@@ -32,6 +32,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\WebsocketController;
 use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
+use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
@@ -63,6 +64,10 @@ Route::get('/store/tokens/packs', [TokenPackController::class, 'index'])->name('
 Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])
     ->middleware('throttle:10,1')
     ->name('api:client.store.tokens.checkout');
+// Shop billing of the user's servers. Outside the server group: a suspended server's renewal must still work.
+Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('api:client.subscriptions');
+Route::patch('/subscriptions/{server}', [SubscriptionController::class, 'update'])->name('api:client.subscriptions.update');
+Route::post('/subscriptions/{server}/renew', [SubscriptionController::class, 'renew'])->name('api:client.subscriptions.renew');
 
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function (): void {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function (): void {
