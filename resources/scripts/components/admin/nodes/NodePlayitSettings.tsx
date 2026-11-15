@@ -8,6 +8,7 @@ import {
 import Button from '@/components/elements/Button';
 import Spinner from '@/components/elements/Spinner';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
+import { cleanPlayitValue } from '@/lib/playit';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -17,10 +18,14 @@ function PlayitForm({ nodeId, settings }: { nodeId: number; settings: NodePlayit
     const form = useAppForm({
         defaultValues: { agentId: settings.agent_id ?? '', secret: '' },
         onSubmit: async ({ value }) => {
-            const agentId = value.agentId.trim();
+            // Lines pasted from playit.toml (`agent_id = "…"`) are cleaned here as on the server.
+            const agentId = cleanPlayitValue(value.agentId, 'agent_id');
 
             try {
-                await update.mutateAsync({ agent_id: agentId === '' ? null : agentId, secret: value.secret });
+                await update.mutateAsync({
+                    agent_id: agentId === '' ? null : agentId,
+                    secret: cleanPlayitValue(value.secret, 'secret_key'),
+                });
                 form.reset({ agentId, secret: '' });
             } catch {
                 // Error toast is handled by the mutation.
@@ -39,8 +44,11 @@ function PlayitForm({ nodeId, settings }: { nodeId: number; settings: NodePlayit
                     <form.AppField
                         name='agentId'
                         validators={{
-                            onChange: ({ value }) =>
-                                value.trim() === '' || UUID.test(value.trim()) ? undefined : 'Enter the agent UUID.',
+                            onChange: ({ value }) => {
+                                const agentId = cleanPlayitValue(value, 'agent_id');
+
+                                return agentId === '' || UUID.test(agentId) ? undefined : 'Enter the agent UUID.';
+                            },
                         }}
                     >
                         {(field) => (
