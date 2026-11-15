@@ -24,6 +24,7 @@ use Pterodactyl\Models\User;
  * @property string $uuid
  * @property int $user_id
  * @property string $scope
+ * @property string $mode "chat", or "crash_doctor" for a diagnosis the crash doctor started
  * @property int|null $server_id
  * @property int|null $provider_id
  * @property string $title
@@ -42,6 +43,7 @@ use Pterodactyl\Models\User;
     'uuid',
     'user_id',
     'scope',
+    'mode',
     'server_id',
     'provider_id',
     'title',
@@ -61,6 +63,10 @@ class AiConversation extends Model
 
     public const string SCOPE_ADMIN = 'admin';
 
+    public const string MODE_CHAT = 'chat';
+
+    public const string MODE_CRASH_DOCTOR = 'crash_doctor';
+
     public const string STATUS_IDLE = 'idle';
 
     public const string STATUS_RUNNING = 'running';
@@ -78,6 +84,7 @@ class AiConversation extends Model
 
     protected $attributes = [
         'status' => self::STATUS_IDLE,
+        'mode' => self::MODE_CHAT,
     ];
 
     /**
@@ -125,6 +132,12 @@ class AiConversation extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(AiMessage::class, 'conversation_id');
+    }
+
+    /** Whether the crash doctor started this conversation to diagnose the server. */
+    public function isCrashDoctor(): bool
+    {
+        return $this->mode === self::MODE_CRASH_DOCTOR;
     }
 
     /**

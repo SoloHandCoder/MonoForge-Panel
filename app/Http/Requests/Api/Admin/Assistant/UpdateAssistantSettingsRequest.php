@@ -19,6 +19,7 @@ class UpdateAssistantSettingsRequest extends AdminAssistantRequest
             'enabled' => ['required', 'boolean'],
             'server_enabled' => ['required', 'boolean'],
             'admin_enabled' => ['required', 'boolean'],
+            'crash_doctor_enabled' => ['sometimes', 'boolean'],
             'default_provider_id' => ['present', 'nullable', 'integer', Rule::exists(AiProvider::class, 'id')],
             'ratio' => ['required', 'integer', 'min:1', 'max:'.AssistantSettings::MAX_RATIO],
             'free_tokens_monthly' => ['required', 'integer', 'min:0', 'max:'.AssistantSettings::MAX_FREE_TOKENS],
@@ -38,6 +39,8 @@ class UpdateAssistantSettingsRequest extends AdminAssistantRequest
             'enabled' => $this->boolean('enabled'),
             'server_enabled' => $this->boolean('server_enabled'),
             'admin_enabled' => $this->boolean('admin_enabled'),
+            // Optional, so older clients that do not send it keep the current value.
+            'crash_doctor_enabled' => $this->has('crash_doctor_enabled') ? $this->boolean('crash_doctor_enabled') : AssistantSettings::crashDoctorEnabled(),
             'default_provider_id' => $this->filled('default_provider_id') ? $this->integer('default_provider_id') : null,
             'ratio' => $this->integer('ratio'),
             'free_tokens_monthly' => $this->integer('free_tokens_monthly'),

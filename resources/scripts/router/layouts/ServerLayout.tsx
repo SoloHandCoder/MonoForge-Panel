@@ -13,6 +13,7 @@ import TransferListener from '@/components/server/TransferListener';
 import WebsocketHandler from '@/components/server/WebsocketHandler';
 import ServerSleepBanner from '@/components/server/billing/ServerSleepBanner';
 import ServerSubscriptionPanel from '@/components/server/billing/ServerSubscriptionPanel';
+import CrashDoctor from '@/components/server/crashDoctor/CrashDoctor';
 import { useIsRenderedRoute } from '@/router/renderedRoute';
 import { useCurrentUser } from '@/api/account/queries';
 import { View } from '@/views/View';
@@ -45,6 +46,10 @@ function ServerContent({ id, server }: { id: string; server: Server }) {
             <div className='page-width empty:hidden pt-(--layout-page-spacing)'>
                 <ServerSubscriptionPanel identifier={identifier} summary={isConsole} />
                 {isConsole && !inConflictState && <ServerSleepBanner identifier={identifier} />}
+            </div>
+            {/* The AI crash doctor: the crash notice, and "Diagnose" on the console. */}
+            <div className='page-width empty:hidden pt-(--layout-page-spacing)'>
+                <CrashDoctor id={id} console={isConsole} />
             </div>
             {inConflictState && (!rootAdmin || !location.pathname.endsWith(`/server/${identifier}`)) ? (
                 <View name='server.conflict' />

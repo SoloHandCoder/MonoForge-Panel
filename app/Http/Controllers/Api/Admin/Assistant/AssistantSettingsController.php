@@ -23,6 +23,7 @@ class AssistantSettingsController extends AdminApiController
         'enabled' => true,
         'server_enabled' => true,
         'admin_enabled' => true,
+        'crash_doctor_enabled' => true,
         'default_provider_id' => 1,
         'ratio' => 1000,
         'free_tokens_monthly' => 50000,
@@ -32,14 +33,14 @@ class AssistantSettingsController extends AdminApiController
         'max_output_tokens' => 2048,
     ];
 
-    #[Endpoint('Get AI assistant settings', 'Returns whether the assistant is on (overall, on server pages, in the admin area), the default provider, the panel token price (ratio: AI tokens per panel token), the free AI tokens per user and month, when the free allowance warning shows (warn_percent), and the loop and context limits.')]
+    #[Endpoint('Get AI assistant settings', 'Returns whether the assistant is on (overall, on server pages, in the admin area), whether the AI crash doctor is offered when a server crashes (crash_doctor_enabled; it also needs the server assistant on), the default provider, the panel token price (ratio: AI tokens per panel token), the free AI tokens per user and month, when the free allowance warning shows (warn_percent), and the loop and context limits.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Settings returned.')]
     public function index(AdminAssistantRequest $request): JsonResponse
     {
         return new JsonResponse(AssistantSettings::all());
     }
 
-    #[Endpoint('Update AI assistant settings', 'Replaces the AI assistant settings.')]
+    #[Endpoint('Update AI assistant settings', 'Replaces the AI assistant settings. crash_doctor_enabled is optional and keeps its value when left out.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Settings updated.')]
     public function update(UpdateAssistantSettingsRequest $request): JsonResponse
     {

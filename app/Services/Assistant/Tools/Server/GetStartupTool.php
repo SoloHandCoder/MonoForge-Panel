@@ -25,7 +25,7 @@ final class GetStartupTool extends ServerTool
 
     public function description(): string
     {
-        return "Get the server's startup command, Docker image and startup variables (key, value, default, whether it can be edited and its validation rules). Values of variables that look like secrets are shown as ".SecretRedactor::PLACEHOLDER.'; to show one to the user, use reveal_startup_variable.';
+        return "Get the server's startup command, Docker image (and the images it can switch to, docker_images) and startup variables (key, value, default, whether it can be edited and its validation rules). Values of variables that look like secrets are shown as ".SecretRedactor::PLACEHOLDER.'; to show one to the user, use reveal_startup_variable.';
     }
 
     public function parameters(): array
@@ -56,6 +56,8 @@ final class GetStartupTool extends ServerTool
         $data = [
             'startup_command' => $masked->startupCommand(),
             'docker_image' => $server->image,
+            // The images set_docker_image can switch to (such as other Java versions), by their label.
+            'docker_images' => (object) ($server->egg->docker_images ?? []),
             'variables' => $variables->map(function (EggVariable $variable): array {
                 $hidden = SecretRedactor::isSecretName($variable->env_variable);
 

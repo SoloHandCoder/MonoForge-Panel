@@ -21,6 +21,9 @@ class ConversationContext
     /** Tool results are cut to 4 KB in the context. */
     public const int TOOL_RESULT_BYTES = 4096;
 
+    /** The crash doctor reads the console and logs in full (each tool keeps at most 12 KB of their end). */
+    public const int CRASH_DOCTOR_TOOL_RESULT_BYTES = 12_288;
+
     /** What an older tool result becomes when a long turn outgrows the context. */
     public const string OMITTED = '[This older tool result was left out to stay within the context limit. Call the tool again if you still need it.]';
 
@@ -39,6 +42,26 @@ class ConversationContext
         }
 
         return mb_strcut($text, 0, max(0, $bytes - 64))."\n[... truncated, ".mb_strlen($text, '8bit').' bytes in total]';
+    }
+
+    /**
+     * Cuts text to at most $bytes bytes from its start, keeping the end: for the console and
+     * the last lines of a log, where the newest lines matter.
+     */
+    public static function truncateStart(string $text, int $bytes): string
+    {
+        $length = mb_strlen($text, '8bit');
+        if ($length <= $bytes) {
+            return $text;
+        }
+
+        return '[... truncated, '.$length." bytes in total]\n".mb_strcut($text, $length - max(0, $bytes - 64));
+    }
+
+    /** How much of each tool result the model reads again in this conversation. */
+    public static function toolResultBytes(AiConversation $conversation): int
+    {
+        return $conversation->isCrashDoctor() ? self::CRASH_DOCTOR_TOOL_RESULT_BYTES : self::TOOL_RESULT_BYTES;
     }
 
     /**
@@ -61,7 +84,7 @@ class ConversationContext
 
         return $this->compact([
             ['role' => 'system', 'content' => $system],
-            ...$this->format($this->history($conversation)),
+            ...$this->format($this->history($conversation), self::toolResultBytes($conversation)),
         ]);
     }
 
@@ -134,7 +157,8 @@ class ConversationContext
         $system = ChatClient::estimateTokens(SystemPrompt::for($conversation));
 
         $messages = $history->values()->all();
-        $sizes = array_map($this->estimate(...), $messages);
+        $bytes = self::toolResultBytes($conversation);
+        $sizes = array_map(fn (AiMessage $message): int => $this->estimate($message, $bytes), $messages);
         if ($system + array_sum($sizes) <= $limit) {
             return false;
         }
@@ -206,20 +230,24 @@ class ConversationContext
      * OpenAI chat messages for the history. A tool call without a result (a crashed run) gets
      * a placeholder result, or providers reject the whole request.
      *
+     * The console and the last lines of a log keep their end when cut, other results their start.
+     *
      * @param  Collection<int, AiMessage>  $history
      * @return list<array<string, mixed>>
      */
-    public function format(Collection $history): array
+    public function format(Collection $history, int $toolResultBytes = self::TOOL_RESULT_BYTES): array
     {
         $answered = $history->where('role', AiMessage::ROLE_TOOL)->pluck('tool_call_id')->filter()->flip();
+        $tails = $this->tailCalls($history);
         $messages = [];
 
         foreach ($history as $message) {
             if ($message->role === AiMessage::ROLE_TOOL) {
+                $content = $message->content ?? '';
                 $messages[] = [
                     'role' => 'tool',
                     'tool_call_id' => (string) $message->tool_call_id,
-                    'content' => self::truncate($message->content ?? '', self::TOOL_RESULT_BYTES),
+                    'content' => isset($tails[(string) $message->tool_call_id]) ? self::truncateStart($content, $toolResultBytes) : self::truncate($content, $toolResultBytes),
                 ];
 
                 continue;
@@ -249,11 +277,34 @@ class ConversationContext
         return $messages;
     }
 
-    private function estimate(AiMessage $message): int
+    /**
+     * The ids of the calls whose result is the end of some output: read_console, and read_file
+     * with tail_lines.
+     *
+     * @param  Collection<int, AiMessage>  $history
+     * @return array<string, true>
+     */
+    private function tailCalls(Collection $history): array
+    {
+        $tails = [];
+        foreach ($history as $message) {
+            foreach ($message->tool_calls ?? [] as $call) {
+                $name = $call['function']['name'];
+                $arguments = json_decode($call['function']['arguments'], true);
+                if ($name === 'read_console' || ($name === 'read_file' && is_array($arguments) && isset($arguments['tail_lines']))) {
+                    $tails[$call['id']] = true;
+                }
+            }
+        }
+
+        return $tails;
+    }
+
+    private function estimate(AiMessage $message, int $toolResultBytes = self::TOOL_RESULT_BYTES): int
     {
         $content = $message->content ?? '';
         if ($message->role === AiMessage::ROLE_TOOL) {
-            $content = self::truncate($content, self::TOOL_RESULT_BYTES);
+            $content = self::truncate($content, $toolResultBytes);
         }
 
         return ChatClient::estimateTokens($content.json_encode($message->tool_calls ?? [])) + 4;

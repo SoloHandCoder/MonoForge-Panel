@@ -19,6 +19,7 @@ use Pterodactyl\Http\Controllers\Api\Client\OAuthAccountController;
 use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\BackupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\CommandController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\CrashDoctorController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\DatabaseController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileUploadController;
@@ -257,6 +258,14 @@ Route::group([
         Route::put('/', [ServerPageController::class, 'update']);
         Route::middleware('throttle:10,1')->post('/banner', [ServerPageController::class, 'uploadBanner']);
         Route::delete('/banner', [ServerPageController::class, 'deleteBanner']);
+    });
+
+    // The AI crash doctor (phase 6): the crash notice, a crash the console saw, and the diagnosis.
+    Route::prefix('/crash-doctor')->group(function (): void {
+        Route::get('/', [CrashDoctorController::class, 'show']);
+        Route::post('/report', [CrashDoctorController::class, 'report'])->middleware('throttle:6,1');
+        Route::post('/diagnose', [CrashDoctorController::class, 'diagnose'])->middleware('throttle:20,1');
+        Route::post('/crashes/{crash}/dismiss', [CrashDoctorController::class, 'dismiss'])->withoutScopedBindings();
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

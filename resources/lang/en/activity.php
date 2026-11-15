@@ -63,6 +63,9 @@ return [
         'console' => [
             'command' => 'Executed ":command" on the server',
         ],
+        'crash-doctor' => [
+            'diagnose' => 'Asked the AI crash doctor to check the server (:kind)',
+        ],
         'power' => [
             'start' => 'Started the server',
             'stop' => 'Stopped the server',

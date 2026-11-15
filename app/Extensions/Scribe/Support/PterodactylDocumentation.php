@@ -108,6 +108,8 @@ class PterodactylDocumentation
         'conversation_uuid' => ['string', 'The assistant conversation UUID.', '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
         'toolCall_id' => ['integer', 'The assistant tool call ID.', 2],
         'provider_id' => ['integer', 'The AI provider ID.', 1],
+        // Phase 6: the AI crash doctor.
+        'crash_id' => ['integer', 'The server crash ID.', 3],
     ];
 
     private const array FIELD_DESCRIPTIONS = [
@@ -123,6 +125,8 @@ class PterodactylDocumentation
         'contents' => 'The file contents.',
         'continue_on_failure' => 'Whether the schedule continues when this task fails.',
         'copy_script_from' => 'Another egg ID to copy the install script from.',
+        'crash_doctor_enabled' => 'Whether the AI crash doctor is offered when a server crashes or fails to start.',
+        'crash_id' => 'The crash to diagnose, from the crash doctor status; null for a check without a crash.',
         'cpu' => 'The CPU limit percentage.',
         'current_password' => 'The current account password.',
         'database_host_id' => 'The database host ID.',
@@ -139,6 +143,7 @@ class PterodactylDocumentation
         'env_variable' => 'The environment variable name.',
         'environment' => 'Environment variables for the server.',
         'external_id' => 'An external identifier for this resource.',
+        'kind' => 'What the console saw: crashed (the server went offline without stopping first) or start_failed (it went offline while starting).',
         'feature_limits.allocations' => 'The maximum number of allocations allowed.',
         'feature_limits.backups' => 'The maximum number of backups allowed.',
         'feature_limits.databases' => 'The maximum number of databases allowed.',

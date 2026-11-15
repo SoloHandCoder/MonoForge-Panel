@@ -42,6 +42,18 @@ final class AssistantSettings
         return config()->boolean('monoforge.ai.admin_enabled', true);
     }
 
+    /** Whether the crash doctor switch is on; see crashDoctorAvailable() for whether it can be used. */
+    public static function crashDoctorEnabled(): bool
+    {
+        return config()->boolean('monoforge.ai.crash_doctor_enabled', true);
+    }
+
+    /** The crash doctor runs on the server assistant, so it needs that on as well as its own switch. */
+    public static function crashDoctorAvailable(): bool
+    {
+        return self::crashDoctorEnabled() && self::scopeEnabled(AiConversation::SCOPE_SERVER);
+    }
+
     /** Whether the assistant of this scope may be used at all. */
     public static function scopeEnabled(string $scope): bool
     {
@@ -87,7 +99,7 @@ final class AssistantSettings
     }
 
     /**
-     * @return array{enabled: bool, server_enabled: bool, admin_enabled: bool, default_provider_id: int|null, ratio: int, free_tokens_monthly: int, warn_percent: int, max_tool_iterations: int, context_tokens: int, max_output_tokens: int}
+     * @return array{enabled: bool, server_enabled: bool, admin_enabled: bool, crash_doctor_enabled: bool, default_provider_id: int|null, ratio: int, free_tokens_monthly: int, warn_percent: int, max_tool_iterations: int, context_tokens: int, max_output_tokens: int}
      */
     public static function all(): array
     {
@@ -95,6 +107,7 @@ final class AssistantSettings
             'enabled' => self::enabled(),
             'server_enabled' => self::serverEnabled(),
             'admin_enabled' => self::adminEnabled(),
+            'crash_doctor_enabled' => self::crashDoctorEnabled(),
             'default_provider_id' => self::defaultProviderId(),
             'ratio' => self::ratio(),
             'free_tokens_monthly' => self::freeTokensMonthly(),

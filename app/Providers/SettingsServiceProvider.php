@@ -75,6 +75,8 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:ai:max_tool_iterations',
         'monoforge:ai:context_tokens',
         'monoforge:ai:max_output_tokens',
+        // Phase 6 Task D: the AI crash doctor.
+        'monoforge:ai:crash_doctor_enabled',
         // Addresses hidden from activity entries.
         'monoforge:privacy:hidden_ips',
     ];

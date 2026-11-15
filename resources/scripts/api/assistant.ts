@@ -26,6 +26,8 @@ export type AssistantWarning = 'near_limit' | 'free_exhausted' | 'no_balance';
 export interface AssistantStatus {
     enabled: boolean;
     server_enabled: boolean;
+    /** The AI crash doctor is offered (its switch and the server assistant are on). */
+    crash_doctor_enabled: boolean;
     /** Free AI tokens per month. */
     free_limit: number;
     /** Free AI tokens used this month. */
@@ -38,6 +40,9 @@ export interface AssistantStatus {
 }
 
 export type AssistantConversationStatus = 'idle' | 'running' | 'awaiting_approval' | 'error';
+
+/** `crash_doctor` for a diagnosis the crash doctor started. */
+export type AssistantConversationMode = 'chat' | 'crash_doctor';
 
 export type AssistantToolCallStatus = 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
 
@@ -76,6 +81,7 @@ export interface AssistantMessage {
 export interface AssistantConversationSummary {
     uuid: string;
     title: string;
+    mode: AssistantConversationMode;
     status: AssistantConversationStatus;
     updated_at: string | null;
 }
@@ -90,6 +96,7 @@ export interface AssistantConversationUsage {
 export interface AssistantConversation {
     uuid: string;
     title: string;
+    mode: AssistantConversationMode;
     status: AssistantConversationStatus;
     error: string | null;
     messages: AssistantMessage[];
@@ -249,6 +256,7 @@ export interface AssistantSettings {
     enabled: boolean;
     server_enabled: boolean;
     admin_enabled: boolean;
+    crash_doctor_enabled: boolean;
     default_provider_id: number | null;
     ratio: number;
     free_tokens_monthly: number;

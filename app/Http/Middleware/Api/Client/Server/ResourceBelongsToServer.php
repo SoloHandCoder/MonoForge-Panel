@@ -16,6 +16,7 @@ use Pterodactyl\Models\Backup;
 use Pterodactyl\Models\Database;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\ServerCrash;
 use Pterodactyl\Models\Subuser;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
@@ -62,6 +63,7 @@ class ResourceBelongsToServer
                 case Backup::class:
                 case Database::class:
                 case Schedule::class:
+                case ServerCrash::class:
                 case Subuser::class:
                     throw_if($model->server_id !== $server->id, $exception);
 

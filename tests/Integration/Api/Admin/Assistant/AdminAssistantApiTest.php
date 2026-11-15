@@ -162,6 +162,7 @@ test('settings are read and stored', function (): void {
         'enabled' => true,
         'server_enabled' => true,
         'admin_enabled' => false,
+        'crash_doctor_enabled' => false,
         'default_provider_id' => $provider->id,
         'ratio' => 500,
         'free_tokens_monthly' => 20000,
@@ -175,6 +176,13 @@ test('settings are read and stored', function (): void {
 
     expect(Setting::query()->where('key', 'settings::monoforge:ai:ratio')->value('value'))->toBe('500');
     $this->putJson('/api/admin/assistant/settings', [...$settings, 'ratio' => 0])->assertUnprocessable();
+
+    // The crash doctor switch is optional: left out, it keeps its value.
+    expect(Setting::query()->where('key', 'settings::monoforge:ai:crash_doctor_enabled')->value('value'))->toBe('false');
+    $without = $settings;
+    unset($without['crash_doctor_enabled']);
+    $this->putJson('/api/admin/assistant/settings', $without)->assertOk()->assertJsonPath('crash_doctor_enabled', false);
+    $this->putJson('/api/admin/assistant/settings', [...$settings, 'crash_doctor_enabled' => true])->assertOk()->assertJsonPath('crash_doctor_enabled', true);
 });
 
 test('usage is reported per user for a month', function (): void {

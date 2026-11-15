@@ -3,6 +3,7 @@ import { adminNodeListQueryParams } from '@/api/admin/nodes/queries';
 import { adminServerListQueryParams } from '@/api/admin/servers/queries';
 import {
     parseActivitySearch,
+    parseAssistantSearch,
     parseDashboardSearch,
     parseEditorSearch,
     parseEmailSearch,
@@ -18,12 +19,16 @@ describe('search value coercion', () => {
         expect(parseUserListSearch({ filter: true })).toEqual({ filter: 'true' });
         expect(parseActivitySearch({ event: 'server:power', user: 42 })).toEqual({ event: 'server:power', user: '42' });
         expect(parseEmailSearch({ email: 'alex@example.test' })).toEqual({ email: 'alex@example.test' });
+        expect(parseAssistantSearch({ conversation: 'c0ffee00-0000-4000-8000-000000000001' })).toEqual({
+            conversation: 'c0ffee00-0000-4000-8000-000000000001',
+        });
     });
 
     it('drops empty and null values', () => {
         expect(parseServerListSearch({ filter: '   ', page: null })).toEqual({});
         expect(parseActivitySearch({ event: null, user: '' })).toEqual({});
         expect(parseEmailSearch({ email: null })).toEqual({});
+        expect(parseAssistantSearch({ conversation: ' ' })).toEqual({});
     });
 
     it('accepts only positive integer pages', () => {

@@ -1572,10 +1572,6 @@ export type ClientServerAttributes = {
      * The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.
      */
     playit_address: string | null;
-    /**
-     * True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
-     */
-    address_pending: boolean;
     relationships?: {
         allocations?: ClientAllocationListResponse | NullResource;
         variables?: ClientEggVariableListResponse | NullResource;
@@ -1695,38 +1691,6 @@ export type ClientServerScheduleResource = {
     attributes: ClientServerScheduleAttributes;
 };
 
-export type ClientServerSleepAttributes = {
-    /**
-     * The plan allows auto-sleep and the game is supported.
-     */
-    available: boolean;
-    /**
-     * The game tells who is online (Minecraft Java for now).
-     */
-    supported: boolean;
-    /**
-     * The owner turned auto-sleep on.
-     */
-    enabled: boolean;
-    /**
-     * Auto-sleep stopped the server and nobody has started it since.
-     */
-    sleeping: boolean;
-    /**
-     * When it fell asleep (ISO 8601), or null.
-     */
-    sleep_started_at?: string | null;
-    /**
-     * The viewer may wake it (needs control.start).
-     */
-    can_wake: boolean;
-};
-
-export type ClientServerSleepResource = {
-    object: string;
-    attributes: ClientServerSleepAttributes;
-};
-
 export type ClientServerSubscriptionAttributes = {
     server_identifier: string;
     server_name: string;
@@ -1742,18 +1706,6 @@ export type ClientServerSubscriptionAttributes = {
     suspended_at: string | null;
     delete_at: string | null;
     can_renew_now: boolean;
-    sleep: {
-        allowed: boolean;
-        supported: boolean;
-        enabled: boolean;
-        sleeping: boolean;
-        sleep_started_at: string | null;
-        idle_minutes: number;
-        discount_percent: number;
-        slept_seconds_this_period: number;
-        saved_this_period: number;
-        last_saved_tokens: number;
-    };
 };
 
 export type ClientServerSubscriptionListResponse = {
@@ -1774,7 +1726,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 
 export type ClientServerSubuserListResponse = {
@@ -2159,18 +2111,6 @@ export type AdminCreateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
-    /**
-     * The sleep allowed.
-     */
-    sleep_allowed?: boolean;
-    /**
-     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
-     */
-    sleep_discount_percent?: number;
-    /**
-     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
-     */
-    sleep_idle_minutes?: number;
 };
 
 export type AdminUpdateShopPlanRequest = {
@@ -2238,18 +2178,6 @@ export type AdminUpdateShopPlanRequest = {
      * Must match an existing stored value.
      */
     node_ids?: Array<number>;
-    /**
-     * The sleep allowed.
-     */
-    sleep_allowed?: boolean;
-    /**
-     * The sleep discount percent. Must be at least 0. Must not be greater than 100.
-     */
-    sleep_discount_percent?: number;
-    /**
-     * The sleep idle minutes. Must be at least 5. Must not be greater than 1440.
-     */
-    sleep_idle_minutes?: number;
 };
 
 export type AdminCreateBillingPeriodRequest = {
@@ -2623,6 +2551,10 @@ export type AdminUpdateAiAssistantSettingsRequest = {
      * The admin enabled.
      */
     admin_enabled: boolean;
+    /**
+     * Whether the AI crash doctor is offered when a server crashes or fails to start.
+     */
+    crash_doctor_enabled?: boolean;
     /**
      * The default provider id. Must match an existing stored value.
      */
@@ -4648,13 +4580,9 @@ export type ClientBuyTokenPackRequest = {
 
 export type ClientUpdateServerSubscriptionRequest = {
     /**
-     * Renew automatically from the token balance. Required without auto_sleep.
+     * Renew automatically from the token balance.
      */
-    auto_renew?: boolean;
-    /**
-     * Let the server sleep while nobody plays. Required without auto_renew.
-     */
-    auto_sleep?: boolean;
+    auto_renew: boolean;
 };
 
 export type ClientEnableTwoFactorAuthenticationRequest = {
@@ -5021,14 +4949,14 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 
 export type ClientCreateServerBackupRequest = {
@@ -5078,34 +5006,18 @@ export type ClientSendAnAssistantMessageRequest = {
     message: string;
 };
 
-export type ClientUpdateServerPublicPageRequest = {
+export type ClientReportACrashFromTheConsoleRequest = {
     /**
-     * The part of the address after /s/.
+     * What the console saw: crashed (the server went offline without stopping first) or start_failed (it went offline while starting).
      */
-    slug: string;
-    /**
-     * Whether anyone can open the page.
-     */
-    published: boolean;
-    /**
-     * Whether search engines are asked not to list the page.
-     */
-    noindex: boolean;
-    /**
-     * The description in markdown, at most 2000 characters, or null for none.
-     */
-    description: string;
-    /**
-     * The banner colour as #rrggbb, or null for the default.
-     */
-    banner_color: string;
+    kind: 'crashed' | 'start_failed';
 };
 
-export type ClientUploadServerPublicPageBannerRequest = {
+export type ClientDiagnoseWithTheCrashDoctorRequest = {
     /**
-     * The banner image.
+     * The crash to diagnose, from the crash doctor status; null for a check without a crash. Must be at least 1.
      */
-    banner: Blob | File;
+    crash_id?: number | null;
 };
 
 export type ClientRenameServerRequest = {
@@ -5257,9 +5169,6 @@ export type AdminListShopPlansResponseBody = {
         };
         egg_ids?: Array<number>;
         node_ids?: string | null;
-        sleep_allowed?: boolean;
-        sleep_discount_percent?: number;
-        sleep_idle_minutes?: number;
     }>;
 };
 
@@ -5283,9 +5192,6 @@ export type AdminCreateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
-    sleep_allowed?: boolean;
-    sleep_discount_percent?: number;
-    sleep_idle_minutes?: number;
 };
 
 export type AdminGetShopPlanResponseBody = {
@@ -5308,9 +5214,6 @@ export type AdminGetShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
-    sleep_allowed?: boolean;
-    sleep_discount_percent?: number;
-    sleep_idle_minutes?: number;
 };
 
 export type AdminUpdateShopPlanResponseBody = {
@@ -5333,9 +5236,6 @@ export type AdminUpdateShopPlanResponseBody = {
     };
     egg_ids?: Array<number>;
     node_ids?: string | null;
-    sleep_allowed?: boolean;
-    sleep_discount_percent?: number;
-    sleep_idle_minutes?: number;
 };
 
 export type AdminListBillingPeriodsResponseBody = {
@@ -5596,6 +5496,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -5604,6 +5505,7 @@ export type AdminListAdminAssistantConversationsResponseBody = {
 export type AdminStartAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5657,6 +5559,7 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
 export type AdminGetAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5710,6 +5613,7 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
 export type AdminSendAnAdminAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5763,6 +5667,7 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
 export type AdminAllowAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5816,6 +5721,7 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
 export type AdminDenyAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -5943,6 +5849,7 @@ export type AdminGetAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -5956,6 +5863,7 @@ export type AdminUpdateAiAssistantSettingsResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
     admin_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     default_provider_id?: number;
     ratio?: number;
     free_tokens_monthly?: number;
@@ -6154,13 +6062,11 @@ export type AdminDisableExtensionResponseBody = {
 export type AdminGetNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
-    read_only?: boolean;
 };
 
 export type AdminUpdateNodePlayitGgAgentResponseBody = {
     agent_id?: string;
     secret_set?: boolean;
-    read_only?: boolean;
 };
 
 export type AdminTestNodePlayitGgAgentResponseBody = {
@@ -6188,24 +6094,6 @@ export type AdminImportExistingTunnelsResponseBody = {
         result?: string;
         reason?: string;
         server_ids?: Array<number>;
-    }>;
-};
-
-export type AdminListServersWithoutATunnelResponseBody = {
-    nodes?: Array<{
-        id?: number;
-        name?: string;
-        read_only?: boolean;
-    }>;
-    servers?: Array<{
-        server_id?: number;
-        server_name?: string;
-        server_identifier?: string;
-        node_id?: number;
-        node_name?: string;
-        local_ip?: string;
-        local_port?: number;
-        tunnel_status?: string;
     }>;
 };
 
@@ -6783,6 +6671,7 @@ export type ClientGetExtensionJobProgressResponseBody = {
 export type ClientGetAssistantStatusResponseBody = {
     enabled?: boolean;
     server_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
     free_limit?: number;
     free_used?: number;
     ratio?: number;
@@ -7048,6 +6937,7 @@ export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
         title?: string;
+        mode?: string;
         status?: string;
         updated_at?: string;
     }>;
@@ -7056,6 +6946,7 @@ export type ClientListAssistantConversationsResponseBody = {
 export type ClientStartAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7109,6 +7000,7 @@ export type ClientStartAnAssistantConversationResponseBody = {
 export type ClientGetAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7162,6 +7054,7 @@ export type ClientGetAnAssistantConversationResponseBody = {
 export type ClientSendAnAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7215,6 +7108,7 @@ export type ClientSendAnAssistantMessageResponseBody = {
 export type ClientAllowAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7268,6 +7162,7 @@ export type ClientAllowAnAssistantActionResponseBody = {
 export type ClientDenyAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
+    mode?: string;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7318,176 +7213,107 @@ export type ClientDenyAnAssistantActionResponseBody = {
     };
 };
 
-export type ClientGetServerPublicPageResponseBody = {
+export type ClientGetCrashDoctorStatusResponseBody = {
     /**
-     * Whether the page has been saved before.
+     * Whether the crash doctor can be used. When false, crash is always null.
      */
-    exists: boolean;
+    enabled: boolean;
     /**
-     * The part of the address after /s/, or null before the page is saved.
+     * The newest crash of the last 24 hours that was not dismissed, or null.
      */
-    slug: string | null;
-    /**
-     * The full address of the page, or null before the page is saved.
-     */
-    url: string | null;
-    /**
-     * Whether anyone can open the page.
-     */
-    published: boolean;
-    /**
-     * Whether search engines are asked not to list the page.
-     */
-    noindex: boolean;
-    /**
-     * The description in markdown; links, bold, italics, lists and headings are shown, HTML is shown as text.
-     */
-    description: string;
-    /**
-     * The banner colour as #rrggbb, or null for the panel's default.
-     */
-    banner_color: string | null;
-    /**
-     * The path of the banner image, or null when there is none.
-     */
-    banner_image_url: string | null;
-    /**
-     * The total votes the page has received.
-     */
-    votes: number;
-    /**
-     * Whether the page shows a join address: only a live playit tunnel address is ever shown.
-     */
-    has_address: boolean;
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
 };
 
-export type ClientUpdateServerPublicPageResponseBody = {
+export type ClientReportACrashFromTheConsoleResponseBody = {
     /**
-     * Always true after a save.
+     * Whether the crash doctor can be used.
      */
-    exists: boolean;
+    enabled: boolean;
     /**
-     * The part of the address after /s/.
+     * The newest crash of the last 24 hours that was not dismissed, or null.
      */
-    slug: string | null;
-    /**
-     * The full address of the page.
-     */
-    url: string | null;
-    /**
-     * Whether anyone can open the page.
-     */
-    published: boolean;
-    /**
-     * Whether search engines are asked not to list the page.
-     */
-    noindex: boolean;
-    /**
-     * The description in markdown.
-     */
-    description: string;
-    /**
-     * The banner colour as #rrggbb, or null for the default.
-     */
-    banner_color: string | null;
-    /**
-     * The path of the banner image, or null when there is none.
-     */
-    banner_image_url: string | null;
-    /**
-     * The total votes the page has received.
-     */
-    votes: number;
-    /**
-     * Whether the page shows a join address.
-     */
-    has_address: boolean;
+    crash: {
+        id: number;
+        kind: 'crashed' | 'start_failed';
+        status: 'open' | 'diagnosing';
+        detected_at: string;
+        /**
+         * The crash doctor conversation, once one was started.
+         */
+        conversation_uuid: string | null;
+    } | null;
 };
 
-export type ClientUploadServerPublicPageBannerResponseBody = {
+export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
     /**
-     * Always true.
+     * The conversation UUID; open it in the server assistant.
      */
-    exists: boolean;
+    uuid: string;
     /**
-     * The part of the address after /s/.
+     * The conversation title.
      */
-    slug: string | null;
+    title: string;
     /**
-     * The full address of the page.
+     * The conversation mode: crash_doctor.
      */
-    url: string | null;
+    mode: 'chat' | 'crash_doctor';
     /**
-     * Whether anyone can open the page.
+     * The conversation status: idle, running, awaiting_approval or error.
      */
-    published: boolean;
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
     /**
-     * Whether search engines are asked not to list the page.
+     * The messages, oldest first. Tool results are part of their tool call.
      */
-    noindex: boolean;
-    /**
-     * The description in markdown.
-     */
-    description: string;
-    /**
-     * The banner colour as #rrggbb, or null for the default.
-     */
-    banner_color: string | null;
-    /**
-     * The path of the new banner image.
-     */
-    banner_image_url: string | null;
-    /**
-     * The total votes the page has received.
-     */
-    votes: number;
-    /**
-     * Whether the page shows a join address.
-     */
-    has_address: boolean;
-};
-
-export type ClientDeleteServerPublicPageBannerResponseBody = {
-    /**
-     * Whether the page has been saved before.
-     */
-    exists: boolean;
-    /**
-     * The part of the address after /s/.
-     */
-    slug: string | null;
-    /**
-     * The full address of the page.
-     */
-    url: string | null;
-    /**
-     * Whether anyone can open the page.
-     */
-    published: boolean;
-    /**
-     * Whether search engines are asked not to list the page.
-     */
-    noindex: boolean;
-    /**
-     * The description in markdown.
-     */
-    description: string;
-    /**
-     * The banner colour as #rrggbb, or null for the default.
-     */
-    banner_color: string | null;
-    /**
-     * Always null after the delete.
-     */
-    banner_image_url: string | null;
-    /**
-     * The total votes the page has received.
-     */
-    votes: number;
-    /**
-     * Whether the page shows a join address.
-     */
-    has_address: boolean;
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
 };
 
 export type ApiListThePublicStorePlansResponseBody = {
@@ -7534,95 +7360,6 @@ export type ApiListThePublicStorePlansResponseBody = {
             }>;
         }>;
     }>;
-};
-
-export type ApiGetAPublicServerPageResponseBody = {
-    /**
-     * The part of the page address after /s/.
-     */
-    slug: string;
-    /**
-     * The server name.
-     */
-    name: string;
-    /**
-     * The description in markdown, to be shown with a safe renderer; empty for none.
-     */
-    description: string;
-    /**
-     * The banner colour and image.
-     */
-    banner: {
-        /**
-         * The banner colour as #rrggbb, or null for the default.
-         */
-        color: string | null;
-        /**
-         * The path of the banner image, or null for none.
-         */
-        image_url: string | null;
-    };
-    /**
-     * The game, such as Minecraft, or null when it is not one the panel knows.
-     */
-    game: string | null;
-    /**
-     * The server type, such as Paper.
-     */
-    software: string | null;
-    /**
-     * The game version, from the game itself or the server's settings, or null.
-     */
-    version: string | null;
-    /**
-     * The current state of the server.
-     */
-    status: 'online' | 'offline' | 'starting' | 'sleeping' | 'unknown';
-    /**
-     * The players online and the limit.
-     */
-    players: {
-        online: number;
-        max: number;
-    } | null;
-    /**
-     * The playit address to join with, or null when the server has none.
-     */
-    address: string | null;
-    /**
-     * A link that adds the server in the game (Minecraft Bedrock), or null.
-     */
-    join_url: string | null;
-    /**
-     * The total votes.
-     */
-    votes: number;
-};
-
-export type ApiVoteForAPublicServerPageResponseBody = {
-    /**
-     * Whether this vote was counted.
-     */
-    counted: boolean;
-    /**
-     * The total votes now.
-     */
-    votes: number;
-    /**
-     * When this visitor can vote for the page again.
-     */
-    next_vote_at: string;
-};
-
-export type ApiWakeASleepingServerResponseBody = {
-    /**
-     * Whether the server was started.
-     */
-    woken: boolean;
-    /**
-     * Whether the server is still sleeping.
-     */
-    sleeping: boolean;
 };
 
 export type ApiGetPublicStatusResponseBody = {
@@ -9004,10 +8741,6 @@ export type ClientSendServerCommandServerUuidPathParameter = string;
 
 export type ClientSendPowerActionServerUuidPathParameter = string;
 
-export type ClientGetServerSleepStateServerUuidPathParameter = string;
-
-export type ClientWakeServerServerUuidPathParameter = string;
-
 /**
  * Comma-separated relationships to include. Supports "password" when the user can view database passwords.
  */
@@ -9191,21 +8924,21 @@ export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
 
-export type ClientGetServerPublicPageServerUuidPathParameter = string;
+export type ClientGetCrashDoctorStatusServerUuidPathParameter = string;
 
-export type ClientUploadServerPublicPageBannerServerUuidPathParameter = string;
+export type ClientReportACrashFromTheConsoleServerUuidPathParameter = string;
+
+export type ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter = string;
+
+export type ClientDismissACrashServerUuidPathParameter = string;
+
+export type ClientDismissACrashCrashIdPathParameter = number;
 
 export type ClientRenameServerServerUuidPathParameter = string;
 
 export type ClientReinstallServerServerUuidPathParameter = string;
 
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
-
-export type ApiGetAPublicServerPageSlugPathParameter = string;
-
-export type ApiVoteForAPublicServerPageSlugPathParameter = string;
-
-export type ApiWakeASleepingServerSlugPathParameter = string;
 
 export type AdminListLanguagesData = {
     body?: never;
@@ -12779,35 +12512,6 @@ export type AdminImportExistingTunnelsResponses = {
 };
 
 export type AdminImportExistingTunnelsResponse = AdminImportExistingTunnelsResponses[keyof AdminImportExistingTunnelsResponses];
-
-export type AdminListServersWithoutATunnelData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/admin/tunnels/unlinked';
-};
-
-export type AdminListServersWithoutATunnelErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-};
-
-export type AdminListServersWithoutATunnelError = AdminListServersWithoutATunnelErrors[keyof AdminListServersWithoutATunnelErrors];
-
-export type AdminListServersWithoutATunnelResponses = {
-    /**
-     * Servers without a tunnel returned.
-     */
-    200: AdminListServersWithoutATunnelResponseBody;
-};
-
-export type AdminListServersWithoutATunnelResponse = AdminListServersWithoutATunnelResponses[keyof AdminListServersWithoutATunnelResponses];
 
 export type AdminGetTunnelSettingsData = {
     body?: never;
@@ -20069,7 +19773,7 @@ export type ClientListServerSubscriptionsResponses = {
 export type ClientListServerSubscriptionsResponse = ClientListServerSubscriptionsResponses[keyof ClientListServerSubscriptionsResponses];
 
 export type ClientUpdateServerSubscriptionData = {
-    body?: ClientUpdateServerSubscriptionRequest;
+    body: ClientUpdateServerSubscriptionRequest;
     path: {
         /**
          * The server UUID.
@@ -21312,90 +21016,6 @@ export type ClientSendPowerActionResponses = {
 };
 
 export type ClientSendPowerActionResponse = ClientSendPowerActionResponses[keyof ClientSendPowerActionResponses];
-
-export type ClientGetServerSleepStateData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientGetServerSleepStateServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/sleep';
-};
-
-export type ClientGetServerSleepStateErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-};
-
-export type ClientGetServerSleepStateError = ClientGetServerSleepStateErrors[keyof ClientGetServerSleepStateErrors];
-
-export type ClientGetServerSleepStateResponses = {
-    /**
-     * Sleep state returned.
-     */
-    200: ClientServerSleepResource;
-};
-
-export type ClientGetServerSleepStateResponse = ClientGetServerSleepStateResponses[keyof ClientGetServerSleepStateResponses];
-
-export type ClientWakeServerData = {
-    body?: never;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientWakeServerServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/sleep/wake';
-};
-
-export type ClientWakeServerErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
-     */
-    403: ErrorEnvelope;
-    /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The server is not sleeping.
-     */
-    409: ErrorEnvelope;
-    /**
-     * Wings did not accept the start; try again later.
-     */
-    503: ErrorEnvelope;
-};
-
-export type ClientWakeServerError = ClientWakeServerErrors[keyof ClientWakeServerErrors];
-
-export type ClientWakeServerResponses = {
-    /**
-     * The server is starting.
-     */
-    204: void;
-};
-
-export type ClientWakeServerResponse = ClientWakeServerResponses[keyof ClientWakeServerResponses];
 
 export type ClientListServerDatabasesData = {
     body?: never;
@@ -23812,19 +23432,19 @@ export type ClientDenyAnAssistantActionResponses = {
 
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
 
-export type ClientGetServerPublicPageData = {
+export type ClientGetCrashDoctorStatusData = {
     body?: never;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+        server_uuid: ClientGetCrashDoctorStatusServerUuidPathParameter;
     };
     query?: never;
-    url: '/api/client/servers/{server_uuid}/page';
+    url: '/api/client/servers/{server_uuid}/crash-doctor';
 };
 
-export type ClientGetServerPublicPageErrors = {
+export type ClientGetCrashDoctorStatusErrors = {
     /**
      * Authentication credentials were missing or invalid.
      */
@@ -23839,36 +23459,36 @@ export type ClientGetServerPublicPageErrors = {
     404: ErrorEnvelope;
 };
 
-export type ClientGetServerPublicPageError = ClientGetServerPublicPageErrors[keyof ClientGetServerPublicPageErrors];
+export type ClientGetCrashDoctorStatusError = ClientGetCrashDoctorStatusErrors[keyof ClientGetCrashDoctorStatusErrors];
 
-export type ClientGetServerPublicPageResponses = {
+export type ClientGetCrashDoctorStatusResponses = {
     /**
-     * Public page returned.
+     * Crash doctor status returned.
      */
-    200: ClientGetServerPublicPageResponseBody;
+    200: ClientGetCrashDoctorStatusResponseBody;
 };
 
-export type ClientGetServerPublicPageResponse = ClientGetServerPublicPageResponses[keyof ClientGetServerPublicPageResponses];
+export type ClientGetCrashDoctorStatusResponse = ClientGetCrashDoctorStatusResponses[keyof ClientGetCrashDoctorStatusResponses];
 
-export type ClientUpdateServerPublicPageData = {
-    body: ClientUpdateServerPublicPageRequest;
+export type ClientReportACrashFromTheConsoleData = {
+    body: ClientReportACrashFromTheConsoleRequest;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientGetServerPublicPageServerUuidPathParameter;
+        server_uuid: ClientReportACrashFromTheConsoleServerUuidPathParameter;
     };
     query?: never;
-    url: '/api/client/servers/{server_uuid}/page';
+    url: '/api/client/servers/{server_uuid}/crash-doctor/report';
 };
 
-export type ClientUpdateServerPublicPageErrors = {
+export type ClientReportACrashFromTheConsoleErrors = {
     /**
      * Authentication credentials were missing or invalid.
      */
     401: ErrorEnvelope;
     /**
-     * The API key does not have permission to perform this action.
+     * The crash doctor or the assistant is turned off.
      */
     403: ErrorEnvelope;
     /**
@@ -23881,74 +23501,40 @@ export type ClientUpdateServerPublicPageErrors = {
     422: ValidationErrorEnvelope;
 };
 
-export type ClientUpdateServerPublicPageError = ClientUpdateServerPublicPageErrors[keyof ClientUpdateServerPublicPageErrors];
+export type ClientReportACrashFromTheConsoleError = ClientReportACrashFromTheConsoleErrors[keyof ClientReportACrashFromTheConsoleErrors];
 
-export type ClientUpdateServerPublicPageResponses = {
+export type ClientReportACrashFromTheConsoleResponses = {
     /**
-     * Public page saved.
+     * Crash recorded, or already known; status returned.
      */
-    200: ClientUpdateServerPublicPageResponseBody;
+    200: ClientReportACrashFromTheConsoleResponseBody;
 };
 
-export type ClientUpdateServerPublicPageResponse = ClientUpdateServerPublicPageResponses[keyof ClientUpdateServerPublicPageResponses];
+export type ClientReportACrashFromTheConsoleResponse = ClientReportACrashFromTheConsoleResponses[keyof ClientReportACrashFromTheConsoleResponses];
 
-export type ClientDeleteServerPublicPageBannerData = {
-    body?: never;
+export type ClientDiagnoseWithTheCrashDoctorData = {
+    body?: ClientDiagnoseWithTheCrashDoctorRequest;
     path: {
         /**
          * The server UUID.
          */
-        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
+        server_uuid: ClientDiagnoseWithTheCrashDoctorServerUuidPathParameter;
     };
     query?: never;
-    url: '/api/client/servers/{server_uuid}/page/banner';
+    url: '/api/client/servers/{server_uuid}/crash-doctor/diagnose';
 };
 
-export type ClientDeleteServerPublicPageBannerErrors = {
+export type ClientDiagnoseWithTheCrashDoctorErrors = {
     /**
      * Authentication credentials were missing or invalid.
      */
     401: ErrorEnvelope;
     /**
-     * The API key does not have permission to perform this action.
+     * No free AI tokens and no token balance left.
      */
-    403: ErrorEnvelope;
+    402: ErrorEnvelope;
     /**
-     * The requested resource could not be found.
-     */
-    404: ErrorEnvelope;
-};
-
-export type ClientDeleteServerPublicPageBannerError = ClientDeleteServerPublicPageBannerErrors[keyof ClientDeleteServerPublicPageBannerErrors];
-
-export type ClientDeleteServerPublicPageBannerResponses = {
-    /**
-     * Banner deleted.
-     */
-    200: ClientDeleteServerPublicPageBannerResponseBody;
-};
-
-export type ClientDeleteServerPublicPageBannerResponse = ClientDeleteServerPublicPageBannerResponses[keyof ClientDeleteServerPublicPageBannerResponses];
-
-export type ClientUploadServerPublicPageBannerData = {
-    body: ClientUploadServerPublicPageBannerRequest;
-    path: {
-        /**
-         * The server UUID.
-         */
-        server_uuid: ClientUploadServerPublicPageBannerServerUuidPathParameter;
-    };
-    query?: never;
-    url: '/api/client/servers/{server_uuid}/page/banner';
-};
-
-export type ClientUploadServerPublicPageBannerErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * The API key does not have permission to perform this action.
+     * The crash doctor or the assistant is turned off.
      */
     403: ErrorEnvelope;
     /**
@@ -23956,7 +23542,7 @@ export type ClientUploadServerPublicPageBannerErrors = {
      */
     404: ErrorEnvelope;
     /**
-     * The page has not been saved yet.
+     * The assistant is already working on another of your conversations.
      */
     409: ErrorEnvelope;
     /**
@@ -23965,16 +23551,58 @@ export type ClientUploadServerPublicPageBannerErrors = {
     422: ValidationErrorEnvelope;
 };
 
-export type ClientUploadServerPublicPageBannerError = ClientUploadServerPublicPageBannerErrors[keyof ClientUploadServerPublicPageBannerErrors];
+export type ClientDiagnoseWithTheCrashDoctorError = ClientDiagnoseWithTheCrashDoctorErrors[keyof ClientDiagnoseWithTheCrashDoctorErrors];
 
-export type ClientUploadServerPublicPageBannerResponses = {
+export type ClientDiagnoseWithTheCrashDoctorResponses = {
     /**
-     * Banner stored.
+     * Diagnosis started.
      */
-    200: ClientUploadServerPublicPageBannerResponseBody;
+    200: ClientDiagnoseWithTheCrashDoctorResponseBody;
 };
 
-export type ClientUploadServerPublicPageBannerResponse = ClientUploadServerPublicPageBannerResponses[keyof ClientUploadServerPublicPageBannerResponses];
+export type ClientDiagnoseWithTheCrashDoctorResponse = ClientDiagnoseWithTheCrashDoctorResponses[keyof ClientDiagnoseWithTheCrashDoctorResponses];
+
+export type ClientDismissACrashData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDismissACrashServerUuidPathParameter;
+        /**
+         * The server crash ID.
+         */
+        crash_id: ClientDismissACrashCrashIdPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/crash-doctor/crashes/{crash_id}/dismiss';
+};
+
+export type ClientDismissACrashErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientDismissACrashError = ClientDismissACrashErrors[keyof ClientDismissACrashErrors];
+
+export type ClientDismissACrashResponses = {
+    /**
+     * Crash dismissed.
+     */
+    204: void;
+};
+
+export type ClientDismissACrashResponse = ClientDismissACrashResponses[keyof ClientDismissACrashResponses];
 
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
@@ -24140,120 +23768,6 @@ export type ApiListThePublicStorePlansResponses = {
 };
 
 export type ApiListThePublicStorePlansResponse = ApiListThePublicStorePlansResponses[keyof ApiListThePublicStorePlansResponses];
-
-export type ApiGetAPublicServerPageData = {
-    body?: never;
-    path: {
-        /**
-         * The part of a public server page address after /s/.
-         */
-        slug: ApiGetAPublicServerPageSlugPathParameter;
-    };
-    query?: never;
-    url: '/api/public/servers/{slug}';
-};
-
-export type ApiGetAPublicServerPageErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * No published page has that address.
-     */
-    404: ErrorEnvelope;
-};
-
-export type ApiGetAPublicServerPageError = ApiGetAPublicServerPageErrors[keyof ApiGetAPublicServerPageErrors];
-
-export type ApiGetAPublicServerPageResponses = {
-    /**
-     * Page returned.
-     */
-    200: ApiGetAPublicServerPageResponseBody;
-};
-
-export type ApiGetAPublicServerPageResponse = ApiGetAPublicServerPageResponses[keyof ApiGetAPublicServerPageResponses];
-
-export type ApiVoteForAPublicServerPageData = {
-    body?: never;
-    path: {
-        /**
-         * The part of a public server page address after /s/.
-         */
-        slug: ApiVoteForAPublicServerPageSlugPathParameter;
-    };
-    query?: never;
-    url: '/api/public/servers/{slug}/vote';
-};
-
-export type ApiVoteForAPublicServerPageErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * No published page has that address.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The request was neither JSON nor marked with X-Requested-With.
-     */
-    415: ErrorEnvelope;
-};
-
-export type ApiVoteForAPublicServerPageError = ApiVoteForAPublicServerPageErrors[keyof ApiVoteForAPublicServerPageErrors];
-
-export type ApiVoteForAPublicServerPageResponses = {
-    /**
-     * Vote handled.
-     */
-    200: ApiVoteForAPublicServerPageResponseBody;
-};
-
-export type ApiVoteForAPublicServerPageResponse = ApiVoteForAPublicServerPageResponses[keyof ApiVoteForAPublicServerPageResponses];
-
-export type ApiWakeASleepingServerData = {
-    body?: never;
-    path: {
-        /**
-         * The part of a public server page address after /s/.
-         */
-        slug: ApiWakeASleepingServerSlugPathParameter;
-    };
-    query?: never;
-    url: '/api/public/servers/{slug}/wake';
-};
-
-export type ApiWakeASleepingServerErrors = {
-    /**
-     * Authentication credentials were missing or invalid.
-     */
-    401: ErrorEnvelope;
-    /**
-     * No published page has that address.
-     */
-    404: ErrorEnvelope;
-    /**
-     * The request was neither JSON nor marked with X-Requested-With.
-     */
-    415: ErrorEnvelope;
-    /**
-     * Woken too recently; the Retry-After header says when to try again.
-     */
-    429: ErrorEnvelope;
-};
-
-export type ApiWakeASleepingServerError = ApiWakeASleepingServerErrors[keyof ApiWakeASleepingServerErrors];
-
-export type ApiWakeASleepingServerResponses = {
-    /**
-     * Wake handled.
-     */
-    200: ApiWakeASleepingServerResponseBody;
-};
-
-export type ApiWakeASleepingServerResponse = ApiWakeASleepingServerResponses[keyof ApiWakeASleepingServerResponses];
 
 export type ApiGetPublicStatusData = {
     body?: never;
