@@ -7,7 +7,9 @@ namespace Pterodactyl\Tests\Pest\Unit\Services\Extensions\ExtensionRepositoryTes
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Pterodactyl\Events\Extensions\ExtensionLoadFailed;
+use Pterodactyl\Exceptions\Extensions\InvalidExtensionException;
 use Pterodactyl\Facades\Extensions;
+use Pterodactyl\Services\Extensions\ExtensionManifest;
 use Pterodactyl\Services\Extensions\ExtensionManifestValidator;
 use Pterodactyl\Services\Extensions\ExtensionProviderLoader;
 use Pterodactyl\Services\Extensions\ExtensionRepository;
@@ -67,6 +69,27 @@ test('provider boot failures are caught', function (): void {
     $repository = repository();
     (new ExtensionProviderLoader(pterodactylTestCase()->app, $repository))->registerProviders(collect([$manifest->id => $manifest]));
     Event::assertDispatched(ExtensionLoadFailed::class, fn (ExtensionLoadFailed $event): bool => $event->identifier === 'broken' && $event->phase === 'boot' && str_contains($event->reason, 'boot failed'));
+});
+test('a validated manifest is reused from the cache until its file changes', function (): void {
+    writeExtension('alpha', ['id' => 'alpha', 'name' => 'Alpha', 'version' => '1.0.0']);
+    expect(repository()->discovered()->get('alpha')?->version)->toBe('1.0.0');
+
+    // A validator that rejects everything shows whether discovery validated again.
+    pterodactylTestCase()->app->instance(ExtensionManifestValidator::class, new class extends ExtensionManifestValidator
+    {
+        public function fromDirectory(string $directory): ExtensionManifest
+        {
+            throw new InvalidExtensionException('validated again');
+        }
+    });
+
+    expect(repository()->discovered()->get('alpha')?->version)->toBe('1.0.0');
+
+    writeExtension('alpha', ['id' => 'alpha', 'name' => 'Alpha', 'version' => '1.0.1']);
+    $repository = repository();
+
+    expect($repository->discovered()->has('alpha'))->toBeFalse();
+    expect($repository->discoveryErrors())->toBe(['alpha' => 'validated again']);
 });
 test('the facade hands out the same settings as the repository', function (): void {
     $settings = repository()->settings('alpha');
