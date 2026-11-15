@@ -61,7 +61,7 @@ function PlayitForm({ nodeId, settings }: { nodeId: number; settings: NodePlayit
                                 description={
                                     settings.secret_set
                                         ? 'A secret is stored. Leave blank to keep it.'
-                                        : 'The secret key from the agent (playit.toml). No secret is stored yet.'
+                                        : 'The secret_key value from the playit.toml the agent uses (often /etc/playit/playit.toml). No secret is stored yet.'
                                 }
                             />
                         )}
