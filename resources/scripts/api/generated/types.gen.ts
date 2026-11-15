@@ -14551,6 +14551,9 @@ export type ClientSetAPasswordResponse = ClientSetAPasswordResponses[keyof Clien
 export type ClientStartLinkingAnAccountData = {
     body?: never;
     path: {
+        /**
+         * The login provider: discord or google.
+         */
         provider: ClientStartLinkingAnAccountProviderPathParameter;
     };
     query?: never;
@@ -14586,6 +14589,9 @@ export type ClientStartLinkingAnAccountResponse = ClientStartLinkingAnAccountRes
 export type ClientUnlinkAnAccountData = {
     body?: never;
     path: {
+        /**
+         * The login provider: discord or google.
+         */
         provider: ClientUnlinkAnAccountProviderPathParameter;
     };
     query?: never;

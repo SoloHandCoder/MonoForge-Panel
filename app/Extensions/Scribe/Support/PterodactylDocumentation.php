@@ -53,6 +53,7 @@ class PterodactylDocumentation
     public const string DEPLOY_TAGS = "Deploy tags (IDs or slugs) the deployment declares. A node's egg tags are OR-matched against the egg's tags: a node with none accepts every egg, otherwise it needs one tag in common with the egg. Its deployment tags must match these exactly: a node reserved for a tag missing here is skipped, and every tag listed must be reserved on the node.";
 
     private const array URL_PARAMETERS = [
+        'provider' => ['string', 'The login provider: discord or google.', 'discord'],
         'allocation' => ['integer', 'The allocation ID.', 1],
         'backup' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
         'backup_uuid' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
