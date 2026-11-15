@@ -19,7 +19,7 @@ const STEP_LABELS = {
     backing_up: 'Backing up the code and database',
     installing: 'Copying the new build into place',
     migrating: 'Running database migrations',
-    finishing: 'Clearing caches and restarting the queue',
+    finishing: 'Rebuilding caches and restarting the queue',
     restoring: 'Restoring the previous code',
 } as const;
 

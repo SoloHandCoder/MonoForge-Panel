@@ -317,8 +317,10 @@ class MonoForgeUpdateService
             $this->progress('migrating', 'Running database migrations.', $from, $to);
             $this->artisan(['migrate', '--force']);
 
-            $this->progress('finishing', 'Clearing caches and restarting the queue.', $from, $to);
+            $this->progress('finishing', 'Rebuilding caches and restarting the queue.', $from, $to);
             $this->artisan(['optimize:clear']);
+            // Cached config, routes, events and views make the panel much lighter on the CPU.
+            $cacheWarning = $this->optimize();
             $this->artisan(['queue:restart']);
             $this->artisan(['up']);
 
@@ -327,7 +329,9 @@ class MonoForgeUpdateService
             $this->cache->forget(self::CACHE_KEY);
             Log::info("MonoForge updated from build {$from} to {$to}.");
 
-            return $this->writeStatus(['state' => 'success', 'step' => null, 'message' => "Updated MonoForge from build {$from} to {$to}.", 'from' => $from, 'to' => $to, 'error' => null]);
+            $message = "Updated MonoForge from build {$from} to {$to}.".($cacheWarning === null ? '' : ' '.$cacheWarning);
+
+            return $this->writeStatus(['state' => 'success', 'step' => null, 'message' => $message, 'from' => $from, 'to' => $to, 'error' => null]);
         } catch (Throwable $throwable) {
             Log::error('MonoForge update failed: '.$throwable->getMessage(), ['exception' => $throwable]);
             $error = $this->shorten($throwable->getMessage()).$this->rollBack($run);
@@ -342,6 +346,32 @@ class MonoForgeUpdateService
             return $this->writeStatus(['state' => 'failed', 'step' => null, 'message' => 'The update failed.', 'from' => $from, 'to' => $this->readStatus()['to'], 'error' => $error]);
         } finally {
             $this->releaseLock();
+        }
+    }
+
+    /**
+     * Cache the panel's config, routes, events and views ("php artisan optimize") in a fresh
+     * PHP process. When that fails every cache is cleared again, so the panel keeps working
+     * without them. Never throws: returns null on success, otherwise a sentence to show.
+     */
+    public function optimize(): ?string
+    {
+        try {
+            $this->artisan(['optimize']);
+
+            return null;
+        } catch (Throwable $throwable) {
+            Log::warning('MonoForge: caching the config, routes, events and views failed: '.$throwable->getMessage());
+
+            try {
+                $this->artisan(['optimize:clear']);
+            } catch (Throwable $clearFailure) {
+                Log::error('MonoForge: clearing the caches after a failed optimize also failed: '.$clearFailure->getMessage());
+
+                return 'The panel caches could not be built or cleared ('.$this->shorten($throwable->getMessage()).'); run "php artisan optimize:clear".';
+            }
+
+            return 'The panel caches could not be built ('.$this->shorten($throwable->getMessage()).'), so the panel runs without them.';
         }
     }
 
