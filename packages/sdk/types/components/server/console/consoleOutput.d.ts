@@ -45,10 +45,16 @@ export interface ConsoleOutput {
 }
 /** A line longer than this is cut, so one runaway line cannot stall the page. */
 export declare const MAX_LINE_LENGTH = 8192;
+/** A line as written is cut to this many characters, with an ellipsis, before it is kept or mirrored. */
+export declare const MAX_RAW_LINE_LENGTH = 16384;
+/** The lines a console keeps, as parsed and as written. */
+export declare const MAX_CONSOLE_LINES = 2000;
 /** The CSS colour of an xterm 256-colour index, or null when it is not one. */
 export declare function paletteColor(index: number | undefined): string | null;
 /** Parses one line of output into styled runs; escape sequences other than colours and styles are dropped. */
 export declare function parseAnsi(raw: string): ConsoleSegment[];
+/** `raw` cut to MAX_RAW_LINE_LENGTH characters, never inside a surrogate pair. */
+export declare function capRawLine(raw: string): string;
 /** The URL to link `candidate` to, or null unless it is a plain https URL. */
 export declare function safeLink(candidate: string): string | null;
 /** Splits runs at the https URLs in their text, marking those parts as links. */
@@ -77,7 +83,7 @@ export declare class ConsoleOutputStore {
     readonly getSnapshot: () => readonly ConsoleLine[];
     /** Hears each line and clear as it happens. */
     onChange(listener: (change: ConsoleOutputChange) => void): () => void;
-    writeln(raw: string): void;
+    writeln(written: string): void;
     clear(): void;
     /** Every retained line as plain text. */
     text(): string;

@@ -6906,6 +6906,14 @@ export type ClientListServerActivityFilterOptionsResponseBody = {
 
 export type ClientGetFileContentsResponseBody = string;
 
+export type ClientWriteFileContentsResponseBody = {
+    errors?: Array<{
+        code?: string;
+        status?: string;
+        detail?: string;
+    }>;
+};
+
 export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
@@ -21384,6 +21392,10 @@ export type ClientWriteFileContentsErrors = {
      * The requested resource could not be found.
      */
     404: ErrorEnvelope;
+    /**
+     * The contents are larger than the panel saves for editing (pterodactyl.files.max_edit_size).
+     */
+    413: ClientWriteFileContentsResponseBody;
     /**
      * The submitted data is invalid.
      */
