@@ -24,7 +24,8 @@ class ApproveTebexPaymentRequest extends AdminApiRequest
     }
 
     /**
-     * An optional panel user to credit, for a payment that matched none.
+     * An optional panel user to credit, for a payment that matched none, and the explicit
+     * acceptance of a payment that does not cover its package price.
      *
      * @return ValidationRules
      */
@@ -32,6 +33,7 @@ class ApproveTebexPaymentRequest extends AdminApiRequest
     {
         return [
             'user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'accept_underpaid' => ['sometimes', 'boolean'],
         ];
     }
 

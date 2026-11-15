@@ -459,3 +459,21 @@ test('a refused delete keeps the tunnel and its subdomain; a delete that goes th
         ->and(ServerTunnel::query()->find($tunnel->id))->toBeNull();
     Bus::assertDispatched(DeletePlayitTunnelJob::class);
 });
+
+test("an admin unsuspend that Wings refuses leaves the suspension billing's", function (): void {
+    [$user, $server, $subscription] = dueSubscription($this, 0);
+    $this->service->renewDue();
+    expect($subscription->fresh()->suspended_by_billing)->toBeTrue();
+
+    $this->daemon->throwable = new DaemonConnectionException(Http::failedRequest([], 500));
+    expect(fn () => $this->app->make(TogglesServerSuspension::class)->toggle($server->refresh(), TogglesServerSuspension::ACTION_UNSUSPEND))
+        ->toThrow(DaemonConnectionException::class);
+    expect($server->refresh()->isSuspended())->toBeTrue()
+        ->and($subscription->fresh()->suspended_by_billing)->toBeTrue();
+
+    // So the player's payment still lifts it once Wings is back.
+    $this->daemon->throwable = null;
+    $this->wallet->credit($user, 500, 'purchase', 'Top-up');
+    $this->service->collectOverdue();
+    expect($server->refresh()->isSuspended())->toBeFalse();
+});

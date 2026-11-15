@@ -59,6 +59,8 @@ export interface TebexPayment {
     currency: string;
     events: string[];
     flagged: boolean;
+    /** Why the payment was not credited: it matched no user or pack, or paid less than the package price. */
+    flag_reason: string | null;
     processed_at: string | null;
     created_at: string | null;
 }
@@ -155,17 +157,32 @@ export const useUpdateAdminTokenPack = () =>
 export const canApproveTebexPayment = (payment: Pick<TebexPayment, 'status' | 'processed_at'>): boolean =>
     payment.processed_at === null && (payment.status === 'underpaid' || payment.status === 'unmatched');
 
-/** Credits a flagged payment through the normal credit path; `userId` for a payment that matched no user. */
+/**
+ * Credits a flagged payment through the normal credit path; `userId` only for a payment that matched no
+ * user, `acceptUnderpaid` to credit one that paid less than the package price.
+ */
+/** Whether the flag says the payment paid less than the package price, which approving must accept explicitly. */
+export const isUnderpaidTebexPayment = (payment: Pick<TebexPayment, 'status' | 'flag_reason'>): boolean =>
+    payment.status === 'underpaid' || (payment.flag_reason ?? '').includes('; also ');
+
 export const useApproveTebexPayment = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, userId }: { id: number; userId?: number }): Promise<TebexPayment> =>
+        mutationFn: async ({
+            id,
+            userId,
+            acceptUnderpaid,
+        }: {
+            id: number;
+            userId?: number;
+            acceptUnderpaid: boolean;
+        }): Promise<TebexPayment> =>
             (
-                await http.post<TebexPayment>(
-                    `/api/admin/shop/tebex/payments/${id}/approve`,
-                    userId === undefined ? {} : { user_id: userId }
-                )
+                await http.post<TebexPayment>(`/api/admin/shop/tebex/payments/${id}/approve`, {
+                    user_id: userId ?? null,
+                    accept_underpaid: acceptUnderpaid,
+                })
             ).data,
         onSuccess: async (payment) => {
             await queryClient.invalidateQueries({ queryKey: paymentsKey });

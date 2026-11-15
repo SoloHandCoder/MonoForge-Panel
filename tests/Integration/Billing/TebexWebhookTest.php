@@ -18,6 +18,7 @@ use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
 use Pterodactyl\Services\Billing\Tebex\TebexSettings;
+use Pterodactyl\Services\Billing\Tebex\TebexWebhookProcessor;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -390,11 +391,19 @@ test('an admin approves a flagged payment once, and a later refund takes the tok
     expect($payment->status)->toBe(TebexPayment::STATUS_UNDERPAID)
         ->and(UserNotice::query()->where('user_id', $admin->id)->value('body'))->toContain('Approve and credit');
 
+    // The shortfall must be accepted explicitly, and the list shows why it was flagged.
+    $this->actingAs($admin)->getJson(route('api.admin.shop.tebex.payments'))
+        ->assertJsonPath('data.0.flag_reason', '0.99 EUR was paid for 1 × a package priced 4.99 EUR');
     $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', fn (string $detail): bool => str_contains($detail, 'does not cover its package price'));
+    expect(wallet()->balance($user))->toBe(0);
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['accept_underpaid' => true])
         ->assertOk()
         ->assertJsonPath('status', TebexPayment::STATUS_COMPLETED)
         ->assertJsonPath('tokens', 100);
-    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id))->assertOk();
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['accept_underpaid' => true])->assertOk();
 
     expect(wallet()->balance($user))->toBe(100)
         ->and(ActivityLog::query()->where('event', 'admin:tebex-payment.approve')->count())->toBe(1);
@@ -443,4 +452,68 @@ test('a payment that is not flagged for approval cannot be approved', function (
     $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $refunded->id))
         ->assertStatus(409)
         ->assertJsonPath('errors.0.detail', 'Only an underpaid or unmatched payment can be approved.');
+});
+
+test('a payment that matched a user is credited to that user only, and never to the approving admin', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $buyer = User::factory()->create();
+    $other = User::factory()->create();
+    $payment = flaggedPayment($buyer);
+
+    foreach ([$other, $admin] as $recipient) {
+        $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['user_id' => $recipient->id, 'accept_underpaid' => true])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.0.detail', "This payment belongs to user #{$buyer->id}; its tokens can only be credited to them.");
+    }
+
+    expect(wallet()->balance($other))->toBe(0)
+        ->and(wallet()->balance($admin))->toBe(0)
+        ->and($payment->fresh()->user_id)->toBe($buyer->id)
+        ->and($payment->fresh()->processed_at)->toBeNull();
+});
+
+test('an unmatched payment cannot be credited to the approving admin', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    sendWebhook(paymentEvent('payment.completed', 'tbx-self', 100, []))->assertOk();
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-self')->sole();
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['user_id' => $admin->id])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'You cannot credit a payment to yourself.');
+    expect(wallet()->balance($admin))->toBe(0);
+});
+
+test('an unmatched payment that is also underpaid needs the shortfall accepted', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $user = User::factory()->create();
+    TokenPack::query()->create(['tebex_package_id' => '100', 'name' => 'Small', 'tokens' => 100]);
+    $event = paymentEvent('payment.completed', 'tbx-both', 100, []);
+    $event['subject']['price_paid']['amount'] = 0.99;
+    $event['subject']['products'][0]['paid_price']['amount'] = 0.99;
+    sendWebhook($event)->assertOk();
+    $payment = TebexPayment::query()->where('transaction_id', 'tbx-both')->sole();
+
+    expect($payment->status)->toBe(TebexPayment::STATUS_UNMATCHED)
+        ->and($payment->flag_reason)->toBe('it matched no panel user; also 0.99 EUR was paid for 1 × a package priced 4.99 EUR');
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['user_id' => $user->id])->assertUnprocessable();
+    expect(wallet()->balance($user))->toBe(0);
+
+    $this->actingAs($admin)->postJson(route('api.admin.shop.tebex.payments.approve', $payment->id), ['user_id' => $user->id, 'accept_underpaid' => true])->assertOk();
+    expect(wallet()->balance($user))->toBe(100)
+        ->and(ActivityLog::query()->where('event', 'admin:tebex-payment.approve')->sole()->properties->get('accepted_underpaid'))->toContain('0.99 EUR');
+});
+
+test('a second approve of a stale model credits and logs nothing', function (): void {
+    $admin = User::factory()->create(['root_admin' => true]);
+    $payment = flaggedPayment(User::factory()->create());
+    $stale = TebexPayment::query()->findOrFail($payment->id);
+    $processor = resolve(TebexWebhookProcessor::class);
+
+    expect($processor->approve($payment, $admin, null, true))->toBeTrue()
+        // A second admin's copy was loaded before the first approval.
+        ->and($processor->approve($stale, $admin, null, true))->toBeFalse()
+        ->and($stale->processed_at)->not->toBeNull()
+        ->and(ActivityLog::query()->where('event', 'admin:tebex-payment.approve')->count())->toBe(1);
 });

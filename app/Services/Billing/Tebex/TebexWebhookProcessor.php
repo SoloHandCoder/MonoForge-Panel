@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Billing\Tebex;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\Billing\TokenTransaction;
@@ -13,6 +14,7 @@ use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Notices\NoticeService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Applies a verified Tebex payment webhook to the token ledger. Every event is recorded on the
@@ -91,17 +93,25 @@ readonly class TebexWebhookProcessor
      * An administrator's "Approve and credit" for a flagged (underpaid or unmatched) payment: it
      * credits the tokens of its completed webhook through the normal credit path, so the
      * payment's `tokens` are set and a later refund, dispute or chargeback takes them back.
-     * Approving a payment that is already credited changes nothing.
      *
-     * @throws ConflictHttpException
+     * - The tokens go to the user the payment matched. `$recipient` is accepted only for a
+     *   payment that matched no user, and never the approving administrator.
+     * - A payment that does not cover its package price is credited only with `$acceptUnderpaid`.
+     * - Approving a payment that is already credited changes nothing and logs nothing; the check
+     *   and the activity log run under the payment's row lock, so two admins log once.
+     *
+     * @return bool whether this call credited the payment
+     *
+     * @throws ConflictHttpException|UnprocessableEntityHttpException
      */
-    public function approve(TebexPayment $payment, ?User $recipient = null): TebexPayment
+    public function approve(TebexPayment $payment, User $admin, ?User $recipient = null, bool $acceptUnderpaid = false): bool
     {
-        return DB::transaction(function () use ($payment, $recipient): TebexPayment {
+        return DB::transaction(function () use ($payment, $admin, $recipient, $acceptUnderpaid): bool {
             /** @var TebexPayment $locked */
             $locked = TebexPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
+            $payment->setRawAttributes($locked->getAttributes(), true);
             if ($locked->processed_at !== null) {
-                return $locked;
+                return false;
             }
 
             throw_unless(in_array($locked->status, [TebexPayment::STATUS_UNDERPAID, TebexPayment::STATUS_UNMATCHED], true), ConflictHttpException::class, 'Only an underpaid or unmatched payment can be approved.');
@@ -109,16 +119,41 @@ readonly class TebexWebhookProcessor
             $subject = $this->completedSubject($locked);
             throw_if($subject === null, ConflictHttpException::class, 'The details of this payment were pruned; adjust the tokens by hand instead.');
 
-            $user = $recipient ?? $this->user($subject) ?? ($locked->user_id === null ? null : User::query()->find($locked->user_id));
+            $matched = $this->user($subject) ?? ($locked->user_id === null ? null : User::query()->find($locked->user_id));
+            if ($recipient instanceof User) {
+                if ($matched instanceof User) {
+                    throw new UnprocessableEntityHttpException(sprintf('This payment belongs to user #%d; its tokens can only be credited to them.', $matched->id));
+                }
+
+                throw_if($recipient->id === $admin->id, UnprocessableEntityHttpException::class, 'You cannot credit a payment to yourself.');
+            }
+
+            $user = $matched ?? $recipient;
             [$tokens, $names] = $this->tokens($subject);
             throw_unless($user instanceof User, ConflictHttpException::class, 'The payment matched no panel user. Choose the user to credit.');
             throw_if($tokens < 1, ConflictHttpException::class, 'The payment matched no token pack, so there are no tokens to credit.');
 
+            $underpaid = $this->underpaid($subject);
+            throw_if($underpaid !== null && ! $acceptUnderpaid, UnprocessableEntityHttpException::class, "This payment does not cover its package price: {$underpaid}. Confirm that you accept it to credit it anyway.");
+
             $locked->user_id = $user->id;
             $this->credit($locked, $user, $tokens, $names);
             $locked->save();
+            $payment->setRawAttributes($locked->getAttributes(), true);
 
-            return $locked;
+            Activity::event('admin:tebex-payment.approve')
+                ->actor($admin)
+                ->property([
+                    'transaction_id' => $locked->transaction_id,
+                    'tokens' => $tokens,
+                    'user_id' => $user->id,
+                    'chosen_by_admin' => $recipient instanceof User,
+                    'flag_reason' => $locked->flag_reason,
+                    'accepted_underpaid' => $underpaid,
+                ])
+                ->log();
+
+            return true;
         });
     }
 
@@ -144,6 +179,13 @@ readonly class TebexWebhookProcessor
         if (! $user instanceof User || $tokens < 1) {
             $payment->status = TebexPayment::STATUS_UNMATCHED;
             $payment->flagged_at ??= now()->toImmutable();
+            $payment->flag_reason = $user instanceof User ? 'it matched no token pack' : 'it matched no panel user';
+            // An unmatched payment may also be underpaid; say so, so the admin sees it before approving.
+            $underpaid = $this->underpaid($subject);
+            if ($underpaid !== null) {
+                $payment->flag_reason = mb_substr($payment->flag_reason.'; also '.$underpaid, 0, 255);
+            }
+
             Log::warning('A Tebex payment matched no panel user or token pack; nothing was credited.', ['payment' => $payment->id]);
 
             return;
@@ -153,6 +195,7 @@ readonly class TebexWebhookProcessor
         if ($underpaid !== null) {
             $payment->status = TebexPayment::STATUS_UNDERPAID;
             $payment->flagged_at ??= now()->toImmutable();
+            $payment->flag_reason = mb_substr($underpaid, 0, 255);
             Log::warning('A Tebex payment paid less than its package price; nothing was credited.', ['payment' => $payment->id, 'reason' => $underpaid]);
             $this->notifyAdmins(
                 'Tebex payment needs a look',
@@ -173,8 +216,15 @@ readonly class TebexWebhookProcessor
     private function completedSubject(TebexPayment $payment): ?array
     {
         foreach (array_reverse($payment->raw) as $event) {
-            if (($event['type'] ?? null) === 'payment.completed' && is_array($event['subject'] ?? null)) {
-                return $event['subject'];
+            $subject = $event['subject'] ?? null;
+            if (($event['type'] ?? null) !== 'payment.completed' || ! is_array($subject)) {
+                continue;
+            }
+
+            // Like complete(), only a completion with the "complete" status counts.
+            $status = is_array($subject['status'] ?? null) ? ($subject['status']['id'] ?? null) : null;
+            if ($status === self::STATUS_COMPLETE || $status === (string) self::STATUS_COMPLETE) {
+                return $subject;
             }
         }
 

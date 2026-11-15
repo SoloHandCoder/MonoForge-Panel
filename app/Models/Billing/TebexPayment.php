@@ -27,11 +27,12 @@ use Pterodactyl\Models\User;
  * @property CarbonImmutable|null $raw_pruned_at when the webhook bodies were cut down to id, type and date
  * @property CarbonImmutable|null $processed_at
  * @property CarbonImmutable|null $flagged_at
+ * @property string|null $flag_reason why the payment was not credited (underpaid or unmatched)
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property User|null $user
  */
-#[Fillable(['transaction_id', 'user_id', 'status', 'tokens', 'tokens_reversed', 'amount', 'currency', 'raw', 'raw_pruned_at', 'processed_at', 'flagged_at'])]
+#[Fillable(['transaction_id', 'user_id', 'status', 'tokens', 'tokens_reversed', 'amount', 'currency', 'raw', 'raw_pruned_at', 'processed_at', 'flagged_at', 'flag_reason'])]
 #[RouteKey('id')]
 class TebexPayment extends Model
 {
@@ -131,6 +132,7 @@ class TebexPayment extends Model
             'currency' => $this->currency,
             'events' => array_map(fn (array $event): string => is_string($event['type'] ?? null) ? $event['type'] : 'unknown', $this->raw),
             'flagged' => $this->flagged_at !== null,
+            'flag_reason' => $this->flag_reason,
             'processed_at' => $this->processed_at?->toAtomString(),
             'created_at' => $this->created_at?->toAtomString(),
         ];

@@ -2109,6 +2109,10 @@ export type AdminApproveAndCreditATebexPaymentRequest = {
      * The user id. Must match an existing stored value.
      */
     user_id?: number | null;
+    /**
+     * The accept underpaid.
+     */
+    accept_underpaid?: boolean;
 };
 export type AdminCreateTokenPackRequest = {
     /**
@@ -4719,6 +4723,7 @@ export type AdminListTebexPaymentsResponseBody = {
         currency?: string;
         events?: Array<string>;
         flagged?: boolean;
+        flag_reason?: string | null;
         processed_at?: string;
         created_at?: string;
     }>;
@@ -4743,6 +4748,7 @@ export type AdminApproveAndCreditATebexPaymentResponseBody = {
     currency?: string;
     events?: Array<string>;
     flagged?: boolean;
+    flag_reason?: string;
     processed_at?: string;
     created_at?: string;
 };

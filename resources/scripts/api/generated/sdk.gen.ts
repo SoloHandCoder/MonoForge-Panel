@@ -507,7 +507,7 @@ export const adminListTebexPayments = <ThrowOnError extends boolean = true>(opti
 /**
  * Approve and credit a Tebex payment
  *
- * Credits a flagged (underpaid or unmatched) payment through the normal credit path, so a later refund or chargeback takes the tokens back. Pass user_id when the payment matched no panel user. Approving a payment that is already credited changes nothing. Root administrators only, from a panel session (API keys get 403).
+ * Credits a flagged (underpaid or unmatched) payment through the normal credit path, so a later refund or chargeback takes the tokens back. The tokens go to the user the payment matched; user_id is accepted only for a payment that matched no user, and never the approving admin (422). A payment that does not cover its package price needs accept_underpaid=true (422 otherwise). Approving a payment that is already credited changes nothing. Root administrators only, from a panel session (API keys get 403).
  */
 export const adminApproveAndCreditATebexPayment = <ThrowOnError extends boolean = true>(options: Options<AdminApproveAndCreditATebexPaymentData, ThrowOnError>): RequestResult<AdminApproveAndCreditATebexPaymentResponses, AdminApproveAndCreditATebexPaymentErrors, ThrowOnError> => (options.client ?? client).post<AdminApproveAndCreditATebexPaymentResponses, AdminApproveAndCreditATebexPaymentErrors, ThrowOnError>({
     responseType: 'json',

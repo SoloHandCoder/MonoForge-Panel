@@ -3,6 +3,7 @@ import { Coins } from 'lucide-react';
 import { useState } from 'react';
 import {
     canApproveTebexPayment,
+    isUnderpaidTebexPayment,
     useAdminTebexPayments,
     useApproveTebexPayment,
     useAdminTebexSettings,
@@ -26,6 +27,7 @@ import { Dialog } from '@/components/elements/dialog';
 import { NewButton } from '@/components/elements/NewButton';
 import { ServerError } from '@/components/elements/ScreenBlock';
 import Spinner from '@/components/elements/Spinner';
+import Checkbox from '@/components/ui/Checkbox';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
 import DataTable from '@/components/elements/table/DataTable';
 import { actionsColumn, DeleteAction, EditAction, RowActions } from '@/components/elements/table/RowActions';
@@ -286,18 +288,20 @@ function ApprovePaymentAction({ payment }: { payment: TebexPayment }) {
     const [userId, setUserId] = useState('');
     const parsedUserId = /^\d+$/.test(userId.trim()) ? Number(userId.trim()) : undefined;
     const needsUser = payment.user === null;
+    const underpaid = isUnderpaidTebexPayment(payment);
+    const [acceptUnderpaid, setAcceptUnderpaid] = useState(false);
 
     return (
         <Dialog.ConfirmTrigger
             title='Approve and credit'
             confirm='Approve and credit'
             onConfirmed={async (_event, close) => {
-                if (needsUser && parsedUserId === undefined) {
+                if ((needsUser && parsedUserId === undefined) || (underpaid && !acceptUnderpaid)) {
                     return;
                 }
 
                 try {
-                    await approve.mutateAsync({ id: payment.id, userId: parsedUserId });
+                    await approve.mutateAsync({ id: payment.id, userId: parsedUserId, acceptUnderpaid });
                     close();
                 } catch {
                     // Error toast is handled by the mutation.
@@ -314,6 +318,15 @@ function ApprovePaymentAction({ payment }: { payment: TebexPayment }) {
                 <strong className='font-mono text-foreground'>{payment.transaction_id}</strong> ({payment.amount}{' '}
                 {payment.currency}) as if it had passed the checks. A later refund or chargeback takes them back.
             </p>
+            {payment.flag_reason && (
+                <p className='mt-3 text-sm text-destructive'>Not credited because {payment.flag_reason}.</p>
+            )}
+            {underpaid && (
+                <label className='mt-4 flex items-center gap-3 text-sm text-foreground'>
+                    <Checkbox checked={acceptUnderpaid} onChange={setAcceptUnderpaid} />
+                    Credit the full tokens although it paid less than the package price
+                </label>
+            )}
             {needsUser && (
                 <div className='mt-4'>
                     <Label htmlFor={`approve-user-${payment.id}`}>User ID to credit</Label>
@@ -352,6 +365,9 @@ function PaymentRow({ payment }: { payment: TebexPayment }) {
                 <Badge tone={statusTones[payment.status]} variant='soft' size='sm'>
                     {payment.status}
                 </Badge>
+                {payment.flag_reason && payment.processed_at === null && (
+                    <p className='mt-1 max-w-xs text-xs text-muted-foreground'>{payment.flag_reason}</p>
+                )}
             </td>
             <td className='py-2 pl-3 text-right'>
                 {canApproveTebexPayment(payment) && <ApprovePaymentAction payment={payment} />}
