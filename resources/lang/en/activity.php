@@ -234,12 +234,20 @@ return [
             'update' => 'Updated the :slug tag',
             'delete' => 'Deleted the :slug tag',
         ],
+        'tebex' => [
+            'update' => 'Updated the Tebex store settings',
+        ],
         'theme' => [
             'activate' => 'Activated the :theme theme',
             'reset' => 'Reset the panel to the classic theme',
             'settings' => 'Updated the settings of the :theme theme',
             'image' => 'Uploaded the :setting image of the :theme theme',
             'image-clear' => 'Removed the :setting image of the :theme theme',
+        ],
+        'token-pack' => [
+            'create' => 'Created the ":name" token pack',
+            'update' => 'Updated the ":name" token pack',
+            'delete' => 'Deleted the ":name" token pack',
         ],
         'user' => [
             'create' => 'Created the user :email',

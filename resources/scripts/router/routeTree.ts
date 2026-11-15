@@ -49,6 +49,7 @@ import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
+import { adminTebexSettingsQueryOptions, adminTokenPacksQueryOptions } from '@/api/admin/shop/tebex';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
 import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
@@ -838,6 +839,18 @@ const panelChildren = [
             await context.queryClient.ensureQueryData({ ...adminAnnouncementsQueryOptions(), revalidateIfStale: true });
         },
         component: componentRoute(() => import('@/components/admin/announcements/AnnouncementsContainer')),
+    }),
+    // The Shop's "Token packs & Tebex" sub-tab (phase 3 Task P); Task R's Shop shell owns the nav entry.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/tebex',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminTebexSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminTokenPacksQueryOptions(), revalidateIfStale: true }),
+            ]);
+        },
+        component: componentRoute(() => import('@/components/admin/shop/TebexShopTab')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,

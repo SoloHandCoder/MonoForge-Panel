@@ -61,6 +61,9 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexPaymentController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
@@ -93,6 +96,25 @@ Route::prefix('/announcements')->name('api.admin.announcements')->group(function
     Route::put('/{announcement:id}', [AnnouncementController::class, 'update'])->name('.update');
 
     Route::delete('/{announcement:id}', [AnnouncementController::class, 'destroy'])->name('.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Shop: Tebex and token packs (phase 3 Task P)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/shop
+|
+*/
+Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
+    Route::get('/tebex', [TebexSettingsController::class, 'index'])->name('.tebex');
+    Route::put('/tebex', [TebexSettingsController::class, 'update'])->name('.tebex.update');
+    Route::get('/tebex/payments', [TebexPaymentController::class, 'index'])->name('.tebex.payments');
+
+    Route::get('/token-packs', [TokenPackController::class, 'index'])->name('.token-packs');
+    Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
+    Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
+    Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
 });
 
 /*

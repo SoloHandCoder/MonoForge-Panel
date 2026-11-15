@@ -1,0 +1,70 @@
+<?php
+
+// In-memory stand-ins for Task Q's TokenWallet and TokenTransaction, loaded by the Tebex tests
+// only while those classes are not on this branch. They follow the plan's binding signatures.
+// Delete this file once Task Q is merged.
+
+declare(strict_types=1);
+
+namespace Pterodactyl\Models\Billing {
+    use Pterodactyl\Models\Model;
+
+    class TokenTransaction extends Model {}
+}
+
+namespace Pterodactyl\Services\Billing {
+    use InvalidArgumentException;
+    use Pterodactyl\Models\Billing\TokenTransaction;
+    use Pterodactyl\Models\User;
+
+    class TokenWallet
+    {
+        /** @var array<int, int> */
+        public array $balances = [];
+
+        /** @var list<array{user: int, amount: int, type: string, refType: ?string, refId: ?string}> */
+        public array $entries = [];
+
+        public function balance(User $user): int
+        {
+            return $this->balances[$user->id] ?? 0;
+        }
+
+        public function credit(User $user, int $tokens, string $type, string $description, ?string $refType = null, ?string $refId = null, array $meta = []): TokenTransaction
+        {
+            if ($tokens <= 0) {
+                throw new InvalidArgumentException('Credits must be positive.');
+            }
+
+            return $this->record($user, $tokens, $type, $refType, $refId);
+        }
+
+        public function debit(User $user, int $tokens, string $type, string $description, ?string $refType = null, ?string $refId = null, array $meta = [], bool $allowNegative = false): TokenTransaction
+        {
+            if (! $allowNegative && $this->balance($user) < $tokens) {
+                throw new InvalidArgumentException('Insufficient tokens.');
+            }
+
+            return $this->record($user, -$tokens, $type, $refType, $refId);
+        }
+
+        public function hasTransaction(string $refType, string $refId, string $type): bool
+        {
+            foreach ($this->entries as $entry) {
+                if ($entry['refType'] === $refType && $entry['refId'] === $refId && $entry['type'] === $type) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private function record(User $user, int $amount, string $type, ?string $refType, ?string $refId): TokenTransaction
+        {
+            $this->balances[$user->id] = $this->balance($user) + $amount;
+            $this->entries[] = ['user' => $user->id, 'amount' => $amount, 'type' => $type, 'refType' => $refType, 'refId' => $refId];
+
+            return new TokenTransaction;
+        }
+    }
+}
