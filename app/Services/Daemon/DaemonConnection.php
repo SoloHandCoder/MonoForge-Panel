@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Daemon;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\App;
@@ -29,13 +30,9 @@ final readonly class DaemonConnection
     /** @param RequestOptions $options */
     public function request(string $method, string $path, array $options = [], bool $useStatusCode = true): Response
     {
-        $request = Http::baseUrl($this->url)
-            ->withToken($this->token)
-            ->acceptJson()
-            ->asJson()
+        $request = $this->prepare(Http::asJson())
             ->timeout(config('pterodactyl.guzzle.timeout'))
-            ->connectTimeout(config('pterodactyl.guzzle.connect_timeout'))
-            ->withOptions(['verify' => App::isProduction()]);
+            ->connectTimeout(config('pterodactyl.guzzle.connect_timeout'));
 
         if (isset($options['body'])) {
             $request->withBody($options['body'], 'application/json');
@@ -47,6 +44,18 @@ final readonly class DaemonConnection
         } catch (ConnectionException|RequestException $exception) {
             throw new DaemonConnectionException($exception, $useStatusCode);
         }
+    }
+
+    /**
+     * Points a request at this node and authenticates it, for callers that send it
+     * themselves, such as a request in an HTTP pool.
+     */
+    public function prepare(PendingRequest $request): PendingRequest
+    {
+        return $request->baseUrl($this->url)
+            ->withToken($this->token)
+            ->acceptJson()
+            ->withOptions(['verify' => App::isProduction()]);
     }
 
     /**

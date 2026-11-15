@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Daemon;
 
 use Illuminate\Http\Client\Response;
 use Pterodactyl\Models\Node;
+use Pterodactyl\Models\Server;
 
 final readonly class NodeClient
 {
@@ -14,6 +15,12 @@ final readonly class NodeClient
     public static function forNode(Node $node): self
     {
         return new self(DaemonConnection::forNode($node));
+    }
+
+    /** A client for one of this node's servers that reuses this node's connection details. */
+    public function server(Server $server): ServerClient
+    {
+        return ServerClient::onConnection($server->uuid, $this->connection);
     }
 
     /** @return array<mixed> */
