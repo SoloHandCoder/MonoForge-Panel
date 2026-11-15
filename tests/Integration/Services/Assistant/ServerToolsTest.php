@@ -331,12 +331,12 @@ test('the labels and details of changing tools come from the resolved values tha
     $prepared = $delete->prepareArguments(['files' => ["logs/{$padding}/../../world"]], $context);
     expect($prepared)->toBe(['root' => '/', 'files' => ['world']])
         ->and($delete->describeCall($prepared))->toBe('Delete /world')
-        ->and($delete->callDetails($prepared))->toBe([['label' => 'Path', 'value' => '/world']]);
+        ->and($delete->callDetails($prepared, $context))->toBe([['label' => 'Path', 'value' => '/world']]);
 
     // Every path is listed, and more than 50 are refused.
     $many = $delete->prepareArguments(['root' => '/logs', 'files' => ['a.log', 'old/../b.log', 'c.log']], $context);
     expect($delete->describeCall($many))->toBe('Delete 3 files in /logs')
-        ->and($delete->callDetails($many))->toBe([['label' => 'Paths (3)', 'value' => "/logs/a.log\n/logs/b.log\n/logs/c.log"]])
+        ->and($delete->callDetails($many, $context))->toBe([['label' => 'Paths (3)', 'value' => "/logs/a.log\n/logs/b.log\n/logs/c.log"]])
         ->and(fn (): array => $delete->prepareArguments(['files' => array_map(fn (int $i): string => "f{$i}", range(1, 51))], $context))->toThrow(ToolException::class, 'at most 50');
 
     $rename = tool(Tools\RenameFileTool::class);
@@ -349,13 +349,13 @@ test('the labels and details of changing tools come from the resolved values tha
     $prepared = $command->prepareArguments(['command' => "  {$long}  "], $context);
     expect($prepared)->toBe(['command' => $long])
         ->and($command->describeCall($prepared))->toEndWith('…')
-        ->and($command->callDetails($prepared))->toBe([['label' => 'command', 'value' => $long]])
+        ->and($command->callDetails($prepared, $context))->toBe([['label' => 'command', 'value' => $long]])
         ->and(fn (): array => $command->prepareArguments(['command' => "say a\nop me"], $context))->toThrow(ToolException::class, 'single-line');
 
     // write_file shows the target and a preview of the first 2 KB with the size.
     $write = tool(Tools\WriteFileTool::class);
     $prepared = $write->prepareArguments(['path' => 'plugins/../server.properties', 'content' => str_repeat('x', 3000)], $context);
-    $details = $write->callDetails($prepared);
+    $details = $write->callDetails($prepared, $context);
     expect($prepared['path'])->toBe('/server.properties')
         ->and($write->describeCall($prepared))->toBe('Write /server.properties')
         ->and($details[0])->toBe(['label' => 'Path', 'value' => '/server.properties'])
@@ -465,25 +465,28 @@ test('a masked file the model writes back keeps its secrets from the file on the
     // What the model read, edited: the MOTD changes, the mask stays.
     $edited = str_replace('motd=Old', 'motd=New', SecretRedactor::redact($fakes['file']->content));
     expect($edited)->toContain('rcon.password='.SecretRedactor::PLACEHOLDER)
-        ->and($tool->callDetails(['path' => '/server.properties', 'content' => $edited]))->toContain(['label' => 'Hidden values', 'value' => 'Each '.SecretRedactor::PLACEHOLDER.' keeps its current value from the file on the server.']);
+        ->and($tool->callDetails(['path' => '/server.properties', 'content' => $edited], context($user, $server)))
+        ->toContain(['label' => 'Hidden values', 'value' => Tools\WriteFileTool::HIDDEN_VALUES_NOTE])
+        // The card lists the changed lines, compared on masked copies.
+        ->toContain(['label' => 'Changes', 'value' => "Lines 1-1 change: 1 removed, 1 added.\n- motd=Old\n+ motd=New"]);
 
     $tool->execute(['path' => '/server.properties', 'content' => $edited], context($user, $server));
     $fakes['file']->assertContentPut('/server.properties', "motd=New\nrcon.port=25575\nrcon.password=hunter2\n");
 
     // A mask that matches no hidden value of the file is refused, and nothing is written.
     expect(fn (): ToolResult => $tool->execute(['path' => '/server.properties', 'content' => "motd=New\nquery.password=".SecretRedactor::PLACEHOLDER], context($user, $server)))
-        ->toThrow(ToolException::class, 'no matching hidden value');
+        ->toThrow(ToolException::class, 'moves or changes a hidden value');
     expect($fakes['file']->callsFor('putContent'))->toHaveCount(1);
 });
 
 test('secrets printed on the console are masked for the model', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::WebsocketConnect->value]);
     $fakes = wings();
-    $fakes['server']->logs = ['[12:00:00] Starting', '[12:00:01] Webhook https://discord.com/api/webhooks/1/secretpart', 'token=abc123'];
+    $fakes['server']->logs = ['[12:00:00] Starting', '[12:00:01] Webhook https://discord.com/api/webhooks/1/secretpart', 'token=abc123', '[12:00:02 INFO]: RCON password: hunter22'];
 
     $result = tool(Tools\ReadConsoleTool::class)->execute(['lines' => 10], context($user, $server));
 
-    expect($result->content)->not->toContain('secretpart')->not->toContain('abc123')->toContain('Starting')
+    expect($result->content)->not->toContain('secretpart')->not->toContain('abc123')->not->toContain('hunter22')->toContain('Starting')
         ->and($result->private)->toContain('secretpart');
 });
 

@@ -86,3 +86,59 @@ test('address placeholders are still never written back', function (): void {
     expect(OutputRedactor::containsPlaceholder('ip='.OutputRedactor::IP))->toBeTrue()
         ->and(OutputRedactor::containsPlaceholder('password: '.MASK))->toBeFalse();
 });
+
+test('a value written back where the next read would not mask it is refused (round trip)', function (string $original, string $from, string $to): void {
+    $edited = str_replace($from, $to, SecretRedactor::redact($original));
+
+    expect($edited)->toContain(MASK)
+        ->and(SecretRedactor::restore($edited, $original))->toBeNull();
+})->with([
+    'URL credential with the @ moved' => ["url: jdbc:mysql://root:S3cretPw@db:3306/mc\n", MASK.'@db', MASK.'/@db'],
+    'URL credential pointed at another host' => ["url: jdbc:mysql://root:S3cretPw@db:3306/mc\n", '@db:3306', '@attacker.example:3306'],
+    'JSON closing quote moved' => ["{\n  \"password\": \"S3cretPw\"\n}\n", '"'.MASK.'"', '"'.MASK."\n\""],
+    'PHP closing quote moved' => ["<?php return [\n  'password' => 'S3cretPw',\n];\n", "'".MASK."',", "'".MASK."\n',"],
+]);
+
+test('a value never moves to another section with the same key', function (): void {
+    $original = "mysql:\n  host: db\n  password: MYSQLPW\nredis:\n  host: cache\n  password: REDISPW\n";
+    $masked = SecretRedactor::redact($original);
+
+    // The MySQL section is removed: the redis password stays the redis password.
+    $withoutMysql = "redis:\n  host: cache\n  password: ".MASK."\n";
+    expect(SecretRedactor::restore($withoutMysql, $original))->toBe("redis:\n  host: cache\n  password: REDISPW\n");
+
+    // Swapping the sections is fine too: each value follows its own key path.
+    $swapped = "redis:\n  host: cache\n  password: ".MASK."\nmysql:\n  host: db\n  password: ".MASK."\n";
+    expect(SecretRedactor::restore($swapped, $original))->toBe("redis:\n  host: cache\n  password: REDISPW\nmysql:\n  host: db\n  password: MYSQLPW\n");
+
+    // A mask under a section that had none, or twice under one, is refused.
+    expect(SecretRedactor::restore($masked."web:\n  password: ".MASK."\n", $original))->toBeNull()
+        ->and(SecretRedactor::restore("redis:\n  password: ".MASK."\n  password: ".MASK."\n", $original))->toBeNull();
+});
+
+test('a mask without a key is restored only on identical lines', function (): void {
+    $original = "motd: Hello\nkey: |\n  -----BEGIN RSA PRIVATE KEY-----\n  MIIEow\n  -----END RSA PRIVATE KEY-----\n";
+    $masked = SecretRedactor::redact($original);
+
+    expect($masked)->toBe("motd: Hello\nkey: |\n  ".MASK."\n")
+        // The block moved under the MOTD (public in the server list): refused.
+        ->and(SecretRedactor::restore("motd: |\n  ".MASK."\n", $original))->toBeNull()
+        // Left byte-identical while another line changes: restored.
+        ->and(SecretRedactor::restore(str_replace('Hello', 'Hi', $masked), $original))->toBe(str_replace('Hello', 'Hi', $original));
+});
+
+test('keys are found in JSON and PHP nesting', function (): void {
+    $original = '{"db": {"password": "A"}, "cache": {"password": "B"}}';
+    $masked = SecretRedactor::redact($original);
+    $swapped = '{"cache": {"password": "'.MASK.'"}, "db": {"password": "'.MASK.'"}}';
+
+    expect(SecretRedactor::restore($swapped, $original))->toBe('{"cache": {"password": "B"}, "db": {"password": "A"}}')
+        ->and(SecretRedactor::restore(str_replace('"db"', '"other"', $masked), $original))->toBeNull();
+});
+
+test('file keys named like a secret startup variable are masked, and log lines are masked mid-line', function (): void {
+    expect(SecretRedactor::redact('STEAM_ACC=ABCDEF'))->toBe('STEAM_ACC='.MASK)
+        ->and(SecretRedactor::redactLog('[12:00:01 INFO]: RCON password: hunter22'))->toBe('[12:00:01 INFO]: RCON password: '.MASK)
+        ->and(SecretRedactor::redactLog('[Bot] token=MTAxabc rest'))->toBe('[Bot] token='.MASK.' rest')
+        ->and(SecretRedactor::redactLog('[12:00:01 INFO]: Done (3.2s)! port: 25565'))->toBe('[12:00:01 INFO]: Done (3.2s)! port: 25565');
+});

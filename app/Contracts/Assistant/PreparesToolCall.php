@@ -30,5 +30,5 @@ interface PreparesToolCall
      * @param  array<string, mixed>  $arguments  the prepared arguments
      * @return list<array{label: string, value: string}>
      */
-    public function callDetails(array $arguments): array;
+    public function callDetails(array $arguments, ToolContext $context): array;
 }

@@ -108,7 +108,7 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool, P
     /**
      * Each argument in full, lists one entry a line and anything else as JSON.
      */
-    public function callDetails(array $arguments): array
+    public function callDetails(array $arguments, ToolContext $context): array
     {
         $details = [];
         foreach ($arguments as $key => $value) {

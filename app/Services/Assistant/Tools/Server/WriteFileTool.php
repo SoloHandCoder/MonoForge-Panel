@@ -18,6 +18,7 @@ use Pterodactyl\Services\Assistant\ToolResult;
 use Pterodactyl\Services\Assistant\Tools\OutputRedactor;
 use Pterodactyl\Services\Assistant\Tools\SecretRedactor;
 use Pterodactyl\Services\Assistant\Tools\ServerPaths;
+use Throwable;
 
 /**
  * Creates or overwrites a text file. Like the file manager, overwriting needs file.update
@@ -34,11 +35,55 @@ final class WriteFileTool extends ServerTool
     /** How much of the new content the card shows before the user allows the write. */
     public const int PREVIEW_BYTES = 2048;
 
+    /** How many changed lines the card lists. */
+    public const int CHANGED_LINES = 40;
+
+    public const string HIDDEN_VALUES_NOTE = 'Each '.SecretRedactor::PLACEHOLDER.' is replaced by the value it hides in the current file on the server, at the same key. If a hidden value was moved or changed, the write is refused and nothing is written.';
+
     public function __construct(
         private readonly WritesFileContents $writer,
         private readonly ListsDirectories $lister,
         private readonly ReadsFileContents $reader,
     ) {}
+
+    /**
+     * A short summary of the lines that differ between two texts: the changed block between
+     * their common start and end, with its removed and added lines.
+     *
+     * @param  list<string>  $old
+     * @param  list<string>  $new
+     */
+    public static function lineDiff(array $old, array $new): string
+    {
+        $start = 0;
+        while ($start < count($old) && $start < count($new) && $old[$start] === $new[$start]) {
+            $start++;
+        }
+
+        $oldEnd = count($old);
+        $newEnd = count($new);
+        while ($oldEnd > $start && $newEnd > $start && $old[$oldEnd - 1] === $new[$newEnd - 1]) {
+            $oldEnd--;
+            $newEnd--;
+        }
+
+        if ($oldEnd === $start && $newEnd === $start) {
+            return 'No lines change.';
+        }
+
+        $removed = array_slice($old, $start, $oldEnd - $start);
+        $added = array_slice($new, $start, $newEnd - $start);
+        $lines = [
+            ...array_map(fn (string $line): string => '- '.$line, $removed),
+            ...array_map(fn (string $line): string => '+ '.$line, $added),
+        ];
+        $shown = array_slice($lines, 0, self::CHANGED_LINES);
+        $more = count($lines) - count($shown);
+
+        return sprintf('Lines %d-%d change: %d removed, %d added.', $start + 1, max($start + 1, $oldEnd), count($removed), count($added))
+            ."\n".implode("\n", $shown)
+            .($more > 0 ? sprintf("\n… %d more changed lines not shown", $more) : '');
+    }
 
     public function name(): string
     {
@@ -74,7 +119,7 @@ final class WriteFileTool extends ServerTool
         return ['path' => $path, 'content' => $content];
     }
 
-    public function callDetails(array $arguments): array
+    public function callDetails(array $arguments, ToolContext $context): array
     {
         $content = is_string($arguments['content'] ?? null) ? $arguments['content'] : '';
         $bytes = mb_strlen($content, '8bit');
@@ -85,7 +130,8 @@ final class WriteFileTool extends ServerTool
             ['label' => 'Path', 'value' => ServerPaths::normalize($this->labelValue($arguments, 'path'))],
             ['label' => 'Size', 'value' => sprintf('%s bytes', number_format($bytes))],
             ['label' => $rest > 0 ? sprintf('Content (first %s bytes)', number_format(mb_strlen($preview, '8bit'))) : 'Content', 'value' => $rest > 0 ? $preview.sprintf("\n… %s more bytes not shown", number_format($rest)) : $preview],
-            ...(SecretRedactor::containsPlaceholder($content) ? [['label' => 'Hidden values', 'value' => sprintf('Each %s keeps its current value from the file on the server.', SecretRedactor::PLACEHOLDER)]] : []),
+            ['label' => 'Changes', 'value' => $this->changes($arguments, $context)],
+            ...(SecretRedactor::containsPlaceholder($content) ? [['label' => 'Hidden values', 'value' => self::HIDDEN_VALUES_NOTE]] : []),
         ];
     }
 
@@ -138,7 +184,7 @@ final class WriteFileTool extends ServerTool
      */
     private function restoreSecrets(Server $server, string $path, string $content, bool $exists): string
     {
-        $refuse = sprintf('The content holds %s where the file on the server has no matching hidden value. Keep each %1$s on the line it was read on, or ask the user to edit that value in the file manager.', SecretRedactor::PLACEHOLDER);
+        $refuse = SecretRedactor::MOVED;
         throw_unless($exists, ToolException::class, $refuse);
 
         try {
@@ -147,7 +193,36 @@ final class WriteFileTool extends ServerTool
             throw new ToolException($refuse, 0, $fileSizeTooLargeException);
         }
 
-        return SecretRedactor::restore($content, $original) ?? throw new ToolException($refuse);
+        return SecretRedactor::restore($content, $original) ?? throw new ToolException(SecretRedactor::MOVED);
+    }
+
+    /**
+     * Which lines of the current file the write changes, compared on masked copies (so no
+     * secret reaches the card) with addresses taken out.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    private function changes(array $arguments, ToolContext $context): string
+    {
+        $server = $context->server;
+        $content = is_string($arguments['content'] ?? null) ? $arguments['content'] : '';
+        $path = ServerPaths::normalize($this->labelValue($arguments, 'path'));
+        if (! $server instanceof Server) {
+            return 'Could not compare with the current file.';
+        }
+
+        try {
+            $current = $this->exists($server, $path) ? $this->reader->read($server, $path, self::MAX_BYTES) : null;
+        } catch (Throwable) {
+            return 'Could not compare with the current file.';
+        }
+
+        $new = explode("\n", str_replace("\r\n", "\n", $content));
+        if ($current === null) {
+            return sprintf('A new file with %s lines.', number_format(count($new)));
+        }
+
+        return (new OutputRedactor)->redact(self::lineDiff(explode("\n", str_replace("\r\n", "\n", SecretRedactor::redact($current))), $new));
     }
 
     /**

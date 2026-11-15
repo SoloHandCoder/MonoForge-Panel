@@ -71,7 +71,7 @@ final class DeleteFilesTool extends ServerTool
             : sprintf('Delete %d files in %s', count($paths), self::shorten($root, 80));
     }
 
-    public function callDetails(array $arguments): array
+    public function callDetails(array $arguments, ToolContext $context): array
     {
         $paths = $this->paths($arguments);
 

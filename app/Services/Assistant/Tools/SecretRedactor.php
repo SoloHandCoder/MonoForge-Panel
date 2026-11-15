@@ -11,12 +11,18 @@ namespace Pterodactyl\Services\Assistant\Tools;
  *
  * A key is judged by its whole segments (split on ".", "_", "-", spaces and camelCase), so
  * "rcon.password" and "api_key" are secrets but "rcon.port", "enable-rcon", "author",
- * "api-version" and "hotkey" are not. The masked text keeps its shape, and restore() puts the
- * original values back when the model writes a masked file, so it can still edit the rest.
+ * "api-version" and "hotkey" are not.
+ *
+ * restore() puts the original values back when the model writes a masked file, so it can
+ * edit the rest of a config. It is strict: every mask must sit at the same key path as in the
+ * file on the server, and the result must mask back to exactly what the model wrote.
  */
 final class SecretRedactor
 {
     public const string PLACEHOLDER = '[hidden-secret]';
+
+    /** What the model is told when restore() refuses a write. */
+    public const string MOVED = 'This edit moves or changes a hidden value; leave hidden values where they are. Keep every '.self::PLACEHOLDER.' exactly as it was read, under the same key, with the text around it unchanged, or ask the user to edit that value in the file manager. Nothing was written.';
 
     /** Key segments that make a key a secret on their own. */
     private const array SECRET_SEGMENTS = [
@@ -25,8 +31,8 @@ final class SecretRedactor
         'key', 'auth', 'gslt', 'webhook',
     ];
 
-    /** Startup variable names that are secrets although no segment says so. */
-    private const array SECRET_VARIABLES = ['steam_acc'];
+    /** Whole names that are secrets although no segment says so (startup variables and file keys). */
+    private const array SECRET_NAMES = ['steam_acc'];
 
     /** YAML block scalar markers: the value is on the following lines, not this one. */
     private const array BLOCK_MARKERS = ['|', '>', '|-', '>-', '|+', '>+'];
@@ -44,16 +50,17 @@ final class SecretRedactor
         return array_values(array_filter($parts, fn (string $part): bool => $part !== ''));
     }
 
-    /** Whether a configuration key names a secret, judged by its whole segments. */
+    /** Whether a configuration key or startup variable names a secret. */
     public static function isSecretKey(string $key): bool
     {
-        return array_intersect(self::segments($key), self::SECRET_SEGMENTS) !== [];
+        return array_intersect(self::segments($key), self::SECRET_SEGMENTS) !== []
+            || in_array(mb_strtolower(mb_trim($key)), self::SECRET_NAMES, true);
     }
 
     /** Whether a startup variable (RCON_PASSWORD, STEAM_ACC, DB_PW...) holds a secret. */
     public static function isSecretName(string $name): bool
     {
-        return self::isSecretKey($name) || in_array(mb_strtolower($name), self::SECRET_VARIABLES, true);
+        return self::isSecretKey($name);
     }
 
     public static function containsPlaceholder(string $text): bool
@@ -77,6 +84,21 @@ final class SecretRedactor
         ) ?? $label;
 
         return preg_replace('/(?<![\w+-])(?=[\w+-]*\d)(?=[\w+-]*[A-Za-z])[\w+-]{24,}(?![\w+-])/', self::PLACEHOLDER, $label) ?? $label;
+    }
+
+    /**
+     * Log or console text: as redact(), and also "key: value" pairs anywhere in a line, since
+     * console lines start with a timestamp ("[12:00:01 INFO]: RCON password: hunter22").
+     */
+    public static function redactLog(string $text): string
+    {
+        $text = self::redact($text);
+
+        return preg_replace_callback(
+            '/(?<![\w.\-])([A-Za-z][\w.\-]*(?:\h[A-Za-z][\w.\-]*)?)(\h*[:=]\h*)(?!\[hidden-secret\])([^\s,;]+)/',
+            fn (array $m): string => self::isSecretKey($m[1]) && ! self::maskedOrBlock($m[3]) ? $m[1].$m[2].self::PLACEHOLDER : $m[0],
+            $text,
+        ) ?? $text;
     }
 
     public static function redact(string $text): string
@@ -118,9 +140,14 @@ final class SecretRedactor
 
     /**
      * Puts the original values back into content the model wrote from a masked copy of
-     * $original: each placeholder takes the value that was masked after the same text on its
-     * line (in order, when that text appears more than once). Returns null when a placeholder
-     * has no such original value, so nothing is written with a placeholder in it.
+     * $original. Returns null (refuse the write) unless:
+     *
+     *  - every mask sits at a known key path (YAML parents by indentation, JSON and PHP array
+     *    nesting, the key of a properties or env line), or, for a mask without a key (a PEM
+     *    block, a value in a block scalar), on lines identical to the masked original;
+     *  - each of those paths holds as many masks as in the original;
+     *  - masking the restored file gives back exactly the content the model wrote, so no
+     *    value was moved out of a masked position (a quote or "@" moved, for example).
      */
     public static function restore(string $content, string $original): ?string
     {
@@ -128,43 +155,46 @@ final class SecretRedactor
             return $content;
         }
 
-        $originals = self::originals($original);
-        if ($originals === null) {
+        $masked = self::redact($original);
+        $values = self::maskedValues($masked, $original);
+        if ($values === null) {
             return null;
+        }
+
+        $byPath = [];
+        foreach (self::keyPaths($masked) as $index => $path) {
+            $byPath[$path][] = $values[$index];
+        }
+
+        $paths = self::keyPaths($content);
+        foreach (array_count_values($paths) as $path => $count) {
+            if (count($byPath[$path] ?? []) !== $count) {
+                return null;
+            }
         }
 
         $parts = explode(self::PLACEHOLDER, $content);
         $restored = array_shift($parts);
-        $before = $restored;
-
-        foreach ($parts as $part) {
-            $prefix = self::linePrefix($before);
-            if (($originals[$prefix] ?? []) === []) {
-                return null;
-            }
-
-            $restored .= array_shift($originals[$prefix]).$part;
-            $before = $part;
+        foreach ($parts as $index => $part) {
+            $restored .= array_shift($byPath[$paths[$index]]).$part;
         }
 
-        return $restored;
+        return self::redact($restored) === $content ? $restored : null;
     }
 
     /**
-     * The masked values of a text, by the trimmed text before them on their line, in order.
-     * Found by lining the masked copy up against the original.
+     * The values a masked copy hides, in order. Found by lining the masked copy up against
+     * the original: each value is the text between one unchanged part and the next.
      *
-     * @return array<string, list<string>>|null
+     * @return list<string>|null
      */
-    private static function originals(string $original): ?array
+    private static function maskedValues(string $masked, string $original): ?array
     {
-        $parts = explode(self::PLACEHOLDER, self::redact($original));
+        $parts = explode(self::PLACEHOLDER, $masked);
         if (count($parts) === 1) {
             return [];
         }
 
-        // The masked copy is the original with some values replaced, so each value is the text
-        // between one unchanged part and the next (the first place the next part occurs).
         $first = array_shift($parts);
         $last = (string) array_pop($parts);
         if (! str_starts_with($original, $first) || ! str_ends_with($original, $last)) {
@@ -173,36 +203,145 @@ final class SecretRedactor
 
         $end = mb_strlen($original) - mb_strlen($last);
         $position = mb_strlen($first);
-        $before = $first;
-        $originals = [];
+        $values = [];
 
         foreach ($parts as $part) {
-            // Two placeholders with nothing between them cannot be told apart.
+            // Two masks with nothing between them cannot be told apart.
             $next = $part === '' ? false : mb_strpos($original, $part, $position);
             if ($next === false || $next + mb_strlen($part) > $end) {
                 return null;
             }
 
-            $originals[self::linePrefix($before)][] = mb_substr($original, $position, $next - $position);
+            $values[] = mb_substr($original, $position, $next - $position);
             $position = $next + mb_strlen($part);
-            $before = $part;
         }
 
         if ($position > $end) {
             return null;
         }
 
-        $originals[self::linePrefix($before)][] = mb_substr($original, $position, $end - $position);
+        $values[] = mb_substr($original, $position, $end - $position);
 
-        return $originals;
+        return $values;
     }
 
-    /** The trimmed text on the last line of $text, which is what precedes a placeholder. */
-    private static function linePrefix(string $text): string
+    /**
+     * The key path of every mask in a text, in order.
+     *
+     * @return list<string>
+     */
+    private static function keyPaths(string $text): array
     {
-        $newline = mb_strrpos($text, "\n");
+        $lines = explode("\n", $text);
+        $paths = [];
 
-        return mb_trim($newline === false ? $text : mb_substr($text, $newline + 1));
+        foreach ($lines as $number => $line) {
+            $pieces = explode(self::PLACEHOLDER, $line);
+            $before = '';
+            foreach (array_slice($pieces, 0, -1) as $index => $piece) {
+                $before .= ($index > 0 ? self::PLACEHOLDER : '').$piece;
+                $path = self::keyPath($lines, $number, $before, $pieces[$index + 1] ?? '');
+                // Masks without a key are told apart by their place on the (identical) line.
+                $paths[] = str_starts_with($path, 'lines:') ? $path.'#'.$index : $path;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * The key path of a mask between $before and $after on line $number.
+     *
+     * @param  list<string>  $lines
+     */
+    private static function keyPath(array $lines, int $number, string $before, string $after): string
+    {
+        $line = $lines[$number];
+
+        // "password": "…, 'DB_PASSWORD', '…, 'key' => '…: the key inside its JSON or PHP nesting.
+        if (preg_match('/(["\'])([\w.\-]+)\1\h*(?:=>|,|:|=)\h*["\']$/', $before, $m) === 1) {
+            return 'nested:'.implode('/', [...self::nestingParents(implode("\n", array_slice($lines, 0, $number))."\n".$before), $m[2]]);
+        }
+
+        $lineKey = preg_match('/^(\h*)(?:export\h+)?["\']?([\w.\-]+)["\']?\h*(?:=>|[:=])/', $line, $k) === 1 ? $k : null;
+        $keyPath = $lineKey === null ? null : implode('/', [...self::indentParents($lines, $number, mb_strlen($lineKey[1])), $lineKey[2]]);
+
+        // scheme://user:…@host inside a URL, or a webhook token: under the line's key, if any.
+        // The host is part of the path, so a password cannot be pointed at another server.
+        if (preg_match('#([a-z][a-z0-9+.\-]*://[^\s:/@"\']+):$#i', $before, $u) === 1) {
+            $host = preg_match('#^@([^\s/"\'?\#]*)#', $after, $h) === 1 ? mb_strtolower($h[1]) : '?';
+
+            return 'url:'.($keyPath ?? '?'.mb_trim($line)).'@'.mb_strtolower($u[1]).'@'.$host;
+        }
+
+        if (preg_match('#/api/webhooks/(\d+)/$#', $before, $w) === 1) {
+            return 'webhook:'.($keyPath ?? '?'.mb_trim($line)).'@'.$w[1];
+        }
+
+        // key: …, KEY=…: the key under its YAML parents.
+        if ($lineKey !== null && preg_match('/^\h*(?:export\h+)?[\w.\-]+\h*[:=]\h*$/', $before) === 1) {
+            return 'key:'.$keyPath;
+        }
+
+        // No key (a PEM block, a block scalar body): only the identical lines around it match.
+        return 'lines:'.($lines[$number - 1] ?? '')."\n".$line;
+    }
+
+    /**
+     * The YAML keys a line at the given indentation is nested under, outermost first.
+     *
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    private static function indentParents(array $lines, int $number, int $indent): array
+    {
+        $parents = [];
+        for ($i = $number - 1; $i >= 0 && $indent > 0; $i--) {
+            $line = $lines[$i];
+            if (mb_trim($line) === '' || str_starts_with(mb_ltrim($line), '#')) {
+                continue;
+            }
+
+            $own = mb_strlen($line) - mb_strlen(mb_ltrim($line, " \t"));
+            if ($own >= $indent) {
+                continue;
+            }
+
+            if (preg_match('/^\h*(-\h+)?["\']?([\w.\-]+)["\']?\h*:\h*(?:[|>][+-]?)?\h*$/', $line, $m) === 1) {
+                array_unshift($parents, ($m[1] !== '' ? '-' : '').$m[2]);
+            } else {
+                array_unshift($parents, mb_trim($line));
+            }
+
+            $indent = $own;
+        }
+
+        return $parents;
+    }
+
+    /**
+     * The keys of the JSON objects or PHP arrays open at the end of $text, outermost first;
+     * an opening without a key counts as "[]".
+     *
+     * @return list<string>
+     */
+    private static function nestingParents(string $text): array
+    {
+        $stack = [];
+        $tokens = '/(["\'])((?:\\\\.|(?!\1).)*)\1(\h*(?::|=>)\h*)?([\[{(])?|([\[{(])|([\]})])/s';
+        preg_match_all($tokens, $text, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $m) {
+            if (($m[6] ?? '') !== '') {
+                array_pop($stack);
+            } elseif (($m[5] ?? '') !== '') {
+                $stack[] = '[]';
+            } elseif (($m[4] ?? '') !== '') {
+                $stack[] = ($m[3] ?? '') !== '' ? ($m[2] ?? '') : '[]';
+            }
+        }
+
+        return $stack;
     }
 
     private static function maskedOrBlock(string $value): bool

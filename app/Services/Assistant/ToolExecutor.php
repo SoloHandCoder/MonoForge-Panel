@@ -197,7 +197,7 @@ class ToolExecutor
         }
 
         try {
-            $details = $tool instanceof PreparesToolCall ? $tool->callDetails($arguments) : null;
+            $details = $tool instanceof PreparesToolCall ? $tool->callDetails($arguments, $context) : null;
         } catch (Throwable $throwable) {
             report($throwable);
             $details = null;

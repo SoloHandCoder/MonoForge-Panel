@@ -58,7 +58,7 @@ final class ReadConsoleTool extends ServerTool
         }
 
         // Plugins sometimes print tokens or passwords; the model gets them masked, the user's card in full.
-        $masked = SecretRedactor::redact($text);
+        $masked = SecretRedactor::redactLog($text);
 
         return $masked === $text
             ? new ToolResult($text, ['lines' => count($lines)])
