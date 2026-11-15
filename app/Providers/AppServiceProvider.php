@@ -284,6 +284,26 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(3)->by('store-purchase:'.($user instanceof User ? $user->id : (string) $request->ip()));
         });
 
+        // Support tickets: 3 new tickets an hour per player, counting only tickets actually opened,
+        // and 20 replies per 10 minutes; staff get a looser reply limit of their own.
+        RateLimiter::for('support.ticket', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perHour(3)
+                ->by('support-ticket:'.($user instanceof User ? $user->id : (string) $request->ip()))
+                ->after(fn (Response $response): bool => $response->getStatusCode() === Response::HTTP_CREATED);
+        });
+        RateLimiter::for('support.reply', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinutes(10, 20)->by('support-reply:'.($user instanceof User ? $user->id : (string) $request->ip()));
+        });
+        RateLimiter::for('support.staff-reply', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(30)->by('support-staff-reply:'.($user instanceof User ? $user->id : (string) $request->ip()));
+        });
+
         ResourceLimit::boot();
     }
 

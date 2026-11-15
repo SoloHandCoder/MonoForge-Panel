@@ -107,6 +107,11 @@ class PterodactylDocumentation
         'conversation_uuid' => ['string', 'The assistant conversation UUID.', '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
         'toolCall_id' => ['integer', 'The assistant tool call ID.', 2],
         'provider_id' => ['integer', 'The AI provider ID.', 1],
+        // Phase 6: support tickets.
+        'ticket' => ['integer', 'The support ticket ID.', 12],
+        'attachment' => ['integer', 'The support attachment ID.', 3],
+        'canned_reply' => ['integer', 'The canned reply ID.', 1],
+        'support_category' => ['integer', 'The support category ID.', 1],
     ];
 
     private const array FIELD_DESCRIPTIONS = [

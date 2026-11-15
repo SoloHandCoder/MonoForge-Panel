@@ -48,6 +48,11 @@ return [
         'store' => [
             'purchase' => 'Bought the server ":name" for :tokens tokens',
         ],
+        'support' => [
+            'create' => 'Opened support ticket #:ticket ":title"',
+            'reply' => 'Replied to support ticket #:ticket',
+            'close' => 'Closed support ticket #:ticket',
+        ],
     ],
     'server' => [
         'reinstall' => 'Reinstalled server',
@@ -148,6 +153,21 @@ return [
         ],
     ],
     'admin' => [
+        'support' => [
+            'reply' => 'Replied to support ticket #:ticket',
+            'note' => 'Added an internal note to support ticket #:ticket',
+            'update' => 'Updated support ticket #:ticket',
+            'canned-reply' => [
+                'create' => 'Created the ":title" canned reply',
+                'update' => 'Updated the ":title" canned reply',
+                'delete' => 'Deleted the ":title" canned reply',
+            ],
+            'category' => [
+                'create' => 'Created the ":name" support category',
+                'update' => 'Updated the ":name" support category',
+                'delete' => 'Deleted the ":name" support category',
+            ],
+        ],
         'announcement' => [
             'create' => 'Created the ":title" announcement',
             'update' => 'Updated the ":title" announcement',
