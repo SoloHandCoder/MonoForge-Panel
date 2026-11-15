@@ -49,6 +49,7 @@ import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
+import { adminStatusPageSettingsQueryOptions } from '@/api/admin/settings/status';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
@@ -178,6 +179,13 @@ const legalRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: 'legal/$document',
     component: componentRoute(() => import('@/components/legal/LegalPage')),
+});
+
+// The public status page: the panel and its nodes (by display name), readable without signing in.
+const statusRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'status',
+    component: componentRoute(() => import('@/components/status/StatusPage')),
 });
 
 const authenticatedRoute = createRoute({
@@ -979,6 +987,23 @@ const panelChildren = [
     }),
     createRoute({
         getParentRoute: () => panelRoute,
+        path: 'settings/status',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({
+                    ...adminStatusPageSettingsQueryOptions(),
+                    revalidateIfStale: true,
+                }),
+            ]);
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
         path: 'users',
         staticData: { nav: { label: 'Users', icon: 'users' } },
         validateSearch: parseUserListSearch,
@@ -1381,6 +1406,7 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
     return rootRoute.addChildren([
         authRoute.addChildren(authChildren),
         legalRoute,
+        statusRoute,
         authenticatedRoute.addChildren([
             dashboardRoute,
             storeRoute,

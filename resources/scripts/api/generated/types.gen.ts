@@ -3701,6 +3701,30 @@ export type AdminUpdateLegalDocumentRequest = {
     reaccept: boolean;
 };
 
+export type AdminUpdateStatusPageSettingsRequest = {
+    /**
+     * Whether the public status page is on.
+     */
+    enabled: boolean;
+    /**
+     * The nodes to change.
+     */
+    nodes: Array<{
+        /**
+         * The node ID.
+         */
+        id: number;
+        /**
+         * Whether the status page shows the node.
+         */
+        visible: boolean;
+        /**
+         * The public name of the node. Blank uses the default.
+         */
+        display_name?: string | null;
+    }>;
+};
+
 export type AdminCreateDatabaseHostRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -6341,6 +6365,34 @@ export type AdminUpdateLegalDocumentResponseBody = {
     updated_at?: string;
 };
 
+export type AdminGetStatusPageSettingsResponseBody = {
+    enabled?: boolean;
+    public_url?: string;
+    nodes?: Array<{
+        id?: number;
+        name?: string;
+        location?: string;
+        visible?: boolean;
+        display_name?: string;
+        custom_name?: string;
+        default_name?: string;
+    }>;
+};
+
+export type AdminUpdateStatusPageSettingsResponseBody = {
+    enabled?: boolean;
+    public_url?: string;
+    nodes?: Array<{
+        id?: number;
+        name?: string;
+        location?: string;
+        visible?: boolean;
+        display_name?: string;
+        custom_name?: string;
+        default_name?: string;
+    }>;
+};
+
 export type AdminGetUpdateStatusResponseBody = {
     /**
      * off, notify or auto.
@@ -7106,6 +7158,90 @@ export type ClientDenyAnAssistantActionResponseBody = {
         free_limit?: number;
         charged_this_month?: number;
     };
+};
+
+export type ApiGetPublicStatusResponseBody = {
+    /**
+     * The overall state: the panel down or every node down is a major outage, some nodes down a partial one.
+     */
+    state: 'operational' | 'partial_outage' | 'major_outage';
+    /**
+     * When the panel was last checked, or null when the checks have stopped.
+     */
+    checked_at: string | null;
+    /**
+     * The panel itself, with how long it last took to answer.
+     */
+    panel: {
+        name: string;
+        /**
+         * The current state: unknown when it has not been checked in the last 5 minutes.
+         */
+        status: 'operational' | 'outage' | 'unknown';
+        /**
+         * The 90-day uptime percentage, or null before the first check.
+         */
+        uptime: number | null;
+        /**
+         * One entry per day for the last 90 days, oldest first.
+         */
+        days: Array<{
+            date: string;
+            /**
+             * The uptime percentage that day, or null for a day without checks.
+             */
+            uptime: number | null;
+            /**
+             * The average panel response time that day; always null for nodes.
+             */
+            response_ms: number | null;
+        }>;
+        /**
+         * How long the panel last took to answer, in milliseconds.
+         */
+        response_ms: number | null;
+    };
+    /**
+     * The nodes shown on the status page, by display name.
+     */
+    nodes: Array<{
+        /**
+         * The public display name of the node.
+         */
+        name: string;
+        /**
+         * The current state: unknown when it has not been checked in the last 5 minutes.
+         */
+        status: 'operational' | 'outage' | 'unknown';
+        /**
+         * The 90-day uptime percentage, or null before the first check.
+         */
+        uptime: number | null;
+        /**
+         * One entry per day for the last 90 days, oldest first.
+         */
+        days: Array<{
+            date: string;
+            /**
+             * The uptime percentage that day, or null for a day without checks.
+             */
+            uptime: number | null;
+            /**
+             * The average panel response time that day; always null for nodes.
+             */
+            response_ms: number | null;
+        }>;
+    }>;
+    /**
+     * Announcements of level warning or danger that are showing now.
+     */
+    incidents: Array<{
+        id: number;
+        title: string;
+        body: string;
+        level: 'warning' | 'danger';
+        started_at: string | null;
+    }>;
 };
 
 /**
@@ -16249,6 +16385,68 @@ export type AdminUpdateLegalDocumentResponses = {
 
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
 
+export type AdminGetStatusPageSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/status';
+};
+
+export type AdminGetStatusPageSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetStatusPageSettingsError = AdminGetStatusPageSettingsErrors[keyof AdminGetStatusPageSettingsErrors];
+
+export type AdminGetStatusPageSettingsResponses = {
+    /**
+     * Status page settings returned.
+     */
+    200: AdminGetStatusPageSettingsResponseBody;
+};
+
+export type AdminGetStatusPageSettingsResponse = AdminGetStatusPageSettingsResponses[keyof AdminGetStatusPageSettingsResponses];
+
+export type AdminUpdateStatusPageSettingsData = {
+    body: AdminUpdateStatusPageSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/status';
+};
+
+export type AdminUpdateStatusPageSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateStatusPageSettingsError = AdminUpdateStatusPageSettingsErrors[keyof AdminUpdateStatusPageSettingsErrors];
+
+export type AdminUpdateStatusPageSettingsResponses = {
+    /**
+     * Status page settings updated.
+     */
+    200: AdminUpdateStatusPageSettingsResponseBody;
+};
+
+export type AdminUpdateStatusPageSettingsResponse = AdminUpdateStatusPageSettingsResponses[keyof AdminUpdateStatusPageSettingsResponses];
+
 export type AdminListDatabaseHostsData = {
     body?: never;
     path?: never;
@@ -23090,3 +23288,32 @@ export type AuthGetCsrfCookieResponses = {
 };
 
 export type AuthGetCsrfCookieResponse = AuthGetCsrfCookieResponses[keyof AuthGetCsrfCookieResponses];
+
+export type ApiGetPublicStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/public/status';
+};
+
+export type ApiGetPublicStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The status page is turned off.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ApiGetPublicStatusError = ApiGetPublicStatusErrors[keyof ApiGetPublicStatusErrors];
+
+export type ApiGetPublicStatusResponses = {
+    /**
+     * Status returned.
+     */
+    200: ApiGetPublicStatusResponseBody;
+};
+
+export type ApiGetPublicStatusResponse = ApiGetPublicStatusResponses[keyof ApiGetPublicStatusResponses];
