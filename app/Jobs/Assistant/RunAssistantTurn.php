@@ -26,14 +26,18 @@ class RunAssistantTurn implements ShouldQueue
 
     public const string QUEUE = 'assistant';
 
+    /** The longest a turn may work, once it holds the conversation. */
     public const int TIMEOUT = 900;
 
     /**
-     * How long a turn waits for an older run to let go of the conversation. An older run that
-     * lost its token stops at its next check, at the latest after one model call (290 s) and
-     * a tool run.
+     * How long a turn waits for an older run to let go of the conversation. It has its own
+     * budget on top of TIMEOUT, so a turn that waited still has its full time to work. An
+     * older run that lost its token stops at its next check; if it is still busy after this,
+     * the conversation is handed back to the user as busy.
      */
-    public const int LOCK_WAIT_SECONDS = 420;
+    public const int LOCK_WAIT_SECONDS = 120;
+
+    public const string BUSY = 'The assistant was still finishing an earlier step of this conversation. Wait a moment, then send your message again.';
 
     /**
      * One attempt only: a worker that crashed or was killed never hands the turn to another
@@ -46,7 +50,7 @@ class RunAssistantTurn implements ShouldQueue
 
     public bool $failOnTimeout = true;
 
-    public int $timeout = self::TIMEOUT;
+    public int $timeout = self::TIMEOUT + self::LOCK_WAIT_SECONDS;
 
     public function __construct(public readonly int $conversationId, public readonly string $runToken)
     {
@@ -58,7 +62,8 @@ class RunAssistantTurn implements ShouldQueue
     {
         $conversation = AiConversation::query()->find($this->conversationId);
         if ($conversation instanceof AiConversation && ! $agent->run($conversation, $this->runToken, self::LOCK_WAIT_SECONDS)) {
-            $agent->fail($conversation, 'The assistant was still busy with an earlier step. Send your message again to continue.', $this->runToken);
+            // Busy, not broken: the conversation goes back to idle with a note, like a 409.
+            $conversation->finishRun($this->runToken, AiConversation::STATUS_IDLE, self::BUSY);
         }
     }
 

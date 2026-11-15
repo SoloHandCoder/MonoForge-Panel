@@ -347,3 +347,25 @@ test('M2: a turn waits for the lock of an older run and gives up after the wait'
     Http::assertNothingSent();
     $lock->release();
 });
+
+test('M2: a turn that cannot get the lock in time hands the conversation back as busy, with its full time still ahead', function (): void {
+    Queue::fake();
+    $this->actingAs($this->user)->postJson($this->base, ['message' => 'Hi'])->assertOk();
+    $conversation = AiConversation::query()->sole();
+    $job = new RunAssistantTurn($conversation->id, (string) $conversation->run_token);
+    Http::fake();
+
+    expect($job->timeout)->toBe(RunAssistantTurn::TIMEOUT + RunAssistantTurn::LOCK_WAIT_SECONDS)
+        ->and(RunAssistantTurn::LOCK_WAIT_SECONDS)->toBeLessThanOrEqual(120);
+
+    $lock = Cache::lock(AssistantAgent::lockKey($conversation->id), 600);
+    $lock->get();
+    Sleep::fake(syncWithCarbon: true);
+
+    $job->handle(resolve(AssistantAgent::class));
+
+    expect($conversation->refresh()->status)->toBe(AiConversation::STATUS_IDLE)
+        ->and($conversation->error)->toBe(RunAssistantTurn::BUSY);
+    Http::assertNothingSent();
+    $lock->release();
+});

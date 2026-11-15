@@ -421,6 +421,11 @@ function Thread({
                     />
                 ))}
                 {running && <TypingIndicator />}
+                {conversation.status === 'idle' && !!conversation.error && (
+                    <Alert type='warning' title='The assistant was busy'>
+                        {conversation.error}
+                    </Alert>
+                )}
                 {conversation.status === 'error' && (
                     <Alert type='danger' title='The assistant stopped'>
                         {conversation.error ?? 'Something went wrong. Send a message to try again.'}

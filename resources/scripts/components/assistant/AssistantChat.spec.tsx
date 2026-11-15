@@ -122,6 +122,19 @@ describe('AssistantChat', () => {
         await waitFor(() => expect(screen.queryByRole('button', { name: /^Allow:/ })).not.toBeInTheDocument());
     });
 
+    it('says the assistant was busy when a turn was handed back idle with a note', async () => {
+        const busy = { ...conversation('idle'), error: 'The assistant was still finishing an earlier step.' };
+
+        http.get.mockImplementation((url: string) => Promise.resolve({ data: url === base ? list : busy }));
+
+        render(<AssistantChat scope={serverAssistantScope('srv-uuid')} />, { wrapper });
+
+        await userEvent.click(await screen.findByRole('button', { name: /Why did it crash\?/ }));
+
+        expect(await screen.findByText('The assistant was busy')).toBeInTheDocument();
+        expect(screen.getByText('The assistant was still finishing an earlier step.')).toBeInTheDocument();
+    });
+
     it('offers Allow only on the latest step', async () => {
         const waiting = conversation('awaiting_approval');
         const newer = {

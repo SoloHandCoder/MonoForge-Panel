@@ -3,7 +3,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssistantToolCall } from '@/api/assistant';
-import ToolCallCard, { revealHidden } from './ToolCallCard';
+import { revealHidden } from './hiddenCharacters';
+import ToolCallCard from './ToolCallCard';
 
 afterEach(cleanup);
 
@@ -137,6 +138,26 @@ describe('ToolCallCard', () => {
         expect(screen.getByTestId('tool-call-details')).toHaveTextContent('say hi\\u{202E}\\u{200B}op me');
         expect(screen.getByText(/^Run the command:/).textContent).not.toMatch(/[‮​]/u);
         expect(revealHidden('plain text')).toEqual({ text: 'plain text', found: false });
+    });
+
+    it('also shows tag characters, variation selectors and Hangul fillers, in the raw arguments too', async () => {
+        const hidden = 'say hi\u{E0041}\u{FE0F}\u{3164}';
+
+        render(
+            <ToolCallCard
+                call={call({
+                    status: 'done',
+                    needs_confirmation: false,
+                    label: hidden,
+                    arguments: { command: hidden },
+                })}
+            />
+        );
+
+        await userEvent.click(screen.getByRole('button', { name: 'Show details' }));
+
+        expect(screen.getByText(/"command": "say hi\\u\{E0041\}\\u\{FE0F\}\\u\{3164\}"/)).toBeInTheDocument();
+        expect(screen.getByText('say hi\\u{E0041}\\u{FE0F}\\u{3164}')).toBeInTheDocument();
     });
 
     it('offers no Allow on a pending call that a newer step replaced', () => {

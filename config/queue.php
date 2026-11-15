@@ -81,13 +81,14 @@ return [
         /*
          * The AI assistant's turns: the default connection's backend on its own "assistant"
          * queue, with its own worker (`queue:work assistant --queue=assistant`). A turn may run
-         * for up to 15 minutes (RunAssistantTurn::$timeout), so a job is only handed out again
-         * after retry_after, which must stay above that timeout.
+         * for up to 17 minutes (RunAssistantTurn::$timeout: 15 minutes of work plus 2 waiting
+         * for the conversation lock), so a job is only handed out again after retry_after,
+         * which must stay above that timeout.
          */
         'assistant' => [
             ...($connections[$default] ?? $connections['sync']),
             'queue' => env('ASSISTANT_QUEUE', 'assistant'),
-            'retry_after' => (int) env('ASSISTANT_QUEUE_RETRY_AFTER', 960),
+            'retry_after' => (int) env('ASSISTANT_QUEUE_RETRY_AFTER', 1080),
         ],
     ],
 

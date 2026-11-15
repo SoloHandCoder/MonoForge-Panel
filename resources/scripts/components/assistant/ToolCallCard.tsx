@@ -4,6 +4,7 @@ import type { AssistantDecision, AssistantToolCall } from '@/api/assistant';
 import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
 import Icon from '@/components/elements/Icon';
+import { revealHidden } from '@/components/assistant/hiddenCharacters';
 import { CopyButton } from '@/components/assistant/markdown';
 import {
     confirmationWarning,
@@ -36,33 +37,10 @@ function Section({ title, text }: { title: string; text: string }) {
                 <CopyButton text={text} label={`Copy ${title.toLowerCase()}`} />
             </div>
             <pre className='max-h-64 overflow-auto rounded-lg border border-border bg-sunken p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground'>
-                {text}
+                {revealHidden(text).text}
             </pre>
         </div>
     );
-}
-
-/**
- * Invisible and direction-changing characters (zero-width spaces, bidi overrides and isolates,
- * soft hyphens, BOM) that can make a command or path look different from what runs.
- */
-const hiddenCharacters = /[­؜᠎​-‏‪-‮⁠-⁤⁦-⁩﻿]/gu;
-
-export interface RevealedText {
-    text: string;
-    found: boolean;
-}
-
-/** Text with every hidden character shown as `\u{XXXX}`, and whether there was any. */
-export function revealHidden(text: string): RevealedText {
-    let found = false;
-    const shown = text.replace(hiddenCharacters, (character) => {
-        found = true;
-
-        return `\\u{${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}}`;
-    });
-
-    return { text: shown, found };
 }
 
 /** The details of a call, or its raw arguments for calls recorded before details existed. */
@@ -212,7 +190,7 @@ function CallIcon({ call, tone }: { call: AssistantToolCall; tone: CardTone }) {
     );
 }
 
-/** The label (wrapped, with hidden characters shown, while it waits) and the tool name. */
+/** The label (with hidden characters shown, and wrapped while it waits) and the tool name. */
 function CallTitle({ call, awaiting }: { call: AssistantToolCall; awaiting: boolean }) {
     return (
         <div className='min-w-0 flex-1'>
@@ -222,7 +200,7 @@ function CallTitle({ call, awaiting }: { call: AssistantToolCall; awaiting: bool
                     awaiting ? 'break-words whitespace-normal' : 'truncate'
                 )}
             >
-                {awaiting ? revealHidden(call.label).text : call.label}
+                {revealHidden(call.label).text}
             </p>
             <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
         </div>

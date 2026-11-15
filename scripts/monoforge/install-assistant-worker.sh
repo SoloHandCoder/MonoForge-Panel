@@ -5,7 +5,7 @@
 #   sudo bash install-assistant-worker.sh --remove   stop and remove it
 #
 # Assistant turns run on their own "assistant" queue connection, whose retry_after
-# (960 s) is above a turn's 15-minute timeout. The normal monoforge-queue worker must
+# (1080 s) is above a turn's 17-minute timeout (15 minutes of work, 2 waiting for the lock). The normal monoforge-queue worker must
 # not pick them up, so this is a separate service.
 set -euo pipefail
 
@@ -31,7 +31,7 @@ After=redis-server.service mariadb.service
 User=www-data
 Group=www-data
 WorkingDirectory=$PANEL
-ExecStart=/usr/bin/php $PANEL/artisan queue:work assistant --queue=assistant --sleep=3 --tries=1 --timeout=930
+ExecStart=/usr/bin/php $PANEL/artisan queue:work assistant --queue=assistant --sleep=3 --tries=1 --timeout=1050
 Restart=always
 RestartSec=5s
 
