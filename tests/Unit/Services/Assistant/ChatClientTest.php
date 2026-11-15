@@ -57,6 +57,22 @@ test('Cline gets stream:false, the OpenAI response format header and no tool_cho
     });
 });
 
+test('a reasoning model that used up max_tokens is asked again without the limit', function (): void {
+    Http::fake([FakeAi::URL => Http::sequence()
+        ->push(['error' => 'empty response content', 'success' => false], 500)
+        ->push(FakeAi::text('OK')),
+    ]);
+
+    $response = resolve(ChatClient::class)->complete(provider(AiProviderPreset::ClinePass), [['role' => 'user', 'content' => 'Reply with OK']], [], 16);
+
+    expect($response->content)->toBe('OK');
+
+    $sent = Http::recorded();
+    expect($sent)->toHaveCount(2)
+        ->and($sent[0][0]->data()['max_tokens'] ?? null)->toBe(16)
+        ->and(array_key_exists('max_tokens', $sent[1][0]->data()))->toBeFalse();
+});
+
 test('the legacy Cline wrapper is unwrapped', function (): void {
     Http::fake([FakeAi::URL => Http::response(['success' => true, 'data' => FakeAi::text('Wrapped')])]);
 

@@ -127,7 +127,7 @@ class AiProviderController extends AdminApiController
         try {
             $response = $client->complete($provider, [
                 ['role' => 'user', 'content' => 'Reply with the single word OK.'],
-            ], [], 16);
+            ], [], 512);
             $result = ['ok' => true, 'error' => null, 'reply' => mb_substr(mb_trim($response->content ?? ''), 0, 100)];
         } catch (ChatProviderException $exception) {
             $result = ['ok' => false, 'error' => $exception->getMessage(), 'reply' => null];

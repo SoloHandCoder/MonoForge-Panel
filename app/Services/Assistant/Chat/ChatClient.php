@@ -98,6 +98,15 @@ class ChatClient
                 return $response;
             }
 
+            // A reasoning model can spend the whole max_tokens budget thinking and answer
+            // nothing; Cline then refuses with "empty response content". Ask once more
+            // without the limit instead of failing the turn.
+            if (isset($payload['max_tokens']) && $this->isEmptyResponseError($response)) {
+                unset($payload['max_tokens']);
+
+                continue;
+            }
+
             $status = $response->status();
             if (($status === 429 || $status >= 500) && $attempt < self::MAX_RETRIES) {
                 Sleep::for($this->backoff($response, $attempt))->milliseconds();
@@ -126,6 +135,14 @@ class ChatClient
             ->withHeaders($headers);
 
         return $provider->hasKey() ? $request->withToken((string) $provider->api_key) : $request;
+    }
+
+    private function isEmptyResponseError(Response $response): bool
+    {
+        $error = $response->json('error');
+        $message = is_array($error) ? ($error['message'] ?? null) : $error;
+
+        return is_string($message) && str_contains(mb_strtolower($message), 'empty response');
     }
 
     private function backoff(Response $response, int $attempt): int
