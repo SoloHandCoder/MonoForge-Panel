@@ -5,6 +5,7 @@ import { isTebexCheckoutUrl, useTokenPackCheckout, useTokenPacks, type TokenPack
 import Button from '@/components/elements/Button';
 import Card from '@/components/elements/Card';
 import Spinner from '@/components/elements/Spinner';
+import PurchaseAgreement from '@/components/legal/PurchaseAgreement';
 
 const formatTokens = (tokens: number) => tokens.toLocaleString();
 
@@ -119,6 +120,7 @@ export default function TokenPacks() {
             <p className='mt-4 text-xs text-muted-foreground'>
                 Payments are handled by Tebex, our payment partner. Tokens are added once the payment is confirmed.
             </p>
+            <PurchaseAgreement className='mt-1' />
         </Card>
     );
 }

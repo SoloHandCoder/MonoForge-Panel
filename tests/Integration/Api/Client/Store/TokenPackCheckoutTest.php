@@ -6,9 +6,11 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Store\TokenPackCheckoutT
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\Tebex\TebexSettings;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
 
 uses(ClientApiIntegrationTestCase::class);
@@ -82,4 +84,17 @@ test('a Tebex error is reported without leaking details', function (): void {
         ->assertBadRequest();
 
     expect($response->getContent())->not->toContain('abcd-public')->not->toContain('Invalid webstore');
+});
+
+test('a user with updated terms to accept cannot start a checkout', function (): void {
+    $user = User::factory()->create();
+    $pack = TokenPack::query()->create(['tebex_package_id' => '6012345', 'name' => '500 tokens', 'tokens' => 500]);
+    LegalSettings::save(LegalDocument::Terms, '# New terms', '', reaccept: true);
+    Http::fake();
+
+    $this->actingAs($user)->postJson('/api/client/store/tokens/checkout', ['pack_id' => $pack->id])
+        ->assertConflict()
+        ->assertJsonPath('errors.0.detail', 'Please accept the updated terms first.');
+
+    Http::assertNothingSent();
 });

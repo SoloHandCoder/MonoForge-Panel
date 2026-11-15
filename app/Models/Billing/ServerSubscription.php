@@ -30,6 +30,7 @@ use Pterodactyl\Models\User;
  * @property bool $suspended_by_billing whether billing's suspension changed the server (it was not suspended already)
  * @property CarbonImmutable|null $delete_at
  * @property bool $auto_renew
+ * @property int|null $terms_version the Terms of Service version in force when the server was bought
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Server $server
@@ -52,6 +53,7 @@ use Pterodactyl\Models\User;
     'suspended_by_billing',
     'delete_at',
     'auto_renew',
+    'terms_version',
 ])]
 class ServerSubscription extends Model
 {
@@ -81,6 +83,7 @@ class ServerSubscription extends Model
             'period_id' => 'int',
             'period_days' => 'int',
             'price_tokens' => 'int',
+            'terms_version' => 'int',
             'addons' => 'array',
             'next_renewal_at' => 'immutable_datetime',
             'suspended_at' => 'immutable_datetime',

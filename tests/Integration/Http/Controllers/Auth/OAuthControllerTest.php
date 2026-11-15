@@ -9,11 +9,16 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Testing\TestResponse;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
+use Pterodactyl\Contracts\Users\CompletesLogins;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Controllers\Auth\OAuthController;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
+use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
 
 uses(HttpTestCase::class);
@@ -53,6 +58,30 @@ function startFlow(string $provider): string
     parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
 
     return (string) $query['state'];
+}
+
+/**
+ * Accept the terms on the consent screen of a Discord/Google sign-up waiting in the session, as
+ * the screen does: with the sign-up's nonce and the document versions it showed.
+ *
+ * @param  array<string, mixed>  $overrides
+ */
+function acceptSignUp(bool $terms = true, array $overrides = []): TestResponse
+{
+    return test()->postJson('/auth/modules/register', [
+        'terms' => $terms,
+        'nonce' => session(OAuthRegistration::SESSION_KEY.'.nonce') ?? 'none-pending',
+        'terms_version' => LegalSettings::version(LegalDocument::Terms),
+        'privacy_version' => LegalSettings::version(LegalDocument::Privacy),
+        ...$overrides,
+    ]);
+}
+
+/** Continue with Discord until the consent screen. */
+function reachConsent(): void
+{
+    $state = startFlow('discord');
+    test()->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
 }
 
 function linkAccount(User $user, string $provider = 'discord', string $id = '80351110224678912'): UserOAuthAccount
@@ -167,7 +196,13 @@ test('an unlinked account creates a new user while registration is on', function
     User::factory()->create(['username' => 'nelly']);
 
     $state = startFlow('discord');
-    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+
+    // Nothing is created before the visitor accepts the terms.
+    $this->assertGuest();
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+
+    acceptSignUp()->assertCreated()->assertJsonPath('data.complete', true)->assertJsonPath('data.intended', '/');
 
     $user = User::query()->where('email', 'nelly@example.com')->firstOrFail();
     $this->assertAuthenticatedAs($user);
@@ -186,7 +221,8 @@ test('creating accounts through a provider uses the sign-up limit of the IP', fu
 
     fakeDiscord(['id' => '10003', 'username' => 'newcomer3', 'email' => 'newcomer3@example.com']);
     $state = startFlow('discord');
-    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+    acceptSignUp()->assertCreated();
     expect(RateLimiter::attempts($key))->toBe(3);
     $this->post('/auth/logout')->assertNoContent();
     $this->flushSession();
@@ -221,6 +257,136 @@ test('sign-ups of the form and of a provider share one budget', function (): voi
     $state = startFlow('discord');
     $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/auth/login');
     expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+});
+
+test('a provider sign-up records the accepted terms only once the visitor agrees', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    LegalSettings::save(LegalDocument::Privacy, '# Privacy', '', reaccept: true);
+    fakeDiscord();
+
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+
+    // The consent screen learns which provider is waiting from the page bootstrap.
+    $this->get(OAuthController::CONSENT_PATH)->assertOk()
+        ->assertViewHas('siteConfiguration', fn (array $config): bool => $config['oauth']['registration']['provider'] === 'discord'
+            && $config['oauth']['registration']['email'] === 'nelly@example.com');
+
+    acceptSignUp(false)->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'You must agree to the Terms of Service and Privacy Policy to create an account.');
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+
+    acceptSignUp()->assertCreated();
+    $user = User::query()->where('email', 'nelly@example.com')->firstOrFail();
+    expect($user->terms_accepted_version)->toBe(1)
+        ->and($user->privacy_accepted_version)->toBe(2)
+        ->and($user->terms_accepted_at)->not->toBeNull()
+        ->and(session(OAuthRegistration::SESSION_KEY))->toBeNull();
+});
+
+test('the consent screen cannot create an account without a provider sign-up in progress', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+
+    acceptSignUp()->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'That sign up expired or was replaced. Please continue with Discord or Google again.');
+    expect(User::query()->count())->toBe(0);
+
+    // An expired one is refused too.
+    fakeDiscord();
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+    $this->travel(OAuthRegistration::TTL_SECONDS + 1)->seconds();
+    acceptSignUp()->assertUnprocessable();
+    expect(User::query()->count())->toBe(0);
+
+    config()->set('monoforge.auth.registration.enabled', false);
+    acceptSignUp()->assertNotFound();
+});
+
+test('the session gets a new ID before it holds a pending sign-up', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord();
+
+    $state = startFlow('discord');
+    $fixed = session()->getId();
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+
+    expect(session()->getId())->not->toBe($fixed)
+        ->and(session(OAuthRegistration::SESSION_KEY.'.email'))->toBe('nelly@example.com');
+});
+
+test('a pending sign-up lasts ten minutes and can be cancelled', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord();
+    reachConsent();
+
+    expect(OAuthRegistration::TTL_SECONDS)->toBe(600);
+
+    $this->deleteJson('/auth/modules/register')->assertNoContent();
+    expect(session(OAuthRegistration::SESSION_KEY))->toBeNull();
+
+    acceptSignUp(overrides: ['nonce' => 'anything'])->assertUnprocessable();
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+});
+
+test('signing in any other way ends a pending sign-up', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord();
+    reachConsent();
+    $nonce = (string) session(OAuthRegistration::SESSION_KEY.'.nonce');
+
+    resolve(CompletesLogins::class)->complete(User::factory()->create());
+
+    expect(session(OAuthRegistration::SESSION_KEY))->toBeNull();
+    auth()->logout();
+    acceptSignUp(overrides: ['nonce' => $nonce])->assertUnprocessable();
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+});
+
+test('the consent screen creates only the sign-up it showed', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    fakeDiscord();
+    reachConsent();
+
+    acceptSignUp(overrides: ['nonce' => str_repeat('x', 40)])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'That sign up expired or was replaced. Please continue with Discord or Google again.');
+    acceptSignUp(overrides: ['nonce' => null])->assertUnprocessable();
+
+    // A Terms of Service version published while the screen was open is not accepted unseen.
+    $shown = LegalSettings::version(LegalDocument::Terms);
+    LegalSettings::save(LegalDocument::Terms, '# New terms', '', reaccept: true);
+    acceptSignUp(overrides: ['terms_version' => $shown])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'The Terms of Service changed while you were reading. Please review the new version.');
+
+    expect(User::query()->where('email', 'nelly@example.com')->exists())->toBeFalse();
+    acceptSignUp()->assertCreated();
+});
+
+test('a pending sign-up uses the sign-up budget', function (): void {
+    config()->set('monoforge.auth.registration.enabled', true);
+    $key = md5('registration'.'ip:127.0.0.1');
+
+    foreach (['10101', '10102', '10103'] as $id) {
+        Http::swap(new HttpFactory);
+        fakeDiscord(['id' => $id, 'username' => "p{$id}", 'email' => "p{$id}@example.com"]);
+        reachConsent();
+        $this->flushSession();
+    }
+
+    expect(RateLimiter::attempts($key))->toBe(3);
+
+    // The fourth pending sign-up from this address is refused at the callback.
+    Http::swap(new HttpFactory);
+    fakeDiscord(['id' => '10104', 'username' => 'p10104', 'email' => 'p10104@example.com']);
+    $state = startFlow('discord');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")
+        ->assertRedirect('/auth/login')
+        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'Too many accounts have been created from your network recently. Please try again later.');
+    expect(session(OAuthRegistration::SESSION_KEY))->toBeNull();
+    // Finishing a pending sign-up does not count again: see "creating accounts through a
+    // provider uses the sign-up limit of the IP", which stays at 3 after its account is made.
 });
 
 test('registration never takes over an existing email or uses an unverified one', function (array $profile, string $message): void {
@@ -301,9 +467,9 @@ test('a provider email the account rules refuse ends on the sign-in page instead
     fakeDiscord(['email' => '-nelly@example.com']);
 
     $state = startFlow('discord');
-    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")
-        ->assertRedirect('/auth/login')
-        ->assertSessionHas(OAuthController::RESULT_KEY.'.message', 'A MonoForge account could not be created from your Discord account. Please try again or contact support.');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+    acceptSignUp()->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'A MonoForge account could not be created from your Discord account. Please try again or contact support.');
 
     $this->assertGuest();
     expect(User::query()->where('email', '-nelly@example.com')->exists())->toBeFalse()
@@ -315,7 +481,8 @@ test('new accounts never take a reserved username', function (): void {
     fakeDiscord(['username' => 'admin']);
 
     $state = startFlow('discord');
-    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect('/');
+    $this->get("/auth/modules/discord/authenticate?code=abc&state={$state}")->assertRedirect(OAuthController::CONSENT_PATH);
+    acceptSignUp()->assertCreated();
 
     expect(User::query()->where('email', 'nelly@example.com')->value('username'))->not->toBe('admin')->toMatch('/^admin\d+$/');
 });

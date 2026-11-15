@@ -5,6 +5,7 @@ import Button from '@/components/elements/Button';
 import { Dialog } from '@/components/elements/dialog';
 import Icon from '@/components/elements/Icon';
 import Spinner from '@/components/elements/Spinner';
+import PurchaseAgreement from '@/components/legal/PurchaseAgreement';
 import { CapacityNotice } from '@/components/store/StoreNotices';
 import { everyDays, planResources, tokens } from '@/components/store/storeFormat';
 import type { CheckoutError } from '@/components/store/useCheckout';
@@ -163,6 +164,7 @@ export function ConfirmPurchaseDialog({
                         {tokens(price.total)}
                     </span>
                 </p>
+                <PurchaseAgreement />
             </div>
             <Dialog.Footer>
                 <Button.Text isSecondary onClick={onClose}>

@@ -64,6 +64,15 @@ Route::middleware(['throttle:authentication'])->group(function (): void {
         ->withoutMiddleware('guest')
         ->name('auth.modules.authenticate');
 
+    // A Discord/Google sign-up becomes an account only once the visitor accepts the Terms of
+    // Service and Privacy Policy on the consent screen the callback sends them to. The callback
+    // counts the pending sign-up against the `registration` limit; "Cancel" drops it.
+    Route::post('/modules/register', [OAuthController::class, 'register'])
+        ->name('auth.modules.register')
+        ->middleware(EnsureRegistrationIsEnabled::class);
+    Route::delete('/modules/register', [OAuthController::class, 'cancelRegistration'])
+        ->name('auth.modules.register.cancel');
+
     // Sign-up, only while the admin allows it, with its own tighter limits.
     Route::post('/register', RegisterController::class)
         ->name('auth.post.register')

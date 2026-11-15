@@ -18,6 +18,9 @@ vi.mock('@/api/store/tokenPacks', async (importOriginal) => ({
     useTokenPackCheckout: () => ({ mutateAsync: state.checkout }),
 }));
 
+// The legal links read the page bootstrap; without one they point at the panel's own pages.
+vi.mock('@/api/settings/queries', () => ({ useSiteSettings: () => null }));
+
 const assign = vi.fn();
 
 afterEach(cleanup);
@@ -40,6 +43,9 @@ describe('token packs', () => {
         render(<TokenPacks />);
 
         expect(screen.getByText('+50 bonus tokens')).toBeVisible();
+        expect(screen.getByText(/By purchasing you agree to the/)).toBeVisible();
+        expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/legal/terms');
+        expect(screen.getByRole('link', { name: 'Refund Policy' })).toHaveAttribute('target', '_blank');
         await userEvent.click(screen.getByRole('button', { name: 'Buy Starter' }));
 
         expect(state.checkout).toHaveBeenCalledWith(1);

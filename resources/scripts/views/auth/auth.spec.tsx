@@ -339,12 +339,28 @@ describe('sign-up', () => {
         expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/auth/register');
     });
 
-    it('creates the account with a Turnstile token once the rules are accepted', async () => {
+    it('creates the account with a Turnstile token once the Terms of Service and Privacy Policy are accepted', async () => {
         mocks.register.mockReturnValue(new Promise(() => {}));
         mocks.execute.mockResolvedValue('turnstile-token');
+        const doc = (title: string, id: string, version: number) => ({
+            title,
+            url: `/legal/${id}`,
+            external: false,
+            version,
+            updatedAt: '',
+        });
+
         await renderAuth('/auth/register', false, {
             captcha: { provider: 'turnstile', siteKey: 'site-key' },
             registration: { enabled: true },
+            legal: {
+                pending: [],
+                documents: {
+                    terms: doc('Terms of Service', 'terms', 3),
+                    privacy: doc('Privacy Policy', 'privacy', 2),
+                    refunds: doc('Refund Policy', 'refunds', 1),
+                },
+            },
         });
 
         // The widget names its form, which the panel checks when verifying the token.
@@ -361,7 +377,22 @@ describe('sign-up', () => {
 
         expect(screen.getByRole('button', { name: 'Create Account' })).toBeDisabled();
 
-        fireEvent.click(screen.getByRole('checkbox', { name: 'I agree to the rules' }));
+        // The documents open in a new tab so the half-filled form stays.
+        for (const [name, href] of [
+            ['Terms of Service', '/legal/terms'],
+            ['Privacy Policy', '/legal/privacy'],
+        ]) {
+            const link = screen.getByRole('link', { name });
+
+            expect(link).toHaveAttribute('href', href);
+            expect(link).toHaveAttribute('target', '_blank');
+            expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+        }
+
+        // The card footer links every document.
+        expect(screen.getByRole('navigation', { name: 'Legal' })).toHaveTextContent('Terms · Privacy · Refunds');
+
+        fireEvent.click(screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' }));
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
         });
@@ -373,6 +404,9 @@ describe('sign-up', () => {
                 password: 'correct horse',
                 password_confirmation: 'correct horse',
                 terms: true,
+                // The versions the form showed, so a later publication is not accepted unseen.
+                terms_version: 3,
+                privacy_version: 2,
                 'g-recaptcha-response': 'turnstile-token',
             },
         });

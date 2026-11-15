@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Pterodactyl\Contracts\Servers\DeletesServers;
 use Pterodactyl\Contracts\Servers\TogglesServerSuspension;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
@@ -19,6 +20,7 @@ use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Throwable;
 
 /**
@@ -90,6 +92,8 @@ class SubscriptionService
             'suspended_at' => null,
             'delete_at' => null,
             'auto_renew' => true,
+            // The version this user accepted (purchases are refused while a newer one waits).
+            'terms_version' => LegalSettings::acceptedVersion($user, LegalDocument::Terms),
         ])->save();
 
         return $subscription;

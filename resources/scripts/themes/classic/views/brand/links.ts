@@ -7,3 +7,16 @@ export const discordLinkProps = {
     target: '_blank',
     rel: 'noopener noreferrer',
 } as const;
+
+/**
+ * The Terms of Service, Privacy Policy and Refund Policy. The panel serves each at these paths and
+ * redirects to the document's external page when the admin set one, so the links never go stale.
+ */
+export const LEGAL_LINKS = [
+    { id: 'terms', label: 'Terms', title: 'Terms of Service', href: '/legal/terms' },
+    { id: 'privacy', label: 'Privacy', title: 'Privacy Policy', href: '/legal/privacy' },
+    { id: 'refunds', label: 'Refunds', title: 'Refund Policy', href: '/legal/refunds' },
+] as const;
+
+/** Attributes for a link to a legal document: a new tab, so a form being filled in is kept. */
+export const legalLinkProps = (href: string) => ({ href, target: '_blank', rel: 'noopener noreferrer' }) as const;

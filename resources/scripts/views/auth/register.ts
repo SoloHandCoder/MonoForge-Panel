@@ -1,5 +1,6 @@
 import { useField, useForm, useStore } from '@tanstack/react-form';
 import { useRegister } from '@/api/auth/queries';
+import { useLegalDocuments } from '@/api/legal';
 import { firstError } from '@/components/form/errors';
 import { boundField, fixtureField } from '../forms';
 import { implementViews } from '../registry';
@@ -10,11 +11,13 @@ const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 // The same characters the panel accepts for usernames; the server has the final say.
 const isUsername = (value: string) => /^[a-z0-9]([\w.-]+)[a-z0-9]$/.test(value.toLowerCase());
 const newPassword = { type: 'password', autoComplete: 'new-password' } as const;
-const RULES_REQUIRED = 'You must agree to the rules to create an account.';
+const RULES_REQUIRED = 'You must agree to the Terms of Service and Privacy Policy to create an account.';
 
 function useRegisterFormModel(): RegisterFormModel {
     const register = useRegister();
     const { Captcha, token } = useCaptcha('register');
+    // The versions the linked documents were at when the form opened; the server refuses older ones.
+    const { terms: termsDocument, privacy: privacyDocument } = useLegalDocuments();
     const form = useForm({
         defaultValues: { username: '', email: '', password: '', passwordConfirmation: '', terms: false },
         onSubmit: async ({ value }) => {
@@ -32,6 +35,8 @@ function useRegisterFormModel(): RegisterFormModel {
                         password: value.password,
                         password_confirmation: value.passwordConfirmation,
                         terms: value.terms,
+                        terms_version: termsDocument.version,
+                        privacy_version: privacyDocument.version,
                         'g-recaptcha-response': captcha,
                     },
                 });
@@ -99,7 +104,7 @@ function useRegisterFormModel(): RegisterFormModel {
             error: firstError(terms.state.meta.errors) ?? null,
         },
         submit: () => void form.handleSubmit(),
-        // The rules must be ticked before the form can be sent.
+        // The Terms of Service and Privacy Policy must be ticked before the form can be sent.
         canSubmit: canSubmit && terms.state.value,
         submitting,
         Captcha,

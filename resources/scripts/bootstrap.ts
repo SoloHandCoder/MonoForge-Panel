@@ -1,5 +1,5 @@
 import type { UserData } from '@/api/account/types';
-import type { SiteSettings } from '@/api/settings/types';
+import type { LegalDocumentId, SiteSettings } from '@/api/settings/types';
 import type { DevelopmentPayload } from '@/extensions/development';
 import type { SiteExtensionEntry } from '@/extensions/registry';
 
@@ -23,11 +23,22 @@ export interface ThemeBootstrap {
     preview: boolean;
 }
 
+/** A panel-hosted legal document: its markdown, version and last update (ISO 8601). */
+export interface LegalPageBootstrap {
+    document: LegalDocumentId;
+    title: string;
+    content: string;
+    version: number;
+    updatedAt: string;
+}
+
 interface ExtendedWindow extends Window {
     SiteConfiguration?: SiteSettings & {
         extensions?: SiteExtensionEntry[];
         theme?: Partial<ThemeBootstrap>;
     };
+    /** The document of a /legal page, rendered into that page only. */
+    LegalPage?: LegalPageBootstrap;
     PterodactylUser?: {
         uuid: string;
         username: string;
@@ -66,6 +77,9 @@ export const endBootstrapSession = (): void => {
 export const hasBootstrapSession = (): boolean => !sessionEnded && !!getBootstrapUser()?.uuid;
 
 export const getBootstrapSiteSettings = (): SiteSettings | undefined => (window as ExtendedWindow).SiteConfiguration;
+
+/** The legal document the server rendered this /legal page with, if it is one. */
+export const getBootstrapLegalPage = (): LegalPageBootstrap | undefined => (window as ExtendedWindow).LegalPage;
 
 export const getBootstrapExtensions = (): SiteExtensionEntry[] =>
     (window as ExtendedWindow).SiteConfiguration?.extensions ?? [];

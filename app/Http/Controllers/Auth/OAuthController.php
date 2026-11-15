@@ -7,8 +7,10 @@ namespace Pterodactyl\Http\Controllers\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\Service\Auth\OAuthException;
@@ -18,7 +20,10 @@ use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Providers\AppServiceProvider;
 use Pterodactyl\Services\Auth\OAuth\OAuthAccountService;
 use Pterodactyl\Services\Auth\OAuth\OAuthClient;
+use Pterodactyl\Services\Auth\OAuth\OAuthIdentity;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
+use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -29,6 +34,13 @@ class OAuthController extends Controller
 {
     /** The session flash the sign-in and account pages read the outcome from. */
     public const string RESULT_KEY = 'oauth_result';
+
+    /** Where a Discord/Google sign-up accepts the terms before its account is made. */
+    public const string CONSENT_PATH = '/auth/register/consent';
+
+    private const string TOO_MANY_SIGN_UPS = 'Too many accounts have been created from your network recently. Please try again later.';
+
+    private const string SIGN_UP_EXPIRED = 'That sign up expired or was replaced. Please continue with Discord or Google again.';
 
     public function __construct(
         private readonly OAuthClient $client,
@@ -91,13 +103,27 @@ class OAuthController extends Controller
                 $this->accounts->refresh($account, $identity);
                 $user = $account->user;
             } elseif (filter_var(config('monoforge.auth.registration.enabled'), FILTER_VALIDATE_BOOL)) {
-                $limit = $this->registrationLimit($request);
-                if (RateLimiter::tooManyAttempts($limit['key'], $limit['max'])) {
-                    return $this->fail(false, 'Too many accounts have been created from your network recently. Please try again later.');
+                if ($this->registrationLimited($request)) {
+                    return $this->fail(false, self::TOO_MANY_SIGN_UPS);
                 }
 
-                $user = $this->accounts->register($identity);
-                RateLimiter::hit($limit['key'], $limit['decay']);
+                $this->accounts->ensureRegistrable($identity);
+
+                // A pending sign-up uses the IP's sign-up budget the moment it exists, counted
+                // atomically (increment, then compare), so sign-ups prepared in many sessions
+                // cannot all pass one check and be completed in parallel.
+                if (! $this->countSignUp($request)) {
+                    return $this->fail(false, self::TOO_MANY_SIGN_UPS);
+                }
+
+                // The account is only made once the visitor accepts the Terms of Service and
+                // Privacy Policy on the consent screen, which posts to register() below. A new
+                // session ID first: a session an attacker fixed must not hold the right to
+                // create, and sign in to, this account.
+                $request->session()->regenerate(true);
+                OAuthRegistration::stash($request->session(), $identity);
+
+                return new RedirectResponse(self::CONSENT_PATH);
             } else {
                 return $this->fail(false, "No MonoForge account is linked to this {$label} account.");
             }
@@ -114,6 +140,77 @@ class OAuthController extends Controller
         $request->session()->flash(self::RESULT_KEY, ['status' => 'checkpoint', 'token' => $result->confirmationToken]);
 
         return new RedirectResponse('/auth/login');
+    }
+
+    /**
+     * Creates the account of a Discord/Google sign-up waiting on the consent screen, once the
+     * visitor accepts the Terms of Service and Privacy Policy, and signs it in.
+     *
+     * @throws ValidationException
+     */
+    public function register(Request $request, CompletesLogins $logins): JsonResponse
+    {
+        $request->validate(
+            [
+                'terms' => ['accepted'],
+                'nonce' => ['required', 'string', 'max:64'],
+                'terms_version' => ['required', 'integer', 'min:1'],
+                'privacy_version' => ['required', 'integer', 'min:1'],
+            ],
+            ['terms.accepted' => 'You must agree to the Terms of Service and Privacy Policy to create an account.'],
+        );
+
+        // Only the sign-up the visitor was shown: another one started in a second tab replaced
+        // the nonce, and an expired one has none.
+        $identity = OAuthRegistration::claim($request->session(), $request->string('nonce')->toString());
+        if (! $identity instanceof OAuthIdentity || ! $identity->provider->enabled()) {
+            throw ValidationException::withMessages(['terms' => self::SIGN_UP_EXPIRED]);
+        }
+
+        // And only the documents the visitor was shown.
+        LegalSettings::ensureShownVersions($request->integer('terms_version'), $request->integer('privacy_version'));
+
+        // The sign-up budget was already used when this sign-up was stashed (callback()).
+        try {
+            $user = $this->accounts->register($identity);
+        } catch (OAuthException $oAuthException) {
+            OAuthRegistration::forget($request->session());
+
+            throw ValidationException::withMessages(['terms' => $oAuthException->getMessage()]);
+        }
+
+        OAuthRegistration::forget($request->session());
+        LegalSettings::recordAcceptance($user);
+
+        return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
+    }
+
+    /**
+     * Cancels the Discord/Google sign-up waiting on the consent screen ("Cancel" there).
+     */
+    public function cancelRegistration(Request $request): Response
+    {
+        OAuthRegistration::forget($request->session());
+
+        return new Response(status: Response::HTTP_NO_CONTENT);
+    }
+
+    private function registrationLimited(Request $request): bool
+    {
+        $limit = $this->registrationLimit($request);
+
+        return RateLimiter::tooManyAttempts($limit['key'], $limit['max']);
+    }
+
+    /**
+     * Uses one sign-up of the IP's budget: the counter is incremented first and compared after,
+     * so concurrent requests cannot all slip under the limit. False when the budget is spent.
+     */
+    private function countSignUp(Request $request): bool
+    {
+        $limit = $this->registrationLimit($request);
+
+        return RateLimiter::increment($limit['key'], $limit['decay']) <= $limit['max'];
     }
 
     /**

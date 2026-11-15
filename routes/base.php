@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
+use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
@@ -17,6 +19,13 @@ Route::get('/account', [IndexController::class, 'index'])
 Route::get('/locales/locale.json', LocaleController::class)
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->where('namespace', '.*');
+
+// The Terms of Service, Privacy Policy and Refund Policy: public, and reachable by a user
+// who still has to set up two-factor authentication.
+Route::get('/legal/{document}', LegalPageController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->whereIn('document', LegalDocument::values())
+    ->name('legal');
 
 // Files uploaded through extension `file` settings. Public and stateless: no
 // session, no cookies, so the immutable cache headers are safe behind a proxy.

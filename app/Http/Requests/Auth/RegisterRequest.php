@@ -16,7 +16,8 @@ class RegisterRequest extends FormRequest
 
     /**
      * The username and email rules of every new account, a confirmed password
-     * that passes the panel's password policy, and the accepted rules.
+     * that passes the panel's password policy, and the accepted Terms of Service and
+     * Privacy Policy.
      *
      * @return ValidationRules
      */
@@ -29,13 +30,16 @@ class RegisterRequest extends FormRequest
             'email' => $rules['email'],
             'password' => ['required', 'confirmed', ...CreateUser::passwordRules()],
             'terms' => ['accepted'],
+            // The document versions the form showed; the controller refuses older ones.
+            'terms_version' => ['required', 'integer', 'min:1'],
+            'privacy_version' => ['required', 'integer', 'min:1'],
         ];
     }
 
     /** Rename fields to be more clear in error messages. */
     public function attributes(): array
     {
-        return ['terms' => 'rules'];
+        return ['terms' => 'Terms of Service and Privacy Policy'];
     }
 
     /**
@@ -43,6 +47,6 @@ class RegisterRequest extends FormRequest
      */
     public function messages(): array
     {
-        return ['terms.accepted' => 'You must agree to the rules to create an account.'];
+        return ['terms.accepted' => 'You must agree to the Terms of Service and Privacy Policy to create an account.'];
     }
 }

@@ -13,6 +13,7 @@ use Pterodactyl\Data\LoginResult;
 use Pterodactyl\Events\Auth\DirectLogin;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
 
 final readonly class CompleteLogin implements CompletesLogins
 {
@@ -22,6 +23,10 @@ final readonly class CompleteLogin implements CompletesLogins
 
     public function complete(User $user): LoginResult
     {
+        // Signing in, any way, ends a Discord/Google sign-up left on the consent screen, so the
+        // next person on a shared browser cannot finish it.
+        Session::forget(OAuthRegistration::SESSION_KEY);
+
         if (! $user->use_totp) {
             return $this->establish($user);
         }
@@ -37,6 +42,7 @@ final readonly class CompleteLogin implements CompletesLogins
     public function establish(User $user): LoginResult
     {
         Session::remove(self::CHECKPOINT_KEY);
+        Session::forget(OAuthRegistration::SESSION_KEY);
         Session::regenerate();
 
         Auth::guard()->login($user, true);

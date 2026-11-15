@@ -8,8 +8,10 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
+use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
+use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
 
 uses(HttpTestCase::class);
@@ -48,6 +50,8 @@ function registration(array $overrides = []): array
         'password' => 'correct-horse-battery',
         'password_confirmation' => 'correct-horse-battery',
         'terms' => true,
+        'terms_version' => 1,
+        'privacy_version' => 1,
     ], $overrides);
 }
 
@@ -85,6 +89,40 @@ test('registering creates a normal account and signs it in', function (): void {
     $this->assertAuthenticatedAs($user);
     // The new user is signed in already, so no "account created" email.
     Notification::assertNothingSent();
+});
+
+test('registering records the accepted Terms of Service and Privacy Policy versions', function (): void {
+    LegalSettings::save(LegalDocument::Terms, '# Terms', '', reaccept: true);
+
+    $this->postJson('/auth/register', registration(['terms_version' => 2]))->assertCreated();
+
+    $user = User::query()->where('username', 'newplayer')->firstOrFail();
+    expect($user->terms_accepted_version)->toBe(2)
+        ->and($user->privacy_accepted_version)->toBe(1)
+        ->and($user->terms_accepted_at)->not->toBeNull()
+        ->and(LegalSettings::pendingFor($user))->toBe([]);
+});
+
+test('sign-up refuses document versions other than the ones in force', function (): void {
+    // The form was opened before the admin published version 2.
+    LegalSettings::save(LegalDocument::Privacy, '# Privacy', '', reaccept: true);
+
+    $this->postJson('/auth/register', registration())
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'The Privacy Policy changed while you were reading. Please review the new version.');
+    $this->postJson('/auth/register', registration(['terms_version' => null]))->assertUnprocessable();
+
+    $this->assertGuest();
+    expect(User::query()->count())->toBe(0);
+});
+
+test('sign-up requires accepting the Terms of Service and Privacy Policy', function (): void {
+    $this->postJson('/auth/register', registration(['terms' => false]))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.detail', 'You must agree to the Terms of Service and Privacy Policy to create an account.');
+
+    $this->assertGuest();
+    expect(User::query()->count())->toBe(0);
 });
 
 test('sign-up allows one attempt an hour per email and three per address', function (): void {

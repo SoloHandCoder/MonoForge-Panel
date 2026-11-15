@@ -53,6 +53,11 @@
                     window.SiteConfiguration = @json($siteConfiguration);
                 </script>
             @endif
+            @if(!empty($legalPage))
+                <script>
+                    window.LegalPage = @json($legalPage);
+                </script>
+            @endif
         @show
 
         {{-- The "system" scheme preference is resolved before any stylesheet applies. --}}
