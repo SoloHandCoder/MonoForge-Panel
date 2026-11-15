@@ -9,6 +9,8 @@ use Pterodactyl\Http\Controllers\Api\Client\AccountController;
 use Pterodactyl\Http\Controllers\Api\Client\ActivityLogController;
 use Pterodactyl\Http\Controllers\Api\Client\ActivityLogFilterController;
 use Pterodactyl\Http\Controllers\Api\Client\ApiKeyController;
+use Pterodactyl\Http\Controllers\Api\Client\Assistant\AssistantController;
+use Pterodactyl\Http\Controllers\Api\Client\Assistant\ConversationController as AssistantConversationController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
 use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
@@ -38,6 +40,7 @@ use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
 use Pterodactyl\Http\Middleware\Activity\ServerSubject;
+use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
 use Pterodactyl\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
 use Pterodactyl\Http\Middleware\Api\Client\Server\ResourceBelongsToServer;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
@@ -53,6 +56,9 @@ use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 Route::get('/', [ClientController::class, 'index'])->name('api:client.index');
 Route::get('/permissions', [ClientController::class, 'permissions']);
 Route::get('/extension-progress/{extension}/{job}', [ExtensionProgressController::class, 'user'])->where('extension', '[a-z][a-z0-9-]{0,47}')->whereUuid('job')->name('api:client.extension-progress');
+
+// The AI assistant: whether it is on, and the user's free AI tokens and balance (phase 4).
+Route::get('/assistant', AssistantController::class)->name('api:client.assistant');
 
 Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
 Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
@@ -213,6 +219,19 @@ Route::group([
     Route::group(['prefix' => '/startup'], function (): void {
         Route::get('/', [StartupController::class, 'index']);
         Route::put('/variable', [StartupController::class, 'update']);
+    });
+
+    // The server AI assistant (phase 4). Conversations belong to the user who started them;
+    // ResourceBelongsToServer checks that, so bindings are not scoped through the server.
+    Route::prefix('/assistant/conversations')->group(function (): void {
+        Route::get('/', [AssistantConversationController::class, 'index'])->name('api:client:server.assistant')->withoutScopedBindings();
+        Route::post('/', [AssistantConversationController::class, 'store'])->middleware('throttle:20,1')->withoutScopedBindings();
+        Route::get('/{conversation}', [AssistantConversationController::class, 'show'])->withoutScopedBindings();
+        Route::post('/{conversation}/messages', [AssistantConversationController::class, 'message'])->middleware('throttle:30,1')->withoutScopedBindings();
+        // A human click: from a panel session only, never an API key.
+        Route::post('/{conversation}/tool-calls/{toolCall}/approve', [AssistantConversationController::class, 'approve'])->middleware(RequireSessionAuthentication::class)->withoutScopedBindings();
+        Route::post('/{conversation}/tool-calls/{toolCall}/deny', [AssistantConversationController::class, 'deny'])->middleware(RequireSessionAuthentication::class)->withoutScopedBindings();
+        Route::delete('/{conversation}', [AssistantConversationController::class, 'destroy'])->withoutScopedBindings();
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

@@ -153,4 +153,7 @@ enum Permissions: string
     case SettingsReinstall = 'settings.reinstall';
 
     case ActivityRead = 'activity.read';
+
+    // Phase 4: using the server AI assistant. Owners and root admins always have it.
+    case AssistantUse = 'assistant.use';
 }

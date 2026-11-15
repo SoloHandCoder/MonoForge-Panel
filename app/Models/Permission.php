@@ -130,6 +130,14 @@ class Permission extends Model
                 'read' => 'Allows a user to view the activity logs for the server.',
             ],
         ],
+
+        // Phase 4: the AI assistant on the server page.
+        'assistant' => [
+            'description' => "Permissions that control a user's access to the AI assistant for this server.",
+            'keys' => [
+                'use' => "Allows a user to chat with the AI assistant on this server. The assistant can only do what the user's other permissions allow, and asks before sensitive actions.",
+            ],
+        ],
     ];
 
     /**

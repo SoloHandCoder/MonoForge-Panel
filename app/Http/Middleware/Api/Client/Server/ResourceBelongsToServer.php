@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 use Pterodactyl\Http\Concerns\ResolvesRequestContext;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\Assistant\AiConversation;
+use Pterodactyl\Models\Assistant\AiToolCall;
 use Pterodactyl\Models\Backup;
 use Pterodactyl\Models\Database;
 use Pterodactyl\Models\Schedule;
@@ -79,6 +81,21 @@ class ResourceBelongsToServer
                 case Task::class:
                     $schedule = $route->parameter('schedule');
                     throw_if(! $schedule instanceof Schedule || $model->schedule_id !== $schedule->id || $schedule->server_id !== $server->id, $exception);
+
+                    break;
+                    // Assistant conversations are private to the user who started them.
+                case AiConversation::class:
+                    throw_if(
+                        $model->server_id !== $server->id
+                        || $model->scope !== AiConversation::SCOPE_SERVER
+                        || $model->user_id !== $request->user()?->id,
+                        $exception,
+                    );
+
+                    break;
+                case AiToolCall::class:
+                    $conversation = $route->parameter('conversation');
+                    throw_if(! $conversation instanceof AiConversation || $model->conversation_id !== $conversation->id || $conversation->server_id !== $server->id, $exception);
 
                     break;
                 default:

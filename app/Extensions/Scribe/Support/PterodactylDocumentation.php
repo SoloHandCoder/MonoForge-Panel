@@ -101,6 +101,10 @@ class PterodactylDocumentation
         'addon_id' => ['integer', 'The shop add-on ID.', 1],
         'tokenPack_id' => ['integer', 'The token pack ID.', 1],
         'tunnel_id' => ['integer', 'The server tunnel ID.', 1],
+        // Phase 4: the AI assistant.
+        'conversation' => ['string', 'The assistant conversation UUID.', '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
+        'toolCall' => ['integer', 'The assistant tool call ID.', 2],
+        'provider_id' => ['integer', 'The AI provider ID.', 1],
     ];
 
     private const array FIELD_DESCRIPTIONS = [
