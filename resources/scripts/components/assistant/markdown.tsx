@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 /*
  * A tiny Markdown renderer for assistant replies. It builds React elements and never HTML strings, so
  * whatever the model writes, including tags, renders as text. It knows paragraphs, headings, lists,
- * quotes, fenced code, inline code, bold, italics and http(s) links.
+ * quotes, fenced code, inline code, bold, italics and links (https only, shown with their full address).
  */
 
 export type MarkdownBlock =
@@ -185,6 +185,62 @@ export function parseInline(text: string): MarkdownInline[] {
     return spans;
 }
 
+const ipv4Host = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/**
+ * The address a link may open, or null. Only https addresses with a real host name are linked:
+ * plain http, raw IP addresses (in any spelling, which URL normalises) and addresses with a
+ * user name or password stay text, so a link is less useful for phishing or for sending data
+ * to a server the model picked.
+ */
+export function linkTarget(href: string): string | null {
+    let url: URL;
+
+    try {
+        url = new URL(href);
+    } catch {
+        return null;
+    }
+
+    const host = url.hostname;
+
+    if (url.protocol !== 'https:' || host === '' || host.startsWith('[') || ipv4Host.test(host)) {
+        return null;
+    }
+
+    return url.username === '' && url.password === '' ? href : null;
+}
+
+/** A link shows its full address as its text, so a label never hides where it goes. */
+function renderLink(span: Extract<MarkdownInline, { kind: 'link' }>, key: number): ReactNode {
+    const target = linkTarget(span.href);
+    const label = span.text.trim() === span.href ? null : span.text;
+
+    if (target === null) {
+        return label === null ? span.href : `${label} (${span.href})`;
+    }
+
+    const anchor = (
+        <a
+            key={label === null ? key : undefined}
+            href={target}
+            target='_blank'
+            rel='noopener noreferrer nofollow'
+            className='break-all text-primary underline underline-offset-2 hover:opacity-80'
+        >
+            {target}
+        </a>
+    );
+
+    return label === null ? (
+        anchor
+    ) : (
+        <span key={key}>
+            {label} ({anchor})
+        </span>
+    );
+}
+
 function renderSpan(span: MarkdownInline, key: number): ReactNode {
     switch (span.kind) {
         case 'text':
@@ -204,17 +260,7 @@ function renderSpan(span: MarkdownInline, key: number): ReactNode {
         case 'em':
             return <em key={key}>{span.text}</em>;
         case 'link':
-            return (
-                <a
-                    key={key}
-                    href={span.href}
-                    target='_blank'
-                    rel='noopener noreferrer nofollow'
-                    className='text-primary underline underline-offset-2 hover:opacity-80'
-                >
-                    {span.text}
-                </a>
-            );
+            return renderLink(span, key);
     }
 }
 
