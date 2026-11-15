@@ -7,6 +7,7 @@ return [
     Pterodactyl\Providers\ActionServiceProvider::class,
     Pterodactyl\Providers\AppServiceProvider::class,
     Pterodactyl\Providers\AssistantServiceProvider::class,
+    Pterodactyl\Providers\AssistantToolServiceProvider::class,
     Pterodactyl\Providers\AuthServiceProvider::class,
     Pterodactyl\Providers\BackupsServiceProvider::class,
     Pterodactyl\Providers\BladeServiceProvider::class,
