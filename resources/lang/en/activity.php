@@ -45,6 +45,9 @@ return [
             'create' => 'Enabled two-factor auth',
             'delete' => 'Disabled two-factor auth',
         ],
+        'store' => [
+            'purchase' => 'Bought the server ":name" for :tokens tokens',
+        ],
     ],
     'server' => [
         'reinstall' => 'Reinstalled server',

@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Pterodactyl\Data;
+
+use Pterodactyl\Models\Server;
+
+/**
+ * A completed store purchase. A replay of an idempotency key that already bought a server
+ * returns that server with `replayed` set and nothing charged again.
+ */
+final readonly class StorePurchaseResult
+{
+    public function __construct(
+        public Server $server,
+        public int $tokensCharged,
+        public int $periodDays,
+        public bool $replayed = false,
+        public ?string $address = null,
+    ) {}
+}
