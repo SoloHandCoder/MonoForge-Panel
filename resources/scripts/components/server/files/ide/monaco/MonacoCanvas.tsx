@@ -3,6 +3,9 @@ import Editor, { loader, type OnMount } from '@monaco-editor/react';
 import Spinner from '@/components/elements/Spinner';
 import { monaco } from './setup';
 import { defineMonoForgeTheme, MONOFORGE_THEME } from './theme';
+import { modelPath } from './modelUri';
+
+const modelKey = (path: string) => monaco.Uri.parse(modelPath(path)).toString();
 
 // The bundled build, never the loader's default CDN copy.
 loader.config({ monaco });
@@ -22,8 +25,6 @@ export interface MonacoCanvasProps {
 }
 
 /** One model per file, at a URI that keeps any character of its path. */
-const modelPath = (path: string) => `file:///${encodeURIComponent(path)}`;
-const modelKey = (path: string) => monaco.Uri.parse(modelPath(path)).toString();
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
