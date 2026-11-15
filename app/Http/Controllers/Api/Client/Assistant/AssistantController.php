@@ -21,6 +21,7 @@ class AssistantController extends ClientApiController
     private const array EXAMPLE = [
         'enabled' => true,
         'server_enabled' => true,
+        'crash_doctor_enabled' => true,
         'free_limit' => 50000,
         'free_used' => 41000,
         'ratio' => 1000,
@@ -28,13 +29,14 @@ class AssistantController extends ClientApiController
         'warning' => 'near_limit',
     ];
 
-    #[Endpoint('Get assistant status', 'Returns whether the AI assistant is turned on, the free AI tokens of this month (free_limit, free_used), how many AI tokens one panel token buys (ratio), the token balance, and a warning: null, near_limit, free_exhausted (now paid from the balance) or no_balance (the assistant cannot be used until the wallet is topped up).')]
+    #[Endpoint('Get assistant status', 'Returns whether the AI assistant is turned on (and the AI crash doctor, crash_doctor_enabled, which also needs the server assistant), the free AI tokens of this month (free_limit, free_used), how many AI tokens one panel token buys (ratio), the token balance, and a warning: null, near_limit, free_exhausted (now paid from the balance) or no_balance (the assistant cannot be used until the wallet is topped up).')]
     #[ScribeResponse(self::EXAMPLE, description: 'Assistant status returned.')]
     public function __invoke(GetAssistantStatusRequest $request, AssistantBilling $billing): JsonResponse
     {
         return new JsonResponse([
             'enabled' => AssistantSettings::enabled(),
             'server_enabled' => AssistantSettings::serverEnabled(),
+            'crash_doctor_enabled' => AssistantSettings::crashDoctorAvailable(),
             ...$billing->status($request->user()),
         ]);
     }

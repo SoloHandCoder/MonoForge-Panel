@@ -158,6 +158,8 @@ return [
         'max_tool_iterations' => 8,
         'context_tokens' => 24000,
         'max_output_tokens' => 2048,
+        // Phase 6: offer the AI crash doctor when a server crashes or fails to start.
+        'crash_doctor_enabled' => true,
     ],
 
     /*

@@ -7,6 +7,7 @@ namespace Pterodactyl\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
+use Pterodactyl\Console\Commands\Assistant\DetectCrashesCommand;
 use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
@@ -18,6 +19,7 @@ use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\Billing\TebexCheckout;
+use Pterodactyl\Models\ServerCrash;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\Status\StatusCheck;
 use Pterodactyl\Models\Status\StatusDay;
@@ -59,6 +61,11 @@ final class Scheduler
         // a minute, and the checks and their daily sums dropped after 90 days.
         $schedule->command(CheckStatusCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
         $schedule->command(PruneCommand::class, ['--model' => [StatusCheck::class, StatusDay::class]])->daily()->withoutOverlapping()->onOneServer();
+
+        // The AI crash doctor: compare the servers' states each minute (cached Wings readings, one
+        // pool per node) and record crashes; crashes go after 30 days.
+        $schedule->command(DetectCrashesCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
+        $schedule->command(PruneCommand::class, ['--model' => [ServerCrash::class]])->daily()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

@@ -26,6 +26,7 @@ class ConversationPresenter
     public const array EXAMPLE = [
         'uuid' => '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93',
         'title' => 'Why does my server crash on start?',
+        'mode' => 'chat',
         'status' => 'awaiting_approval',
         'error' => null,
         'messages' => [
@@ -120,10 +121,14 @@ class ConversationPresenter
 
     public const array STATUS_SCHEMA = ['type' => 'string', 'enum' => ['idle', 'running', 'awaiting_approval', 'error'], 'example' => 'awaiting_approval'];
 
+    /** "crash_doctor" for a diagnosis the crash doctor started, "chat" otherwise. */
+    public const array MODE_SCHEMA = ['type' => 'string', 'enum' => [AiConversation::MODE_CHAT, AiConversation::MODE_CRASH_DOCTOR], 'example' => 'chat'];
+
     public const array LIST_EXAMPLE = [
         'data' => [[
             'uuid' => '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93',
             'title' => 'Why does my server crash on start?',
+            'mode' => 'chat',
             'status' => 'idle',
             'updated_at' => '2026-11-18T12:01:00+00:00',
         ]],
@@ -153,13 +158,14 @@ class ConversationPresenter
     public function __construct(private readonly AssistantBilling $billing) {}
 
     /**
-     * @return array{uuid: string, title: string, status: string, updated_at: string|null}
+     * @return array{uuid: string, title: string, mode: string, status: string, updated_at: string|null}
      */
     public static function summary(AiConversation $conversation): array
     {
         return [
             'uuid' => $conversation->uuid,
             'title' => $conversation->title,
+            'mode' => $conversation->mode,
             'status' => $conversation->status,
             'updated_at' => $conversation->updated_at?->toAtomString(),
         ];
@@ -216,6 +222,7 @@ class ConversationPresenter
         return [
             'uuid' => $conversation->uuid,
             'title' => $conversation->title,
+            'mode' => $conversation->mode,
             'status' => $conversation->status,
             'error' => $conversation->error,
             'messages' => $messages->map(fn (AiMessage $message): array => [

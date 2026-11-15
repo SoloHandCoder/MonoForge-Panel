@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
 
 #[Description('Perform bulk power management on large groupings of servers or nodes at once.')]
 #[Signature('p:server:bulk-power
@@ -62,6 +63,7 @@ class BulkPowerActionCommand extends Command
             $bar->clear();
 
             try {
+                CrashRecorder::expectPowerChange($server, $action);
                 Daemon::server($server)->power($action);
             } catch (DaemonConnectionException $daemonConnectionException) {
                 $this->output->error(trans('command/messages.server.power.action_failed', [

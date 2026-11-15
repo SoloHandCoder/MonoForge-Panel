@@ -35,6 +35,7 @@ use Pterodactyl\Services\Assistant\Tools\Server\RevealStartupVariableTool;
 use Pterodactyl\Services\Assistant\Tools\Server\SearchFilesTool;
 use Pterodactyl\Services\Assistant\Tools\Server\SendCommandTool;
 use Pterodactyl\Services\Assistant\Tools\Server\ServerStatusTool;
+use Pterodactyl\Services\Assistant\Tools\Server\SetDockerImageTool;
 use Pterodactyl\Services\Assistant\Tools\Server\UpdateStartupVariableTool;
 use Pterodactyl\Services\Assistant\Tools\Server\WriteFileTool;
 
@@ -63,6 +64,7 @@ class AssistantToolServiceProvider extends ServiceProvider
         PowerTool::class,
         CreateBackupTool::class,
         UpdateStartupVariableTool::class,
+        SetDockerImageTool::class,
     ];
 
     /** @var list<class-string<Admin\AdminTool>> */

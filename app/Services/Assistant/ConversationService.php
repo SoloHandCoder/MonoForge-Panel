@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant;
 
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pterodactyl\Exceptions\Assistant\AssistantUnavailableException;
@@ -34,29 +35,42 @@ class ConversationService
     ) {}
 
     /**
+     * Starts a conversation with the user's message. $prepare runs after the message is stored
+     * and before the turn is queued: the crash doctor records the calls that pre-load the logs.
+     *
+     * @param  (Closure(AiConversation): void)|null  $prepare
+     *
      * @throws AssistantUnavailableException
      * @throws ConflictHttpException while another conversation of the user is running
      */
-    public function start(User $user, string $scope, ?Server $server, string $message): AiConversation
-    {
+    public function start(
+        User $user,
+        string $scope,
+        ?Server $server,
+        string $message,
+        string $mode = AiConversation::MODE_CHAT,
+        ?string $title = null,
+        ?Closure $prepare = null,
+    ): AiConversation {
         $this->assertAvailable($user, $scope);
         $provider = AssistantProviders::resolve();
 
-        [$conversation, $token] = $this->withUserSlot($user, null, function () use ($user, $scope, $server, $provider, $message): array {
+        [$conversation, $token] = $this->withUserSlot($user, null, function () use ($user, $scope, $server, $provider, $message, $mode, $title): array {
             $conversation = AiConversation::query()->create([
                 'uuid' => Str::uuid()->toString(),
                 'user_id' => $user->id,
                 'scope' => $scope,
+                'mode' => $mode,
                 'server_id' => $scope === AiConversation::SCOPE_SERVER ? $server?->id : null,
                 'provider_id' => $provider->id,
-                'title' => $this->title($message),
+                'title' => $title ?? $this->title($message),
                 'status' => AiConversation::STATUS_IDLE,
             ]);
 
             return [$conversation, (string) $conversation->startRun([AiConversation::STATUS_IDLE])];
         });
 
-        $this->addUserMessage($conversation, $message, $token);
+        $this->addUserMessage($conversation, $message, $token, $prepare);
 
         return $conversation->refresh();
     }
@@ -195,13 +209,20 @@ class ConversationService
         throw_if(! is_numeric($latest) || (int) $latest !== $call->message_id, ConflictHttpException::class, 'This action is from an earlier step and can no longer be decided.');
     }
 
-    private function addUserMessage(AiConversation $conversation, string $message, string $token): void
+    /**
+     * @param  (Closure(AiConversation): void)|null  $prepare
+     */
+    private function addUserMessage(AiConversation $conversation, string $message, string $token, ?Closure $prepare = null): void
     {
         AiMessage::query()->create([
             'conversation_id' => $conversation->id,
             'role' => AiMessage::ROLE_USER,
             'content' => $message,
         ]);
+
+        if ($prepare instanceof Closure) {
+            $prepare($conversation);
+        }
 
         dispatch(new RunAssistantTurn($conversation->id, $token));
     }

@@ -16,6 +16,7 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Task;
+use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
 use Throwable;
 
 class RunTaskJob implements ShouldQueue
@@ -65,6 +66,11 @@ class RunTaskJob implements ShouldQueue
             $this->failed();
 
             return;
+        }
+
+        // The crash doctor must not take a scheduled stop or restart for a crash.
+        if ($this->task->action === Task::ACTION_POWER || ($this->task->action === Task::ACTION_COMMAND && CrashRecorder::isStopCommand($server, $this->task->payload))) {
+            CrashRecorder::expectPowerChange($server, $this->task->action === Task::ACTION_POWER ? $this->task->payload : 'stop');
         }
 
         // Perform the provided task against the daemon.

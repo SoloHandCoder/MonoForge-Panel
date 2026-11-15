@@ -77,7 +77,7 @@ test('every server tool is registered under the server scope', function (): void
     $names = array_map(fn (AssistantTool $tool): string => $tool->name(), resolve(ToolRegistry::class)->for('server', context($user, $server)));
 
     expect($names)->toHaveCount(count(AssistantToolServiceProvider::SERVER_TOOLS))
-        ->toContain('server_status', 'read_console', 'list_files', 'read_file', 'search_files', 'list_backups', 'list_schedules', 'get_startup', 'get_network', 'write_file', 'delete_files', 'rename_file', 'send_command', 'power', 'create_backup', 'update_startup_variable');
+        ->toContain('server_status', 'read_console', 'list_files', 'read_file', 'search_files', 'list_backups', 'list_schedules', 'get_startup', 'get_network', 'write_file', 'delete_files', 'rename_file', 'send_command', 'power', 'create_backup', 'update_startup_variable', 'set_docker_image');
 });
 
 test('the registry only offers a subuser the tools their permissions allow', function (): void {
@@ -118,6 +118,7 @@ test('a subuser without the permission cannot run the tool', function (string $c
     'power' => [Tools\PowerTool::class, ['signal' => 'start']],
     'create_backup' => [Tools\CreateBackupTool::class, []],
     'update_startup_variable' => [Tools\UpdateStartupVariableTool::class, ['key' => 'X', 'value' => 'y']],
+    'set_docker_image' => [Tools\SetDockerImageTool::class, ['image' => 'ghcr.io/pterodactyl/yolks:java_21']],
 ]);
 
 test('permissions are checked again when the tool runs', function (): void {
@@ -163,6 +164,7 @@ test('changing tools always need confirmation', function (string $class): void {
     Tools\PowerTool::class,
     Tools\CreateBackupTool::class,
     Tools\UpdateStartupVariableTool::class,
+    Tools\SetDockerImageTool::class,
     Tools\RevealStartupVariableTool::class,
 ]);
 

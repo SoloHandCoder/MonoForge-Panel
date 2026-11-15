@@ -57,6 +57,9 @@ final class ReadConsoleTool extends ServerTool
             return new ToolResult('(the console has no output)', ['lines' => 0]);
         }
 
+        // Long lines are cut from the oldest end, so the newest output (where a crash shows) stays.
+        $text = ReadFileTool::tail($text, $count);
+
         // Plugins sometimes print tokens or passwords; the model gets them masked, the user's card in full.
         $masked = ReadFileTool::forModel(SecretRedactor::redactLog($text));
 
