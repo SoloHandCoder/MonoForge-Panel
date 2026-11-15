@@ -2654,13 +2654,13 @@ export type AdminUpdateGeneralSettingsRequest = {
 
 export type AdminUpdateMailSettingsRequest = {
     /**
-     * The mail driver. Defaults to smtp when omitted.
+     * The driver.
      */
-    driver?: 'smtp' | 'resend' | 'log';
+    driver: 'smtp' | 'resend' | 'log';
     /**
-     * Required when the driver is smtp.
+     * The smtp.
      */
-    smtp?: {
+    smtp: {
         /**
          * The smtp host.
          */
@@ -2682,25 +2682,28 @@ export type AdminUpdateMailSettingsRequest = {
          */
         password?: string | null;
         /**
-         * The smtp from address. Must be a valid email address. Legacy: use from_address.
+         * The smtp from address. Must be a valid email address.
          */
         from_address?: string | null;
         /**
-         * The smtp from name. Must not be greater than 191 characters. Legacy: use from_name.
+         * The smtp from name. Must not be greater than 191 characters.
          */
         from_name?: string | null;
     };
     /**
-     * The sender address. Must be a valid email address.
+     * The from address. Must be a valid email address.
      */
-    from_address?: string;
+    from_address: string;
     /**
-     * The sender name. Must not be greater than 191 characters.
+     * The from name. Must not be greater than 191 characters.
      */
     from_name?: string | null;
+    /**
+     * The resend.
+     */
     resend?: {
         /**
-         * The Resend API key (write-only). Blank keeps the stored key, "!e" clears it.
+         * The resend api key. Must not be greater than 255 characters.
          */
         api_key?: string | null;
     };
@@ -2739,6 +2742,43 @@ export type AdminUpdateAdvancedSettingsRequest = {
      * The pterodactyl:client features:allocations:range end. This field is required when <code>pterodactyl:client_features:allocations:enabled</code> is <code>true</code>. Must be between 1024 and 65535.
      */
     'pterodactyl:client_features:allocations:range_end'?: number | null;
+};
+
+export type AdminUpdateLoginProvidersRequest = {
+    /**
+     * The discord.
+     */
+    discord: {
+        /**
+         * Whether users can sign in with Discord.
+         */
+        enabled: boolean;
+        /**
+         * The Discord application client ID.
+         */
+        client_id?: string | null;
+        /**
+         * A new Discord client secret, or blank to keep the stored one.
+         */
+        client_secret?: string | null;
+    };
+    /**
+     * The google.
+     */
+    google: {
+        /**
+         * Whether users can sign in with Google.
+         */
+        enabled: boolean;
+        /**
+         * The Google OAuth client ID.
+         */
+        client_id?: string | null;
+        /**
+         * A new Google client secret, or blank to keep the stored one.
+         */
+        client_secret?: string | null;
+    };
 };
 
 export type AdminUpdateRegistrationSettingsRequest = {
@@ -3574,6 +3614,17 @@ export type ClientDeleteSshKeyRequest = {
     fingerprint: string;
 };
 
+export type ClientSetAPasswordRequest = {
+    /**
+     * The password. Must be at least 8 characters.
+     */
+    password: string;
+    /**
+     * Confirmation matching the new password.
+     */
+    password_confirmation: string;
+};
+
 export type ClientSendServerCommandRequest = {
     /**
      * The console command to send. Must be at least 1 character.
@@ -4320,6 +4371,21 @@ export type AdminListEggCatalogResponseBody = {
  */
 export type AdminExportEggResponseBody = string;
 
+export type AdminGetLoginProvidersResponseBody = {
+    discord?: {
+        enabled?: boolean;
+        client_id?: string;
+        client_secret_set?: boolean;
+        callback_url?: string;
+    };
+    google?: {
+        enabled?: boolean;
+        client_id?: string;
+        client_secret_set?: boolean;
+        callback_url?: string;
+    };
+};
+
 export type AdminGetRegistrationSettingsResponseBody = {
     registration_enabled?: boolean;
     captcha_provider?: string;
@@ -4502,6 +4568,24 @@ export type ClientListAccountActivityFilterOptionsResponseBody = {
             email?: string;
         }>;
     };
+};
+
+export type ClientListConnectedAccountsResponseBody = {
+    has_password?: boolean;
+    providers?: Array<{
+        provider?: string;
+        label?: string;
+        enabled?: boolean;
+        linked?: boolean;
+        username?: string;
+        email?: string;
+        avatar?: string;
+        linked_at?: string;
+    }>;
+};
+
+export type ClientStartLinkingAnAccountResponseBody = {
+    url?: string;
 };
 
 export type ClientGetWebsocketCredentialsResponseBody = {
@@ -5660,6 +5744,10 @@ export type ClientListAccountActivitySortQueryParameter = 'timestamp' | '-timest
 export type ClientListAccountActivityIncludeQueryParameter = string;
 
 export type ClientDeleteAccountApiKeyIdentifierPathParameter = string;
+
+export type ClientStartLinkingAnAccountProviderPathParameter = string;
+
+export type ClientUnlinkAnAccountProviderPathParameter = string;
 
 export type ClientGetServerServerUuidPathParameter = string;
 
@@ -10872,7 +10960,7 @@ export type AdminUpdateGeneralSettingsResponses = {
 export type AdminUpdateGeneralSettingsResponse = AdminUpdateGeneralSettingsResponses[keyof AdminUpdateGeneralSettingsResponses];
 
 export type AdminUpdateMailSettingsData = {
-    body?: AdminUpdateMailSettingsRequest;
+    body: AdminUpdateMailSettingsRequest;
     path?: never;
     query?: never;
     url: '/api/admin/settings/mail';
@@ -10880,7 +10968,7 @@ export type AdminUpdateMailSettingsData = {
 
 export type AdminUpdateMailSettingsErrors = {
     /**
-     * The panel is not configured to use SMTP mail.
+     * The panel reads its settings from the environment only.
      */
     400: ErrorEnvelope;
     /**
@@ -10973,6 +11061,68 @@ export type AdminUpdateAdvancedSettingsResponses = {
 };
 
 export type AdminUpdateAdvancedSettingsResponse = AdminUpdateAdvancedSettingsResponses[keyof AdminUpdateAdvancedSettingsResponses];
+
+export type AdminGetLoginProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/login-providers';
+};
+
+export type AdminGetLoginProvidersErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetLoginProvidersError = AdminGetLoginProvidersErrors[keyof AdminGetLoginProvidersErrors];
+
+export type AdminGetLoginProvidersResponses = {
+    /**
+     * Login provider settings returned.
+     */
+    200: AdminGetLoginProvidersResponseBody;
+};
+
+export type AdminGetLoginProvidersResponse = AdminGetLoginProvidersResponses[keyof AdminGetLoginProvidersResponses];
+
+export type AdminUpdateLoginProvidersData = {
+    body: AdminUpdateLoginProvidersRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/login-providers';
+};
+
+export type AdminUpdateLoginProvidersErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateLoginProvidersError = AdminUpdateLoginProvidersErrors[keyof AdminUpdateLoginProvidersErrors];
+
+export type AdminUpdateLoginProvidersResponses = {
+    /**
+     * Login provider settings updated.
+     */
+    204: void;
+};
+
+export type AdminUpdateLoginProvidersResponse = AdminUpdateLoginProvidersResponses[keyof AdminUpdateLoginProvidersResponses];
 
 export type AdminGetRegistrationSettingsData = {
     body?: never;
@@ -14335,6 +14485,138 @@ export type ClientDeleteSshKeyResponses = {
 };
 
 export type ClientDeleteSshKeyResponse = ClientDeleteSshKeyResponses[keyof ClientDeleteSshKeyResponses];
+
+export type ClientListConnectedAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/oauth';
+};
+
+export type ClientListConnectedAccountsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type ClientListConnectedAccountsError = ClientListConnectedAccountsErrors[keyof ClientListConnectedAccountsErrors];
+
+export type ClientListConnectedAccountsResponses = {
+    /**
+     * Connected accounts returned.
+     */
+    200: ClientListConnectedAccountsResponseBody;
+};
+
+export type ClientListConnectedAccountsResponse = ClientListConnectedAccountsResponses[keyof ClientListConnectedAccountsResponses];
+
+export type ClientSetAPasswordData = {
+    body: ClientSetAPasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/oauth/password';
+};
+
+export type ClientSetAPasswordErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientSetAPasswordError = ClientSetAPasswordErrors[keyof ClientSetAPasswordErrors];
+
+export type ClientSetAPasswordResponses = {
+    /**
+     * Password set.
+     */
+    204: void;
+};
+
+export type ClientSetAPasswordResponse = ClientSetAPasswordResponses[keyof ClientSetAPasswordResponses];
+
+export type ClientStartLinkingAnAccountData = {
+    body?: never;
+    path: {
+        provider: ClientStartLinkingAnAccountProviderPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/oauth/{provider}/link';
+};
+
+export type ClientStartLinkingAnAccountErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientStartLinkingAnAccountError = ClientStartLinkingAnAccountErrors[keyof ClientStartLinkingAnAccountErrors];
+
+export type ClientStartLinkingAnAccountResponses = {
+    /**
+     * Authorization URL returned.
+     */
+    200: ClientStartLinkingAnAccountResponseBody;
+};
+
+export type ClientStartLinkingAnAccountResponse = ClientStartLinkingAnAccountResponses[keyof ClientStartLinkingAnAccountResponses];
+
+export type ClientUnlinkAnAccountData = {
+    body?: never;
+    path: {
+        provider: ClientUnlinkAnAccountProviderPathParameter;
+    };
+    query?: never;
+    url: '/api/client/account/oauth/{provider}';
+};
+
+export type ClientUnlinkAnAccountErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientUnlinkAnAccountError = ClientUnlinkAnAccountErrors[keyof ClientUnlinkAnAccountErrors];
+
+export type ClientUnlinkAnAccountResponses = {
+    /**
+     * Account unlinked.
+     */
+    204: void;
+};
+
+export type ClientUnlinkAnAccountResponse = ClientUnlinkAnAccountResponses[keyof ClientUnlinkAnAccountResponses];
 
 export type ClientGetServerData = {
     body?: never;
