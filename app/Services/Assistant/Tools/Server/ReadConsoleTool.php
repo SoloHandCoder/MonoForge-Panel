@@ -8,6 +8,7 @@ use Pterodactyl\Contracts\Servers\ReadsServerLogs;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Services\Assistant\ToolResult;
+use Pterodactyl\Services\Assistant\Tools\SecretRedactor;
 
 final class ReadConsoleTool extends ServerTool
 {
@@ -52,6 +53,15 @@ final class ReadConsoleTool extends ServerTool
         // Console lines carry ANSI colour codes, which only cost tokens.
         $text = preg_replace('/\e\[[\d;?]*[A-Za-z]/', '', implode("\n", $lines)) ?? '';
 
-        return new ToolResult($text === '' ? '(the console has no output)' : $text, ['lines' => count($lines)]);
+        if ($text === '') {
+            return new ToolResult('(the console has no output)', ['lines' => 0]);
+        }
+
+        // Plugins sometimes print tokens or passwords; the model gets them masked, the user's card in full.
+        $masked = SecretRedactor::redact($text);
+
+        return $masked === $text
+            ? new ToolResult($text, ['lines' => count($lines)])
+            : new ToolResult($masked, ['lines' => count($lines), 'hidden_from_assistant' => true], $text);
     }
 }

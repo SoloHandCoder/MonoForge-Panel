@@ -118,7 +118,12 @@ final class ReadFileTool extends ServerTool
         }
 
         if (! $sensitive) {
-            return new ToolResult(SecretRedactor::redact($contents), $display);
+            $masked = SecretRedactor::redact($contents);
+
+            // The user's card shows the file as it is; only the model gets the masked copy.
+            return $masked === $contents
+                ? new ToolResult($contents, $display)
+                : new ToolResult($masked, [...$display, 'hidden_from_assistant' => true], $contents);
         }
 
         $forModel = ServerPaths::isKeyMaterial($path)

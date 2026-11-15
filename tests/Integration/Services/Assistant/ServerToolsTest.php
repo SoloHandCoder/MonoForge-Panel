@@ -295,10 +295,17 @@ test('secret values never reach the model, and an allowed sensitive read shows t
     ];
     $tool = tool(Tools\ReadFileTool::class);
 
-    // An ordinary config: secret-looking values are masked for the model, nothing private kept.
+    // An ordinary config: secret-looking values are masked for the model, the user sees the file as it is.
     $fakes['file']->content = "database:\n  host: db\n  password: hunter2\n";
     $result = $tool->execute(['path' => '/plugins/x/config.yml'], context($user, $server));
     expect($result->content)->toContain('host: db')->toContain('password: '.SecretRedactor::PLACEHOLDER)->not->toContain('hunter2')
+        ->and($result->private)->toBe("database:\n  host: db\n  password: hunter2\n")
+        ->and($result->display)->toMatchArray(['hidden_from_assistant' => true]);
+
+    // Nothing to mask: nothing private either.
+    $fakes['file']->content = "rcon.port=25575\nenable-rcon=true\n";
+    $result = $tool->execute(['path' => '/plugins/x/config.yml'], context($user, $server));
+    expect($result->content)->toBe("rcon.port=25575\nenable-rcon=true\n")
         ->and($result->private)->toBeNull();
 
     // A sensitive file: masked for the model, in full for the user.
@@ -448,7 +455,39 @@ test('writing a new file needs file.create and an existing one file.update', fun
     $fakes['file']->assertContentPut('/new.txt', 'hello');
 });
 
-test('redaction placeholders are never written back into a file', function (): void {
+test('a masked file the model writes back keeps its secrets from the file on the server', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'server.properties', 'file' => true, 'symlink' => false, 'size' => 60]];
+    $fakes['file']->content = "motd=Old\nrcon.port=25575\nrcon.password=hunter2\n";
+    $tool = tool(Tools\WriteFileTool::class);
+
+    // What the model read, edited: the MOTD changes, the mask stays.
+    $edited = str_replace('motd=Old', 'motd=New', SecretRedactor::redact($fakes['file']->content));
+    expect($edited)->toContain('rcon.password='.SecretRedactor::PLACEHOLDER)
+        ->and($tool->callDetails(['path' => '/server.properties', 'content' => $edited]))->toContain(['label' => 'Hidden values', 'value' => 'Each '.SecretRedactor::PLACEHOLDER.' keeps its current value from the file on the server.']);
+
+    $tool->execute(['path' => '/server.properties', 'content' => $edited], context($user, $server));
+    $fakes['file']->assertContentPut('/server.properties', "motd=New\nrcon.port=25575\nrcon.password=hunter2\n");
+
+    // A mask that matches no hidden value of the file is refused, and nothing is written.
+    expect(fn (): ToolResult => $tool->execute(['path' => '/server.properties', 'content' => "motd=New\nquery.password=".SecretRedactor::PLACEHOLDER], context($user, $server)))
+        ->toThrow(ToolException::class, 'no matching hidden value');
+    expect($fakes['file']->callsFor('putContent'))->toHaveCount(1);
+});
+
+test('secrets printed on the console are masked for the model', function (): void {
+    [$user, $server] = $this->generateTestAccount([Permissions::WebsocketConnect->value]);
+    $fakes = wings();
+    $fakes['server']->logs = ['[12:00:00] Starting', '[12:00:01] Webhook https://discord.com/api/webhooks/1/secretpart', 'token=abc123'];
+
+    $result = tool(Tools\ReadConsoleTool::class)->execute(['lines' => 10], context($user, $server));
+
+    expect($result->content)->not->toContain('secretpart')->not->toContain('abc123')->toContain('Starting')
+        ->and($result->private)->toContain('secretpart');
+});
+
+test('address placeholders are never written back into a file', function (): void {
     [$user, $server] = $this->generateTestAccount();
     $fakes = wings();
 

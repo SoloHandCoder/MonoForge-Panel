@@ -29,12 +29,12 @@ class OutputRedactor
     private ?array $hosts = null;
 
     /**
-     * Whether the text still holds a redaction placeholder, such as a file the model read
-     * and is now writing back.
+     * Whether the text still holds an address placeholder, such as a file the model read
+     * and is now writing back. (Masked secrets are restored instead, see SecretRedactor.)
      */
     public static function containsPlaceholder(string $text): bool
     {
-        return str_contains($text, self::IP) || str_contains($text, self::HOST) || SecretRedactor::containsPlaceholder($text);
+        return str_contains($text, self::IP) || str_contains($text, self::HOST);
     }
 
     /**
