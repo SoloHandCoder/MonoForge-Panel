@@ -76,12 +76,12 @@ class TebexPaymentController extends AdminApiController
     }
 
     #[Endpoint('Approve and credit a Tebex payment', 'Credits a flagged (underpaid or unmatched) payment through the normal credit path, so a later refund or chargeback takes the tokens back. Pass user_id when the payment matched no panel user. Approving a payment that is already credited changes nothing. Root administrators only, from a panel session (API keys get 403).')]
-    #[UrlParam('tebex_payment', 'integer', 'The ID of the Tebex payment.', example: 1)]
+    #[UrlParam('payment_id', 'integer', 'The ID of the Tebex payment.', example: 1)]
     #[ScribeResponse(self::APPROVED_EXAMPLE, description: 'Payment credited.')]
-    public function approve(ApproveTebexPaymentRequest $request, TebexWebhookProcessor $processor, TebexPayment $tebexPayment): JsonResponse
+    public function approve(ApproveTebexPaymentRequest $request, TebexWebhookProcessor $processor, TebexPayment $payment): JsonResponse
     {
-        $alreadyCredited = $tebexPayment->processed_at !== null;
-        $payment = $processor->approve($tebexPayment, $request->recipient());
+        $alreadyCredited = $payment->processed_at !== null;
+        $payment = $processor->approve($payment, $request->recipient());
 
         if (! $alreadyCredited) {
             Activity::event('admin:tebex-payment.approve')

@@ -2303,6 +2303,13 @@ export type AdminUpdateTebexSettingsRequest = {
     webhook_ips: Array<string>;
 };
 
+export type AdminApproveAndCreditATebexPaymentRequest = {
+    /**
+     * The user id. Must match an existing stored value.
+     */
+    user_id?: number | null;
+};
+
 export type AdminCreateTokenPackRequest = {
     /**
      * The tebex package id. Must match the regex /^[0-9]+$/. Must not be greater than 20 characters.
@@ -2482,7 +2489,7 @@ export type AdminUpdateUserRequest = {
 
 export type AdminAdjustUserTokensRequest = {
     /**
-     * The amount. Must not be one of <code>0</code> Must be at least -1000000000000. Must not be greater than 1000000000000.
+     * The amount. Must not be one of <code>0</code> Must be at least -1000000. Must not be greater than 1000000.
      */
     amount: number;
     /**
@@ -5055,6 +5062,25 @@ export type AdminListTebexPaymentsResponseBody = {
     };
 };
 
+export type AdminApproveAndCreditATebexPaymentResponseBody = {
+    id?: number;
+    transaction_id?: string;
+    user?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    status?: string;
+    tokens?: number;
+    tokens_reversed?: number;
+    amount?: string;
+    currency?: string;
+    events?: Array<string>;
+    flagged?: boolean;
+    processed_at?: string;
+    created_at?: string;
+};
+
 export type AdminListTokenPacksResponseBody = {
     data?: Array<{
         id?: number;
@@ -6045,6 +6071,8 @@ export type AdminListTebexPaymentsPageQueryParameter = number;
  * Results to return per page.
  */
 export type AdminListTebexPaymentsPerPageQueryParameter = number;
+
+export type AdminApproveAndCreditATebexPaymentPaymentIdPathParameter = number;
 
 export type AdminUpdateTokenPackTokenPackIdPathParameter = number;
 
@@ -8671,6 +8699,48 @@ export type AdminListTebexPaymentsResponses = {
 };
 
 export type AdminListTebexPaymentsResponse = AdminListTebexPaymentsResponses[keyof AdminListTebexPaymentsResponses];
+
+export type AdminApproveAndCreditATebexPaymentData = {
+    body?: AdminApproveAndCreditATebexPaymentRequest;
+    path: {
+        /**
+         * The ID of the Tebex payment.
+         */
+        payment_id: AdminApproveAndCreditATebexPaymentPaymentIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/tebex/payments/{payment_id}/approve';
+};
+
+export type AdminApproveAndCreditATebexPaymentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminApproveAndCreditATebexPaymentError = AdminApproveAndCreditATebexPaymentErrors[keyof AdminApproveAndCreditATebexPaymentErrors];
+
+export type AdminApproveAndCreditATebexPaymentResponses = {
+    /**
+     * Payment credited.
+     */
+    200: AdminApproveAndCreditATebexPaymentResponseBody;
+};
+
+export type AdminApproveAndCreditATebexPaymentResponse = AdminApproveAndCreditATebexPaymentResponses[keyof AdminApproveAndCreditATebexPaymentResponses];
 
 export type AdminListTokenPacksData = {
     body?: never;
