@@ -115,6 +115,7 @@ it('builds the tree from the extensions it is given', async () => {
         'ssh',
         'activity',
         'wallet',
+        'support',
         'given',
     ]);
 });

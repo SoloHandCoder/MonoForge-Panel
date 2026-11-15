@@ -47,6 +47,8 @@ export const ADMIN_NAV: NavCategoryScheme = {
         activity: 'general',
         users: 'users',
         servers: 'users',
+        // Player support tickets sit with the users they come from.
+        support: 'users',
         // The token shop and its billing pages, before their routes declare a group of their own.
         shop: 'billing',
         billing: 'billing',
