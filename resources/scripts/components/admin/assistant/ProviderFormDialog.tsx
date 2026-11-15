@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-form';
 import {
     useSaveAssistantProvider,
     type AssistantProvider,
+    type AssistantProviderHeader,
     type AssistantProviderInput,
     type AssistantProviderPreset,
 } from '@/api/assistant';
@@ -33,28 +34,30 @@ export interface ProviderFormValues {
     contextWindow: number | null;
     supportsTools: boolean;
     enabled: boolean;
-    /** `Header: value`, one per line. */
+    /** `Header: value`, one per line; stored values are never shown, so they start blank. */
     extraHeaders: string;
 }
 
 const presetOptionsOf = (presets: ProviderPresetMap) =>
     providerPresetOrder.map((preset) => ({ value: preset, label: presets[preset].label }));
 
-export const formatHeaders = (headers: Readonly<Record<string, string>>): string =>
-    Object.entries(headers)
-        .map(([name, value]) => `${name}: ${value}`)
-        .join('\n');
+/** The stored headers as `Header:` lines with the value left blank, since values stay on the server. */
+export const formatHeaders = (headers: readonly AssistantProviderHeader[]): string =>
+    headers.map(({ name }) => `${name}:`).join('\n');
 
-/** `Header: value` lines as a header map; lines without a colon are skipped. */
-export const parseHeaders = (text: string): Record<string, string> | null => {
-    const headers: Record<string, string> = {};
+/**
+ * `Header: value` lines as a header map; lines without a colon are skipped. A blank value is
+ * null, which keeps the stored value of that header.
+ */
+export const parseHeaders = (text: string): Record<string, string | null> | null => {
+    const headers: Record<string, string | null> = {};
 
     for (const line of text.split('\n')) {
         const at = line.indexOf(':');
         const name = line.slice(0, at).trim();
 
         if (at > 0 && name) {
-            headers[name] = line.slice(at + 1).trim();
+            headers[name] = line.slice(at + 1).trim() || null;
         }
     }
 
@@ -214,7 +217,7 @@ export default function ProviderFormDialog({ open, onClose, provider, presets = 
                         {(field) => (
                             <field.TextAreaField
                                 label='Extra headers'
-                                description='Optional, one per line as Header: value.'
+                                description='Optional, one per line as Header: value. Stored values are hidden: leave a value blank to keep it, remove the line to delete the header.'
                                 rows={2}
                             />
                         )}

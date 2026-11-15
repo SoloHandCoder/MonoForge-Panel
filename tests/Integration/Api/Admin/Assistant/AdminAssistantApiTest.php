@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Admin\Assistant\AdminAssistantApiTest;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Assistant\AiConversation;
@@ -90,12 +91,33 @@ test('providers are managed with a write-only key', function (): void {
         'base_url' => 'https://api.cline.bot/api/v1',
         'api_key' => 'sk-very-secret',
         'model' => 'cline-pass/deepseek-v4.1-flash',
-        'extra_headers' => ['X-Team' => 'ops'],
+        'extra_headers' => ['X-Team' => 'ops', 'api-key' => 'azure-header-secret'],
     ])->assertCreated();
 
-    $response->assertJsonPath('has_key', true)->assertJsonPath('extra_headers', ['X-Team' => 'ops'])->assertJsonMissingPath('api_key');
-    expect($response->getContent())->not->toContain('sk-very-secret');
+    // Header values are write-only, like the key: only names and whether they have a value.
+    $response->assertJsonPath('has_key', true)
+        ->assertJsonPath('extra_headers', [['name' => 'X-Team', 'has_value' => true], ['name' => 'api-key', 'has_value' => true]])
+        ->assertJsonMissingPath('api_key');
+    expect($response->getContent())->not->toContain('sk-very-secret')->not->toContain('azure-header-secret')->not->toContain('ops');
     $id = $response->json('id');
+
+    // At rest the headers are encrypted.
+    $raw = (string) DB::table('ai_providers')->where('id', $id)->value('extra_headers');
+    expect($raw)->not->toContain('azure-header-secret')->not->toContain('X-Team')
+        ->and(AiProvider::query()->findOrFail($id)->extra_headers)->toBe(['X-Team' => 'ops', 'api-key' => 'azure-header-secret']);
+
+    // A header sent without a value keeps its stored value, a new value replaces it, and a header
+    // left out of the list is removed. Leaving extra_headers out keeps them all.
+    $this->putJson("/api/admin/assistant/providers/{$id}", ['extra_headers' => ['api-key' => null, 'X-Title' => 'Panel']])
+        ->assertOk()
+        ->assertJsonPath('extra_headers', [['name' => 'api-key', 'has_value' => true], ['name' => 'X-Title', 'has_value' => true]]);
+    expect(AiProvider::query()->findOrFail($id)->extra_headers)->toBe(['api-key' => 'azure-header-secret', 'X-Title' => 'Panel']);
+    $this->putJson("/api/admin/assistant/providers/{$id}", ['model' => 'other'])->assertOk();
+    expect(AiProvider::query()->findOrFail($id)->extra_headers)->toBe(['api-key' => 'azure-header-secret', 'X-Title' => 'Panel']);
+    $this->putJson("/api/admin/assistant/providers/{$id}", ['extra_headers' => ['X-New' => null]])->assertUnprocessable();
+    $this->putJson("/api/admin/assistant/providers/{$id}", ['extra_headers' => ['api-key' => 'rotated']])->assertOk();
+    expect(AiProvider::query()->findOrFail($id)->extra_headers)->toBe(['api-key' => 'rotated']);
+
     $this->assertActivityLogged('admin:assistant.provider.create');
 
     // Leaving the key out keeps it; null removes it.

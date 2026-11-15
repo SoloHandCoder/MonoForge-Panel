@@ -7,6 +7,7 @@ namespace Pterodactyl\Http\Requests\Api\Admin\Assistant;
 use Closure;
 use Illuminate\Validation\Rule;
 use Pterodactyl\Enum\AiProviderPreset;
+use Pterodactyl\Models\Assistant\AiProvider;
 use Pterodactyl\Services\Assistant\Chat\ProviderUrl;
 
 class StoreAiProviderRequest extends AdminAssistantRequest
@@ -15,6 +16,9 @@ class StoreAiProviderRequest extends AdminAssistantRequest
 
     /**
      * The key is write-only: send it to set it, null to remove it, or leave it out to keep it.
+     * Extra header values are write-only too: extra_headers lists every header by name, with a
+     * new value to set it, or null (or "") to keep the stored value. A header left out of the
+     * list is removed, and leaving extra_headers out keeps them all.
      *
      * @return ValidationRules
      */
@@ -34,11 +38,11 @@ class StoreAiProviderRequest extends AdminAssistantRequest
     }
 
     /**
-     * The validated attributes to store.
+     * The validated attributes to store, over the provider's current ones when it is updated.
      *
      * @return array<string, mixed>
      */
-    public function providerAttributes(): array
+    public function providerAttributes(?AiProvider $existing = null): array
     {
         $attributes = [];
         foreach (['name', 'preset', 'base_url', 'model'] as $key) {
@@ -53,8 +57,7 @@ class StoreAiProviderRequest extends AdminAssistantRequest
         }
 
         if ($this->has('extra_headers')) {
-            $headers = $this->input('extra_headers');
-            $attributes['extra_headers'] = is_array($headers) && $headers !== [] ? array_map(fn (mixed $value): string => is_scalar($value) ? (string) $value : '', $headers) : null;
+            $attributes['extra_headers'] = $this->headers($existing);
         }
 
         if ($this->has('context_window')) {
@@ -68,6 +71,41 @@ class StoreAiProviderRequest extends AdminAssistantRequest
         }
 
         return $attributes;
+    }
+
+    /**
+     * The headers to store: sent values replace stored ones, and a header sent without a value
+     * keeps its stored value.
+     *
+     * @return array<string, string>|null
+     */
+    private function headers(?AiProvider $existing): ?array
+    {
+        $sent = $this->input('extra_headers');
+        if (! is_array($sent) || $sent === []) {
+            return null;
+        }
+
+        $stored = $existing->extra_headers ?? [];
+        $headers = [];
+        foreach ($sent as $name => $value) {
+            $name = (string) $name;
+            if (is_string($value) && $value !== '') {
+                $headers[$name] = $value;
+            } elseif (is_scalar($stored[$name] ?? null)) {
+                $headers[$name] = (string) $stored[$name];
+            }
+        }
+
+        return $headers === [] ? null : $headers;
+    }
+
+    /** The provider being updated, when there is one. */
+    private function existingProvider(): ?AiProvider
+    {
+        $provider = $this->route('provider');
+
+        return $provider instanceof AiProvider ? $provider : null;
     }
 
     private function allowedUrl(string $attribute, mixed $value, Closure $fail): void
@@ -94,6 +132,16 @@ class StoreAiProviderRequest extends AdminAssistantRequest
                 $fail("The {$name} header cannot be set here; use the API key field for authentication.");
 
                 return;
+            }
+
+            if ($header === null || $header === '') {
+                if (! array_key_exists($name, $this->existingProvider()->extra_headers ?? [])) {
+                    $fail("Enter a value for the {$name} header.");
+
+                    return;
+                }
+
+                continue;
             }
 
             if (! is_string($header) || mb_strlen($header) > 1024 || preg_match('/[\r\n]/', $header) === 1) {

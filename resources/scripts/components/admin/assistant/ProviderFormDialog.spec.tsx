@@ -24,7 +24,7 @@ const provider: AssistantProvider = {
     preset: 'clinepass',
     base_url: 'https://api.cline.bot/api/v1',
     model: 'cline-pass/deepseek-v4.1-flash',
-    extra_headers: { 'X-Title': 'MonoForge' },
+    extra_headers: [{ name: 'X-Title', has_value: true }],
     context_window: 64000,
     supports_tools: true,
     enabled: true,
@@ -60,7 +60,8 @@ describe('ProviderFormDialog', () => {
         expect(body).toMatchObject({
             preset: 'clinepass',
             context_window: 64000,
-            extra_headers: { 'X-Title': 'MonoForge' },
+            // The stored value is never shown, and an untouched header keeps it.
+            extra_headers: { 'X-Title': null },
         });
         await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
@@ -73,9 +74,13 @@ describe('ProviderFormDialog', () => {
 });
 
 describe('provider helpers', () => {
-    it('parses header lines', () => {
-        expect(parseHeaders('X-A: 1\nbad line\n X-B :two ')).toEqual({ 'X-A': '1', 'X-B': 'two' });
+    it('parses header lines, a blank value keeping the stored one', () => {
+        expect(parseHeaders('X-A: 1\nbad line\n X-B :two \nX-C:')).toEqual({ 'X-A': '1', 'X-B': 'two', 'X-C': null });
         expect(parseHeaders('')).toBeNull();
+    });
+
+    it('prefills stored headers by name only', () => {
+        expect(providerFormValues(provider).extraHeaders).toBe('X-Title:');
     });
 
     it('picks the sub-tab from the path and steps months', () => {

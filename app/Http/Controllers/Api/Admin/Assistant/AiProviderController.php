@@ -35,7 +35,7 @@ class AiProviderController extends AdminApiController
         'base_url' => 'https://api.cline.bot/api/v1',
         'has_key' => true,
         'model' => 'cline-pass/deepseek-v4.1-flash',
-        'extra_headers' => [],
+        'extra_headers' => [['name' => 'X-Title', 'has_value' => true]],
         'context_window' => 32000,
         'supports_tools' => true,
         'enabled' => true,
@@ -88,12 +88,12 @@ class AiProviderController extends AdminApiController
         return new JsonResponse($provider->toApiArray(), Response::HTTP_CREATED);
     }
 
-    #[Endpoint('Update an AI provider', 'Changes the fields that are sent. api_key: a new key replaces the stored one, null removes it, leaving it out keeps it.')]
+    #[Endpoint('Update an AI provider', 'Changes the fields that are sent. api_key: a new key replaces the stored one, null removes it, leaving it out keeps it. extra_headers: list every header by name with a new value, or with null to keep its stored value; headers left out are removed. Header values are never returned.')]
     #[UrlParam('provider_id', 'integer', 'The AI provider ID.', example: 1)]
     #[ScribeResponse(self::PROVIDER_EXAMPLE, description: 'Provider updated.')]
     public function update(UpdateAiProviderRequest $request, AiProvider $provider): JsonResponse
     {
-        $provider->fill($request->providerAttributes())->save();
+        $provider->fill($request->providerAttributes($provider))->save();
 
         Activity::event('admin:assistant.provider.update')->property('name', $provider->name)->log();
 

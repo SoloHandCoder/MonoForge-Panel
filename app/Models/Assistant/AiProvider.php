@@ -13,8 +13,9 @@ use Pterodactyl\Enum\AiProviderPreset;
 use Pterodactyl\Models\Model;
 
 /**
- * An OpenAI-compatible chat completions API the assistant can use. The API key is encrypted
- * at rest and never leaves the panel: API responses only say whether one is set.
+ * An OpenAI-compatible chat completions API the assistant can use. The API key and the extra
+ * header values (which can hold keys too) are encrypted at rest and never leave the panel:
+ * API responses only say whether a key is set and which headers have a value.
  *
  * @property int $id
  * @property string $name
@@ -40,7 +41,7 @@ use Pterodactyl\Models\Model;
     'supports_tools',
     'enabled',
 ])]
-#[Hidden(['api_key'])]
+#[Hidden(['api_key', 'extra_headers'])]
 #[RouteKey('id')]
 #[Table(name: 'ai_providers')]
 class AiProvider extends Model
@@ -61,7 +62,7 @@ class AiProvider extends Model
         return [
             'preset' => AiProviderPreset::class,
             'api_key' => 'encrypted',
-            'extra_headers' => 'array',
+            'extra_headers' => 'encrypted:array',
             'context_window' => 'int',
             'supports_tools' => 'bool',
             'enabled' => 'bool',
@@ -73,6 +74,21 @@ class AiProvider extends Model
     public function hasKey(): bool
     {
         return is_string($this->api_key) && $this->api_key !== '';
+    }
+
+    /**
+     * The extra headers by name, without their values.
+     *
+     * @return list<array{name: string, has_value: bool}>
+     */
+    public function headerNames(): array
+    {
+        $names = [];
+        foreach ($this->extra_headers ?? [] as $name => $value) {
+            $names[] = ['name' => (string) $name, 'has_value' => is_scalar($value) && (string) $value !== ''];
+        }
+
+        return $names;
     }
 
     /**
@@ -89,7 +105,7 @@ class AiProvider extends Model
             'base_url' => $this->base_url,
             'has_key' => $this->hasKey(),
             'model' => $this->model,
-            'extra_headers' => $this->extra_headers ?? (object) [],
+            'extra_headers' => $this->headerNames(),
             'context_window' => $this->context_window,
             'supports_tools' => $this->supports_tools,
             'enabled' => $this->enabled,
