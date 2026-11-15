@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as OAuthApi from '@/api/account/oauth';
 import { queryClient } from '@/api/queryClient';
 import { siteSettingsQueryKey } from '@/api/settings/queries';
 import type { SiteSettings } from '@/api/settings/types';
@@ -37,7 +38,7 @@ vi.mock('@/api/auth/queries', () => ({
 }));
 
 vi.mock('@/api/account/oauth', async (importOriginal) => ({
-    ...(await importOriginal<typeof import('@/api/account/oauth')>()),
+    ...(await importOriginal<typeof OAuthApi>()),
     useStartOAuthLogin: () => ({ mutate: mocks.startOAuth, isPending: false, variables: undefined }),
 }));
 
