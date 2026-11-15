@@ -66,6 +66,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LegalController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\PluginSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\StatusPageController;
@@ -620,6 +621,10 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     Route::put('/legal/{document}', [LegalController::class, 'update'])
         ->whereIn('document', LegalDocument::values())
         ->name('.legal.update');
+
+    // Phase 6: one-click plugins (the CurseForge API key).
+    Route::get('/plugins', [PluginSettingsController::class, 'index'])->name('.plugins');
+    Route::put('/plugins', [PluginSettingsController::class, 'update'])->name('.plugins.update');
 
     // The public status page and the nodes it shows.
     Route::get('/status', [StatusPageController::class, 'index'])->name('.status');

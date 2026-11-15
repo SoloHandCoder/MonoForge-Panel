@@ -32,5 +32,6 @@ return [
         'schedule_update' => 'Allows a user permission to make modifications to an existing server schedule.',
         'schedule_delete' => 'Allows a user to delete a schedule for the server.',
         'assistant_use' => 'Allows a user to chat with the AI assistant on this server, limited to what their other permissions allow.',
+        'plugins_manage' => 'Allows a user to install, update and remove plugins, mods and modpacks.',
     ],
 ];

@@ -21,6 +21,7 @@ $environmentVariables = [
     'monoforge:captcha:turnstile:site_key' => 'TURNSTILE_SITE_KEY',
     'monoforge:captcha:turnstile:secret_key' => 'TURNSTILE_SECRET_KEY',
     'monoforge:privacy:hidden_ips' => 'MONOFORGE_HIDDEN_IPS',
+    'monoforge:plugins:curseforge_key' => 'CURSEFORGE_API_KEY',
 ];
 
 return [
@@ -158,6 +159,20 @@ return [
         'max_tool_iterations' => 8,
         'context_tokens' => 24000,
         'max_output_tokens' => 2048,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | One-click plugins and mods (phase 6)
+    |--------------------------------------------------------------------------
+    |
+    | Modrinth and Hangar need no key. CurseForge is offered once a key from the
+    | CurseForge for Studios console is set here or in Admin > Settings > Plugins,
+    | which stores it encrypted as "monoforge:plugins:curseforge_key".
+    |
+    */
+    'plugins' => [
+        'curseforge_key' => env('CURSEFORGE_API_KEY', ''),
     ],
 
     /*

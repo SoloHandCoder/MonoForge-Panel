@@ -138,6 +138,14 @@ class Permission extends Model
                 'use' => "Allows a user to chat with the AI assistant on this server. The assistant can only do what the user's other permissions allow, and asks before sensitive actions.",
             ],
         ],
+
+        // Phase 6: one-click plugins, mods and modpacks.
+        'plugins' => [
+            'description' => "Permissions that control a user's access to one-click plugins, mods and modpacks for this server.",
+            'keys' => [
+                'manage' => 'Allows a user to install, update and remove plugins, mods and modpacks from Modrinth, Hangar and CurseForge. Browsing them needs the file read permission.',
+            ],
+        ],
     ];
 
     /**

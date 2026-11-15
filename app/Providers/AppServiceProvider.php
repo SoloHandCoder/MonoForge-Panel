@@ -276,6 +276,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('files-search:'.($user instanceof User ? $user->id : (string) $request->ip()).':'.$serverKey);
         });
 
+        // One-click plugins: catalog lookups 60 a minute and installs 15 a minute per user and server.
+        // The catalogs themselves are also limited panel-wide (see MarketplaceHttp).
+        foreach (['plugins.browse' => 60, 'plugins.manage' => 15] as $name => $perMinute) {
+            RateLimiter::for($name, function (Request $request) use ($name, $perMinute): Limit {
+                $user = $request->user();
+                $server = $request->route('server');
+                $serverKey = $server instanceof Server ? $server->uuid : (is_string($server) ? $server : '');
+
+                return Limit::perMinute($perMinute)->by($name.':'.($user instanceof User ? $user->id : (string) $request->ip()).':'.$serverKey);
+            });
+        }
+
         // Store purchases: 3 attempts a minute per player, so one player retrying against a hung
         // node cannot keep the store-wide capacity lock busy for everyone else.
         RateLimiter::for('store.purchase', function (Request $request): Limit {

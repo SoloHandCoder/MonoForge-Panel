@@ -31,6 +31,42 @@ final readonly class FilesClient
         return $response->body();
     }
 
+    /**
+     * Streams a file from Wings and hashes it on the way, without holding it in memory.
+     *
+     * @param  list<string>  $algorithms  hash_algos() names, such as sha1 and sha512
+     * @return array<string, string> algorithm => lowercase hex digest
+     *
+     * @throws FileSizeTooLargeException when the file is larger than $notLargerThan bytes
+     */
+    public function hashes(string $path, array $algorithms, int $notLargerThan, int $timeout = 300): array
+    {
+        $response = $this->connection->stream("/api/servers/{$this->uuid}/files/contents", ['file' => $path], $timeout);
+        $body = $response->toPsrResponse()->getBody();
+
+        $contexts = [];
+        foreach ($algorithms as $algorithm) {
+            $contexts[$algorithm] = hash_init($algorithm);
+        }
+
+        $read = 0;
+        while (! $body->eof()) {
+            $chunk = $body->read(1024 * 1024);
+            $read += mb_strlen($chunk);
+            if ($read > $notLargerThan) {
+                $body->close();
+
+                throw new FileSizeTooLargeException;
+            }
+
+            foreach ($contexts as $context) {
+                hash_update($context, $chunk);
+            }
+        }
+
+        return array_map(hash_final(...), $contexts);
+    }
+
     public function putContent(string $path, string $content): Response
     {
         return $this->connection->request('POST', "/api/servers/{$this->uuid}/files/write", [

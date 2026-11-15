@@ -77,6 +77,8 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:ai:max_output_tokens',
         // Addresses hidden from activity entries.
         'monoforge:privacy:hidden_ips',
+        // Phase 6 Task M: the CurseForge API key for one-click mods.
+        'monoforge:plugins:curseforge_key',
     ];
 
     /**
@@ -123,6 +125,8 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:auth:google:client_secret',
         // Phase 2 Task F: sign-up and captcha.
         'monoforge:captcha:turnstile:secret_key',
+        // Phase 6 Task M: one-click plugins and mods.
+        'monoforge:plugins:curseforge_key',
     ];
 
     /**
@@ -166,8 +170,8 @@ class SettingsServiceProvider extends ServiceProvider
                 try {
                     $value = $encrypter->decrypt($value);
                 } catch (DecryptException) {
-                    // Task H: never hand ciphertext to the Resend transport as a key.
-                    if ($key === 'services:resend:key') {
+                    // Task H: never hand ciphertext to the Resend transport (or CurseForge) as a key.
+                    if (in_array($key, ['services:resend:key', 'monoforge:plugins:curseforge_key'], true)) {
                         $value = null;
                     }
                 }
