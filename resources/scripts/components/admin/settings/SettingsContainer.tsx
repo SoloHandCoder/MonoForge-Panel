@@ -55,11 +55,7 @@ const tabFromPath = (pathname: string): Tab | undefined => {
 };
 
 const parseTab = (tab: string | undefined): Tab =>
-    tab === 'mail' ||
-    tab === 'advanced' ||
-    tab === 'general' ||
-    tab === 'login-providers' ||
-    tab === 'registration'
+    tab === 'mail' || tab === 'advanced' || tab === 'general' || tab === 'login-providers' || tab === 'registration'
         ? tab
         : 'general';
 
