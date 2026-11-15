@@ -3,11 +3,18 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import AppToaster from '@/components/elements/AppToaster';
 import { lazy, Suspense, useState, type ComponentType } from 'react';
 import { QueryClient, QueryClientProvider, useSuspenseQuery } from '@tanstack/react-query';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RegistryModule from '@/extensions/registry';
 import type { SlotComponentProps, SlotName } from '@/extensions/registry';
 
 afterEach(cleanup);
+
+// Toasts shown by these tests remove themselves on a short timer. Let those timers run
+// while the DOM still exists, or they fire after the environment is torn down and fail
+// the run with "window is not defined".
+afterAll(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+});
 
 /** What the loader does for an extension whose setup registers one slot component. */
 function registerSlot(

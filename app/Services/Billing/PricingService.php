@@ -89,7 +89,7 @@ class PricingService
 
     /**
      * Refuses a purchase the store does not offer: a hidden plan, a disabled period, or a
-     * node the plan does not allow (or that is under maintenance).
+     * node the plan does not allow (or that is under maintenance or not available in the shop).
      *
      * @throws InvalidQuoteException
      */
@@ -99,7 +99,7 @@ class PricingService
 
         throw_unless($period->enabled, InvalidQuoteException::class, 'This billing period is not available.');
 
-        throw_if(! $plan->allowsNode($node) || $node->isUnderMaintenance(), InvalidQuoteException::class, 'This plan is not available on the selected node.');
+        throw_if(! $node->shop_enabled || ! $plan->allowsNode($node) || $node->isUnderMaintenance(), InvalidQuoteException::class, 'This plan is not available on the selected node.');
     }
 
     /**

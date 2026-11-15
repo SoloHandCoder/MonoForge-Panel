@@ -45,11 +45,11 @@
                         "batch": null,
                         "event": "auth:fail",
                         "is_api": false,
-                        "ip": "192.0.2.99",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "username": "owner",
-                            "ip": "192.0.2.99"
+                            "ip": "[hidden]"
                         },
                         "has_additional_metadata": true,
                         "timestamp": "2026-01-02T03:11:05+00:00"
@@ -142,11 +142,11 @@
                         "batch": null,
                         "event": "auth:fail",
                         "is_api": false,
-                        "ip": "192.0.2.99",
+                        "ip": null,
                         "description": null,
                         "properties": {
                             "username": "owner",
-                            "ip": "192.0.2.99"
+                            "ip": "[hidden]"
                         },
                         "has_additional_metadata": true,
                         "timestamp": "2026-01-02T03:11:05+00:00",

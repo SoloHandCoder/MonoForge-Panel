@@ -147,7 +147,7 @@ test('lists eggs, nodes and locations for the editors without node addresses', f
     $response = $this->getJson(route('api.admin.shop.options'))->assertOk();
 
     expect($response->json('eggs'))->not->toBeEmpty()
-        ->and(array_keys($response->json('nodes.0')))->toBe(['id', 'name', 'location_id', 'public', 'maintenance']);
+        ->and(array_keys($response->json('nodes.0')))->toBe(['id', 'name', 'location_id', 'public', 'maintenance', 'shop_enabled']);
 });
 
 test('non admins are forbidden', function (): void {

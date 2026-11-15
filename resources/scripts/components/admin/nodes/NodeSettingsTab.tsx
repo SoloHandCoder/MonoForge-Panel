@@ -13,6 +13,7 @@ import ExtensionFormFields from '@/components/admin/extensions/ExtensionFormFiel
 import { initialExtensionValues, useExtensionPayload } from '@/extensions/forms';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
 import NodePlayitSettings from '@/components/admin/nodes/NodePlayitSettings';
+import NodeShopSettings from '@/components/admin/nodes/NodeShopSettings';
 
 interface Values extends NodeFormValues {
     resetSecret: boolean;
@@ -245,6 +246,7 @@ export default function NodeSettingsTab() {
     return (
         <>
             <NodeSettingsForm key={node.attributes.id} />
+            <NodeShopSettings nodeId={node.attributes.id} />
             <NodePlayitSettings nodeId={node.attributes.id} />
         </>
     );

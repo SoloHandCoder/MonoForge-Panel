@@ -70,6 +70,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopAddonController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopCategoryController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopMultiplierController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopNodeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPeriodController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPlanController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
@@ -149,6 +150,9 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/multipliers', [ShopMultiplierController::class, 'store'])->name('.multipliers.store');
     Route::put('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'update'])->name('.multipliers.update');
     Route::delete('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'destroy'])->name('.multipliers.delete');
+
+    Route::get('/nodes', [ShopNodeController::class, 'index'])->name('.nodes');
+    Route::put('/nodes/{node:id}', [ShopNodeController::class, 'update'])->name('.nodes.update');
 
     Route::get('/addons', [ShopAddonController::class, 'index'])->name('.addons');
     Route::post('/addons', [ShopAddonController::class, 'store'])->name('.addons.store');
@@ -297,6 +301,8 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
 Route::prefix('/tunnels')->name('api.admin.tunnels')->group(function (): void {
     Route::get('/', [TunnelController::class, 'index']);
     Route::post('/', [TunnelController::class, 'store'])->name('.store');
+    // Links tunnels made by hand on playit.gg to servers: a browser session only, never an API key.
+    Route::post('/import', [TunnelController::class, 'import'])->middleware(RequireSessionAuthentication::class)->name('.import');
     // `/settings` before `/{tunnel}` so the literal is not bound as a tunnel.
     Route::get('/settings', [TunnelSettingsController::class, 'show'])->name('.settings');
     Route::put('/settings', [TunnelSettingsController::class, 'update'])->name('.settings.update');

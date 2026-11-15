@@ -22,6 +22,8 @@ export interface ServerTunnel {
         subdomain: string | null;
         status: TunnelStatus;
         last_error: string | null;
+        /** Set when the tunnel was made by hand on playit.gg and linked by an import. */
+        imported_at: string | null;
         created_at: string;
         updated_at: string;
     };
@@ -48,6 +50,34 @@ export interface NodePlayitTest {
     success: boolean;
     message: string;
     tunnel_count: number | null;
+}
+
+export type TunnelImportOutcome =
+    | 'imported'
+    | 'already_linked'
+    | 'server_has_tunnel'
+    | 'no_match'
+    | 'ambiguous'
+    | 'unsupported';
+
+export interface TunnelImportResult {
+    node_id: number;
+    node_name: string;
+    playit_tunnel_id: string | null;
+    name: string | null;
+    local_ip: string | null;
+    local_port: number | null;
+    address: string | null;
+    result: TunnelImportOutcome;
+    reason: string;
+    server_ids: number[];
+}
+
+export interface TunnelImportSummary {
+    imported: number;
+    skipped: number;
+    errors: { node_id: number; node_name: string; message: string }[];
+    results: TunnelImportResult[];
 }
 
 export interface TunnelSettings {
@@ -113,6 +143,24 @@ export const useCreateTunnel = () => {
             toast.success('Tunnel created');
         },
         onError: (error) => notifyHttpError(error, 'Unable to create the tunnel'),
+    });
+};
+
+/** Links tunnels made by hand on playit.gg to the servers on their ports. */
+export const useImportTunnels = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (nodeId?: number) =>
+            (
+                await http.post<TunnelImportSummary>('/api/admin/tunnels/import', undefined, {
+                    params: nodeId === undefined ? undefined : { node: nodeId },
+                })
+            ).data,
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: tunnelsKey });
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to import the tunnels'),
     });
 };
 

@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { RefreshCw, RotateCcw, Waypoints } from 'lucide-react';
+import { Import, RefreshCw, RotateCcw, Waypoints } from 'lucide-react';
 import { httpErrorToHuman } from '@/api/http';
 import {
     useAdminTunnels,
     useAdminTunnelSettings,
     useCreateTunnel,
+    useImportTunnels,
     useRecreateTunnel,
     useRetryTunnel,
     useUpdateTunnelSettings,
     type ServerTunnel,
+    type TunnelImportOutcome,
+    type TunnelImportSummary,
     type TunnelSettings,
     type TunnelStatus,
 } from '@/api/admin/tunnels/queries';
@@ -17,6 +20,7 @@ import { useAppForm, Form } from '@/components/form';
 import AdminListEmpty from '@/components/admin/AdminListEmpty';
 import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
+import { NewButton } from '@/components/elements/NewButton';
 import Code from '@/components/elements/Code';
 import CopyOnClick from '@/components/elements/CopyOnClick';
 import { Dialog } from '@/components/elements/dialog';
@@ -44,6 +48,24 @@ const statusTones = {
     deleted: 'neutral',
 } satisfies Record<TunnelStatus, UiTone>;
 
+const outcomeLabels = {
+    imported: 'Imported',
+    already_linked: 'Already linked',
+    server_has_tunnel: 'Server has a tunnel',
+    no_match: 'No matching server',
+    ambiguous: 'Ambiguous',
+    unsupported: 'Not supported',
+} satisfies Record<TunnelImportOutcome, string>;
+
+const outcomeTones = {
+    imported: 'success',
+    already_linked: 'neutral',
+    server_has_tunnel: 'neutral',
+    no_match: 'warning',
+    ambiguous: 'warning',
+    unsupported: 'neutral',
+} satisfies Record<TunnelImportOutcome, UiTone>;
+
 const filters: { value: TunnelStatus | ''; label: string }[] = [
     { value: '', label: 'All' },
     { value: 'failed', label: 'Failed' },
@@ -55,7 +77,7 @@ const filters: { value: TunnelStatus | ''; label: string }[] = [
 function TunnelActionsCell({ tunnel }: { tunnel: ServerTunnel }) {
     const retry = useRetryTunnel();
     const recreate = useRecreateTunnel();
-    const { id, server_name: name } = tunnel.attributes;
+    const { id, server_name: name, imported_at: importedAt } = tunnel.attributes;
     const label = name ?? `server #${tunnel.attributes.server_id}`;
 
     return (
@@ -91,6 +113,7 @@ function TunnelActionsCell({ tunnel }: { tunnel: ServerTunnel }) {
                 <p className='text-sm leading-relaxed text-muted-foreground'>
                     This deletes the tunnel of <strong className='text-foreground'>{label}</strong> on playit.gg and
                     creates a new one. Players have to use the new address.
+                    {!!importedAt && ' This tunnel was made by hand and imported; it is deleted on playit.gg too.'}
                 </p>
             </Dialog.ConfirmTrigger>
         </RowActions>
@@ -129,9 +152,16 @@ const columns = [
         header: 'Status',
         cell: ({ row }) => (
             <div className='min-w-0'>
-                <Badge tone={statusTones[row.original.attributes.status]} variant='soft' size='sm'>
-                    {statusLabels[row.original.attributes.status]}
-                </Badge>
+                <div className='flex flex-wrap gap-1'>
+                    <Badge tone={statusTones[row.original.attributes.status]} variant='soft' size='sm'>
+                        {statusLabels[row.original.attributes.status]}
+                    </Badge>
+                    {!!row.original.attributes.imported_at && (
+                        <Badge tone='neutral' variant='soft' size='sm'>
+                            Imported
+                        </Badge>
+                    )}
+                </div>
                 {!!row.original.attributes.last_error && (
                     <p className='mt-1 text-xs break-words text-destructive'>{row.original.attributes.last_error}</p>
                 )}
@@ -172,6 +202,82 @@ function CreateTunnelForm() {
     );
 }
 
+function ImportSummary({ summary }: { summary: TunnelImportSummary }) {
+    return (
+        <div className='grid gap-4 text-sm'>
+            <p className='text-muted-foreground'>
+                <strong className='text-foreground'>{summary.imported}</strong> imported,{' '}
+                <strong className='text-foreground'>{summary.skipped}</strong> skipped.
+            </p>
+            {summary.errors.map((error) => (
+                <p key={error.node_id} className='text-destructive'>
+                    <strong>{error.node_name}:</strong> {error.message}
+                </p>
+            ))}
+            {summary.results.length === 0 && summary.errors.length === 0 && (
+                <p className='text-muted-foreground'>No playit.gg agent has any tunnels to import.</p>
+            )}
+            {summary.results.length > 0 && (
+                <ul className='grid max-h-96 gap-2 overflow-y-auto'>
+                    {summary.results.map((result, index) => (
+                        <li
+                            key={result.playit_tunnel_id ?? `${result.node_id}-${index}`}
+                            className='rounded-md border border-border p-3'
+                        >
+                            <div className='flex flex-wrap items-center justify-between gap-2'>
+                                <span className='min-w-0 truncate font-medium text-foreground'>
+                                    {result.name ?? result.address ?? result.playit_tunnel_id ?? 'Unnamed tunnel'}
+                                </span>
+                                <Badge tone={outcomeTones[result.result]} variant='soft' size='sm'>
+                                    {outcomeLabels[result.result]}
+                                </Badge>
+                            </div>
+                            <p className='mt-1 text-xs text-muted-foreground'>
+                                {result.node_name}
+                                {result.local_port !== null && ` · port ${result.local_port}`}
+                                {result.address !== null && ` · ${result.address}`}
+                            </p>
+                            <p className='mt-1 text-xs text-muted-foreground'>{result.reason}</p>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+function ImportTunnelsButton() {
+    const importTunnels = useImportTunnels();
+    const [summary, setSummary] = useState<TunnelImportSummary>();
+
+    return (
+        <>
+            <NewButton
+                icon={Import}
+                size='small'
+                isSecondary
+                isLoading={importTunnels.isPending}
+                onClick={() => importTunnels.mutate(undefined, { onSuccess: setSummary })}
+            >
+                Import existing tunnels
+            </NewButton>
+            <Dialog
+                open={summary !== undefined}
+                title='Import existing tunnels'
+                description='Tunnels made by hand on playit.gg, linked to the server on their port. The panel leaves imported tunnels alone on playit.gg unless their server is deleted or you recreate them.'
+                onClose={() => setSummary(undefined)}
+            >
+                {summary && <ImportSummary summary={summary} />}
+                <Dialog.Footer>
+                    <Button type='button' onClick={() => setSummary(undefined)}>
+                        Close
+                    </Button>
+                </Dialog.Footer>
+            </Dialog>
+        </>
+    );
+}
+
 function TunnelList() {
     const [page, setPage] = useState(1);
     const [status, setStatus] = useState<TunnelStatus | ''>('');
@@ -208,7 +314,10 @@ function TunnelList() {
                         </Button.Text>
                     ))}
                 </div>
-                <CreateTunnelForm />
+                <div className='flex flex-wrap items-center gap-2'>
+                    <ImportTunnelsButton />
+                    <CreateTunnelForm />
+                </div>
             </div>
             {data ? (
                 <DataTable

@@ -69,7 +69,7 @@ beforeEach(function (): void {
     $this->creation = new FakeServerCreation;
     $this->app->instance(CreatesServers::class, $this->creation);
 
-    $this->node = Node::factory()->create(['location_id' => Location::factory()->create()->id, 'memory' => 16384, 'disk' => 100000]);
+    $this->node = Node::factory()->create(['location_id' => Location::factory()->create()->id, 'memory' => 16384, 'disk' => 100000, 'shop_enabled' => true]);
     Allocation::factory()->count(2)->create(['node_id' => $this->node->id]);
     $this->egg = Egg::query()->where('author', 'support@pterodactyl.io')->where('name', 'Bungeecord')->firstOrFail();
 
@@ -212,6 +212,24 @@ test('refuses a price the player did not confirm, an egg the plan does not offer
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())->assertForbidden();
 
     expect($this->creation->inputs)->toBe([])->and(balance())->toBe(1000);
+});
+
+test('a node not available in the shop is refused, whether picked by location or by id', function (): void {
+    $this->node->forceFill(['shop_enabled' => false])->save();
+
+    // As for any location or node the plan cannot be placed on: there is no node to sell on.
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order())
+        ->assertStatus(409)
+        ->assertJsonPath('errors.0.detail', StorePurchaseException::noNode()->getMessage());
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', order([
+        'location_id' => null,
+        'node_id' => $this->node->id,
+        'idempotency_key' => 'key-'.str_repeat('b', 20),
+    ]))->assertStatus(409);
+
+    expect($this->creation->inputs)->toBe([])
+        ->and(Server::query()->where('owner_id', $this->user->id)->exists())->toBeFalse()
+        ->and(balance())->toBe(1000);
 });
 
 test('a plan in a hidden category is not for sale', function (): void {

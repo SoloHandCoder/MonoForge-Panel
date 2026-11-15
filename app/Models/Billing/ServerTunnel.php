@@ -24,6 +24,7 @@ use Pterodactyl\Models\Server;
  * @property string|null $subdomain
  * @property TunnelStatus $status
  * @property string|null $last_error
+ * @property CarbonImmutable|null $imported_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Server|null $server
@@ -37,6 +38,7 @@ use Pterodactyl\Models\Server;
     'subdomain',
     'status',
     'last_error',
+    'imported_at',
 ])]
 #[RouteKey('id')]
 class ServerTunnel extends Model
@@ -56,9 +58,19 @@ class ServerTunnel extends Model
             'server_id' => 'int',
             'allocation_id' => 'int',
             'status' => TunnelStatus::class,
+            'imported_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * Whether the playit tunnel was made by hand and linked by "Import existing tunnels". The
+     * panel leaves such a tunnel alone on playit unless it is deleted on purpose.
+     */
+    public function isImported(): bool
+    {
+        return $this->imported_at !== null;
     }
 
     /**

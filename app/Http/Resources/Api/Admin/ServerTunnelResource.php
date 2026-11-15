@@ -20,6 +20,7 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 #[ResponseField('subdomain', example: 'survival', nullable: true)]
 #[ResponseField('status', example: 'active', enum: ['pending', 'active', 'failed', 'deleted'])]
 #[ResponseField('last_error', example: null, nullable: true)]
+#[ResponseField('imported_at', description: 'When the tunnel, made by hand on playit.gg, was linked by an import. The panel leaves imported tunnels alone on playit.', example: null, nullable: true)]
 class ServerTunnelResource extends AdminResource
 {
     public function resourceName(): string
@@ -46,6 +47,7 @@ class ServerTunnelResource extends AdminResource
             'subdomain' => $tunnel->subdomain,
             'status' => $tunnel->status->value,
             'last_error' => $tunnel->last_error,
+            'imported_at' => $tunnel->imported_at === null ? null : $this->formatTimestamp($tunnel->imported_at),
             'created_at' => $this->formatTimestamp($tunnel->created_at),
             'updated_at' => $this->formatTimestamp($tunnel->updated_at),
         ];

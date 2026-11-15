@@ -4,6 +4,7 @@ import SettingsTabButton from '@/components/admin/settings/SettingsTabButton';
 import AddonsTab from '@/components/admin/shop/addons/AddonsTab';
 import LimitsTab from '@/components/admin/shop/limits/LimitsTab';
 import MultipliersTab from '@/components/admin/shop/multipliers/MultipliersTab';
+import NodesTab from '@/components/admin/shop/nodes/NodesTab';
 import PeriodsTab from '@/components/admin/shop/periods/PeriodsTab';
 import PlansTab from '@/components/admin/shop/plans/PlansTab';
 import { shopTabFromPath, shopTabs, type ShopTab } from '@/components/admin/shop/shopTabs';
@@ -16,6 +17,7 @@ const tabContent = {
     multipliers: () => <MultipliersTab />,
     addons: () => <AddonsTab />,
     limits: () => <LimitsTab />,
+    nodes: () => <NodesTab />,
     'token-packs': () => <TebexShopTab />,
     tunnels: () => <TunnelsTab />,
 } satisfies Record<ShopTab, () => React.ReactNode>;

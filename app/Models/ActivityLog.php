@@ -124,10 +124,8 @@ class ActivityLog extends Model implements Identifiable
             return null;
         }
 
-        if ($this->isAnonymousAuthAttempt()) {
-            return $this->ip;
-        }
-
+        // Entries without a user actor show as "System" (failed logins included). Their
+        // addresses are never shown: they are often the panel host's own, changing, IPv6.
         $actor = $this->actor;
         if (! $actor instanceof User || self::isAdministrator($actor)) {
             return null;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Tunnels;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,16 @@ class TunnelService
     public function __construct(private readonly PlayitClient $client) {}
 
     /**
+     * Whether a server's tunnel row may be taken over by an imported tunnel: it was deleted, or
+     * it failed before the panel made anything on playit.
+     */
+    public static function isReplaceable(ServerTunnel $tunnel): bool
+    {
+        return $tunnel->status === TunnelStatus::Deleted
+            || ($tunnel->status === TunnelStatus::Failed && $tunnel->playit_tunnel_id === null);
+    }
+
+    /**
      * Make sure the server has a tunnel and queue the work to create it. Calling it again for a
      * server that already has a live or pending tunnel changes nothing.
      */
@@ -53,7 +64,7 @@ class TunnelService
         }
 
         if ($tunnel->status === TunnelStatus::Deleted) {
-            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $server->allocation_id]);
+            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $server->allocation_id, 'imported_at' => null]);
         }
 
         $tunnel->fill(['status' => TunnelStatus::Pending, 'last_error' => null])->save();
@@ -65,20 +76,25 @@ class TunnelService
 
     /**
      * Delete the server's tunnel on playit. The server keeps working on its node address.
+     *
+     * A tunnel made by hand and imported is only unlinked here, and left on playit, unless
+     * `$deleteImported` says it should go too (the server itself is being deleted).
      */
-    public function release(Server $server): void
+    public function release(Server $server, bool $deleteImported = false): void
     {
         $tunnel = ServerTunnel::query()->where('server_id', $server->id)->first();
         if (! $tunnel instanceof ServerTunnel || $tunnel->status === TunnelStatus::Deleted) {
             return;
         }
 
-        $release = function () use ($tunnel, $server): void {
+        $release = function () use ($tunnel, $server, $deleteImported): void {
             $tunnel->refresh();
-            $this->queueRemoteDelete($server->node_id, $tunnel->playit_tunnel_id);
+            if ($deleteImported || ! $tunnel->isImported()) {
+                $this->queueRemoteDelete($server->node_id, $tunnel->playit_tunnel_id);
+            }
 
             // The custom subdomain is released with the tunnel, so the name can be picked again.
-            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'subdomain' => null, 'last_error' => null])->save();
+            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'subdomain' => null, 'last_error' => null, 'imported_at' => null])->save();
         };
 
         try {
@@ -87,6 +103,57 @@ class TunnelService
             // A stuck worker must not keep the server from being deleted.
             $release();
         }
+    }
+
+    /**
+     * Link a tunnel made by hand on playit to the server, as "Import existing tunnels" does. It
+     * becomes active with playit's address right away when playit has allocated one, and stays
+     * pending (for the scheduler to read back) otherwise. Nothing is created or changed on playit.
+     *
+     * Returns null when the server got a live tunnel of its own in the meantime.
+     *
+     * @param  array<mixed>  $remote  the tunnel as playit's `/tunnels/list` returns it
+     */
+    public function adopt(Server $server, int $allocationId, array $remote): ?ServerTunnel
+    {
+        $playitTunnelId = $remote['id'] ?? null;
+        if (! is_string($playitTunnelId) || $playitTunnelId === '') {
+            return null;
+        }
+
+        $tunnel = ServerTunnel::query()->firstOrNew(['server_id' => $server->id]);
+        $adopted = null;
+
+        $adopt = function () use ($tunnel, $allocationId, $remote, $playitTunnelId, &$adopted): void {
+            if ($tunnel->exists) {
+                $tunnel->refresh();
+            }
+
+            if ($tunnel->exists && ! self::isReplaceable($tunnel)) {
+                return;
+            }
+
+            $address = PlayitClient::addressOf($remote);
+            $tunnel->fill([
+                'allocation_id' => $allocationId,
+                'playit_tunnel_id' => $playitTunnelId,
+                'address' => $address,
+                'subdomain' => null,
+                'status' => $address === null ? TunnelStatus::Pending : TunnelStatus::Active,
+                'last_error' => null,
+                'imported_at' => CarbonImmutable::now(),
+            ])->save();
+
+            $adopted = $tunnel;
+        };
+
+        try {
+            $this->locked($tunnel, $adopt);
+        } catch (LockTimeoutException) {
+            return null;
+        }
+
+        return $adopted;
     }
 
     /**
@@ -109,18 +176,24 @@ class TunnelService
     /**
      * Throw the tunnel away on playit and queue a new one, such as after the server moved to
      * another port.
+     *
+     * An imported tunnel (made by hand on playit) is left on playit unless `$deleteImported`
+     * is set, which the admin "Recreate" button does; the server still gets a new tunnel.
      */
-    public function recreate(ServerTunnel $tunnel): ServerTunnel
+    public function recreate(ServerTunnel $tunnel, bool $deleteImported = false): ServerTunnel
     {
         try {
-            $this->locked($tunnel, function () use ($tunnel): void {
+            $this->locked($tunnel, function () use ($tunnel, $deleteImported): void {
                 $tunnel->refresh()->load('server');
                 if ($tunnel->server instanceof Server) {
-                    $this->queueRemoteDelete($tunnel->server->node_id, $tunnel->playit_tunnel_id);
+                    if ($deleteImported || ! $tunnel->isImported()) {
+                        $this->queueRemoteDelete($tunnel->server->node_id, $tunnel->playit_tunnel_id);
+                    }
+
                     $tunnel->allocation_id = $tunnel->server->allocation_id;
                 }
 
-                $tunnel->fill(['status' => TunnelStatus::Pending, 'playit_tunnel_id' => null, 'address' => null, 'last_error' => null])->save();
+                $tunnel->fill(['status' => TunnelStatus::Pending, 'playit_tunnel_id' => null, 'address' => null, 'last_error' => null, 'imported_at' => null])->save();
             });
         } catch (LockTimeoutException) {
             return $tunnel;
@@ -177,6 +250,8 @@ class TunnelService
                     'allocation_id' => $server->allocation_id,
                     'status' => TunnelStatus::Pending,
                     'last_error' => null,
+                    // A tunnel the panel made itself, even if it replaces an imported one.
+                    'imported_at' => null,
                 ])->save();
             }
 
