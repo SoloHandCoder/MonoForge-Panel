@@ -27,6 +27,7 @@ use Pterodactyl\Models\User;
  * @property bool $is_staff
  * @property bool $is_internal
  * @property string $body
+ * @property int $expired_attachments the images removed once the ticket had been closed long enough
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read SupportTicket $ticket
@@ -41,6 +42,9 @@ class SupportMessage extends Model
     /** @use HasFactory<SupportMessageFactory> */
     use HasFactory;
 
+    /** @var array<string, mixed> */
+    protected $attributes = ['expired_attachments' => 0];
+
     /**
      * @return array<string, string>
      */
@@ -51,6 +55,7 @@ class SupportMessage extends Model
             'user_id' => 'int',
             'is_staff' => 'boolean',
             'is_internal' => 'boolean',
+            'expired_attachments' => 'int',
         ];
     }
 

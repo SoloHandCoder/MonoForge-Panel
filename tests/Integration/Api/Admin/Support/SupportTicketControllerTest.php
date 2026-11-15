@@ -16,6 +16,7 @@ use Pterodactyl\Models\Support\SupportTicket;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
 use Pterodactyl\Notifications\SupportReplyNotification;
+use Pterodactyl\Services\Support\SupportAttachmentQuota;
 use Pterodactyl\Services\Support\SupportTicketService;
 use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
@@ -155,6 +156,27 @@ test('a user reply notifies only the assigned staff member', function (): void {
     $this->actingAs($player)->postJson("/api/client/support/tickets/{$ticket->id}/messages", ['body' => 'Any news?'])->assertCreated();
 
     expect(UserNotice::query()->where('kind', "support.staff.{$ticket->id}")->pluck('user_id')->all())->toBe([$assignee->id]);
+});
+
+test('staff skip the daily image count but not the stored size limit', function (): void {
+    $staff = $this->getAdminUser();
+    $ticket = openTicket(User::factory()->create());
+    $png = fn (): UploadedFile => UploadedFile::fake()->createWithContent('fix.png', (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true));
+    $earlier = SupportMessage::factory()->for($ticket, 'ticket')->create(['user_id' => $staff->id, 'is_staff' => true]);
+    $add = function (int $size) use ($earlier): void {
+        $earlier->attachments()->create(['path' => 'support/s.png', 'name' => 's.png', 'mime' => 'image/png', 'size' => $size, 'width' => 1, 'height' => 1]);
+    };
+    for ($i = 0; $i < SupportAttachmentQuota::DAILY_FILES; $i++) {
+        $add(10);
+    }
+
+    $this->post("/api/admin/support/tickets/{$ticket->id}/messages", ['body' => 'Here is the fix.', 'attachments' => [$png()]], ['Accept' => 'application/json'])
+        ->assertCreated();
+
+    $add(SupportAttachmentQuota::MAX_BYTES);
+    $this->post("/api/admin/support/tickets/{$ticket->id}/messages", ['body' => 'One more.', 'attachments' => [$png()]], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.meta.source_field', 'attachments');
 });
 
 test('shows staff the attachments of internal notes', function (): void {

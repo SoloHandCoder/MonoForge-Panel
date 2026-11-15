@@ -5315,6 +5315,10 @@ export type AdminGetASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
             /**
              * A staff-only internal note.
@@ -5376,6 +5380,10 @@ export type AdminUpdateASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
             /**
              * A staff-only internal note.
@@ -5437,6 +5445,10 @@ export type AdminReplyToASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
             /**
              * A staff-only internal note.
@@ -7212,6 +7224,10 @@ export type ClientOpenASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
         }>;
     };
@@ -7260,6 +7276,10 @@ export type ClientGetASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
         }>;
     };
@@ -7308,6 +7328,10 @@ export type ClientReplyToASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
         }>;
     };
@@ -7356,6 +7380,10 @@ export type ClientCloseASupportTicketResponseBody = {
                 width: number;
                 height: number;
             }>;
+            /**
+             * How many images of the message were removed because the ticket was closed more than 180 days ago.
+             */
+            expired_attachments: number;
             created_at: string;
         }>;
     };

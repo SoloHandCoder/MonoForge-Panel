@@ -12,11 +12,31 @@ const message = (overrides: Partial<ThreadMessage>): ThreadMessage => ({
     author: 'steve',
     is_staff: false,
     attachments: [],
+    expired_attachments: 0,
     created_at: '2026-11-15T12:00:00+00:00',
     ...overrides,
 });
 
 describe('support thread', () => {
+    it('says when the images of an old ticket were removed', () => {
+        render(
+            <SupportThread
+                viewer='player'
+                loadAttachment={vi.fn()}
+                messages={[
+                    message({ id: 1, expired_attachments: 1 }),
+                    message({ id: 2, expired_attachments: 3 }),
+                    message({ id: 3 }),
+                ]}
+            />
+        );
+
+        expect(screen.getAllByTestId('support-expired').map((node) => node.textContent)).toEqual([
+            'Attachment expired',
+            '3 attachments expired',
+        ]);
+    });
+
     it('renders markdown without ever turning markup in a message into elements', () => {
         const { container } = render(
             <SupportThread
