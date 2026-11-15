@@ -44,6 +44,7 @@ const icons = new Map<string, LucideIcon>([
     ['create_backup', Archive],
     ['list_schedules', CalendarClock],
     ['get_startup', Rocket],
+    ['reveal_startup_variable', KeyRound],
     ['update_startup_variable', Rocket],
     ['get_network', Network],
     ['list_servers', Server],
@@ -103,9 +104,11 @@ export function confirmationWarning(call: Pick<AssistantToolCall, 'name' | 'need
             return 'This suspends the server: its owner loses access until it is unsuspended.';
         case 'adjust_tokens':
             return "This changes a user's token balance.";
+        case 'reveal_startup_variable':
+            return 'This shows you the value of a startup variable that may be a secret. The assistant does not see it.';
         default:
             return isSensitiveRead(call)
-                ? 'This file may contain secrets such as passwords or keys. Its contents are sent to the AI provider.'
+                ? 'This file may contain secrets such as passwords or keys. You see the full file; the assistant and the AI provider get a copy with secret values hidden.'
                 : 'The assistant needs your permission for this action.';
     }
 }

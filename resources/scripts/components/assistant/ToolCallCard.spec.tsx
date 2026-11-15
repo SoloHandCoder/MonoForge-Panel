@@ -12,6 +12,7 @@ const call = (overrides: Partial<AssistantToolCall> = {}): AssistantToolCall => 
     name: 'read_file',
     label: 'Read .env',
     arguments: { path: '.env' },
+    details: [{ label: 'path', value: '/.env' }],
     needs_confirmation: true,
     status: 'pending',
     result_preview: null,
@@ -69,5 +70,51 @@ describe('ToolCallCard', () => {
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByText(/"path": ".env"/)).toBeInTheDocument();
         expect(screen.getByText('hello')).toBeInTheDocument();
+    });
+
+    it('shows every argument of a pending call in full, without opening anything', () => {
+        const command = `say Restarting soon ${'. '.repeat(80)}rcon-secret-here`;
+
+        render(
+            <ToolCallCard
+                call={call({
+                    name: 'send_command',
+                    label: `Run the command: ${command.slice(0, 100)}…`,
+                    arguments: { command },
+                    details: [{ label: 'command', value: command }],
+                })}
+                onDecide={vi.fn()}
+            />
+        );
+
+        const details = screen.getByTestId('tool-call-details');
+
+        expect(details).toBeVisible();
+        expect(details).toHaveTextContent('rcon-secret-here');
+        expect(screen.getByRole('button', { name: 'Show details' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByText(/^Run the command:/)).not.toHaveClass('truncate');
+    });
+
+    it('lists every path a pending delete removes', () => {
+        render(
+            <ToolCallCard
+                call={call({
+                    name: 'delete_files',
+                    label: 'Delete 3 files in /logs',
+                    arguments: { root: '/logs', files: ['a.log', 'b.log', 'c.log'] },
+                    details: [{ label: 'Paths (3)', value: '/logs/a.log\n/logs/b.log\n/logs/c.log' }],
+                })}
+                onDecide={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('tool-call-details')).toHaveTextContent('/logs/a.log /logs/b.log /logs/c.log');
+    });
+
+    it('keeps decided calls compact', () => {
+        render(<ToolCallCard call={call({ status: 'done', result_preview: 'ok' })} onDecide={vi.fn()} />);
+
+        expect(screen.queryByTestId('tool-call-details')).not.toBeInTheDocument();
+        expect(screen.getByText('Read .env')).toHaveClass('truncate');
     });
 });

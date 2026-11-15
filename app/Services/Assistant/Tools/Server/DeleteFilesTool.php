@@ -40,15 +40,42 @@ final class DeleteFilesTool extends ServerTool
         return true;
     }
 
+    /**
+     * The root and the names below it, resolved and checked, so the label lists exactly the
+     * paths that are deleted.
+     */
+    public function prepareArguments(array $arguments, ToolContext $context): array
+    {
+        $root = ServerPaths::normalize($this->string($arguments, 'root', '/'));
+
+        $files = [];
+        foreach ($this->stringList($arguments, 'files', self::MAX_FILES) as $file) {
+            $path = ServerPaths::join($root, $file);
+            if ($path === '/' || ($root !== '/' && ! str_starts_with($path, $root.'/'))) {
+                throw new ToolException(sprintf('"%s" is not inside %s.', $file, $root));
+            }
+
+            $files[] = mb_ltrim($root === '/' ? $path : mb_substr($path, mb_strlen($root)), '/');
+        }
+
+        return ['root' => $root, 'files' => array_values(array_unique($files))];
+    }
+
     public function describeCall(array $arguments): string
     {
-        $files = $arguments['files'] ?? [];
-        $count = is_array($files) ? count($files) : 1;
-        $root = ServerPaths::normalize($this->labelArgument($arguments, 'root', '/'));
+        $paths = $this->paths($arguments);
+        $root = ServerPaths::normalize($this->labelValue($arguments, 'root', '/'));
 
-        return $count === 1
-            ? 'Delete '.ServerPaths::join($root, $this->labelArgument($arguments, 'files'))
-            : sprintf('Delete %d files in %s', $count, $root);
+        return count($paths) === 1
+            ? 'Delete '.self::shorten($paths[0])
+            : sprintf('Delete %d files in %s', count($paths), self::shorten($root, 80));
+    }
+
+    public function callDetails(array $arguments): array
+    {
+        $paths = $this->paths($arguments);
+
+        return [['label' => count($paths) === 1 ? 'Path' : sprintf('Paths (%d)', count($paths)), 'value' => implode("\n", $paths)]];
     }
 
     protected function permissions(): array
@@ -58,23 +85,30 @@ final class DeleteFilesTool extends ServerTool
 
     protected function run(array $arguments, ToolContext $context): ToolResult
     {
-        $root = ServerPaths::normalize($this->string($arguments, 'root', '/'));
-
-        $paths = [];
-        foreach ($this->stringList($arguments, 'files', self::MAX_FILES) as $file) {
-            $path = ServerPaths::join($root, $file);
-            if ($path === '/' || ($root !== '/' && ! str_starts_with($path, $root.'/'))) {
-                throw new ToolException(sprintf('"%s" is not inside %s.', $file, $root));
-            }
-
-            $paths[] = $path;
-        }
-
-        $paths = array_values(array_unique($paths));
-        $relative = array_map(fn (string $path): string => mb_ltrim($root === '/' ? $path : mb_substr($path, mb_strlen($root)), '/'), $paths);
+        // The stored arguments are already prepared; preparing again keeps a direct call safe.
+        $prepared = $this->prepareArguments($arguments, $context);
+        /** @var string $root */
+        $root = $prepared['root'];
+        /** @var list<string> $relative */
+        $relative = $prepared['files'];
 
         $this->deleter->delete($this->server($context), $root, $relative);
 
-        return new ToolResult('Deleted: '.implode(', ', $paths), ['root' => $root, 'files' => $relative]);
+        return new ToolResult('Deleted: '.implode(', ', $this->paths($prepared)), ['root' => $root, 'files' => $relative]);
+    }
+
+    /**
+     * The absolute paths of prepared arguments.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @return list<string>
+     */
+    private function paths(array $arguments): array
+    {
+        $root = ServerPaths::normalize($this->labelValue($arguments, 'root', '/'));
+        $files = $arguments['files'] ?? [];
+        $files = is_array($files) ? array_values(array_filter($files, is_string(...))) : (is_string($files) ? [$files] : []);
+
+        return array_map(fn (string $file): string => ServerPaths::join($root, $file), $files);
     }
 }

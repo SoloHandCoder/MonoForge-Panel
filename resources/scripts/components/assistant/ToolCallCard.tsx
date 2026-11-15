@@ -40,6 +40,38 @@ function Section({ title, text }: { title: string; text: string }) {
     );
 }
 
+/** What the call will do, every argument in full, as it will run. Long values wrap; nothing is cut. */
+function ConfirmationDetails({ call }: { call: AssistantToolCall }) {
+    // Calls recorded before details existed show their raw arguments instead.
+    let details = call.details;
+
+    if (!details.length && hasArguments(call)) {
+        details = [{ label: 'Arguments', value: JSON.stringify(call.arguments, null, 2) }];
+    }
+
+    if (!details.length) {
+        return null;
+    }
+
+    return (
+        <dl data-testid='tool-call-details' className='grid gap-3 border-t border-inherit px-4 py-3'>
+            {details.map((detail, index) => (
+                // oxlint-disable-next-line react/no-array-index-key -- details have no identity of their own.
+                <div key={index} className='min-w-0'>
+                    <dt className='mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase'>
+                        {detail.label}
+                    </dt>
+                    <dd>
+                        <pre className='rounded-lg border border-border bg-sunken p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground'>
+                            {detail.value}
+                        </pre>
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
 function ConfirmationBar({
     call,
     destructive,
@@ -113,6 +145,11 @@ function Details({ call, id }: { call: AssistantToolCall; id: string }) {
         <div id={id} className='grid animate-fade-in gap-3 border-t border-border px-3 py-3'>
             {hasArguments(call) && <Section title='Arguments' text={JSON.stringify(call.arguments, null, 2)} />}
             {!!call.result_preview && <Section title='Result' text={call.result_preview} />}
+            {call.display?.hidden_from_assistant === true && (
+                <p className='text-xs text-muted-foreground'>
+                    Only you see this result in full. The assistant got a copy with secret values hidden.
+                </p>
+            )}
         </div>
     );
 }
@@ -138,6 +175,7 @@ export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCa
     const tone = cardTone(call);
     const destructive = isDestructiveTool(call.name);
     const expandable = hasArguments(call) || !!call.result_preview;
+    const awaiting = tone !== 'normal';
 
     return (
         <div
@@ -152,7 +190,14 @@ export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCa
             <div className='flex items-center gap-3 px-3 py-2.5'>
                 <CallIcon call={call} tone={tone} />
                 <div className='min-w-0 flex-1'>
-                    <p className='truncate text-sm font-medium text-foreground'>{call.label}</p>
+                    <p
+                        className={cn(
+                            'text-sm font-medium text-foreground',
+                            awaiting ? 'break-words whitespace-normal' : 'truncate'
+                        )}
+                    >
+                        {call.label}
+                    </p>
                     <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
                 </div>
                 <Badge tone={toolStatusTones[call.status]} variant='soft' size='sm' className='shrink-0'>
@@ -176,7 +221,8 @@ export default function ToolCallCard({ call, onDecide, deciding = null }: ToolCa
                 )}
             </div>
             {open && <Details call={call} id={detailsId} />}
-            {tone !== 'normal' && onDecide && (
+            {awaiting && <ConfirmationDetails call={call} />}
+            {awaiting && onDecide && (
                 <ConfirmationBar call={call} destructive={destructive} onDecide={onDecide} deciding={deciding} />
             )}
         </div>

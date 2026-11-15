@@ -14,6 +14,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Services\Assistant\ToolResult;
 use Pterodactyl\Services\Assistant\Tools\OutputRedactor;
+use Pterodactyl\Services\Assistant\Tools\SecretRedactor;
 use Pterodactyl\Services\Assistant\Tools\ServerPaths;
 
 /**
@@ -23,6 +24,9 @@ use Pterodactyl\Services\Assistant\Tools\ServerPaths;
 final class WriteFileTool extends ServerTool
 {
     public const int MAX_BYTES = 262_144;
+
+    /** How much of the new content the card shows before the user allows the write. */
+    public const int PREVIEW_BYTES = 2048;
 
     public function __construct(
         private readonly WritesFileContents $writer,
@@ -52,9 +56,34 @@ final class WriteFileTool extends ServerTool
         return true;
     }
 
+    public function prepareArguments(array $arguments, ToolContext $context): array
+    {
+        $path = ServerPaths::normalize($this->string($arguments, 'path'));
+        throw_if($path === '/', ToolException::class, 'A file path is required.');
+
+        $content = $arguments['content'] ?? null;
+        throw_unless(is_string($content), ToolException::class, 'The "content" argument must be a string.');
+
+        return ['path' => $path, 'content' => $content];
+    }
+
+    public function callDetails(array $arguments): array
+    {
+        $content = is_string($arguments['content'] ?? null) ? $arguments['content'] : '';
+        $bytes = mb_strlen($content, '8bit');
+        $preview = mb_strcut($content, 0, self::PREVIEW_BYTES, 'UTF-8');
+        $rest = $bytes - mb_strlen($preview, '8bit');
+
+        return [
+            ['label' => 'Path', 'value' => ServerPaths::normalize($this->labelValue($arguments, 'path'))],
+            ['label' => 'Size', 'value' => sprintf('%s bytes', number_format($bytes))],
+            ['label' => $rest > 0 ? sprintf('Content (first %s bytes)', number_format(mb_strlen($preview, '8bit'))) : 'Content', 'value' => $rest > 0 ? $preview.sprintf("\n… %s more bytes not shown", number_format($rest)) : $preview],
+        ];
+    }
+
     public function describeCall(array $arguments): string
     {
-        return 'Write '.ServerPaths::normalize($this->labelArgument($arguments, 'path'));
+        return 'Write '.self::shorten(ServerPaths::normalize($this->labelValue($arguments, 'path')));
     }
 
     protected function permissions(): array
@@ -72,10 +101,10 @@ final class WriteFileTool extends ServerTool
 
         throw_if(mb_strlen($content, '8bit') > self::MAX_BYTES, ToolException::class, 'The content is larger than 256 KB.');
 
-        // Addresses in tool output are replaced by placeholders; writing those back would
-        // overwrite the real values.
+        // Addresses and secrets in tool output are replaced by placeholders; writing those
+        // back would overwrite the real values.
         if (OutputRedactor::containsPlaceholder($content)) {
-            throw new ToolException(sprintf('The content still holds the %s or %s placeholder from redacted output. Ask the user to edit those values in the file manager instead.', OutputRedactor::IP, OutputRedactor::HOST));
+            throw new ToolException(sprintf('The content still holds the %s, %s or %s placeholder from redacted output. Ask the user to edit those values in the file manager instead.', OutputRedactor::IP, OutputRedactor::HOST, SecretRedactor::PLACEHOLDER));
         }
 
         $server = $this->server($context);

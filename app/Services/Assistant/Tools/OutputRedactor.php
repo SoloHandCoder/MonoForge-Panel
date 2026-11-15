@@ -34,7 +34,7 @@ class OutputRedactor
      */
     public static function containsPlaceholder(string $text): bool
     {
-        return str_contains($text, self::IP) || str_contains($text, self::HOST);
+        return str_contains($text, self::IP) || str_contains($text, self::HOST) || SecretRedactor::containsPlaceholder($text);
     }
 
     /**

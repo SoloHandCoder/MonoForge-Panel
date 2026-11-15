@@ -49,7 +49,7 @@ final class SearchFilesTool extends ServerTool
 
     public function describeCall(array $arguments): string
     {
-        return sprintf('Search for "%s" in %s', $this->labelArgument($arguments, 'query'), ServerPaths::normalize($this->labelArgument($arguments, 'directory', '/')));
+        return sprintf('Search for "%s" in %s', $this->labelArgument($arguments, 'query'), self::shorten(ServerPaths::normalize($this->labelValue($arguments, 'directory', '/'))));
     }
 
     protected function permissions(): array

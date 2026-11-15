@@ -121,7 +121,7 @@ class ConversationController extends ClientApiController
 
         Activity::event('server:assistant.tool')
             ->subject($server)
-            ->property(['tool' => $toolCall->name, 'label' => $toolCall->label ?? $toolCall->name, 'decision' => 'Allowed'])
+            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Allowed'])
             ->log();
 
         return new JsonResponse($this->presenter->present($conversation));
@@ -140,7 +140,7 @@ class ConversationController extends ClientApiController
 
         Activity::event('server:assistant.tool')
             ->subject($server)
-            ->property(['tool' => $toolCall->name, 'label' => $toolCall->label ?? $toolCall->name, 'decision' => 'Denied'])
+            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Denied'])
             ->log();
 
         return new JsonResponse($this->presenter->present($conversation));

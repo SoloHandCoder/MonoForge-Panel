@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Assistant;
 
 use Carbon\CarbonImmutable;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
+use Pterodactyl\Contracts\Assistant\PreparesToolCall;
 use Pterodactyl\Exceptions\Assistant\ToolException;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
@@ -23,6 +24,13 @@ class ToolExecutor
 {
     public const string DENIED = 'The user denied this action.';
 
+    public const string EXPIRED = 'Error: nobody allowed this action in time, so it did not run. Ask again if it is still needed.';
+
+    /** At most this many tool calls of one model answer run; the rest fail. */
+    public const int MAX_CALLS_PER_STEP = 8;
+
+    public const string TOO_MANY_CALLS = 'Error: too many tool calls in one step. Call at most 8 tools at a time.';
+
     public function __construct(private readonly ToolRegistry $registry) {}
 
     public static function context(AiConversation $conversation): ToolContext
@@ -32,7 +40,10 @@ class ToolExecutor
 
     /**
      * Stores the model's tool calls for an assistant message, deciding for each whether it
-     * needs the user's confirmation. A call with unreadable arguments fails right away.
+     * needs the user's confirmation. The tool settles the arguments first (paths resolved and
+     * checked), and those prepared arguments are what the label and details show, what is
+     * stored, and what later runs. A call whose arguments cannot run fails right away, as do
+     * the calls past the first MAX_CALLS_PER_STEP of one answer.
      *
      * @param  list<ChatToolCall>  $calls
      */
@@ -40,25 +51,30 @@ class ToolExecutor
     {
         $context = self::context($conversation);
 
-        foreach ($calls as $call) {
-            $tool = $this->registry->find($call->name, $context);
+        foreach ($calls as $index => $call) {
+            $tool = $index < self::MAX_CALLS_PER_STEP ? $this->registry->find($call->name, $context) : null;
             $arguments = $call->arguments ?? [];
             $needsConfirmation = false;
             $label = $call->name;
+            $details = null;
+            $error = null;
 
-            if ($tool instanceof AssistantTool && $call->arguments !== null) {
+            if ($index >= self::MAX_CALLS_PER_STEP) {
+                $error = self::TOO_MANY_CALLS;
+            } elseif ($call->arguments === null) {
+                $error = 'Error: the arguments were not valid JSON. Call the tool again with a JSON object.';
+            } elseif ($tool instanceof AssistantTool) {
                 try {
-                    $needsConfirmation = $tool->needsConfirmation($arguments, $context);
+                    $arguments = $tool instanceof PreparesToolCall ? $tool->prepareArguments($arguments, $context) : $arguments;
+                } catch (ToolException $exception) {
+                    $error = 'Error: '.$exception->getMessage();
                 } catch (Throwable $exception) {
-                    // When in doubt, a human decides.
                     report($exception);
-                    $needsConfirmation = true;
+                    $error = 'Error: the tool could not read these arguments.';
                 }
 
-                try {
-                    $label = mb_substr(mb_trim($tool->describeCall($arguments)), 0, 191) ?: $call->name;
-                } catch (Throwable) {
-                    $label = $call->name;
+                if ($error === null) {
+                    [$needsConfirmation, $label, $details] = $this->describe($tool, $arguments, $context);
                 }
             }
 
@@ -69,12 +85,13 @@ class ToolExecutor
                 'name' => mb_substr($call->name, 0, 191),
                 'label' => $label,
                 'arguments' => $arguments,
+                'details' => $details,
                 'needs_confirmation' => $needsConfirmation,
                 'status' => AiToolCall::STATUS_PENDING,
             ]);
 
-            if ($call->arguments === null) {
-                $this->finish($row, AiToolCall::STATUS_FAILED, 'Error: the arguments were not valid JSON. Call the tool again with a JSON object.');
+            if ($error !== null) {
+                $this->finish($row, AiToolCall::STATUS_FAILED, $error);
             }
         }
     }
@@ -108,7 +125,7 @@ class ToolExecutor
 
         try {
             $result = $tool->execute($call->arguments, $context);
-            $this->finish($call, AiToolCall::STATUS_DONE, $result->content, $result->display);
+            $this->finish($call, AiToolCall::STATUS_DONE, $result->content, $result->display, $result->private);
         } catch (ToolException $exception) {
             $this->finish($call, AiToolCall::STATUS_FAILED, 'Error: '.$exception->getMessage());
         } catch (Throwable $exception) {
@@ -135,6 +152,60 @@ class ToolExecutor
         return true;
     }
 
+    /**
+     * Ends a call that waited too long for a decision; the model is told it did not run.
+     * False if the call was not waiting.
+     */
+    public function expire(AiToolCall $call): bool
+    {
+        $changed = AiToolCall::query()
+            ->whereKey($call->id)
+            ->where('status', AiToolCall::STATUS_PENDING)
+            ->where('needs_confirmation', true)
+            ->update(['status' => AiToolCall::STATUS_FAILED, 'updated_at' => CarbonImmutable::now()]);
+
+        if ($changed === 0) {
+            return false;
+        }
+
+        $this->finish($call, AiToolCall::STATUS_FAILED, self::EXPIRED);
+
+        return true;
+    }
+
+    /**
+     * Whether the prepared call needs a click, its label and its full details.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @return array{bool, string, list<array{label: string, value: string}>|null}
+     */
+    private function describe(AssistantTool $tool, array $arguments, ToolContext $context): array
+    {
+        try {
+            $needsConfirmation = $tool->needsConfirmation($arguments, $context);
+        } catch (Throwable $throwable) {
+            // When in doubt, a human decides.
+            report($throwable);
+            $needsConfirmation = true;
+        }
+
+        try {
+            $label = mb_trim($tool->describeCall($arguments));
+            $label = $label === '' ? $tool->name() : (mb_strlen($label) > 191 ? mb_substr($label, 0, 190).'…' : $label);
+        } catch (Throwable) {
+            $label = $tool->name();
+        }
+
+        try {
+            $details = $tool instanceof PreparesToolCall ? $tool->callDetails($arguments) : null;
+        } catch (Throwable $throwable) {
+            report($throwable);
+            $details = null;
+        }
+
+        return [$needsConfirmation, $label, $details];
+    }
+
     private function decide(AiToolCall $call, User $user, string $status): bool
     {
         $now = CarbonImmutable::now();
@@ -150,15 +221,19 @@ class ToolExecutor
     }
 
     /**
+     * Stores the result. The model's copy goes into the history; a private result (a secret
+     * the user allowed to read) is kept encrypted, for the user's card only.
+     *
      * @param  array<string, mixed>  $display
      */
-    private function finish(AiToolCall $call, string $status, string $result, array $display = []): void
+    private function finish(AiToolCall $call, string $status, string $result, array $display = [], ?string $private = null): void
     {
         $stored = ConversationContext::truncate($result, AiToolCall::MAX_RESULT_BYTES);
 
         $call->forceFill([
             'status' => $status,
             'result' => $stored,
+            'private_result' => $private === null ? null : ConversationContext::truncate($private, AiToolCall::MAX_RESULT_BYTES),
             'display' => $display === [] ? null : $display,
         ])->save();
 

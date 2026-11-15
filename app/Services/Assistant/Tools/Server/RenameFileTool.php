@@ -38,9 +38,20 @@ final class RenameFileTool extends ServerTool
         return true;
     }
 
+    public function prepareArguments(array $arguments, ToolContext $context): array
+    {
+        $from = ServerPaths::normalize($this->string($arguments, 'from'));
+        $to = ServerPaths::normalize($this->string($arguments, 'to'));
+        throw_if($from === '/' || $to === '/', ToolException::class, 'The server root cannot be renamed.');
+
+        throw_if($from === $to, ToolException::class, 'The new path is the same as the current one.');
+
+        return ['from' => $from, 'to' => $to];
+    }
+
     public function describeCall(array $arguments): string
     {
-        return sprintf('Rename %s to %s', ServerPaths::normalize($this->labelArgument($arguments, 'from')), ServerPaths::normalize($this->labelArgument($arguments, 'to')));
+        return sprintf('Rename %s to %s', self::shorten(ServerPaths::normalize($this->labelValue($arguments, 'from')), 80), self::shorten(ServerPaths::normalize($this->labelValue($arguments, 'to')), 80));
     }
 
     protected function permissions(): array

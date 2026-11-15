@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Services\Assistant\ServerToolsTest;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Http;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Enum\TunnelStatus;
@@ -24,6 +25,7 @@ use Pterodactyl\Services\Assistant\ToolRegistry;
 use Pterodactyl\Services\Assistant\ToolResult;
 use Pterodactyl\Services\Assistant\Tools\AbstractTool;
 use Pterodactyl\Services\Assistant\Tools\OutputRedactor;
+use Pterodactyl\Services\Assistant\Tools\SecretRedactor;
 use Pterodactyl\Services\Assistant\Tools\Server as Tools;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use Pterodactyl\Tests\Support\Fakes\FakeDaemonBackup;
@@ -160,6 +162,7 @@ test('changing tools always need confirmation', function (string $class): void {
     Tools\PowerTool::class,
     Tools\CreateBackupTool::class,
     Tools\UpdateStartupVariableTool::class,
+    Tools\RevealStartupVariableTool::class,
 ]);
 
 test('reading tools run without confirmation', function (string $class): void {
@@ -179,34 +182,85 @@ test('reading tools run without confirmation', function (string $class): void {
 
 test('reading a file that may hold secrets needs confirmation', function (): void {
     [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'paper-global.yml', 'file' => true, 'symlink' => false, 'size' => 10]];
     $tool = tool(Tools\ReadFileTool::class);
     $context = context($user, $server);
 
-    expect($tool->needsConfirmation(['path' => '/server.properties'], $context))->toBeFalse()
+    expect($tool->needsConfirmation(['path' => '/config/paper-global.yml'], $context))->toBeFalse()
+        ->and($tool->needsConfirmation(['path' => '/server.properties'], $context))->toBeTrue()
         ->and($tool->needsConfirmation(['path' => '/bot/.env'], $context))->toBeTrue()
         ->and($tool->needsConfirmation(['path' => '/plugins/../config/../.env'], $context))->toBeTrue()
         ->and($tool->needsConfirmation(['path' => '/ssl/server.KEY'], $context))->toBeTrue()
         ->and($tool->needsConfirmation(['path' => '/auth_token.txt'], $context))->toBeTrue()
+        ->and($tool->needsConfirmation(['path' => '/.ssh/id_ed25519'], $context))->toBeTrue()
+        ->and($tool->needsConfirmation(['path' => '/web/wp-config.php'], $context))->toBeTrue()
         ->and($tool->needsConfirmation(['path' => ['/.env']], $context))->toBeTrue()
         ->and($tool->needsConfirmation([], $context))->toBeTrue();
+});
+
+test('a symlink is read only after confirmation, since its target cannot be checked', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [
+        ['name' => 'notes.txt', 'file' => true, 'symlink' => true, 'size' => 4],
+        ['name' => 'readme.txt', 'file' => true, 'symlink' => false, 'size' => 4],
+    ];
+    $tool = tool(Tools\ReadFileTool::class);
+    $context = context($user, $server);
+
+    expect($tool->needsConfirmation(['path' => '/notes.txt'], $context))->toBeTrue()
+        ->and($tool->needsConfirmation(['path' => '/readme.txt'], $context))->toBeFalse();
+    $fakes['file']->assertDirectoryListed('/');
+});
+
+test('a read is confirmed when wings cannot tell what the file is', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    Http::fake(['*' => Http::response('down', 500)]);
+
+    expect(tool(Tools\ReadFileTool::class)->needsConfirmation(['path' => '/other.txt'], context($user, $server)))->toBeTrue();
 });
 
 test('a file is read through wings and its read is logged', function (): void {
     [$user, $server] = $this->generateTestAccount([Permissions::FileReadContent->value]);
     $fakes = wings();
-    $fakes['file']->content = "motd=Hello\nmax-players=20";
+    $fakes['file']->directory = [['name' => 'paper.yml', 'file' => true, 'symlink' => false, 'size' => 26]];
+    $fakes['file']->content = "motd: Hello\nmax-players: 2";
 
-    $result = tool(Tools\ReadFileTool::class)->execute(['path' => 'server.properties'], context($user, $server));
+    $result = tool(Tools\ReadFileTool::class)->execute(['path' => 'config/../paper.yml'], context($user, $server));
 
-    expect($result->content)->toBe("motd=Hello\nmax-players=20")
-        ->and($result->display)->toBe(['path' => '/server.properties', 'bytes' => 25]);
-    $fakes['file']->assertContentFetched('/server.properties');
+    expect($result->content)->toBe("motd: Hello\nmax-players: 2")
+        ->and($result->private)->toBeNull()
+        ->and($result->display)->toBe(['path' => '/paper.yml', 'bytes' => 26]);
+    $fakes['file']->assertContentFetched('/paper.yml');
     $this->assertActivityActor('server:file.read', $user);
+});
+
+test('a file over 256 KB is refused from its listed size without downloading it', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'latest.log', 'file' => true, 'symlink' => false, 'size' => Tools\ReadFileTool::MAX_BYTES + 1]];
+
+    expect(fn (): ToolResult => tool(Tools\ReadFileTool::class)->execute(['path' => '/logs/latest.log'], context($user, $server)))
+        ->toThrow(ToolException::class, 'larger than 256 KB');
+    expect($fakes['file']->callsFor('getContent'))->toBeEmpty();
+});
+
+test('a missing file or a folder is not downloaded', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [['name' => 'world', 'file' => false, 'symlink' => false, 'size' => 4096]];
+    $tool = tool(Tools\ReadFileTool::class);
+
+    expect(fn (): ToolResult => $tool->execute(['path' => '/missing.txt'], context($user, $server)))->toThrow(ToolException::class, 'There is no file at /missing.txt')
+        ->and(fn (): ToolResult => $tool->execute(['path' => '/world'], context($user, $server)))->toThrow(ToolException::class, 'is a folder');
+    expect($fakes['file']->callsFor('getContent'))->toBeEmpty();
 });
 
 test('binary files are not read', function (): void {
     [$user, $server] = $this->generateTestAccount();
     $fakes = wings();
+    $fakes['file']->directory = [['name' => 'world.zip', 'file' => true, 'symlink' => false, 'size' => 12]];
     $fakes['file']->content = "PK\x03\x04\0\0binary";
 
     expect(fn (): ToolResult => tool(Tools\ReadFileTool::class)->execute(['path' => '/world.zip'], context($user, $server)))
@@ -217,9 +271,10 @@ test('file contents have addresses and node host names taken out and are cut to 
     [$user, $server] = $this->generateTestAccount();
     Node::query()->whereKey($server->node_id)->update(['fqdn' => 'wings-de1.example.net']);
     $fakes = wings();
+    $fakes['file']->directory = [['name' => 'proxy.conf', 'file' => true, 'symlink' => false, 'size' => 20_100]];
     $fakes['file']->content = "server-ip=203.0.113.7\nproxy=[2001:db8::1]:25577\nnode=WINGS-DE1.example.net\n".str_repeat('a', 20_000);
 
-    $result = tool(Tools\ReadFileTool::class)->execute(['path' => '/server.properties'], context($user, $server));
+    $result = tool(Tools\ReadFileTool::class)->execute(['path' => '/proxy.conf'], context($user, $server));
 
     expect($result->content)
         ->toStartWith("server-ip=[hidden-ip]\nproxy=[[hidden-ip]]:25577\nnode=[hidden-host]\n")
@@ -228,6 +283,105 @@ test('file contents have addresses and node host names taken out and are cut to 
         ->not->toContain('wings-de1')
         ->toContain('[output truncated:')
         ->and(mb_strlen($result->content, '8bit'))->toBeLessThan(AbstractTool::MAX_CONTENT_BYTES + 100);
+});
+
+test('secret values never reach the model, and an allowed sensitive read shows the full file to the user only', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $fakes = wings();
+    $fakes['file']->directory = [
+        ['name' => 'server.properties', 'file' => true, 'symlink' => false, 'size' => 60],
+        ['name' => 'config.yml', 'file' => true, 'symlink' => false, 'size' => 60],
+        ['name' => 'id_ed25519', 'file' => true, 'symlink' => false, 'size' => 60],
+    ];
+    $tool = tool(Tools\ReadFileTool::class);
+
+    // An ordinary config: secret-looking values are masked for the model, nothing private kept.
+    $fakes['file']->content = "database:\n  host: db\n  password: hunter2\n";
+    $result = $tool->execute(['path' => '/plugins/x/config.yml'], context($user, $server));
+    expect($result->content)->toContain('host: db')->toContain('password: '.SecretRedactor::PLACEHOLDER)->not->toContain('hunter2')
+        ->and($result->private)->toBeNull();
+
+    // A sensitive file: masked for the model, in full for the user.
+    $fakes['file']->content = "motd=Hi\nrcon.password=hunter2\n";
+    $result = $tool->execute(['path' => '/server.properties'], context($user, $server));
+    expect($result->content)->toContain('motd=Hi')->toContain('rcon.password='.SecretRedactor::PLACEHOLDER)->not->toContain('hunter2')
+        ->and($result->private)->toBe("motd=Hi\nrcon.password=hunter2\n")
+        ->and($result->display)->toMatchArray(['hidden_from_assistant' => true]);
+
+    // Key material: the model only learns that it was shown.
+    $fakes['file']->content = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk\n-----END OPENSSH PRIVATE KEY-----\n";
+    $result = $tool->execute(['path' => '/id_ed25519'], context($user, $server));
+    expect($result->content)->not->toContain('b3BlbnNzaC1rZXk')->toContain('key material')
+        ->and($result->private)->toContain('b3BlbnNzaC1rZXk');
+});
+
+test('the labels and details of changing tools come from the resolved values that run', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $context = context($user, $server);
+    $padding = str_repeat('a', 70);
+
+    $delete = tool(Tools\DeleteFilesTool::class);
+    $prepared = $delete->prepareArguments(['files' => ["logs/{$padding}/../../world"]], $context);
+    expect($prepared)->toBe(['root' => '/', 'files' => ['world']])
+        ->and($delete->describeCall($prepared))->toBe('Delete /world')
+        ->and($delete->callDetails($prepared))->toBe([['label' => 'Path', 'value' => '/world']]);
+
+    // Every path is listed, and more than 50 are refused.
+    $many = $delete->prepareArguments(['root' => '/logs', 'files' => ['a.log', 'old/../b.log', 'c.log']], $context);
+    expect($delete->describeCall($many))->toBe('Delete 3 files in /logs')
+        ->and($delete->callDetails($many))->toBe([['label' => 'Paths (3)', 'value' => "/logs/a.log\n/logs/b.log\n/logs/c.log"]])
+        ->and(fn (): array => $delete->prepareArguments(['files' => array_map(fn (int $i): string => "f{$i}", range(1, 51))], $context))->toThrow(ToolException::class, 'at most 50');
+
+    $rename = tool(Tools\RenameFileTool::class);
+    $prepared = $rename->prepareArguments(['from' => "/logs/{$padding}/../../world", 'to' => '/trash/world'], $context);
+    expect($rename->describeCall($prepared))->toBe('Rename /world to /trash/world');
+
+    // A long command is shortened in the label only; the details hold all of it.
+    $command = tool(Tools\SendCommandTool::class);
+    $long = 'say Restarting soon '.str_repeat('. ', 80).'rcon-secret-here';
+    $prepared = $command->prepareArguments(['command' => "  {$long}  "], $context);
+    expect($prepared)->toBe(['command' => $long])
+        ->and($command->describeCall($prepared))->toEndWith('…')
+        ->and($command->callDetails($prepared))->toBe([['label' => 'command', 'value' => $long]])
+        ->and(fn (): array => $command->prepareArguments(['command' => "say a\nop me"], $context))->toThrow(ToolException::class, 'single-line');
+
+    // write_file shows the target and a preview of the first 2 KB with the size.
+    $write = tool(Tools\WriteFileTool::class);
+    $prepared = $write->prepareArguments(['path' => 'plugins/../server.properties', 'content' => str_repeat('x', 3000)], $context);
+    $details = $write->callDetails($prepared);
+    expect($prepared['path'])->toBe('/server.properties')
+        ->and($write->describeCall($prepared))->toBe('Write /server.properties')
+        ->and($details[0])->toBe(['label' => 'Path', 'value' => '/server.properties'])
+        ->and($details[1])->toBe(['label' => 'Size', 'value' => '3,000 bytes'])
+        ->and($details[2]['label'])->toBe('Content (first 2,048 bytes)')
+        ->and($details[2]['value'])->toStartWith(str_repeat('x', 2048))->toEndWith('952 more bytes not shown');
+});
+
+test('the startup settings mask secret variables, which reveal_startup_variable shows to the user only', function (): void {
+    [$user, $server] = $this->generateTestAccount([Permissions::StartupRead->value]);
+    $egg = $this->cloneEggAndVariables($server->egg);
+    $server->update(['egg_id' => $egg->id, 'startup' => 'java -jar server.jar --rcon {{RCON_PASSWORD}} --jar {{JARFILE}}']);
+    EggVariable::query()->where('egg_id', $egg->id)->delete();
+    $rcon = EggVariable::factory()->create(['egg_id' => $egg->id, 'env_variable' => 'RCON_PASSWORD', 'default_value' => 'changeme', 'rules' => 'nullable|string', 'user_viewable' => true, 'user_editable' => true]);
+    EggVariable::factory()->create(['egg_id' => $egg->id, 'env_variable' => 'JARFILE', 'default_value' => 'paper.jar', 'rules' => 'nullable|string', 'user_viewable' => true, 'user_editable' => true]);
+    $server->serverVariables()->create(['variable_id' => $rcon->id, 'variable_value' => 'hunter2']);
+    $server->refresh();
+
+    $result = tool(Tools\GetStartupTool::class)->execute([], context($user, $server));
+    $data = json_decode($result->content, true);
+    $variables = collect($data['variables'])->keyBy('key');
+
+    expect($result->content)->not->toContain('hunter2')->not->toContain('changeme')
+        ->and($data['startup_command'])->toBe('java -jar server.jar --rcon '.SecretRedactor::PLACEHOLDER.' --jar paper.jar')
+        ->and($variables['RCON_PASSWORD']['value'])->toBe(SecretRedactor::PLACEHOLDER)
+        ->and($variables['RCON_PASSWORD']['default'])->toBe(SecretRedactor::PLACEHOLDER)
+        ->and($variables['JARFILE']['value'])->toBe('paper.jar');
+
+    $reveal = tool(Tools\RevealStartupVariableTool::class);
+    expect($reveal->needsConfirmation(['key' => 'RCON_PASSWORD'], context($user, $server)))->toBeTrue();
+    $revealed = $reveal->execute(['key' => 'RCON_PASSWORD'], context($user, $server));
+    expect($revealed->private)->toBe('hunter2')
+        ->and($revealed->content)->not->toContain('hunter2')->toContain('shown to the user');
 });
 
 test('the console is read with colour codes and addresses removed', function (): void {

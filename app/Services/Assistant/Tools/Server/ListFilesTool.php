@@ -55,7 +55,7 @@ final class ListFilesTool extends ServerTool
 
     public function describeCall(array $arguments): string
     {
-        return 'List '.ServerPaths::normalize($this->labelArgument($arguments, 'directory', '/'));
+        return 'List '.self::shorten(ServerPaths::normalize($this->labelValue($arguments, 'directory', '/')));
     }
 
     protected function permissions(): array

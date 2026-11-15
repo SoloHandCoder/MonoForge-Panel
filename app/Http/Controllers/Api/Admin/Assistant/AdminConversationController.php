@@ -98,7 +98,7 @@ class AdminConversationController extends AdminApiController
         $conversation = $this->conversations->approve($conversation, $toolCall, $request->user());
 
         Activity::event('admin:assistant.tool')
-            ->property(['tool' => $toolCall->name, 'label' => $toolCall->label ?? $toolCall->name, 'decision' => 'Allowed'])
+            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Allowed'])
             ->log();
 
         return new JsonResponse($this->presenter->present($conversation));
@@ -117,7 +117,7 @@ class AdminConversationController extends AdminApiController
         $conversation = $this->conversations->deny($conversation, $toolCall, $request->user());
 
         Activity::event('admin:assistant.tool')
-            ->property(['tool' => $toolCall->name, 'label' => $toolCall->label ?? $toolCall->name, 'decision' => 'Denied'])
+            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Denied'])
             ->log();
 
         return new JsonResponse($this->presenter->present($conversation));

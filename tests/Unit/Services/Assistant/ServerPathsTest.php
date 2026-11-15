@@ -46,12 +46,31 @@ test('files that may hold secrets are sensitive', function (string $path): void 
     '/plugins/LuckPerms/Credentials.yml',
     'nested/../.env',
     '/.env/',
+    '/home/.ssh/id_ed25519',
+    '/home/.ssh/id_ecdsa',
+    '/putty.ppk',
+    '/.htpasswd',
+    '/.netrc',
+    '/.npmrc',
+    '/.pgpass',
+    '/web/wp-config.php',
+    '/composer/auth.json',
+    '/aws/credentials',
+    '/app.keystore',
+    '/release.jks',
+    '/server.properties',
+    '/ops.json',
+    '/whitelist.json',
+    '/plugins/LuckPerms/luckperms-h2.db',
+    '/data.sqlite',
+    '/bot/api_key.txt',
+    '/my-passwd.txt',
+    '/APIKEY',
 ]);
 
 test('ordinary files are not sensitive', function (string $path): void {
     expect(ServerPaths::isSensitive($path))->toBeFalse();
 })->with([
-    '/server.properties',
     '/config/paper-global.yml',
     '/environment.txt',
     '/keys/readme.md',

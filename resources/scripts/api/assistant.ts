@@ -44,13 +44,21 @@ export type AssistantToolCallStatus = 'pending' | 'approved' | 'denied' | 'runni
 /** Tool results are not messages in the payload: they appear on their call as `result_preview`. */
 export type AssistantRole = 'user' | 'assistant';
 
+export interface AssistantToolCallDetail {
+    label: string;
+    value: string;
+}
+
 export interface AssistantToolCall {
     id: number;
     /** The tool's snake_case name, e.g. `read_file`. */
     name: string;
-    /** A short human label from the tool's `describeCall`, e.g. "Read config/server.properties". */
+    /** A short human label from the tool's `describeCall`, e.g. "Read /config/server.properties". */
     label: string;
+    /** The arguments as they run (paths resolved). */
     arguments: AssistantJsonFields;
+    /** Every argument in full, as the card shows it before the user allows the call. */
+    details: AssistantToolCallDetail[];
     needs_confirmation: boolean;
     status: AssistantToolCallStatus;
     result_preview: string | null;
@@ -170,14 +178,19 @@ export type AssistantProviderPreset =
     | 'openai'
     | 'custom';
 
+export interface AssistantProviderHeader {
+    name: string;
+    has_value: boolean;
+}
+
 export interface AssistantProvider {
     id: number;
     name: string;
     preset: AssistantProviderPreset;
     base_url: string;
     model: string;
-    /** `{}` when the provider has none. */
-    extra_headers: Readonly<Record<string, string>>;
+    /** Header names only: values are write-only, like the key. */
+    extra_headers: readonly AssistantProviderHeader[];
     context_window: number;
     supports_tools: boolean;
     enabled: boolean;
@@ -192,7 +205,11 @@ export interface AssistantProviderInput {
     preset: AssistantProviderPreset;
     base_url: string;
     model: string;
-    extra_headers: Readonly<Record<string, string>> | null;
+    /**
+     * Every header by name: a value sets it, null keeps the stored value. Headers left out are
+     * removed; null removes them all.
+     */
+    extra_headers: Readonly<Record<string, string | null>> | null;
     context_window: number;
     supports_tools: boolean;
     enabled: boolean;

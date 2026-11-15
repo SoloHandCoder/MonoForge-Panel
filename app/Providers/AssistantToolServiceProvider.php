@@ -30,6 +30,7 @@ use Pterodactyl\Services\Assistant\Tools\Server\PowerTool;
 use Pterodactyl\Services\Assistant\Tools\Server\ReadConsoleTool;
 use Pterodactyl\Services\Assistant\Tools\Server\ReadFileTool;
 use Pterodactyl\Services\Assistant\Tools\Server\RenameFileTool;
+use Pterodactyl\Services\Assistant\Tools\Server\RevealStartupVariableTool;
 use Pterodactyl\Services\Assistant\Tools\Server\SearchFilesTool;
 use Pterodactyl\Services\Assistant\Tools\Server\SendCommandTool;
 use Pterodactyl\Services\Assistant\Tools\Server\ServerStatusTool;
@@ -51,6 +52,7 @@ class AssistantToolServiceProvider extends ServiceProvider
         ListBackupsTool::class,
         ListSchedulesTool::class,
         GetStartupTool::class,
+        RevealStartupVariableTool::class,
         GetNetworkTool::class,
         WriteFileTool::class,
         DeleteFilesTool::class,

@@ -14,18 +14,63 @@ final class ServerPaths
      * Basename patterns (matched case-insensitively) of files that may hold secrets.
      */
     public const array SENSITIVE_PATTERNS = [
+        // Environment files.
         '.env',
         '*.env',
         '.env.*',
+        // Keys, certificates and key stores.
         '*.pem',
         '*.key',
-        'id_rsa*',
+        'id_*',
+        '*.ppk',
         '*.p12',
         '*.pfx',
+        '*.keystore',
+        '*.jks',
+        '*.kdbx',
+        // Credential files of common tools.
+        '.htpasswd',
+        '.netrc',
+        '.npmrc',
+        '.pgpass',
+        '.my.cnf',
+        'wp-config.php',
+        'auth.json',
+        'credentials*',
+        // Game server files that hold passwords or player lists.
+        'server.properties',
+        'ops.json',
+        'whitelist.json',
+        // Databases.
+        '*.db',
+        '*.sqlite',
+        '*.sqlite3',
+        // Anything named like a secret.
         '*secret*',
-        '*password*',
         '*token*',
-        '*credentials*',
+        '*password*',
+        '*passwd*',
+        '*key*',
+        '*credential*',
+    ];
+
+    /**
+     * Basename patterns of files that are nothing but key material or credentials. Even after
+     * the user allows reading one, the model only learns its size.
+     */
+    public const array KEY_MATERIAL_PATTERNS = [
+        '*.pem',
+        '*.key',
+        'id_*',
+        '*.ppk',
+        '*.p12',
+        '*.pfx',
+        '*.keystore',
+        '*.jks',
+        '*.kdbx',
+        '.htpasswd',
+        '.netrc',
+        '.pgpass',
     ];
 
     /**
@@ -71,18 +116,12 @@ final class ServerPaths
 
     public static function isSensitive(string $path): bool
     {
-        $name = mb_strtolower(self::basename($path));
-        if ($name === '') {
-            return false;
-        }
+        return self::matchesAny(self::SENSITIVE_PATTERNS, $path);
+    }
 
-        foreach (self::SENSITIVE_PATTERNS as $pattern) {
-            if (self::matches($pattern, $name)) {
-                return true;
-            }
-        }
-
-        return false;
+    public static function isKeyMaterial(string $path): bool
+    {
+        return self::matchesAny(self::KEY_MATERIAL_PATTERNS, $path);
     }
 
     /**
@@ -94,5 +133,24 @@ final class ServerPaths
         $regex = '/^'.str_replace(['\*', '\?'], ['.*', '.'], preg_quote($pattern, '/')).'$/iu';
 
         return preg_match($regex, $name) === 1;
+    }
+
+    /**
+     * @param  list<string>  $patterns
+     */
+    private static function matchesAny(array $patterns, string $path): bool
+    {
+        $name = mb_strtolower(self::basename($path));
+        if ($name === '') {
+            return false;
+        }
+
+        foreach ($patterns as $pattern) {
+            if (self::matches($pattern, $name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

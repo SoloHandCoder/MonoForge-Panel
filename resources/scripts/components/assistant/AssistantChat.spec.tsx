@@ -46,8 +46,9 @@ const conversation = (status: AssistantConversation['status']): AssistantConvers
                 {
                     id: 7,
                     name: 'delete_files',
-                    label: 'Delete logs/old.log',
-                    arguments: { files: ['logs/old.log'] },
+                    label: 'Delete /logs/old.log',
+                    arguments: { root: '/', files: ['logs/old.log'] },
+                    details: [{ label: 'Path', value: '/logs/old.log' }],
                     needs_confirmation: true,
                     status: status === 'awaiting_approval' ? 'pending' : 'done',
                     result_preview: null,
@@ -114,7 +115,7 @@ describe('AssistantChat', () => {
         expect(card).toHaveTextContent('permanently deletes files');
         expect(screen.getByRole('textbox', { name: 'Message the assistant' })).toBeDisabled();
 
-        await userEvent.click(screen.getByRole('button', { name: 'Allow: Delete logs/old.log' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Allow: Delete /logs/old.log' }));
 
         expect(http.post).toHaveBeenCalledWith(`${base}/c1/tool-calls/7/approve`);
         // The approve response is the conversation, now running again, so the composer stays off.

@@ -38,6 +38,14 @@ final class SendCommandTool extends ServerTool
         return true;
     }
 
+    public function prepareArguments(array $arguments, ToolContext $context): array
+    {
+        $command = mb_trim($this->string($arguments, 'command', null, self::MAX_LENGTH));
+        throw_if($command === '' || preg_match('/[\r\n]/', $command) === 1, ToolException::class, 'Send one single-line command at a time.');
+
+        return ['command' => $command];
+    }
+
     public function describeCall(array $arguments): string
     {
         return 'Run the command: '.$this->labelArgument($arguments, 'command');

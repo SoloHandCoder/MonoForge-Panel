@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
 use Pterodactyl\Contracts\Assistant\AuthorizesAssistantTool;
+use Pterodactyl\Contracts\Assistant\PreparesToolCall;
 use Pterodactyl\Exceptions\Assistant\ToolException;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Models\User;
@@ -22,7 +23,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  * the permission again, runs the tool, turns known failures into user-safe ToolExceptions,
  * takes IPs and node host names out of the output and caps its size.
  */
-abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool
+abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool, PreparesToolCall
 {
     public const string SCOPE_SERVER = 'server';
 
@@ -32,6 +33,9 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool
     public const int MAX_CONTENT_BYTES = 15_000;
 
     public const string DENIED = 'You do not have permission to do this.';
+
+    /** The longest label; the details under it always show the full arguments. */
+    public const int LABEL_LENGTH = 120;
 
     /**
      * @param  array<string, mixed>  $arguments
@@ -60,11 +64,58 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool
     }
 
     /**
+     * A value as the details show it: text as it is, a list one entry a line, the rest as JSON.
+     */
+    public static function detailValue(mixed $value): string
+    {
+        return match (true) {
+            is_string($value) => $value,
+            is_bool($value) => $value ? 'true' : 'false',
+            is_int($value), is_float($value) => (string) $value,
+            $value === null => '',
+            is_array($value) && array_is_list($value) && array_filter($value, is_string(...)) === $value => implode("\n", $value),
+            default => (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+        };
+    }
+
+    /**
+     * Text for a one-line label: whitespace collapsed, cut with an ellipsis when long. The
+     * details under the label always show the full value.
+     */
+    public static function shorten(string $value, int $length = self::LABEL_LENGTH): string
+    {
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+
+        return mb_strlen($value) > $length ? mb_substr($value, 0, $length - 1).'…' : $value;
+    }
+
+    /**
      * Auto tools run straight away. Tools that change something override this.
      */
     public function needsConfirmation(array $arguments, ToolContext $context): bool
     {
         return false;
+    }
+
+    /**
+     * Arguments are stored as the model sent them unless a tool settles them first.
+     */
+    public function prepareArguments(array $arguments, ToolContext $context): array
+    {
+        return $arguments;
+    }
+
+    /**
+     * Each argument in full, lists one entry a line and anything else as JSON.
+     */
+    public function callDetails(array $arguments): array
+    {
+        $details = [];
+        foreach ($arguments as $key => $value) {
+            $details[] = ['label' => (string) $key, 'value' => self::detailValue($value)];
+        }
+
+        return $details;
     }
 
     final public function execute(array $arguments, ToolContext $context): ToolResult
@@ -97,7 +148,9 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool
         /** @var array<string, mixed> $display */
         $display = $redactor->redactValue($result->display, $keep);
 
-        return new ToolResult(self::truncate($redactor->redact($result->content, $keep)), $display);
+        $private = $result->private === null ? null : self::truncate($redactor->redact($result->private, $keep));
+
+        return new ToolResult(self::truncate($redactor->redact($result->content, $keep)), $display, $private);
     }
 
     /**
@@ -246,20 +299,28 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool
     }
 
     /**
-     * A short value for a call label, cut to keep the label on one line.
+     * An argument as text for a call label, in full: lists are joined with commas. Pass the
+     * result (after any normalising) through shorten() for the label.
      *
      * @param  array<string, mixed>  $arguments
      */
-    protected function labelArgument(array $arguments, string $key, string $fallback = ''): string
+    protected function labelValue(array $arguments, string $key, string $fallback = ''): string
     {
         $value = $arguments[$key] ?? null;
         if (is_array($value)) {
             $value = implode(', ', array_filter($value, is_string(...)));
         }
 
-        $value = is_scalar($value) ? (string) $value : $fallback;
-        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+        return is_scalar($value) && (string) $value !== '' ? (string) $value : $fallback;
+    }
 
-        return mb_strlen($value) > 80 ? mb_substr($value, 0, 77).'...' : $value;
+    /**
+     * A short value for a call label.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    protected function labelArgument(array $arguments, string $key, string $fallback = ''): string
+    {
+        return self::shorten($this->labelValue($arguments, $key, $fallback));
     }
 }
