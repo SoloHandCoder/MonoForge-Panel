@@ -47,6 +47,7 @@ use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserSSHKey;
+use Pterodactyl\Services\Activity\InfrastructureIps;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
@@ -142,6 +143,9 @@ class AppServiceProvider extends ServiceProvider
         // so the service is shared rather than rebuilt on each resolve.
         $this->app->singleton(EnvironmentService::class);
 
+        // Resolved node addresses are kept for the rest of the request (or queued job).
+        $this->app->scoped(InfrastructureIps::class);
+
         $this->app->extend('auth.password', fn (): PasswordBrokerManager => new PasswordBrokerManager($this->app));
 
         // Resend over its HTTP API without the Resend SDK. The key is read when the
@@ -232,6 +236,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api.client', fn (Request $request): Limit => $this->apiLimit($request, 'client'));
         RateLimiter::for('api.application', fn (Request $request): Limit => $this->apiLimit($request, 'application'));
         RateLimiter::for('api.admin', fn (Request $request): Limit => $this->apiLimit($request, 'admin'));
+
+        // "Check now" for MonoForge updates calls GitHub each time, so it is kept to 6 a minute.
+        RateLimiter::for('monoforge.update-check', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(6)->by($user instanceof User ? $user->uuid : (string) $request->ip());
+        });
 
         ResourceLimit::boot();
     }

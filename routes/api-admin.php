@@ -536,6 +536,7 @@ Route::prefix('/updates')->name('api.admin.updates')->group(function (): void {
     Route::get('/status', [UpdateController::class, 'status'])->name('.status');
 
     Route::middleware(RequireSessionAuthentication::class)->group(function (): void {
+        Route::post('/check', [UpdateController::class, 'check'])->middleware('throttle:monoforge.update-check')->name('.check');
         Route::post('/apply', [UpdateController::class, 'apply'])->name('.apply');
         Route::put('/settings', [UpdateController::class, 'settings'])->name('.settings');
     });

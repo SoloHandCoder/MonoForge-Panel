@@ -56,6 +56,8 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:captcha:provider',
         'monoforge:captcha:turnstile:site_key',
         'monoforge:captcha:turnstile:secret_key',
+        // Addresses hidden from activity entries.
+        'monoforge:privacy:hidden_ips',
     ];
 
     /**

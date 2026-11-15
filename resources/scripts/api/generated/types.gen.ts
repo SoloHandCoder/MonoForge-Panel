@@ -722,6 +722,10 @@ export type AdminSettingsResponse = {
         'pterodactyl:client_features:allocations:enabled': boolean;
         'pterodactyl:client_features:allocations:range_start': number | null;
         'pterodactyl:client_features:allocations:range_end': number | null;
+        /**
+         * IPs or CIDR ranges, one per line, never shown in activity entries.
+         */
+        'monoforge:privacy:hidden_ips': string;
     };
     meta: {
         load_environment_only: boolean;
@@ -2742,6 +2746,10 @@ export type AdminUpdateAdvancedSettingsRequest = {
      * The pterodactyl:client features:allocations:range end. This field is required when <code>pterodactyl:client_features:allocations:enabled</code> is <code>true</code>. Must be between 1024 and 65535.
      */
     'pterodactyl:client_features:allocations:range_end'?: number | null;
+    /**
+     * The monoforge:privacy:hidden ips. Must not be greater than 10000 characters.
+     */
+    'monoforge:privacy:hidden_ips'?: string | null;
 };
 
 export type AdminUpdateLoginProvidersRequest = {
@@ -4395,6 +4403,58 @@ export type AdminGetRegistrationSettingsResponseBody = {
 };
 
 export type AdminGetUpdateStatusResponseBody = {
+    /**
+     * off, notify or auto.
+     */
+    mode: 'off' | 'notify' | 'auto';
+    /**
+     * The running build, or the app version when it is unknown.
+     */
+    current_version: string;
+    /**
+     * The running build, or null when the panel has no version.json.
+     */
+    current: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+    } | null;
+    /**
+     * The latest build on GitHub, or null when it is unknown or update checks are off.
+     */
+    latest: {
+        version: string;
+        commit: string;
+        built_at: string | null;
+        tag: string;
+        url: string;
+    } | null;
+    /**
+     * off (checks disabled), available (GitHub says the latest commit is ahead), current, or unknown (the comparison could not be fetched; nothing is installed automatically).
+     */
+    check: 'off' | 'available' | 'current' | 'unknown';
+    /**
+     * Whether the latest build should replace the running one.
+     */
+    update_available: boolean;
+    /**
+     * The last requested or applied update.
+     */
+    status: {
+        /**
+         * idle, queued, running, success or failed.
+         */
+        state: 'idle' | 'queued' | 'running' | 'success' | 'failed';
+        step: string | null;
+        message: string | null;
+        from: string | null;
+        to: string | null;
+        error: string | null;
+        updated_at: string | null;
+    };
+};
+
+export type AdminCheckForUpdatesResponseBody = {
     /**
      * off, notify or auto.
      */
@@ -11709,6 +11769,39 @@ export type AdminGetUpdateStatusResponses = {
 };
 
 export type AdminGetUpdateStatusResponse = AdminGetUpdateStatusResponses[keyof AdminGetUpdateStatusResponses];
+
+export type AdminCheckForUpdatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/updates/check';
+};
+
+export type AdminCheckForUpdatesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * Too many checks; try again in a minute.
+     */
+    429: ErrorEnvelope;
+};
+
+export type AdminCheckForUpdatesError = AdminCheckForUpdatesErrors[keyof AdminCheckForUpdatesErrors];
+
+export type AdminCheckForUpdatesResponses = {
+    /**
+     * Update status returned after a fresh check.
+     */
+    200: AdminCheckForUpdatesResponseBody;
+};
+
+export type AdminCheckForUpdatesResponse = AdminCheckForUpdatesResponses[keyof AdminCheckForUpdatesResponses];
 
 export type AdminApplyUpdateData = {
     body?: never;

@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import {
     adminApplyUpdateMutation,
+    adminCheckForUpdatesMutation,
     adminGetUpdateStatusOptions,
     adminGetUpdateStatusQueryKey,
     adminGetVersionInformationQueryKey,
@@ -43,6 +44,46 @@ export const useApplyAdminUpdate = () => {
             });
         },
         onError: (error) => notifyHttpError(error, 'Unable to start the update'),
+    });
+};
+
+/** The toast shown for the result of a "Check now". */
+export interface UpdateCheckToast {
+    type: 'success' | 'info' | 'error';
+    title: string;
+}
+
+/** What a "Check now" result means for the admin, as a toast. */
+export const updateCheckToast = (status: AdminUpdateStatus): UpdateCheckToast => {
+    if (status.check === 'off') {
+        return { type: 'info', title: 'Update checks are turned off' };
+    }
+
+    if (status.update_available && status.latest) {
+        return { type: 'info', title: `Update available: ${status.latest.version}` };
+    }
+
+    if (status.check === 'unknown' || !status.latest) {
+        return { type: 'error', title: 'Could not check GitHub for updates' };
+    }
+
+    return { type: 'success', title: 'Up to date' };
+};
+
+/** Asks GitHub for the latest build right away instead of using the cached result. */
+export const useCheckAdminUpdates = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        ...adminCheckForUpdatesMutation(),
+        onSuccess: async (status) => {
+            queryClient.setQueryData(adminGetUpdateStatusQueryKey(), status);
+            await queryClient.invalidateQueries({ queryKey: adminGetVersionInformationQueryKey() });
+            const result = updateCheckToast(status);
+
+            toast[result.type](result.title);
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to check for updates'),
     });
 };
 

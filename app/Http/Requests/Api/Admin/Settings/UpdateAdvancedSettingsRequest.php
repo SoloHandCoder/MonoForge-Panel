@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Http\Requests\Api\Admin\Settings;
 
+use Closure;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Http\Requests\Api\Admin\AdminApiRequest;
+use Pterodactyl\Services\Activity\InfrastructureIps;
 
 class UpdateAdvancedSettingsRequest extends AdminApiRequest
 {
@@ -41,6 +43,12 @@ class UpdateAdvancedSettingsRequest extends AdminApiRequest
                 'between:1024,65535',
                 'gt:pterodactyl:client_features:allocations:range_start',
             ],
+            'monoforge:privacy:hidden_ips' => ['sometimes', 'nullable', 'string', 'max:10000', function (string $attribute, mixed $value, Closure $fail): void {
+                $invalid = array_filter(InfrastructureIps::hiddenList(is_string($value) ? $value : ''), fn (string $entry): bool => ! InfrastructureIps::isValidEntry($entry));
+                if ($invalid !== []) {
+                    $fail('The :attribute must list one IP address or CIDR range per line; not valid: '.implode(', ', array_slice($invalid, 0, 5)).'.');
+                }
+            }],
         ];
     }
 
@@ -56,6 +64,7 @@ class UpdateAdvancedSettingsRequest extends AdminApiRequest
             'pterodactyl:client_features:allocations:enabled' => 'Auto Create Allocations Enabled',
             'pterodactyl:client_features:allocations:range_start' => 'Starting Port',
             'pterodactyl:client_features:allocations:range_end' => 'Ending Port',
+            'monoforge:privacy:hidden_ips' => 'Hidden IP Addresses',
         ];
     }
 
@@ -80,6 +89,12 @@ class UpdateAdvancedSettingsRequest extends AdminApiRequest
                 ? null
                 : $this->integer('pterodactyl:client_features:allocations:range_end'),
         ];
+
+        // Older clients do not send the list; it is only changed when it is present.
+        if ($this->has('monoforge:privacy:hidden_ips')) {
+            $list = InfrastructureIps::hiddenList($this->string('monoforge:privacy:hidden_ips')->toString());
+            $values['monoforge:privacy:hidden_ips'] = $list === [] ? null : implode("\n", $list);
+        }
 
         if ($this->filled('recaptcha:secret_key')) {
             $values['recaptcha:secret_key'] = $this->string('recaptcha:secret_key')->toString();

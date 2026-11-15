@@ -12,6 +12,11 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
+// Loopback and private addresses are never shown, so entries come from a public address.
+beforeEach(function (): void {
+    request()->server->set('REMOTE_ADDR', '203.0.113.50');
+});
+
 test('activity is returned newest first', function (): void {
     $server = $this->createServerModel();
     Activity::event('admin:server.build')->actor($this->getAdminUser())->subject($server)->property('name', $server->name)->log();
@@ -206,5 +211,5 @@ test('admin activity hides system addresses but keeps normal user addresses', fu
 
     $rows = collect($this->getJson(route('api.admin.activity'))->assertOk()->json('data'))->pluck('attributes.ip', 'attributes.event');
 
-    expect($rows['admin:server.build'])->toBeNull()->and($rows['admin:server.suspend'])->toBe('127.0.0.1');
+    expect($rows['admin:server.build'])->toBeNull()->and($rows['admin:server.suspend'])->toBe('203.0.113.50');
 });
