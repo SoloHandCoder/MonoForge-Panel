@@ -6,6 +6,8 @@ namespace Pterodactyl\Models\Billing;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Pterodactyl\Models\Model;
 use Pterodactyl\Models\User;
@@ -30,6 +32,11 @@ use Pterodactyl\Models\User;
 #[Fillable(['uuid', 'user_id', 'token_pack_id', 'basket_ident', 'tebex_payment_id'])]
 class TebexCheckout extends Model
 {
+    use MassPrunable;
+
+    /** A checkout no payment was linked to within this many days was abandoned, and is pruned. */
+    public const int RETENTION_DAYS = 30;
+
     /** No payment confirmed yet. */
     public const string STATUS_PENDING = 'pending';
 
@@ -84,6 +91,19 @@ class TebexCheckout extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(TebexPayment::class, 'tebex_payment_id');
+    }
+
+    /**
+     * Abandoned checkouts: older than the retention and never linked to a payment. A linked
+     * checkout stays as long as its payment, so the player's return page keeps working.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->whereNull('tebex_payment_id')
+            ->where('created_at', '<', CarbonImmutable::now()->subDays(self::RETENTION_DAYS));
     }
 
     /** What the player sees, from the payment Tebex reported for this checkout. */

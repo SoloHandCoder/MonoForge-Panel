@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\TokenPurchaseControllerTest;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
+use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
@@ -97,4 +102,27 @@ test('a guest cannot read a checkout', function (): void {
     $checkout = checkoutFor(User::factory()->create());
 
     $this->getJson('/api/client/account/wallet/purchases/'.$checkout->uuid)->assertUnauthorized();
+});
+
+test('checkouts that never got a payment are pruned daily after 30 days, the others are kept', function (): void {
+    $user = User::factory()->create();
+    $old = CarbonImmutable::now()->subDays(TebexCheckout::RETENTION_DAYS + 1);
+    $abandoned = checkoutFor($user);
+    $paid = checkoutFor($user, payment(TebexPayment::STATUS_COMPLETED, 550));
+    $recent = checkoutFor($user);
+    TebexCheckout::query()->whereKey([$abandoned->id, $paid->id])->update(['created_at' => $old]);
+    TebexCheckout::query()->whereKey($recent->id)->update(['created_at' => CarbonImmutable::now()->subDays(TebexCheckout::RETENTION_DAYS - 1)]);
+
+    $schedule = new Schedule;
+    $this->app->make(Scheduler::class)($schedule);
+    $prune = collect($schedule->events())->first(fn (Event $event): bool => str_contains((string) $event->command, 'model:prune')
+        && str_contains((string) $event->command, 'TebexCheckout'));
+    expect($prune)->not->toBeNull()
+        ->and($prune->expression)->toBe('0 0 * * *')
+        ->and($prune->withoutOverlapping)->toBeTrue()
+        ->and($prune->onOneServer)->toBeTrue();
+
+    Artisan::call('model:prune', ['--model' => [TebexCheckout::class]]);
+
+    expect(TebexCheckout::query()->pluck('id')->sort()->values()->all())->toBe(collect([$paid->id, $recent->id])->sort()->values()->all());
 });

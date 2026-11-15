@@ -17,6 +17,7 @@ use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
 use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
+use Pterodactyl\Models\Billing\TebexCheckout;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Models\Status\StatusCheck;
 use Pterodactyl\Models\Status\StatusDay;
@@ -48,6 +49,8 @@ final class Scheduler
 
         // Tebex webhook bodies carry the buyer's personal details; keep them 90 days.
         $schedule->command(PruneTebexPayloadsCommand::class)->daily()->withoutOverlapping()->onOneServer();
+        // Token checkouts no payment was ever linked to, after 30 days (abandoned baskets).
+        $schedule->command(PruneCommand::class, ['--model' => [TebexCheckout::class]])->daily()->withoutOverlapping()->onOneServer();
 
         // Retry failed playit.gg tunnels and pick up addresses for pending ones.
         $schedule->command(SyncTunnelsCommand::class)->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
