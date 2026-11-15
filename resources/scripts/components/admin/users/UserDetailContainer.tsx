@@ -46,6 +46,7 @@ import type { SelectOption } from '@/components/ui/Select';
 import DataTable from '@/components/elements/table/DataTable';
 import { actionsColumn, RowActions } from '@/components/elements/table/RowActions';
 import ServerEditAction from '@/components/admin/servers/ServerEditAction';
+import UserTokensCard from '@/components/admin/users/UserTokensCard';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { relationshipData } from '@/api/relationships';
 import { resourceNavigation, type ResourceTab } from '@/views/navigation';
@@ -317,6 +318,7 @@ const UserDetailContent = ({ user }: { user: AdminUserWithServers }) => {
             </Form>
 
             <OwnedServersCard servers={servers} />
+            <UserTokensCard userId={userId} />
         </>
     );
 };

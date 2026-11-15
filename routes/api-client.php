@@ -31,6 +31,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\SubuserController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\WebsocketController;
 use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
+use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
 use Pterodactyl\Http\Middleware\Activity\ServerSubject;
 use Pterodactyl\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
@@ -67,6 +68,9 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
 
     Route::get('/activity', ActivityLogController::class)->name('api:client.account.activity');
     Route::get('/activity/filters', ActivityLogFilterController::class)->name('api:client.account.activity.filters');
+
+    // The token balance and history (phase 3 Task Q).
+    Route::get('/wallet', WalletController::class)->name('api:client.account.wallet');
 
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
     Route::post('/api-keys', [ApiKeyController::class, 'store']);

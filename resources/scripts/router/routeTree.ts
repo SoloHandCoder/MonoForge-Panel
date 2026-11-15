@@ -16,6 +16,7 @@ import { accountActivityFacetsQueryOptions, accountActivityLogsQueryOptions } fr
 import { currentUserQueryOptions } from '@/api/account/queries';
 import { accountServersQueryOptions } from '@/api/account/servers/queries';
 import { accountSshKeysQueryOptions } from '@/api/account/ssh-keys/queries';
+import { walletQueryOptions } from '@/api/account/wallet/queries';
 import {
     adminUserListQueryParams,
     adminUserWithServersQueryOptions,
@@ -249,6 +250,15 @@ const accountChildren = [
             ]);
         },
         component: pageRoute('page.account.activity'),
+    }),
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'wallet',
+        staticData: { nav: { label: 'Wallet', icon: 'wallet' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...walletQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/account/wallet/WalletContainer')),
     }),
 ];
 

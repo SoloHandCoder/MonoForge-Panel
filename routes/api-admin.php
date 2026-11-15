@@ -66,6 +66,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\DisableTwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\ExternalController as UserExternalController;
+use Pterodactyl\Http\Controllers\Api\Admin\Users\TokenController as UserTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\UserController;
 use Pterodactyl\Http\Controllers\Api\Admin\VersionController;
 use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
@@ -155,9 +156,11 @@ Route::prefix('/users')->name('api.admin.users')->group(function (): void {
     // `/external/{external_id}` before `/{user:id}` so the literal is not bound as an id.
     Route::get('/external/{external_id}', UserExternalController::class)->name('.external');
     Route::get('/{user:id}', [UserController::class, 'show'])->name('.view');
+    Route::get('/{user:id}/tokens', [UserTokenController::class, 'index'])->name('.tokens');
 
     Route::post('/', [UserController::class, 'store'])->name('.store');
     Route::post('/{user:id}/disable-2fa', DisableTwoFactorController::class)->name('.disable-2fa');
+    Route::post('/{user:id}/tokens', [UserTokenController::class, 'store'])->name('.tokens.adjust');
     Route::put('/{user:id}', [UserController::class, 'update'])->name('.update');
 
     Route::delete('/{user:id}', [UserController::class, 'destroy'])->name('.delete');

@@ -424,7 +424,8 @@ const accountNav = (extension = false) =>
         ['api', 'API Credentials', 'key-round'],
         ['ssh', 'SSH Keys', 'terminal'],
         ['activity', 'Activity', 'history'],
-        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('account', 4)] as const] : []),
+        ['wallet', 'Wallet', 'wallet'],
+        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('account', 5)] as const] : []),
     ]);
 
 const serverPaths = [

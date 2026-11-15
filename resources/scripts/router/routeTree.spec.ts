@@ -109,7 +109,14 @@ it('builds the tree from the extensions it is given', async () => {
 
     expect(router.matchRoutes('/account/given').at(-1)?.routeId).toBe('/authenticated/account/given');
     expect(router.matchRoutes('/server/abc/votes').some((match) => match.routeId.endsWith('/votes'))).toBe(false);
-    expect(getAreaNav('account').map((entry) => entry.segment)).toEqual(['', 'api', 'ssh', 'activity', 'given']);
+    expect(getAreaNav('account').map((entry) => entry.segment)).toEqual([
+        '',
+        'api',
+        'ssh',
+        'activity',
+        'wallet',
+        'given',
+    ]);
 });
 
 type BootstrapWindow = Window & { PterodactylUser?: unknown; SiteConfiguration?: unknown };
