@@ -11,6 +11,7 @@ import InstallListener from '@/components/server/InstallListener';
 import StatsListener from '@/components/server/StatsListener';
 import TransferListener from '@/components/server/TransferListener';
 import WebsocketHandler from '@/components/server/WebsocketHandler';
+import ServerSubscriptionPanel from '@/components/server/billing/ServerSubscriptionPanel';
 import { useIsRenderedRoute } from '@/router/renderedRoute';
 import { useCurrentUser } from '@/api/account/queries';
 import { View } from '@/views/View';
@@ -39,6 +40,10 @@ function ServerContent({ id, server }: { id: string; server: Server }) {
             <TransferListener />
             <WebsocketHandler />
             <StatsListener />
+            {/* Shop billing: the deletion countdown while suspended, and the subscription on the console. */}
+            <div className='page-width empty:hidden pt-(--layout-page-spacing)'>
+                <ServerSubscriptionPanel identifier={identifier} summary={isConsole} />
+            </div>
             {inConflictState && (!rootAdmin || !location.pathname.endsWith(`/server/${identifier}`)) ? (
                 <View name='server.conflict' />
             ) : (

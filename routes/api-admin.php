@@ -35,6 +35,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Nodes\ConfigurationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeleteAllocationBlockController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeployTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\NodeController;
+use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\SystemInformationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UniqueIpsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UtilizationController;
@@ -49,6 +50,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerBackupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerMountController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\StartupController;
+use Pterodactyl\Http\Controllers\Api\Admin\Servers\SubscriptionController as ServerSubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\SuspensionController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ToggleBackupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ToggleInstallController;
@@ -61,11 +63,23 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopAddonController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopCategoryController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopMultiplierController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPeriodController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPlanController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexPaymentController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
+use Pterodactyl\Http\Controllers\Api\Admin\Tunnels\TunnelController;
+use Pterodactyl\Http\Controllers\Api\Admin\Tunnels\TunnelSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\DisableTwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\ExternalController as UserExternalController;
+use Pterodactyl\Http\Controllers\Api\Admin\Users\TokenController as UserTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Users\UserController;
 use Pterodactyl\Http\Controllers\Api\Admin\VersionController;
 use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
@@ -93,6 +107,60 @@ Route::prefix('/announcements')->name('api.admin.announcements')->group(function
     Route::put('/{announcement:id}', [AnnouncementController::class, 'update'])->name('.update');
 
     Route::delete('/{announcement:id}', [AnnouncementController::class, 'destroy'])->name('.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Shop Routes (phase 3)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/shop
+|
+| Catalog, pricing and limits, plus Tebex settings, token packs and payments.
+|
+*/
+Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
+    Route::get('/settings', [ShopSettingsController::class, 'index'])->name('.settings');
+    Route::put('/settings', [ShopSettingsController::class, 'update'])->name('.settings.update');
+    Route::get('/options', [ShopSettingsController::class, 'options'])->name('.options');
+
+    Route::get('/categories', [ShopCategoryController::class, 'index'])->name('.categories');
+    Route::post('/categories', [ShopCategoryController::class, 'store'])->name('.categories.store');
+    Route::put('/categories/order', [ShopCategoryController::class, 'reorder'])->name('.categories.reorder');
+    Route::put('/categories/{category:id}', [ShopCategoryController::class, 'update'])->name('.categories.update');
+    Route::delete('/categories/{category:id}', [ShopCategoryController::class, 'destroy'])->name('.categories.delete');
+
+    Route::get('/plans', [ShopPlanController::class, 'index'])->name('.plans');
+    Route::get('/plans/{plan:id}', [ShopPlanController::class, 'show'])->name('.plans.view');
+    Route::post('/plans', [ShopPlanController::class, 'store'])->name('.plans.store');
+    Route::put('/plans/{plan:id}', [ShopPlanController::class, 'update'])->name('.plans.update');
+    Route::delete('/plans/{plan:id}', [ShopPlanController::class, 'destroy'])->name('.plans.delete');
+
+    Route::get('/periods', [ShopPeriodController::class, 'index'])->name('.periods');
+    Route::post('/periods', [ShopPeriodController::class, 'store'])->name('.periods.store');
+    Route::put('/periods/{period:id}', [ShopPeriodController::class, 'update'])->name('.periods.update');
+    Route::delete('/periods/{period:id}', [ShopPeriodController::class, 'destroy'])->name('.periods.delete');
+
+    Route::get('/multipliers', [ShopMultiplierController::class, 'index'])->name('.multipliers');
+    Route::post('/multipliers', [ShopMultiplierController::class, 'store'])->name('.multipliers.store');
+    Route::put('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'update'])->name('.multipliers.update');
+    Route::delete('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'destroy'])->name('.multipliers.delete');
+
+    Route::get('/addons', [ShopAddonController::class, 'index'])->name('.addons');
+    Route::post('/addons', [ShopAddonController::class, 'store'])->name('.addons.store');
+    Route::put('/addons/{addon:id}', [ShopAddonController::class, 'update'])->name('.addons.update');
+    Route::delete('/addons/{addon:id}', [ShopAddonController::class, 'destroy'])->name('.addons.delete');
+
+    Route::get('/tebex', [TebexSettingsController::class, 'index'])->name('.tebex');
+    Route::put('/tebex', [TebexSettingsController::class, 'update'])->name('.tebex.update');
+    Route::get('/tebex/payments', [TebexPaymentController::class, 'index'])->name('.tebex.payments');
+    // Crediting a flagged payment mints tokens: a browser session only, never an API key.
+    Route::post('/tebex/payments/{payment:id}/approve', [TebexPaymentController::class, 'approve'])->middleware(RequireSessionAuthentication::class)->name('.tebex.payments.approve');
+
+    Route::get('/token-packs', [TokenPackController::class, 'index'])->name('.token-packs');
+    Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
+    Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
+    Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
 });
 
 /*
@@ -155,9 +223,12 @@ Route::prefix('/users')->name('api.admin.users')->group(function (): void {
     // `/external/{external_id}` before `/{user:id}` so the literal is not bound as an id.
     Route::get('/external/{external_id}', UserExternalController::class)->name('.external');
     Route::get('/{user:id}', [UserController::class, 'show'])->name('.view');
+    Route::get('/{user:id}/tokens', [UserTokenController::class, 'index'])->name('.tokens');
 
     Route::post('/', [UserController::class, 'store'])->name('.store');
     Route::post('/{user:id}/disable-2fa', DisableTwoFactorController::class)->name('.disable-2fa');
+    // Tokens are money: a browser session only, never an API key.
+    Route::post('/{user:id}/tokens', [UserTokenController::class, 'store'])->middleware(RequireSessionAuthentication::class)->name('.tokens.adjust');
     Route::put('/{user:id}', [UserController::class, 'update'])->name('.update');
 
     Route::delete('/{user:id}', [UserController::class, 'destroy'])->name('.delete');
@@ -175,6 +246,27 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/system-information', SystemInformationController::class)->name('.system-information');
     Route::post('/deploy-token', DeployTokenController::class)->middleware(RequireSessionAuthentication::class)->name('.deploy-token');
     Route::get('/utilization', UtilizationController::class)->name('.utilization');
+    Route::get('/playit', [PlayitController::class, 'show'])->name('.playit');
+    Route::put('/playit', [PlayitController::class, 'update'])->name('.playit.update');
+    Route::post('/playit/test', [PlayitController::class, 'test'])->name('.playit.test');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Tunnel Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/tunnels
+|
+*/
+Route::prefix('/tunnels')->name('api.admin.tunnels')->group(function (): void {
+    Route::get('/', [TunnelController::class, 'index']);
+    Route::post('/', [TunnelController::class, 'store'])->name('.store');
+    // `/settings` before `/{tunnel}` so the literal is not bound as a tunnel.
+    Route::get('/settings', [TunnelSettingsController::class, 'show'])->name('.settings');
+    Route::put('/settings', [TunnelSettingsController::class, 'update'])->name('.settings.update');
+    Route::post('/{tunnel:id}/retry', [TunnelController::class, 'retry'])->name('.retry');
+    Route::post('/{tunnel:id}/recreate', [TunnelController::class, 'recreate'])->name('.recreate');
 });
 
 /*
@@ -230,6 +322,11 @@ Route::prefix('/servers')->name('api.admin.servers')->group(function (): void {
     Route::get('/{server:admin_identifier}/transfer/progress', TransferProgressController::class)->name('.transfer-progress');
     Route::post('/{server:admin_identifier}/transfer', TransferController::class)->name('.transfer');
     Route::post('/{server:admin_identifier}/settings/toggle-install', ToggleInstallController::class)->name('.toggle-install');
+
+    // Shop billing (phase 3 Task T).
+    Route::get('/{server:admin_identifier}/subscription', [ServerSubscriptionController::class, 'show'])->name('.subscription');
+    Route::post('/{server:admin_identifier}/subscription/extend', [ServerSubscriptionController::class, 'extend'])->name('.subscription.extend');
+    Route::post('/{server:admin_identifier}/subscription/cancel', [ServerSubscriptionController::class, 'cancel'])->name('.subscription.cancel');
 
     Route::delete('/{server:admin_identifier}', [ServerController::class, 'destroy'])->name('.delete');
     Route::delete('/{server:admin_identifier}/force', [ServerController::class, 'forceDestroy'])->name('.delete.force');

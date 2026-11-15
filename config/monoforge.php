@@ -77,6 +77,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Token shop (phase 3)
+    |--------------------------------------------------------------------------
+    |
+    | The admin Shop > Limits tab stores these as "monoforge:shop:*" settings.
+    | grace_days: days a suspended shop server is kept before it is deleted
+    | (0 deletes it at suspension). low_balance_days: how long before a renewal
+    | a player with too few tokens is warned. limits: the most memory (MB), disk
+    | (MB) and CPU (percent) the shop sells across all shop servers; 0 = no limit.
+    |
+    */
+    'shop' => [
+        'enabled' => false,
+        'grace_days' => 7,
+        'low_balance_days' => 3,
+        'limits' => [
+            'memory_mb' => 0,
+            'disk_mb' => 0,
+            'cpu_percent' => 0,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Privacy
     |--------------------------------------------------------------------------
     |

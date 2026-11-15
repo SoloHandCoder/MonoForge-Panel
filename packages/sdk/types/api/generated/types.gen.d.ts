@@ -589,6 +589,33 @@ export type AdminServerResource = {
         resource: string;
     };
 };
+export type AdminServerSubscriptionAttributes = {
+    id: number;
+    server_id: number;
+    user_id: number;
+    plan_id: number;
+    period_id: number;
+    server_identifier: string;
+    server_name: string;
+    status: string;
+    price_tokens: number;
+    period_days: number;
+    addons: Array<{
+        key: string;
+        units: number;
+    }>;
+    auto_renew: boolean;
+    next_renewal_at: string;
+    suspended_at: string | null;
+    delete_at: string | null;
+    can_renew_now: boolean;
+    created_at: string;
+    updated_at: string;
+};
+export type AdminServerSubscriptionResource = {
+    object: string;
+    attributes: AdminServerSubscriptionAttributes;
+};
 export type AdminServerTransferAttributes = {
     id: number;
     server_id: number;
@@ -604,6 +631,32 @@ export type AdminServerTransferAttributes = {
 export type AdminServerTransferResource = {
     object: string;
     attributes: AdminServerTransferAttributes;
+};
+export type AdminServerTunnelAttributes = {
+    id: number;
+    server_id: number;
+    server_name: string;
+    server_identifier: string;
+    node_id: number;
+    node_name: string;
+    playit_tunnel_id: string;
+    address: string;
+    subdomain: string | null;
+    status: string;
+    last_error: string | null;
+    created_at: string;
+    updated_at: string;
+};
+export type AdminServerTunnelPaginatedResponse = {
+    object: string;
+    data: Array<AdminServerTunnelResource>;
+    meta: {
+        pagination: PaginationMeta;
+    };
+};
+export type AdminServerTunnelResource = {
+    object: string;
+    attributes: AdminServerTunnelAttributes;
 };
 export type AdminServerVariableAttributes = {
     id: number;
@@ -757,6 +810,37 @@ export type AdminThemeSettingListResponse = {
 export type AdminThemeSettingResource = {
     object: string;
     attributes: AdminThemeSettingAttributes;
+};
+export type AdminTokenTransactionAttributes = {
+    id: number;
+    /**
+     * Signed change in tokens: positive credits, negative debits.
+     */
+    amount: number;
+    /**
+     * The token balance right after this change.
+     */
+    balance_after: number;
+    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction';
+    reference_type: string | null;
+    reference_id: string | null;
+    description: string;
+    created_at: string;
+};
+export type AdminTokenTransactionPaginatedResponse = {
+    object: string;
+    data: Array<AdminTokenTransactionResource>;
+    meta: {
+        pagination: PaginationMeta;
+        balance: number;
+    };
+};
+export type AdminTokenTransactionResource = {
+    object: string;
+    attributes: AdminTokenTransactionAttributes;
+    meta?: {
+        balance: number;
+    };
 };
 export type AdminUserAttributes = {
     id: number;
@@ -1313,6 +1397,10 @@ export type ClientServerAttributes = {
     is_installing: boolean;
     is_transferring: boolean;
     skip_scripts: boolean;
+    /**
+     * The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.
+     */
+    playit_address: string | null;
     relationships?: {
         allocations?: ClientAllocationListResponse | NullResource;
         variables?: ClientEggVariableListResponse | NullResource;
@@ -1396,6 +1484,30 @@ export type ClientServerScheduleResource = {
     object: string;
     attributes: ClientServerScheduleAttributes;
 };
+export type ClientServerSubscriptionAttributes = {
+    server_identifier: string;
+    server_name: string;
+    status: string;
+    price_tokens: number;
+    period_days: number;
+    addons: Array<{
+        key: string;
+        units: number;
+    }>;
+    auto_renew: boolean;
+    next_renewal_at: string;
+    suspended_at: string | null;
+    delete_at: string | null;
+    can_renew_now: boolean;
+};
+export type ClientServerSubscriptionListResponse = {
+    object: string;
+    data: Array<ClientServerSubscriptionResource>;
+};
+export type ClientServerSubscriptionResource = {
+    object: string;
+    attributes: ClientServerSubscriptionAttributes;
+};
 export type ClientServerSubuserAttributes = {
     uuid: string;
     identifier: string;
@@ -1451,6 +1563,24 @@ export type ClientStatsResource = {
     object: string;
     attributes: ClientStatsAttributes;
 };
+export type ClientStorePurchaseAttributes = {
+    server: {
+        identifier: string;
+        uuid: string;
+        name: string;
+    };
+    tokens_charged: number;
+    period_days: number;
+    replayed: boolean;
+    /**
+     * The playit.gg address of the server once its tunnel is ready; null until then.
+     */
+    address: string | null;
+};
+export type ClientStorePurchaseResource = {
+    object: string;
+    attributes: ClientStorePurchaseAttributes;
+};
 export type ClientSystemPermissionsResponse = {
     object: string;
     attributes: {
@@ -1463,6 +1593,34 @@ export type ClientSystemPermissionsResponse = {
             };
         };
     };
+};
+export type ClientTokenTransactionAttributes = {
+    id: number;
+    /**
+     * Signed change in tokens: positive credits, negative debits.
+     */
+    amount: number;
+    /**
+     * The token balance right after this change.
+     */
+    balance_after: number;
+    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction';
+    reference_type: string | null;
+    reference_id: string | null;
+    description: string;
+    created_at: string;
+};
+export type ClientTokenTransactionPaginatedResponse = {
+    object: string;
+    data: Array<ClientTokenTransactionResource>;
+    meta: {
+        pagination: PaginationMeta;
+        balance: number;
+    };
+};
+export type ClientTokenTransactionResource = {
+    object: string;
+    attributes: ClientTokenTransactionAttributes;
 };
 export type ClientTwoFactorSetupResponse = {
     data: {
@@ -1574,6 +1732,439 @@ export type AdminUpdateAnnouncementRequest = {
      * The dismissible.
      */
     dismissible?: boolean;
+};
+export type AdminUpdateShopSettingsRequest = {
+    /**
+     * The enabled.
+     */
+    enabled: boolean;
+    /**
+     * The grace days. Must be at least 0. Must not be greater than 30.
+     */
+    grace_days: number;
+    /**
+     * The low balance days. Must be at least 0. Must not be greater than 30.
+     */
+    low_balance_days: number;
+    /**
+     * The limits.
+     */
+    limits: {
+        /**
+         * The limits memory. Must be at least 0. Must not be greater than 1000000000.
+         */
+        memory: number;
+        /**
+         * The limits disk. Must be at least 0. Must not be greater than 1000000000.
+         */
+        disk: number;
+        /**
+         * The limits cpu. Must be at least 0. Must not be greater than 10000000.
+         */
+        cpu: number;
+    };
+};
+export type AdminCreateShopCategoryRequest = {
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The slug. Must match the regex /^[a-z0-9]+(?:-[a-z0-9]+)*$/. Must not be greater than 191 characters.
+     */
+    slug: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+};
+export type AdminReorderShopCategoriesRequest = {
+    /**
+     * Must match an existing stored value.
+     */
+    ids?: Array<number>;
+};
+export type AdminUpdateShopCategoryRequest = {
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The slug. Must match the regex /^[a-z0-9]+(?:-[a-z0-9]+)*$/. Must not be greater than 191 characters.
+     */
+    slug: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+};
+export type AdminCreateShopPlanRequest = {
+    /**
+     * The category id. Must match an existing stored value.
+     */
+    category_id: number;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 65535.
+     */
+    sort?: number;
+    /**
+     * The price tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    price_tokens: number;
+    /**
+     * The memory limit in megabytes. Must be at least 128. Must not be greater than 4194304.
+     */
+    memory: number;
+    /**
+     * The swap limit in megabytes. Must be at least 0. Must not be greater than 4194304.
+     */
+    swap?: number;
+    /**
+     * The disk limit in megabytes. Must be at least 128. Must not be greater than 104857600.
+     */
+    disk: number;
+    /**
+     * The CPU limit percentage. Must be at least 1. Must not be greater than 100000.
+     */
+    cpu: number;
+    /**
+     * The block IO weight. Must be at least 10. Must not be greater than 1000.
+     */
+    io?: number;
+    /**
+     * The databases. Must be at least 0. Must not be greater than 1000.
+     */
+    databases?: number;
+    /**
+     * The backups. Must be at least 0. Must not be greater than 1000.
+     */
+    backups?: number;
+    /**
+     * The allocations. Must be at least 0. Must not be greater than 1000.
+     */
+    allocations?: number;
+    /**
+     * Must match an existing stored value.
+     */
+    egg_ids?: Array<number>;
+    /**
+     * Must match an existing stored value.
+     */
+    node_ids?: Array<number>;
+};
+export type AdminUpdateShopPlanRequest = {
+    /**
+     * The category id. Must match an existing stored value.
+     */
+    category_id: number;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 65535.
+     */
+    sort?: number;
+    /**
+     * The price tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    price_tokens: number;
+    /**
+     * The memory limit in megabytes. Must be at least 128. Must not be greater than 4194304.
+     */
+    memory: number;
+    /**
+     * The swap limit in megabytes. Must be at least 0. Must not be greater than 4194304.
+     */
+    swap?: number;
+    /**
+     * The disk limit in megabytes. Must be at least 128. Must not be greater than 104857600.
+     */
+    disk: number;
+    /**
+     * The CPU limit percentage. Must be at least 1. Must not be greater than 100000.
+     */
+    cpu: number;
+    /**
+     * The block IO weight. Must be at least 10. Must not be greater than 1000.
+     */
+    io?: number;
+    /**
+     * The databases. Must be at least 0. Must not be greater than 1000.
+     */
+    databases?: number;
+    /**
+     * The backups. Must be at least 0. Must not be greater than 1000.
+     */
+    backups?: number;
+    /**
+     * The allocations. Must be at least 0. Must not be greater than 1000.
+     */
+    allocations?: number;
+    /**
+     * Must match an existing stored value.
+     */
+    egg_ids?: Array<number>;
+    /**
+     * Must match an existing stored value.
+     */
+    node_ids?: Array<number>;
+};
+export type AdminCreateBillingPeriodRequest = {
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The days. Must be at least 1. Must not be greater than 3650.
+     */
+    days: number;
+    /**
+     * The price modifier percent. Must be at least -90. Must not be greater than 500.
+     */
+    price_modifier_percent: number;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 65535.
+     */
+    sort?: number;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminUpdateBillingPeriodRequest = {
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The days. Must be at least 1. Must not be greater than 3650.
+     */
+    days: number;
+    /**
+     * The price modifier percent. Must be at least -90. Must not be greater than 500.
+     */
+    price_modifier_percent: number;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 65535.
+     */
+    sort?: number;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminCreatePriceMultiplierRequest = {
+    /**
+     * The scope.
+     */
+    scope: 'location' | 'node';
+    /**
+     * The scope id. Must match an existing stored value.
+     */
+    scope_id: number;
+    /**
+     * The multiplier. Must be at least 0.01. Must not be greater than 999.99.
+     */
+    multiplier: number;
+    /**
+     * The label. Must not be greater than 191 characters.
+     */
+    label?: string | null;
+};
+export type AdminUpdatePriceMultiplierRequest = {
+    /**
+     * The scope.
+     */
+    scope: 'location' | 'node';
+    /**
+     * The scope id. Must match an existing stored value.
+     */
+    scope_id: number;
+    /**
+     * The multiplier. Must be at least 0.01. Must not be greater than 999.99.
+     */
+    multiplier: number;
+    /**
+     * The label. Must not be greater than 191 characters.
+     */
+    label?: string | null;
+};
+export type AdminCreateShopAddOnRequest = {
+    /**
+     * The key. Must match the regex /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/. Must not be greater than 64 characters.
+     */
+    key: string;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The resource.
+     */
+    resource: 'backups' | 'databases' | 'allocations' | 'memory' | 'disk' | 'cpu';
+    /**
+     * The amount. Must be at least 1. Must not be greater than 1048576.
+     */
+    amount: number;
+    /**
+     * The price tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    price_tokens: number;
+    /**
+     * The max units. Must be at least 1. Must not be greater than 100.
+     */
+    max_units: number;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminUpdateShopAddOnRequest = {
+    /**
+     * The key. Must match the regex /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/. Must not be greater than 64 characters.
+     */
+    key: string;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * A description for this resource. Must not be greater than 2000 characters.
+     */
+    description?: string | null;
+    /**
+     * The resource.
+     */
+    resource: 'backups' | 'databases' | 'allocations' | 'memory' | 'disk' | 'cpu';
+    /**
+     * The amount. Must be at least 1. Must not be greater than 1048576.
+     */
+    amount: number;
+    /**
+     * The price tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    price_tokens: number;
+    /**
+     * The max units. Must be at least 1. Must not be greater than 100.
+     */
+    max_units: number;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminUpdateTebexSettingsRequest = {
+    /**
+     * The Tebex public (webstore) token, or blank to turn the token store off.
+     */
+    public_token?: string | null;
+    /**
+     * A new Tebex private key, or blank to keep the stored one.
+     */
+    private_key?: string | null;
+    /**
+     * A new Tebex webhook secret, or blank to keep the stored one.
+     */
+    webhook_secret?: string | null;
+    /**
+     * Addresses Tebex webhooks are accepted from; empty uses the addresses Tebex documents.
+     */
+    webhook_ips: Array<string>;
+};
+export type AdminApproveAndCreditATebexPaymentRequest = {
+    /**
+     * The user id. Must match an existing stored value.
+     */
+    user_id?: number | null;
+    /**
+     * The accept underpaid.
+     */
+    accept_underpaid?: boolean;
+};
+export type AdminCreateTokenPackRequest = {
+    /**
+     * The tebex package id. Must match the regex /^[0-9]+$/. Must not be greater than 20 characters.
+     */
+    tebex_package_id: string;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The tokens. Must be at least 1. Must not be greater than 100000000.
+     */
+    tokens: number;
+    /**
+     * The bonus tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    bonus_tokens?: number;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+    /**
+     * The sort. Must be at least -100000. Must not be greater than 100000.
+     */
+    sort?: number;
+};
+export type AdminUpdateTokenPackRequest = {
+    /**
+     * The tebex package id. Must match the regex /^[0-9]+$/. Must not be greater than 20 characters.
+     */
+    tebex_package_id: string;
+    /**
+     * The display name. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The tokens. Must be at least 1. Must not be greater than 100000000.
+     */
+    tokens: number;
+    /**
+     * The bonus tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    bonus_tokens?: number;
+    /**
+     * The visible.
+     */
+    visible?: boolean;
+    /**
+     * The sort. Must be at least -100000. Must not be greater than 100000.
+     */
+    sort?: number;
 };
 export type AdminInstallExtensionRequest = {
     /**
@@ -1690,6 +2281,50 @@ export type AdminUpdateUserRequest = {
         language?: string;
     };
     extensions?: ExtensionFields;
+};
+export type AdminAdjustUserTokensRequest = {
+    /**
+     * The amount. Must not be one of <code>0</code> Must be at least -1000000. Must not be greater than 1000000.
+     */
+    amount: number;
+    /**
+     * The reason. Must be at least 3 characters. Must not be greater than 191 characters.
+     */
+    reason: string;
+    /**
+     * The allow negative.
+     */
+    allow_negative?: boolean;
+};
+export type AdminUpdateNodePlayitGgAgentRequest = {
+    /**
+     * The agent id. Must be a valid UUID.
+     */
+    agent_id?: string | null;
+    /**
+     * The secret. Must not be greater than 512 characters.
+     */
+    secret?: string | null;
+};
+export type AdminCreateTunnelRequest = {
+    /**
+     * The server id. Must match an existing stored value.
+     */
+    server_id: number;
+};
+export type AdminUpdateTunnelSettingsRequest = {
+    /**
+     * The subdomains enabled.
+     */
+    subdomains_enabled: boolean;
+    /**
+     * The base domain. This field is required when <code>subdomains_enabled</code> is <code>true</code>. Must match the regex /^(?=.{1,191}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i. Must not be greater than 191 characters.
+     */
+    base_domain?: string | null;
+    /**
+     * Must not be greater than 63 characters.
+     */
+    blocklist?: Array<string | null>;
 };
 export type AdminAttachServerMountRequest = {
     /**
@@ -1927,6 +2562,12 @@ export type AdminTransferServerRequest = {
      * Whether to move the server to a node whose egg tags its egg does not share.
      */
     ignore_tags?: boolean;
+};
+export type AdminExtendServerSubscriptionRequest = {
+    /**
+     * Free days to add, 1 to 365.
+     */
+    days: number;
 };
 export type AdminCreateServerDatabaseRequest = {
     /**
@@ -3314,6 +3955,86 @@ export type AuthRegisterRequest = {
      */
     'g-recaptcha-response'?: string | null;
 };
+export type ClientQuoteAServerRequest = {
+    /**
+     * The plan id.
+     */
+    plan_id: number;
+    /**
+     * The period id.
+     */
+    period_id: number;
+    /**
+     * The node ID. This field is required when <code>location_id</code> is not present.
+     */
+    node_id?: number | null;
+    /**
+     * The location ID.
+     */
+    location_id?: number | null;
+    /**
+     * Add-on keys mapped to the units to buy; keys left out or at 0 buy none.
+     */
+    addons?: {
+        [key: string]: number;
+    };
+};
+export type ClientPurchaseServerRequest = {
+    /**
+     * The plan id. Must be at least 1.
+     */
+    plan_id: number;
+    /**
+     * The period id. Must be at least 1.
+     */
+    period_id: number;
+    /**
+     * The egg ID. Must be at least 1.
+     */
+    egg_id: number;
+    /**
+     * The location ID. Must be at least 1.
+     */
+    location_id?: number | null;
+    /**
+     * The node ID. Must be at least 1.
+     */
+    node_id?: number | null;
+    /**
+     * The display name. Must match the regex /^[^<>]+$/u. Must be at least 1 character. Must not be greater than 60 characters.
+     */
+    name: string;
+    /**
+     * Add-on keys mapped to the units to buy; keys left out or at 0 buy none.
+     */
+    addons?: {
+        [key: string]: number;
+    };
+    /**
+     * The subdomain. Must not be greater than 63 characters.
+     */
+    subdomain?: string | null;
+    /**
+     * The expected total. Must be at least 0.
+     */
+    expected_total?: number | null;
+    /**
+     * The idempotency key. Must match the regex /^[A-Za-z0-9_-]+$/. Must be at least 16 characters. Must not be greater than 100 characters.
+     */
+    idempotency_key: string;
+};
+export type ClientBuyTokenPackRequest = {
+    /**
+     * The token pack to buy.
+     */
+    pack_id: number;
+};
+export type ClientUpdateServerSubscriptionRequest = {
+    /**
+     * Renew automatically from the token balance.
+     */
+    auto_renew: boolean;
+};
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
      * The six-digit TOTP code generated by the authenticator app.
@@ -3706,6 +4427,360 @@ export type AdminListActivityFilterOptionsResponseBody = {
         }>;
     };
 };
+export type AdminGetShopSettingsResponseBody = {
+    enabled?: boolean;
+    grace_days?: number;
+    low_balance_days?: number;
+    limits?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+    used?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+    remaining?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+};
+export type AdminUpdateShopSettingsResponseBody = {
+    enabled?: boolean;
+    grace_days?: number;
+    low_balance_days?: number;
+    limits?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+    used?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+    remaining?: {
+        memory?: number;
+        disk?: number;
+        cpu?: number;
+    };
+};
+export type AdminGetShopEditorOptionsResponseBody = {
+    eggs?: Array<{
+        id?: number;
+        name?: string;
+        tags?: Array<{
+            id?: number;
+            name?: string;
+            color?: string;
+        }>;
+    }>;
+    nodes?: Array<{
+        id?: number;
+        name?: string;
+        location_id?: number;
+        public?: boolean;
+        maintenance?: boolean;
+    }>;
+    locations?: Array<{
+        id?: number;
+        short?: string;
+        long?: string;
+    }>;
+};
+export type AdminListShopCategoriesResponseBody = {
+    data?: Array<{
+        id?: number;
+        name?: string;
+        slug?: string;
+        description?: string;
+        sort?: number;
+        visible?: boolean;
+        plans_count?: number;
+    }>;
+};
+export type AdminCreateShopCategoryResponseBody = {
+    id?: number;
+    name?: string;
+    slug?: string;
+    description?: string;
+    sort?: number;
+    visible?: boolean;
+    plans_count?: number;
+};
+export type AdminUpdateShopCategoryResponseBody = {
+    id?: number;
+    name?: string;
+    slug?: string;
+    description?: string;
+    sort?: number;
+    visible?: boolean;
+    plans_count?: number;
+};
+export type AdminListShopPlansResponseBody = {
+    data?: Array<{
+        id?: number;
+        category_id?: number;
+        name?: string;
+        description?: string;
+        visible?: boolean;
+        sort?: number;
+        price_tokens?: number;
+        resources?: {
+            memory?: number;
+            swap?: number;
+            disk?: number;
+            io?: number;
+            cpu?: number;
+            databases?: number;
+            backups?: number;
+            allocations?: number;
+        };
+        egg_ids?: Array<number>;
+        node_ids?: string | null;
+    }>;
+};
+export type AdminCreateShopPlanResponseBody = {
+    id?: number;
+    category_id?: number;
+    name?: string;
+    description?: string;
+    visible?: boolean;
+    sort?: number;
+    price_tokens?: number;
+    resources?: {
+        memory?: number;
+        swap?: number;
+        disk?: number;
+        io?: number;
+        cpu?: number;
+        databases?: number;
+        backups?: number;
+        allocations?: number;
+    };
+    egg_ids?: Array<number>;
+    node_ids?: string | null;
+};
+export type AdminGetShopPlanResponseBody = {
+    id?: number;
+    category_id?: number;
+    name?: string;
+    description?: string;
+    visible?: boolean;
+    sort?: number;
+    price_tokens?: number;
+    resources?: {
+        memory?: number;
+        swap?: number;
+        disk?: number;
+        io?: number;
+        cpu?: number;
+        databases?: number;
+        backups?: number;
+        allocations?: number;
+    };
+    egg_ids?: Array<number>;
+    node_ids?: string | null;
+};
+export type AdminUpdateShopPlanResponseBody = {
+    id?: number;
+    category_id?: number;
+    name?: string;
+    description?: string;
+    visible?: boolean;
+    sort?: number;
+    price_tokens?: number;
+    resources?: {
+        memory?: number;
+        swap?: number;
+        disk?: number;
+        io?: number;
+        cpu?: number;
+        databases?: number;
+        backups?: number;
+        allocations?: number;
+    };
+    egg_ids?: Array<number>;
+    node_ids?: string | null;
+};
+export type AdminListBillingPeriodsResponseBody = {
+    data?: Array<{
+        id?: number;
+        name?: string;
+        days?: number;
+        price_modifier_percent?: number;
+        sort?: number;
+        enabled?: boolean;
+    }>;
+};
+export type AdminCreateBillingPeriodResponseBody = {
+    id?: number;
+    name?: string;
+    days?: number;
+    price_modifier_percent?: number;
+    sort?: number;
+    enabled?: boolean;
+};
+export type AdminUpdateBillingPeriodResponseBody = {
+    id?: number;
+    name?: string;
+    days?: number;
+    price_modifier_percent?: number;
+    sort?: number;
+    enabled?: boolean;
+};
+export type AdminListPriceMultipliersResponseBody = {
+    data?: Array<{
+        id?: number;
+        scope?: string;
+        scope_id?: number;
+        multiplier?: number;
+        label?: string;
+    }>;
+};
+export type AdminCreatePriceMultiplierResponseBody = {
+    id?: number;
+    scope?: string;
+    scope_id?: number;
+    multiplier?: number;
+    label?: string;
+};
+export type AdminUpdatePriceMultiplierResponseBody = {
+    id?: number;
+    scope?: string;
+    scope_id?: number;
+    multiplier?: number;
+    label?: string;
+};
+export type AdminListShopAddOnsResponseBody = {
+    data?: Array<{
+        id?: number;
+        key?: string;
+        name?: string;
+        description?: string;
+        resource?: string;
+        amount?: number;
+        price_tokens?: number;
+        max_units?: number;
+        enabled?: boolean;
+    }>;
+};
+export type AdminCreateShopAddOnResponseBody = {
+    id?: number;
+    key?: string;
+    name?: string;
+    description?: string;
+    resource?: string;
+    amount?: number;
+    price_tokens?: number;
+    max_units?: number;
+    enabled?: boolean;
+};
+export type AdminUpdateShopAddOnResponseBody = {
+    id?: number;
+    key?: string;
+    name?: string;
+    description?: string;
+    resource?: string;
+    amount?: number;
+    price_tokens?: number;
+    max_units?: number;
+    enabled?: boolean;
+};
+export type AdminGetTebexSettingsResponseBody = {
+    public_token?: string;
+    private_key_set?: boolean;
+    webhook_secret_set?: boolean;
+    webhook_ips?: Array<string>;
+    default_webhook_ips?: Array<string>;
+    webhook_url?: string;
+    checkout_enabled?: boolean;
+};
+export type AdminUpdateTebexSettingsResponseBody = {
+    public_token?: string;
+    private_key_set?: boolean;
+    webhook_secret_set?: boolean;
+    webhook_ips?: Array<string>;
+    default_webhook_ips?: Array<string>;
+    webhook_url?: string;
+    checkout_enabled?: boolean;
+};
+export type AdminListTebexPaymentsResponseBody = {
+    data?: Array<{
+        id?: number;
+        transaction_id?: string;
+        user?: {
+            id?: number;
+            username?: string;
+            email?: string;
+        };
+        status?: string;
+        tokens?: number;
+        tokens_reversed?: number;
+        amount?: string;
+        currency?: string;
+        events?: Array<string>;
+        flagged?: boolean;
+        flag_reason?: string | null;
+        processed_at?: string;
+        created_at?: string;
+    }>;
+    meta?: {
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+    };
+};
+export type AdminApproveAndCreditATebexPaymentResponseBody = {
+    id?: number;
+    transaction_id?: string;
+    user?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    status?: string;
+    tokens?: number;
+    tokens_reversed?: number;
+    amount?: string;
+    currency?: string;
+    events?: Array<string>;
+    flagged?: boolean;
+    flag_reason?: string;
+    processed_at?: string;
+    created_at?: string;
+};
+export type AdminListTokenPacksResponseBody = {
+    data?: Array<{
+        id?: number;
+        tebex_package_id?: string;
+        name?: string;
+        tokens?: number;
+        bonus_tokens?: number;
+        visible?: boolean;
+        sort?: number;
+    }>;
+};
+export type AdminCreateTokenPackResponseBody = {
+    id?: number;
+    tebex_package_id?: string;
+    name?: string;
+    tokens?: number;
+    bonus_tokens?: number;
+    visible?: boolean;
+    sort?: number;
+};
+export type AdminUpdateTokenPackResponseBody = {
+    id?: number;
+    tebex_package_id?: string;
+    name?: string;
+    tokens?: number;
+    bonus_tokens?: number;
+    visible?: boolean;
+    sort?: number;
+};
 export type AdminListExtensionsResponseBody = {
     data?: Array<{
         id?: string;
@@ -3857,6 +4932,29 @@ export type AdminDisableExtensionResponseBody = {
          */
         errored_at: string | null;
     };
+};
+export type AdminGetNodePlayitGgAgentResponseBody = {
+    agent_id?: string;
+    secret_set?: boolean;
+};
+export type AdminUpdateNodePlayitGgAgentResponseBody = {
+    agent_id?: string;
+    secret_set?: boolean;
+};
+export type AdminTestNodePlayitGgAgentResponseBody = {
+    success?: boolean;
+    message?: string;
+    tunnel_count?: number;
+};
+export type AdminGetTunnelSettingsResponseBody = {
+    subdomains_enabled?: boolean;
+    base_domain?: string;
+    blocklist?: Array<string>;
+};
+export type AdminUpdateTunnelSettingsResponseBody = {
+    subdomains_enabled?: boolean;
+    base_domain?: string;
+    blocklist?: Array<string>;
 };
 export type AdminGetLiveUsageResponseBody = {
     /**
@@ -4325,6 +5423,124 @@ export type ClientGetExtensionJobProgressResponseBody = {
         updated_at: string;
     };
 };
+export type ClientGetTheStoreCatalogResponseBody = {
+    enabled?: boolean;
+    /**
+     * Whether checkout offers a custom subdomain (Tunnels settings).
+     */
+    subdomains_enabled: boolean;
+    /**
+     * The domain a custom subdomain is created under, or null when subdomains are off.
+     */
+    subdomain_base?: string;
+    /**
+     * The token balance of the requesting user.
+     */
+    balance: number;
+    categories?: Array<{
+        id?: number;
+        name?: string;
+        slug?: string;
+        description?: string;
+        sort?: number;
+        visible?: boolean;
+        plans?: Array<{
+            id?: number;
+            name?: string;
+            description?: string;
+            price_tokens?: number;
+            from_price_tokens?: number;
+            resources?: {
+                memory?: number;
+                swap?: number;
+                disk?: number;
+                io?: number;
+                cpu?: number;
+                databases?: number;
+                backups?: number;
+                allocations?: number;
+            };
+            can_provision?: boolean;
+            eggs?: Array<{
+                id?: number;
+                name?: string;
+                description?: string;
+                image?: string | null;
+                tags?: Array<{
+                    name?: string;
+                    color?: string;
+                }>;
+            }>;
+            locations?: Array<{
+                id?: number;
+                short?: string;
+                long?: string;
+                multiplier?: number;
+                nodes?: Array<{
+                    id?: number;
+                    name?: string;
+                    multiplier?: number;
+                }>;
+            }>;
+        }>;
+    }>;
+    periods?: Array<{
+        id?: number;
+        name?: string;
+        days?: number;
+        price_modifier_percent?: number;
+    }>;
+    addons?: Array<{
+        key?: string;
+        name?: string;
+        description?: string;
+        resource?: string;
+        amount?: number;
+        price_tokens?: number;
+        max_units?: number;
+    }>;
+};
+export type ClientQuoteAServerResponseBody = {
+    node_id?: number;
+    can_provision?: boolean;
+    /**
+     * The token balance of the requesting user.
+     */
+    balance: number;
+    quote?: {
+        base_per_period?: number;
+        multiplier?: number;
+        addons_per_period?: number;
+        total_per_period?: number;
+        period_days?: number;
+        lines?: Array<{
+            label?: string;
+            tokens?: number;
+        }>;
+        resources?: {
+            memory?: number;
+            swap?: number;
+            disk?: number;
+            io?: number;
+            cpu?: number;
+            databases?: number;
+            backups?: number;
+            allocations?: number;
+        };
+    };
+};
+export type ClientListTokenPacksResponseBody = {
+    enabled?: boolean;
+    data?: Array<{
+        id?: number;
+        name?: string;
+        tokens?: number;
+        bonus_tokens?: number;
+    }>;
+};
+export type ClientBuyTokenPackResponseBody = {
+    url?: string;
+};
 export type ClientListAccountActivityFilterOptionsResponseBody = {
     data?: {
         events?: Array<string>;
@@ -4448,6 +5664,26 @@ export type AdminListAnnouncementsPageQueryParameter = number;
  */
 export type AdminListAnnouncementsPerPageQueryParameter = number;
 export type AdminGetAnnouncementAnnouncementIdPathParameter = number;
+export type AdminUpdateShopCategoryCategoryIdPathParameter = number;
+export type AdminGetShopPlanPlanIdPathParameter = number;
+export type AdminUpdateBillingPeriodPeriodIdPathParameter = number;
+export type AdminUpdatePriceMultiplierMultiplierIdPathParameter = number;
+export type AdminUpdateShopAddOnAddonIdPathParameter = number;
+/**
+ * Only flagged payments.
+ */
+export type AdminListTebexPaymentsFlaggedQueryParameter = boolean;
+/**
+ * Page number to return.
+ */
+export type AdminListTebexPaymentsPageQueryParameter = number;
+/**
+ * Results to return per page.
+ */
+export type AdminListTebexPaymentsPerPageQueryParameter = number;
+export type AdminApproveAndCreditATebexPaymentPaymentIdPathParameter = number;
+export type AdminUpdateTokenPackTokenPackIdPathParameter = number;
+export type AdminUpdateTokenPackTokenPackPathParameter = number;
 export type AdminGetExtensionSettingsExtensionPathParameter = string;
 export type AdminGetExtensionIconExtensionPathParameter = string;
 export type AdminUploadExtensionSettingFileExtensionPathParameter = string;
@@ -4498,10 +5734,35 @@ export type AdminGetUserByExternalIdExternalIdPathParameter = string;
  */
 export type AdminGetUserIncludeQueryParameter = string;
 export type AdminGetUserUserIdPathParameter = number;
+/**
+ * Page number to return.
+ */
+export type AdminListUserTokenTransactionsPageQueryParameter = number;
+/**
+ * Results to return per page. The maximum is 100.
+ */
+export type AdminListUserTokenTransactionsPerPageQueryParameter = number;
+export type AdminListUserTokenTransactionsUserIdPathParameter = number;
 export type AdminDisableUserTwoFactorAuthenticationUserIdPathParameter = number;
 export type AdminGetNodeSystemInformationNodeIdPathParameter = number;
 export type AdminCreateNodeDeployTokenNodeIdPathParameter = number;
 export type AdminGetNodeUtilizationNodeIdPathParameter = number;
+export type AdminGetNodePlayitGgAgentNodeIdPathParameter = number;
+export type AdminTestNodePlayitGgAgentNodeIdPathParameter = number;
+/**
+ * Only tunnels with this status.
+ */
+export type AdminListTunnelsStatusQueryParameter = 'pending' | 'active' | 'failed' | 'deleted';
+/**
+ * Page number to return.
+ */
+export type AdminListTunnelsPageQueryParameter = number;
+/**
+ * Results to return per page.
+ */
+export type AdminListTunnelsPerPageQueryParameter = number;
+export type AdminRetryTunnelTunnelIdPathParameter = number;
+export type AdminRecreateTunnelTunnelIdPathParameter = number;
 export type AdminListServerMountsServerAdminIdentifierPathParameter = string;
 export type AdminDetachServerMountServerAdminIdentifierPathParameter = string;
 export type AdminDetachServerMountMountIdPathParameter = number;
@@ -4568,6 +5829,9 @@ export type AdminRebuildServerServerAdminIdentifierPathParameter = string;
 export type AdminGetServerTransferProgressServerAdminIdentifierPathParameter = string;
 export type AdminTransferServerServerAdminIdentifierPathParameter = string;
 export type AdminToggleServerInstallStateServerAdminIdentifierPathParameter = string;
+export type AdminGetServerSubscriptionServerAdminIdentifierPathParameter = string;
+export type AdminExtendServerSubscriptionServerAdminIdentifierPathParameter = string;
+export type AdminCancelServerSubscriptionServerAdminIdentifierPathParameter = string;
 export type AdminForceDeleteServerServerAdminIdentifierPathParameter = string;
 /**
  * Comma-separated relationships to include. Supports "password".
@@ -5189,6 +6453,8 @@ export type ClientListClientServersFilterWildcardQueryParameter = string;
 export type ClientGetExtensionJobProgressExtensionPathParameter = string;
 export type ClientGetExtensionJobProgressJobPathParameter = string;
 export type ClientMarkNoticeReadNoticePathParameter = string;
+export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
+export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
 /**
  * Page number to retrieve.
  */
@@ -5221,6 +6487,14 @@ export type ClientListAccountActivitySortQueryParameter = 'timestamp' | '-timest
  * Comma-separated relationships to include. Supports actor.
  */
 export type ClientListAccountActivityIncludeQueryParameter = string;
+/**
+ * Page number to return.
+ */
+export type ClientGetWalletPageQueryParameter = number;
+/**
+ * Results to return per page. The maximum is 100.
+ */
+export type ClientGetWalletPerPageQueryParameter = number;
 export type ClientDeleteAccountApiKeyIdentifierPathParameter = string;
 export type ClientStartLinkingAnAccountProviderPathParameter = string;
 export type ClientUnlinkAnAccountProviderPathParameter = string;
@@ -5646,6 +6920,1009 @@ export type AdminUpdateAnnouncementResponses = {
     200: AdminAnnouncementResource;
 };
 export type AdminUpdateAnnouncementResponse = AdminUpdateAnnouncementResponses[keyof AdminUpdateAnnouncementResponses];
+export type AdminGetShopSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/settings';
+};
+export type AdminGetShopSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetShopSettingsError = AdminGetShopSettingsErrors[keyof AdminGetShopSettingsErrors];
+export type AdminGetShopSettingsResponses = {
+    /**
+     * Shop settings returned.
+     */
+    200: AdminGetShopSettingsResponseBody;
+};
+export type AdminGetShopSettingsResponse = AdminGetShopSettingsResponses[keyof AdminGetShopSettingsResponses];
+export type AdminUpdateShopSettingsData = {
+    body: AdminUpdateShopSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/settings';
+};
+export type AdminUpdateShopSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateShopSettingsError = AdminUpdateShopSettingsErrors[keyof AdminUpdateShopSettingsErrors];
+export type AdminUpdateShopSettingsResponses = {
+    /**
+     * Shop settings updated.
+     */
+    200: AdminUpdateShopSettingsResponseBody;
+};
+export type AdminUpdateShopSettingsResponse = AdminUpdateShopSettingsResponses[keyof AdminUpdateShopSettingsResponses];
+export type AdminGetShopEditorOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/options';
+};
+export type AdminGetShopEditorOptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetShopEditorOptionsError = AdminGetShopEditorOptionsErrors[keyof AdminGetShopEditorOptionsErrors];
+export type AdminGetShopEditorOptionsResponses = {
+    /**
+     * Options returned.
+     */
+    200: AdminGetShopEditorOptionsResponseBody;
+};
+export type AdminGetShopEditorOptionsResponse = AdminGetShopEditorOptionsResponses[keyof AdminGetShopEditorOptionsResponses];
+export type AdminListShopCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/categories';
+};
+export type AdminListShopCategoriesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListShopCategoriesError = AdminListShopCategoriesErrors[keyof AdminListShopCategoriesErrors];
+export type AdminListShopCategoriesResponses = {
+    /**
+     * Categories returned.
+     */
+    200: AdminListShopCategoriesResponseBody;
+};
+export type AdminListShopCategoriesResponse = AdminListShopCategoriesResponses[keyof AdminListShopCategoriesResponses];
+export type AdminCreateShopCategoryData = {
+    body: AdminCreateShopCategoryRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/categories';
+};
+export type AdminCreateShopCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateShopCategoryError = AdminCreateShopCategoryErrors[keyof AdminCreateShopCategoryErrors];
+export type AdminCreateShopCategoryResponses = {
+    /**
+     * Category created.
+     */
+    201: AdminCreateShopCategoryResponseBody;
+};
+export type AdminCreateShopCategoryResponse = AdminCreateShopCategoryResponses[keyof AdminCreateShopCategoryResponses];
+export type AdminReorderShopCategoriesData = {
+    body?: AdminReorderShopCategoriesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/categories/order';
+};
+export type AdminReorderShopCategoriesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminReorderShopCategoriesError = AdminReorderShopCategoriesErrors[keyof AdminReorderShopCategoriesErrors];
+export type AdminReorderShopCategoriesResponses = {
+    /**
+     * Order saved.
+     */
+    204: void;
+};
+export type AdminReorderShopCategoriesResponse = AdminReorderShopCategoriesResponses[keyof AdminReorderShopCategoriesResponses];
+export type AdminDeleteShopCategoryData = {
+    body?: never;
+    path: {
+        /**
+         * The shop category ID.
+         */
+        category_id: AdminUpdateShopCategoryCategoryIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/categories/{category_id}';
+};
+export type AdminDeleteShopCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteShopCategoryError = AdminDeleteShopCategoryErrors[keyof AdminDeleteShopCategoryErrors];
+export type AdminDeleteShopCategoryResponses = {
+    /**
+     * Category deleted.
+     */
+    204: void;
+};
+export type AdminDeleteShopCategoryResponse = AdminDeleteShopCategoryResponses[keyof AdminDeleteShopCategoryResponses];
+export type AdminUpdateShopCategoryData = {
+    body: AdminUpdateShopCategoryRequest;
+    path: {
+        /**
+         * The shop category ID.
+         */
+        category_id: AdminUpdateShopCategoryCategoryIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/categories/{category_id}';
+};
+export type AdminUpdateShopCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateShopCategoryError = AdminUpdateShopCategoryErrors[keyof AdminUpdateShopCategoryErrors];
+export type AdminUpdateShopCategoryResponses = {
+    /**
+     * Category updated.
+     */
+    200: AdminUpdateShopCategoryResponseBody;
+};
+export type AdminUpdateShopCategoryResponse = AdminUpdateShopCategoryResponses[keyof AdminUpdateShopCategoryResponses];
+export type AdminListShopPlansData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/plans';
+};
+export type AdminListShopPlansErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListShopPlansError = AdminListShopPlansErrors[keyof AdminListShopPlansErrors];
+export type AdminListShopPlansResponses = {
+    /**
+     * Plans returned.
+     */
+    200: AdminListShopPlansResponseBody;
+};
+export type AdminListShopPlansResponse = AdminListShopPlansResponses[keyof AdminListShopPlansResponses];
+export type AdminCreateShopPlanData = {
+    body: AdminCreateShopPlanRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/plans';
+};
+export type AdminCreateShopPlanErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateShopPlanError = AdminCreateShopPlanErrors[keyof AdminCreateShopPlanErrors];
+export type AdminCreateShopPlanResponses = {
+    /**
+     * Plan created.
+     */
+    201: AdminCreateShopPlanResponseBody;
+};
+export type AdminCreateShopPlanResponse = AdminCreateShopPlanResponses[keyof AdminCreateShopPlanResponses];
+export type AdminDeleteShopPlanData = {
+    body?: never;
+    path: {
+        /**
+         * The shop plan ID.
+         */
+        plan_id: AdminGetShopPlanPlanIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/plans/{plan_id}';
+};
+export type AdminDeleteShopPlanErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteShopPlanError = AdminDeleteShopPlanErrors[keyof AdminDeleteShopPlanErrors];
+export type AdminDeleteShopPlanResponses = {
+    /**
+     * Plan deleted.
+     */
+    204: void;
+};
+export type AdminDeleteShopPlanResponse = AdminDeleteShopPlanResponses[keyof AdminDeleteShopPlanResponses];
+export type AdminGetShopPlanData = {
+    body?: never;
+    path: {
+        /**
+         * The shop plan ID.
+         */
+        plan_id: AdminGetShopPlanPlanIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/plans/{plan_id}';
+};
+export type AdminGetShopPlanErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetShopPlanError = AdminGetShopPlanErrors[keyof AdminGetShopPlanErrors];
+export type AdminGetShopPlanResponses = {
+    /**
+     * Plan returned.
+     */
+    200: AdminGetShopPlanResponseBody;
+};
+export type AdminGetShopPlanResponse = AdminGetShopPlanResponses[keyof AdminGetShopPlanResponses];
+export type AdminUpdateShopPlanData = {
+    body: AdminUpdateShopPlanRequest;
+    path: {
+        /**
+         * The shop plan ID.
+         */
+        plan_id: AdminGetShopPlanPlanIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/plans/{plan_id}';
+};
+export type AdminUpdateShopPlanErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateShopPlanError = AdminUpdateShopPlanErrors[keyof AdminUpdateShopPlanErrors];
+export type AdminUpdateShopPlanResponses = {
+    /**
+     * Plan updated.
+     */
+    200: AdminUpdateShopPlanResponseBody;
+};
+export type AdminUpdateShopPlanResponse = AdminUpdateShopPlanResponses[keyof AdminUpdateShopPlanResponses];
+export type AdminListBillingPeriodsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/periods';
+};
+export type AdminListBillingPeriodsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListBillingPeriodsError = AdminListBillingPeriodsErrors[keyof AdminListBillingPeriodsErrors];
+export type AdminListBillingPeriodsResponses = {
+    /**
+     * Billing periods returned.
+     */
+    200: AdminListBillingPeriodsResponseBody;
+};
+export type AdminListBillingPeriodsResponse = AdminListBillingPeriodsResponses[keyof AdminListBillingPeriodsResponses];
+export type AdminCreateBillingPeriodData = {
+    body: AdminCreateBillingPeriodRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/periods';
+};
+export type AdminCreateBillingPeriodErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateBillingPeriodError = AdminCreateBillingPeriodErrors[keyof AdminCreateBillingPeriodErrors];
+export type AdminCreateBillingPeriodResponses = {
+    /**
+     * Billing period created.
+     */
+    201: AdminCreateBillingPeriodResponseBody;
+};
+export type AdminCreateBillingPeriodResponse = AdminCreateBillingPeriodResponses[keyof AdminCreateBillingPeriodResponses];
+export type AdminDeleteBillingPeriodData = {
+    body?: never;
+    path: {
+        /**
+         * The billing period ID.
+         */
+        period_id: AdminUpdateBillingPeriodPeriodIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/periods/{period_id}';
+};
+export type AdminDeleteBillingPeriodErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteBillingPeriodError = AdminDeleteBillingPeriodErrors[keyof AdminDeleteBillingPeriodErrors];
+export type AdminDeleteBillingPeriodResponses = {
+    /**
+     * Billing period deleted.
+     */
+    204: void;
+};
+export type AdminDeleteBillingPeriodResponse = AdminDeleteBillingPeriodResponses[keyof AdminDeleteBillingPeriodResponses];
+export type AdminUpdateBillingPeriodData = {
+    body: AdminUpdateBillingPeriodRequest;
+    path: {
+        /**
+         * The billing period ID.
+         */
+        period_id: AdminUpdateBillingPeriodPeriodIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/periods/{period_id}';
+};
+export type AdminUpdateBillingPeriodErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateBillingPeriodError = AdminUpdateBillingPeriodErrors[keyof AdminUpdateBillingPeriodErrors];
+export type AdminUpdateBillingPeriodResponses = {
+    /**
+     * Billing period updated.
+     */
+    200: AdminUpdateBillingPeriodResponseBody;
+};
+export type AdminUpdateBillingPeriodResponse = AdminUpdateBillingPeriodResponses[keyof AdminUpdateBillingPeriodResponses];
+export type AdminListPriceMultipliersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/multipliers';
+};
+export type AdminListPriceMultipliersErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListPriceMultipliersError = AdminListPriceMultipliersErrors[keyof AdminListPriceMultipliersErrors];
+export type AdminListPriceMultipliersResponses = {
+    /**
+     * Multipliers returned.
+     */
+    200: AdminListPriceMultipliersResponseBody;
+};
+export type AdminListPriceMultipliersResponse = AdminListPriceMultipliersResponses[keyof AdminListPriceMultipliersResponses];
+export type AdminCreatePriceMultiplierData = {
+    body: AdminCreatePriceMultiplierRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/multipliers';
+};
+export type AdminCreatePriceMultiplierErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreatePriceMultiplierError = AdminCreatePriceMultiplierErrors[keyof AdminCreatePriceMultiplierErrors];
+export type AdminCreatePriceMultiplierResponses = {
+    /**
+     * Multiplier created.
+     */
+    201: AdminCreatePriceMultiplierResponseBody;
+};
+export type AdminCreatePriceMultiplierResponse = AdminCreatePriceMultiplierResponses[keyof AdminCreatePriceMultiplierResponses];
+export type AdminDeletePriceMultiplierData = {
+    body?: never;
+    path: {
+        /**
+         * The price multiplier ID.
+         */
+        multiplier_id: AdminUpdatePriceMultiplierMultiplierIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/multipliers/{multiplier_id}';
+};
+export type AdminDeletePriceMultiplierErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeletePriceMultiplierError = AdminDeletePriceMultiplierErrors[keyof AdminDeletePriceMultiplierErrors];
+export type AdminDeletePriceMultiplierResponses = {
+    /**
+     * Multiplier deleted.
+     */
+    204: void;
+};
+export type AdminDeletePriceMultiplierResponse = AdminDeletePriceMultiplierResponses[keyof AdminDeletePriceMultiplierResponses];
+export type AdminUpdatePriceMultiplierData = {
+    body: AdminUpdatePriceMultiplierRequest;
+    path: {
+        /**
+         * The price multiplier ID.
+         */
+        multiplier_id: AdminUpdatePriceMultiplierMultiplierIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/multipliers/{multiplier_id}';
+};
+export type AdminUpdatePriceMultiplierErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdatePriceMultiplierError = AdminUpdatePriceMultiplierErrors[keyof AdminUpdatePriceMultiplierErrors];
+export type AdminUpdatePriceMultiplierResponses = {
+    /**
+     * Multiplier updated.
+     */
+    200: AdminUpdatePriceMultiplierResponseBody;
+};
+export type AdminUpdatePriceMultiplierResponse = AdminUpdatePriceMultiplierResponses[keyof AdminUpdatePriceMultiplierResponses];
+export type AdminListShopAddOnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/addons';
+};
+export type AdminListShopAddOnsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListShopAddOnsError = AdminListShopAddOnsErrors[keyof AdminListShopAddOnsErrors];
+export type AdminListShopAddOnsResponses = {
+    /**
+     * Add-ons returned.
+     */
+    200: AdminListShopAddOnsResponseBody;
+};
+export type AdminListShopAddOnsResponse = AdminListShopAddOnsResponses[keyof AdminListShopAddOnsResponses];
+export type AdminCreateShopAddOnData = {
+    body: AdminCreateShopAddOnRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/addons';
+};
+export type AdminCreateShopAddOnErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateShopAddOnError = AdminCreateShopAddOnErrors[keyof AdminCreateShopAddOnErrors];
+export type AdminCreateShopAddOnResponses = {
+    /**
+     * Add-on created.
+     */
+    201: AdminCreateShopAddOnResponseBody;
+};
+export type AdminCreateShopAddOnResponse = AdminCreateShopAddOnResponses[keyof AdminCreateShopAddOnResponses];
+export type AdminDeleteShopAddOnData = {
+    body?: never;
+    path: {
+        /**
+         * The shop add-on ID.
+         */
+        addon_id: AdminUpdateShopAddOnAddonIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/addons/{addon_id}';
+};
+export type AdminDeleteShopAddOnErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteShopAddOnError = AdminDeleteShopAddOnErrors[keyof AdminDeleteShopAddOnErrors];
+export type AdminDeleteShopAddOnResponses = {
+    /**
+     * Add-on deleted.
+     */
+    204: void;
+};
+export type AdminDeleteShopAddOnResponse = AdminDeleteShopAddOnResponses[keyof AdminDeleteShopAddOnResponses];
+export type AdminUpdateShopAddOnData = {
+    body: AdminUpdateShopAddOnRequest;
+    path: {
+        /**
+         * The shop add-on ID.
+         */
+        addon_id: AdminUpdateShopAddOnAddonIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/addons/{addon_id}';
+};
+export type AdminUpdateShopAddOnErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateShopAddOnError = AdminUpdateShopAddOnErrors[keyof AdminUpdateShopAddOnErrors];
+export type AdminUpdateShopAddOnResponses = {
+    /**
+     * Add-on updated.
+     */
+    200: AdminUpdateShopAddOnResponseBody;
+};
+export type AdminUpdateShopAddOnResponse = AdminUpdateShopAddOnResponses[keyof AdminUpdateShopAddOnResponses];
+export type AdminGetTebexSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/tebex';
+};
+export type AdminGetTebexSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetTebexSettingsError = AdminGetTebexSettingsErrors[keyof AdminGetTebexSettingsErrors];
+export type AdminGetTebexSettingsResponses = {
+    /**
+     * Tebex settings returned.
+     */
+    200: AdminGetTebexSettingsResponseBody;
+};
+export type AdminGetTebexSettingsResponse = AdminGetTebexSettingsResponses[keyof AdminGetTebexSettingsResponses];
+export type AdminUpdateTebexSettingsData = {
+    body: AdminUpdateTebexSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/tebex';
+};
+export type AdminUpdateTebexSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateTebexSettingsError = AdminUpdateTebexSettingsErrors[keyof AdminUpdateTebexSettingsErrors];
+export type AdminUpdateTebexSettingsResponses = {
+    /**
+     * Tebex settings updated.
+     */
+    200: AdminUpdateTebexSettingsResponseBody;
+};
+export type AdminUpdateTebexSettingsResponse = AdminUpdateTebexSettingsResponses[keyof AdminUpdateTebexSettingsResponses];
+export type AdminListTebexPaymentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only flagged payments.
+         */
+        flagged?: AdminListTebexPaymentsFlaggedQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListTebexPaymentsPageQueryParameter;
+        /**
+         * Results to return per page.
+         */
+        per_page?: AdminListTebexPaymentsPerPageQueryParameter;
+    };
+    url: '/api/admin/shop/tebex/payments';
+};
+export type AdminListTebexPaymentsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListTebexPaymentsError = AdminListTebexPaymentsErrors[keyof AdminListTebexPaymentsErrors];
+export type AdminListTebexPaymentsResponses = {
+    /**
+     * Payments returned.
+     */
+    200: AdminListTebexPaymentsResponseBody;
+};
+export type AdminListTebexPaymentsResponse = AdminListTebexPaymentsResponses[keyof AdminListTebexPaymentsResponses];
+export type AdminApproveAndCreditATebexPaymentData = {
+    body?: AdminApproveAndCreditATebexPaymentRequest;
+    path: {
+        /**
+         * The ID of the Tebex payment.
+         */
+        payment_id: AdminApproveAndCreditATebexPaymentPaymentIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/tebex/payments/{payment_id}/approve';
+};
+export type AdminApproveAndCreditATebexPaymentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminApproveAndCreditATebexPaymentError = AdminApproveAndCreditATebexPaymentErrors[keyof AdminApproveAndCreditATebexPaymentErrors];
+export type AdminApproveAndCreditATebexPaymentResponses = {
+    /**
+     * Payment credited.
+     */
+    200: AdminApproveAndCreditATebexPaymentResponseBody;
+};
+export type AdminApproveAndCreditATebexPaymentResponse = AdminApproveAndCreditATebexPaymentResponses[keyof AdminApproveAndCreditATebexPaymentResponses];
+export type AdminListTokenPacksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/token-packs';
+};
+export type AdminListTokenPacksErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListTokenPacksError = AdminListTokenPacksErrors[keyof AdminListTokenPacksErrors];
+export type AdminListTokenPacksResponses = {
+    /**
+     * Token packs returned.
+     */
+    200: AdminListTokenPacksResponseBody;
+};
+export type AdminListTokenPacksResponse = AdminListTokenPacksResponses[keyof AdminListTokenPacksResponses];
+export type AdminCreateTokenPackData = {
+    body: AdminCreateTokenPackRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/token-packs';
+};
+export type AdminCreateTokenPackErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateTokenPackError = AdminCreateTokenPackErrors[keyof AdminCreateTokenPackErrors];
+export type AdminCreateTokenPackResponses = {
+    /**
+     * Token pack created.
+     */
+    201: AdminCreateTokenPackResponseBody;
+};
+export type AdminCreateTokenPackResponse = AdminCreateTokenPackResponses[keyof AdminCreateTokenPackResponses];
+export type AdminDeleteTokenPackData = {
+    body?: never;
+    path: {
+        /**
+         * The token pack ID.
+         */
+        tokenPack_id: AdminUpdateTokenPackTokenPackIdPathParameter;
+        /**
+         * The ID of the token pack.
+         */
+        token_pack: AdminUpdateTokenPackTokenPackPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/token-packs/{tokenPack_id}';
+};
+export type AdminDeleteTokenPackErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteTokenPackError = AdminDeleteTokenPackErrors[keyof AdminDeleteTokenPackErrors];
+export type AdminDeleteTokenPackResponses = {
+    /**
+     * Token pack deleted.
+     */
+    204: void;
+};
+export type AdminDeleteTokenPackResponse = AdminDeleteTokenPackResponses[keyof AdminDeleteTokenPackResponses];
+export type AdminUpdateTokenPackData = {
+    body: AdminUpdateTokenPackRequest;
+    path: {
+        /**
+         * The token pack ID.
+         */
+        tokenPack_id: AdminUpdateTokenPackTokenPackIdPathParameter;
+        /**
+         * The ID of the token pack.
+         */
+        token_pack: AdminUpdateTokenPackTokenPackPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/token-packs/{tokenPack_id}';
+};
+export type AdminUpdateTokenPackErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateTokenPackError = AdminUpdateTokenPackErrors[keyof AdminUpdateTokenPackErrors];
+export type AdminUpdateTokenPackResponses = {
+    /**
+     * Token pack updated.
+     */
+    200: AdminUpdateTokenPackResponseBody;
+};
+export type AdminUpdateTokenPackResponse = AdminUpdateTokenPackResponses[keyof AdminUpdateTokenPackResponses];
 export type AdminListExtensionsData = {
     body?: never;
     path?: never;
@@ -6494,6 +8771,89 @@ export type AdminUpdateUserResponses = {
     200: AdminUserResource;
 };
 export type AdminUpdateUserResponse = AdminUpdateUserResponses[keyof AdminUpdateUserResponses];
+export type AdminListUserTokenTransactionsData = {
+    body?: never;
+    path: {
+        /**
+         * The user ID.
+         */
+        user_id: AdminListUserTokenTransactionsUserIdPathParameter;
+    };
+    query?: {
+        /**
+         * Page number to return.
+         */
+        page?: AdminListUserTokenTransactionsPageQueryParameter;
+        /**
+         * Results to return per page. The maximum is 100.
+         */
+        per_page?: AdminListUserTokenTransactionsPerPageQueryParameter;
+    };
+    url: '/api/admin/users/{user_id}/tokens';
+};
+export type AdminListUserTokenTransactionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminListUserTokenTransactionsError = AdminListUserTokenTransactionsErrors[keyof AdminListUserTokenTransactionsErrors];
+export type AdminListUserTokenTransactionsResponses = {
+    /**
+     * Token ledger returned.
+     */
+    200: AdminTokenTransactionPaginatedResponse;
+};
+export type AdminListUserTokenTransactionsResponse = AdminListUserTokenTransactionsResponses[keyof AdminListUserTokenTransactionsResponses];
+export type AdminAdjustUserTokensData = {
+    body: AdminAdjustUserTokensRequest;
+    path: {
+        /**
+         * The user ID.
+         */
+        user_id: AdminListUserTokenTransactionsUserIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/users/{user_id}/tokens';
+};
+export type AdminAdjustUserTokensErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminAdjustUserTokensError = AdminAdjustUserTokensErrors[keyof AdminAdjustUserTokensErrors];
+export type AdminAdjustUserTokensResponses = {
+    /**
+     * Tokens adjusted.
+     */
+    201: AdminTokenTransactionResource;
+};
+export type AdminAdjustUserTokensResponse = AdminAdjustUserTokensResponses[keyof AdminAdjustUserTokensResponses];
 export type AdminDisableUserTwoFactorAuthenticationData = {
     body?: never;
     path: {
@@ -6630,6 +8990,296 @@ export type AdminGetNodeUtilizationResponses = {
     200: AdminNodeUtilizationResponse;
 };
 export type AdminGetNodeUtilizationResponse = AdminGetNodeUtilizationResponses[keyof AdminGetNodeUtilizationResponses];
+export type AdminGetNodePlayitGgAgentData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodePlayitGgAgentNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit';
+};
+export type AdminGetNodePlayitGgAgentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetNodePlayitGgAgentError = AdminGetNodePlayitGgAgentErrors[keyof AdminGetNodePlayitGgAgentErrors];
+export type AdminGetNodePlayitGgAgentResponses = {
+    /**
+     * playit.gg agent returned.
+     */
+    200: AdminGetNodePlayitGgAgentResponseBody;
+};
+export type AdminGetNodePlayitGgAgentResponse = AdminGetNodePlayitGgAgentResponses[keyof AdminGetNodePlayitGgAgentResponses];
+export type AdminUpdateNodePlayitGgAgentData = {
+    body?: AdminUpdateNodePlayitGgAgentRequest;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodePlayitGgAgentNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit';
+};
+export type AdminUpdateNodePlayitGgAgentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateNodePlayitGgAgentError = AdminUpdateNodePlayitGgAgentErrors[keyof AdminUpdateNodePlayitGgAgentErrors];
+export type AdminUpdateNodePlayitGgAgentResponses = {
+    /**
+     * playit.gg agent updated.
+     */
+    200: AdminUpdateNodePlayitGgAgentResponseBody;
+};
+export type AdminUpdateNodePlayitGgAgentResponse = AdminUpdateNodePlayitGgAgentResponses[keyof AdminUpdateNodePlayitGgAgentResponses];
+export type AdminTestNodePlayitGgAgentData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminTestNodePlayitGgAgentNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/test';
+};
+export type AdminTestNodePlayitGgAgentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminTestNodePlayitGgAgentError = AdminTestNodePlayitGgAgentErrors[keyof AdminTestNodePlayitGgAgentErrors];
+export type AdminTestNodePlayitGgAgentResponses = {
+    /**
+     * Connection checked.
+     */
+    200: AdminTestNodePlayitGgAgentResponseBody;
+};
+export type AdminTestNodePlayitGgAgentResponse = AdminTestNodePlayitGgAgentResponses[keyof AdminTestNodePlayitGgAgentResponses];
+export type AdminListTunnelsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only tunnels with this status.
+         */
+        status?: AdminListTunnelsStatusQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListTunnelsPageQueryParameter;
+        /**
+         * Results to return per page.
+         */
+        per_page?: AdminListTunnelsPerPageQueryParameter;
+    };
+    url: '/api/admin/tunnels';
+};
+export type AdminListTunnelsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminListTunnelsError = AdminListTunnelsErrors[keyof AdminListTunnelsErrors];
+export type AdminListTunnelsResponses = {
+    /**
+     * Tunnels returned.
+     */
+    200: AdminServerTunnelPaginatedResponse;
+};
+export type AdminListTunnelsResponse = AdminListTunnelsResponses[keyof AdminListTunnelsResponses];
+export type AdminCreateTunnelData = {
+    body: AdminCreateTunnelRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/tunnels';
+};
+export type AdminCreateTunnelErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateTunnelError = AdminCreateTunnelErrors[keyof AdminCreateTunnelErrors];
+export type AdminCreateTunnelResponses = {
+    /**
+     * Tunnel created or queued.
+     */
+    201: AdminServerTunnelResource;
+};
+export type AdminCreateTunnelResponse = AdminCreateTunnelResponses[keyof AdminCreateTunnelResponses];
+export type AdminGetTunnelSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/tunnels/settings';
+};
+export type AdminGetTunnelSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetTunnelSettingsError = AdminGetTunnelSettingsErrors[keyof AdminGetTunnelSettingsErrors];
+export type AdminGetTunnelSettingsResponses = {
+    /**
+     * Tunnel settings returned.
+     */
+    200: AdminGetTunnelSettingsResponseBody;
+};
+export type AdminGetTunnelSettingsResponse = AdminGetTunnelSettingsResponses[keyof AdminGetTunnelSettingsResponses];
+export type AdminUpdateTunnelSettingsData = {
+    body: AdminUpdateTunnelSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/tunnels/settings';
+};
+export type AdminUpdateTunnelSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateTunnelSettingsError = AdminUpdateTunnelSettingsErrors[keyof AdminUpdateTunnelSettingsErrors];
+export type AdminUpdateTunnelSettingsResponses = {
+    /**
+     * Tunnel settings updated.
+     */
+    200: AdminUpdateTunnelSettingsResponseBody;
+};
+export type AdminUpdateTunnelSettingsResponse = AdminUpdateTunnelSettingsResponses[keyof AdminUpdateTunnelSettingsResponses];
+export type AdminRetryTunnelData = {
+    body?: never;
+    path: {
+        /**
+         * The server tunnel ID.
+         */
+        tunnel_id: AdminRetryTunnelTunnelIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/tunnels/{tunnel_id}/retry';
+};
+export type AdminRetryTunnelErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminRetryTunnelError = AdminRetryTunnelErrors[keyof AdminRetryTunnelErrors];
+export type AdminRetryTunnelResponses = {
+    /**
+     * Tunnel checked.
+     */
+    200: AdminServerTunnelResource;
+};
+export type AdminRetryTunnelResponse = AdminRetryTunnelResponses[keyof AdminRetryTunnelResponses];
+export type AdminRecreateTunnelData = {
+    body?: never;
+    path: {
+        /**
+         * The server tunnel ID.
+         */
+        tunnel_id: AdminRecreateTunnelTunnelIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/tunnels/{tunnel_id}/recreate';
+};
+export type AdminRecreateTunnelErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminRecreateTunnelError = AdminRecreateTunnelErrors[keyof AdminRecreateTunnelErrors];
+export type AdminRecreateTunnelResponses = {
+    /**
+     * Tunnel recreated or queued.
+     */
+    200: AdminServerTunnelResource;
+};
+export type AdminRecreateTunnelResponse = AdminRecreateTunnelResponses[keyof AdminRecreateTunnelResponses];
 export type AdminGetLiveUsageData = {
     body?: never;
     path?: never;
@@ -7318,6 +9968,109 @@ export type AdminToggleServerInstallStateResponses = {
     204: void;
 };
 export type AdminToggleServerInstallStateResponse = AdminToggleServerInstallStateResponses[keyof AdminToggleServerInstallStateResponses];
+export type AdminGetServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminGetServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription';
+};
+export type AdminGetServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The server has no subscription.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetServerSubscriptionError = AdminGetServerSubscriptionErrors[keyof AdminGetServerSubscriptionErrors];
+export type AdminGetServerSubscriptionResponses = {
+    /**
+     * Subscription returned.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminGetServerSubscriptionResponse = AdminGetServerSubscriptionResponses[keyof AdminGetServerSubscriptionResponses];
+export type AdminExtendServerSubscriptionData = {
+    body: AdminExtendServerSubscriptionRequest;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminExtendServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription/extend';
+};
+export type AdminExtendServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminExtendServerSubscriptionError = AdminExtendServerSubscriptionErrors[keyof AdminExtendServerSubscriptionErrors];
+export type AdminExtendServerSubscriptionResponses = {
+    /**
+     * Subscription extended.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminExtendServerSubscriptionResponse = AdminExtendServerSubscriptionResponses[keyof AdminExtendServerSubscriptionResponses];
+export type AdminCancelServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminCancelServerSubscriptionServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/subscription/cancel';
+};
+export type AdminCancelServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminCancelServerSubscriptionError = AdminCancelServerSubscriptionErrors[keyof AdminCancelServerSubscriptionErrors];
+export type AdminCancelServerSubscriptionResponses = {
+    /**
+     * Subscription cancelled.
+     */
+    200: AdminServerSubscriptionResource;
+};
+export type AdminCancelServerSubscriptionResponse = AdminCancelServerSubscriptionResponses[keyof AdminCancelServerSubscriptionResponses];
 export type AdminForceDeleteServerData = {
     body?: never;
     path: {
@@ -12432,6 +15185,240 @@ export type ClientMarkNoticeReadResponses = {
     204: void;
 };
 export type ClientMarkNoticeReadResponse = ClientMarkNoticeReadResponses[keyof ClientMarkNoticeReadResponses];
+export type ClientGetTheStoreCatalogData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/catalog';
+};
+export type ClientGetTheStoreCatalogErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientGetTheStoreCatalogError = ClientGetTheStoreCatalogErrors[keyof ClientGetTheStoreCatalogErrors];
+export type ClientGetTheStoreCatalogResponses = {
+    /**
+     * Catalog returned.
+     */
+    200: ClientGetTheStoreCatalogResponseBody;
+};
+export type ClientGetTheStoreCatalogResponse = ClientGetTheStoreCatalogResponses[keyof ClientGetTheStoreCatalogResponses];
+export type ClientQuoteAServerData = {
+    body: ClientQuoteAServerRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/quote';
+};
+export type ClientQuoteAServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientQuoteAServerError = ClientQuoteAServerErrors[keyof ClientQuoteAServerErrors];
+export type ClientQuoteAServerResponses = {
+    /**
+     * Quote returned.
+     */
+    200: ClientQuoteAServerResponseBody;
+};
+export type ClientQuoteAServerResponse = ClientQuoteAServerResponses[keyof ClientQuoteAServerResponses];
+export type ClientPurchaseServerData = {
+    body: ClientPurchaseServerRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/purchase';
+};
+export type ClientPurchaseServerErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientPurchaseServerError = ClientPurchaseServerErrors[keyof ClientPurchaseServerErrors];
+export type ClientPurchaseServerResponses = {
+    /**
+     * The idempotency key already bought this server; nothing was charged again.
+     */
+    200: ClientStorePurchaseResource;
+    /**
+     * Server bought and installing.
+     */
+    201: ClientStorePurchaseResource;
+};
+export type ClientPurchaseServerResponse = ClientPurchaseServerResponses[keyof ClientPurchaseServerResponses];
+export type ClientListTokenPacksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/tokens/packs';
+};
+export type ClientListTokenPacksErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListTokenPacksError = ClientListTokenPacksErrors[keyof ClientListTokenPacksErrors];
+export type ClientListTokenPacksResponses = {
+    /**
+     * Token packs returned.
+     */
+    200: ClientListTokenPacksResponseBody;
+};
+export type ClientListTokenPacksResponse = ClientListTokenPacksResponses[keyof ClientListTokenPacksResponses];
+export type ClientBuyTokenPackData = {
+    body: ClientBuyTokenPackRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/tokens/checkout';
+};
+export type ClientBuyTokenPackErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientBuyTokenPackError = ClientBuyTokenPackErrors[keyof ClientBuyTokenPackErrors];
+export type ClientBuyTokenPackResponses = {
+    /**
+     * Checkout started.
+     */
+    200: ClientBuyTokenPackResponseBody;
+};
+export type ClientBuyTokenPackResponse = ClientBuyTokenPackResponses[keyof ClientBuyTokenPackResponses];
+export type ClientListServerSubscriptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/subscriptions';
+};
+export type ClientListServerSubscriptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientListServerSubscriptionsError = ClientListServerSubscriptionsErrors[keyof ClientListServerSubscriptionsErrors];
+export type ClientListServerSubscriptionsResponses = {
+    /**
+     * Subscriptions returned.
+     */
+    200: ClientServerSubscriptionListResponse;
+};
+export type ClientListServerSubscriptionsResponse = ClientListServerSubscriptionsResponses[keyof ClientListServerSubscriptionsResponses];
+export type ClientUpdateServerSubscriptionData = {
+    body: ClientUpdateServerSubscriptionRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientUpdateServerSubscriptionServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}';
+};
+export type ClientUpdateServerSubscriptionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUpdateServerSubscriptionError = ClientUpdateServerSubscriptionErrors[keyof ClientUpdateServerSubscriptionErrors];
+export type ClientUpdateServerSubscriptionResponses = {
+    /**
+     * Subscription updated.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientUpdateServerSubscriptionResponse = ClientUpdateServerSubscriptionResponses[keyof ClientUpdateServerSubscriptionResponses];
+export type ClientRenewServerSubscriptionData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientRenewServerSubscriptionServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}/renew';
+};
+export type ClientRenewServerSubscriptionErrors = {
+    /**
+     * The balance is too low, or the next period is already paid.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientRenewServerSubscriptionError = ClientRenewServerSubscriptionErrors[keyof ClientRenewServerSubscriptionErrors];
+export type ClientRenewServerSubscriptionResponses = {
+    /**
+     * Subscription renewed.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientRenewServerSubscriptionResponse = ClientRenewServerSubscriptionResponses[keyof ClientRenewServerSubscriptionResponses];
 export type ClientGetAccountData = {
     body?: never;
     path?: never;
@@ -12690,6 +15677,43 @@ export type ClientListAccountActivityFilterOptionsResponses = {
     200: ClientListAccountActivityFilterOptionsResponseBody;
 };
 export type ClientListAccountActivityFilterOptionsResponse = ClientListAccountActivityFilterOptionsResponses[keyof ClientListAccountActivityFilterOptionsResponses];
+export type ClientGetWalletData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page number to return.
+         */
+        page?: ClientGetWalletPageQueryParameter;
+        /**
+         * Results to return per page. The maximum is 100.
+         */
+        per_page?: ClientGetWalletPerPageQueryParameter;
+    };
+    url: '/api/client/account/wallet';
+};
+export type ClientGetWalletErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetWalletError = ClientGetWalletErrors[keyof ClientGetWalletErrors];
+export type ClientGetWalletResponses = {
+    /**
+     * Wallet returned.
+     */
+    200: ClientTokenTransactionPaginatedResponse;
+};
+export type ClientGetWalletResponse = ClientGetWalletResponses[keyof ClientGetWalletResponses];
 export type ClientListAccountApiKeysData = {
     body?: never;
     path?: never;

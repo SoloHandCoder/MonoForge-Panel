@@ -35,7 +35,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -88,6 +88,7 @@ class Node extends Model implements Identifiable
             'behind_proxy' => 'boolean',
             'public' => 'boolean',
             'maintenance_mode' => 'boolean',
+            'playit_secret' => 'encrypted',
         ];
     }
 
@@ -97,6 +98,15 @@ class Node extends Model implements Identifiable
     public function uniqueIds(): array
     {
         return ['uuid'];
+    }
+
+    /**
+     * Whether the node runs a playit.gg agent the panel can create tunnels on.
+     */
+    public function hasPlayitAgent(): bool
+    {
+        return is_string($this->playit_agent_id) && $this->playit_agent_id !== ''
+            && is_string($this->playit_secret) && $this->playit_secret !== '';
     }
 
     public function getConnectionAddress(): string

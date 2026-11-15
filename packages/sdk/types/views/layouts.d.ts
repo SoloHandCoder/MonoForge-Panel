@@ -50,6 +50,8 @@ export interface AppLayoutModel {
     readonly area: AppArea;
     /** The user's servers on every page of the dashboard's list, from its first page; null until that loads. */
     readonly serverCount: number | null;
+    /** Whether the token shop is open, so the Store can be offered; false until the store catalog loads. */
+    readonly storeEnabled: boolean;
     readonly user: {
         readonly uuid: string;
         readonly username: string;

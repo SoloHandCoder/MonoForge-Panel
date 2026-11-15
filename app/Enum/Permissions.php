@@ -98,6 +98,10 @@ enum Permissions: string
     case AdminAnnouncementsUpdate = 'admin:announcements.update';
     case AdminAnnouncementsDelete = 'admin:announcements.delete';
 
+    // Phase 3 Task R: the token shop catalog, prices, capacity limits and shop settings.
+    case AdminShopRead = 'admin:shop.read';
+    case AdminShopUpdate = 'admin:shop.update';
+
     // Server subuser permissions, granted per-server and checked via ServerPolicy.
     case WebsocketConnect = 'websocket.connect';
 

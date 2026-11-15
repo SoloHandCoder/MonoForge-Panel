@@ -16,6 +16,7 @@ use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Subuser;
+use Pterodactyl\Services\Tunnels\TunnelService;
 use UnexpectedValueException;
 
 /**
@@ -29,10 +30,11 @@ use UnexpectedValueException;
 #[ResponseField('feature_limits.allocations', 'integer', example: 5, nullable: true)]
 #[ResponseField('feature_limits.backups', 'integer', example: 5, nullable: true)]
 #[ResponseField('egg_features', schema: ['type' => 'array', 'nullable' => true, 'items' => ['type' => 'string'], 'example' => ['eula']])]
+#[ResponseField('playit_address', type: 'string', description: 'The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.', example: 'xyz.joinmc.link', nullable: true)]
 #[ResponseField('egg_tags', schema: ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['minecraft']])]
 class ServerResource extends ClientResource
 {
-    protected array $eagerLoads = ['egg.variables', 'egg.configFrom', 'egg.tags', 'serverVariables', 'node', 'transfer', 'subusers', 'allocation'];
+    protected array $eagerLoads = ['egg.variables', 'egg.configFrom', 'egg.tags', 'serverVariables', 'node', 'transfer', 'subusers', 'allocation', 'tunnel'];
 
     protected array $includeRelations = [
         'allocations' => ['relation' => 'allocations', 'resource' => AllocationResource::class],
@@ -54,7 +56,7 @@ class ServerResource extends ClientResource
         $user = $this->getUser();
         $server = $this->resource;
 
-        $server->loadMissing(['egg.tags', 'node', 'transfer']);
+        $server->loadMissing(['egg.tags', 'node', 'transfer', 'tunnel']);
 
         $egg = $server->egg ?? throw new UnexpectedValueException('The server does not have an egg relationship.');
 
@@ -100,6 +102,7 @@ class ServerResource extends ClientResource
             'is_installing' => ! $server->isInstalled(),
             'is_transferring' => ($server->transfer) !== null,
             'skip_scripts' => $server->skip_scripts,
+            'playit_address' => resolve(TunnelService::class)->displayAddress($server),
         ];
     }
 

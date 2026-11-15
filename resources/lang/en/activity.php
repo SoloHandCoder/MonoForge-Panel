@@ -45,9 +45,16 @@ return [
             'create' => 'Enabled two-factor auth',
             'delete' => 'Disabled two-factor auth',
         ],
+        'store' => [
+            'purchase' => 'Bought the server ":name" for :tokens tokens',
+        ],
     ],
     'server' => [
         'reinstall' => 'Reinstalled server',
+        'subscription' => [
+            'renew' => 'Renewed the server subscription for :price_tokens tokens',
+            'auto-renew' => 'Turned automatic renewal :auto_renew',
+        ],
         'console' => [
             'command' => 'Executed ":command" on the server',
         ],
@@ -216,6 +223,8 @@ return [
             'rebuild' => 'Triggered a rebuild of :name',
             'suspend' => 'Suspended :name',
             'unsuspend' => 'Unsuspended :name',
+            'subscription-extend' => 'Extended the subscription of :name by :days days',
+            'subscription-cancel' => 'Cancelled the subscription of :name',
             'toggle-install' => 'Toggled the install status of :name',
             'transfer' => 'Started transferring :name to node :node_id',
             'mount' => 'Added the :name mount to a server',
@@ -229,10 +238,44 @@ return [
             'delete' => 'Deleted the :name database',
             'rotate-password' => 'Rotated the password for the :name database',
         ],
+        'shop' => [
+            'category' => [
+                'create' => 'Created the ":name" shop category',
+                'update' => 'Updated the ":name" shop category',
+                'delete' => 'Deleted the ":name" shop category',
+                'reorder' => 'Reordered the shop categories',
+            ],
+            'plan' => [
+                'create' => 'Created the ":name" shop plan',
+                'update' => 'Updated the ":name" shop plan',
+                'delete' => 'Deleted the ":name" shop plan',
+            ],
+            'period' => [
+                'create' => 'Created the ":name" billing period',
+                'update' => 'Updated the ":name" billing period',
+                'delete' => 'Deleted the ":name" billing period',
+            ],
+            'multiplier' => [
+                'create' => 'Set a :multiplier× :scope price multiplier',
+                'update' => 'Changed a :scope price multiplier to :multiplier×',
+                'delete' => 'Removed a :multiplier× :scope price multiplier',
+            ],
+            'addon' => [
+                'create' => 'Created the ":name" shop add-on',
+                'update' => 'Updated the ":name" shop add-on',
+                'delete' => 'Deleted the ":name" shop add-on',
+            ],
+            'settings' => [
+                'update' => 'Updated the shop settings',
+            ],
+        ],
         'tag' => [
             'create' => 'Created the :slug tag',
             'update' => 'Updated the :slug tag',
             'delete' => 'Deleted the :slug tag',
+        ],
+        'tebex' => [
+            'update' => 'Updated the Tebex store settings',
         ],
         'theme' => [
             'activate' => 'Activated the :theme theme',
@@ -241,11 +284,20 @@ return [
             'image' => 'Uploaded the :setting image of the :theme theme',
             'image-clear' => 'Removed the :setting image of the :theme theme',
         ],
+        'tebex-payment' => [
+            'approve' => 'Approved and credited Tebex payment :transaction_id (:tokens tokens)',
+        ],
+        'token-pack' => [
+            'create' => 'Created the ":name" token pack',
+            'update' => 'Updated the ":name" token pack',
+            'delete' => 'Deleted the ":name" token pack',
+        ],
         'user' => [
             'create' => 'Created the user :email',
             'update' => 'Updated the user :email',
             'delete' => 'Deleted the user :email',
             'disable-2fa' => 'Disabled two-factor authentication for :email',
+            'adjust-tokens' => 'Adjusted the token balance of :email by :amount tokens: :reason',
         ],
     ],
 ];

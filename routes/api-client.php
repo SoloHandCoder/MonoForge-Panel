@@ -30,7 +30,12 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\StartupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SubuserController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\WebsocketController;
 use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
+use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
+use Pterodactyl\Http\Controllers\Api\Client\StoreController;
+use Pterodactyl\Http\Controllers\Api\Client\StorePurchaseController;
+use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
+use Pterodactyl\Http\Controllers\Api\Client\WalletController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
 use Pterodactyl\Http\Middleware\Activity\ServerSubject;
 use Pterodactyl\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
@@ -52,6 +57,20 @@ Route::get('/extension-progress/{extension}/{job}', [ExtensionProgressController
 Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
 Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
 
+// The store: catalog, quotes and buying a server.
+Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');
+Route::post('/store/quote', [StoreController::class, 'quote'])->name('api:client.store.quote');
+Route::post('/store/purchase', [StorePurchaseController::class, 'store'])->middleware('throttle:store.purchase')->name('api:client.store.purchase');
+// Buying tokens through Tebex.
+Route::get('/store/tokens/packs', [TokenPackController::class, 'index'])->name('api:client.store.tokens.packs');
+Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])
+    ->middleware('throttle:10,1')
+    ->name('api:client.store.tokens.checkout');
+// Shop billing of the user's servers. Outside the server group: a suspended server's renewal must still work.
+Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('api:client.subscriptions');
+Route::patch('/subscriptions/{server}', [SubscriptionController::class, 'update'])->name('api:client.subscriptions.update');
+Route::post('/subscriptions/{server}/renew', [SubscriptionController::class, 'renew'])->name('api:client.subscriptions.renew');
+
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function (): void {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function (): void {
         Route::get('/', [AccountController::class, 'index'])->name('api:client.account');
@@ -67,6 +86,9 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
 
     Route::get('/activity', ActivityLogController::class)->name('api:client.account.activity');
     Route::get('/activity/filters', ActivityLogFilterController::class)->name('api:client.account.activity.filters');
+
+    // The token balance and history (phase 3 Task Q).
+    Route::get('/wallet', WalletController::class)->name('api:client.account.wallet');
 
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
     Route::post('/api-keys', [ApiKeyController::class, 'store']);

@@ -8,6 +8,15 @@ export default function ServerCard({ model, server, className }: ViewProps<'dash
             <View name='dashboard.serverCard.identity' model={model} server={server} />
             <View name='dashboard.serverCard.address' model={model} server={server} />
             <View name='dashboard.serverCard.metrics' model={model} server={server} />
+            {model.billingNotice && (
+                <p
+                    role='status'
+                    data-part='billing-notice'
+                    className='rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground'
+                >
+                    {model.billingNotice}
+                </p>
+            )}
         </div>
     );
 }

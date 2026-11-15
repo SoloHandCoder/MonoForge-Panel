@@ -146,6 +146,19 @@ export default function Allocations({ model, className }: ViewProps<'server.allo
     return (
         <div className={className}>
             <SpinnerOverlay visible={creating} />
+            {model.playitAddress && (
+                <div className='mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm'>
+                    <span className='text-muted-foreground'>Public address (playit.gg)</span>
+                    <CopyOnClick text={model.playitAddress} showInNotification>
+                        <Code dark className='break-all'>
+                            {model.playitAddress}
+                        </Code>
+                    </CopyOnClick>
+                    <span className='text-xs text-muted-foreground'>
+                        Players connect here; the ports below are the node&apos;s own.
+                    </span>
+                </div>
+            )}
             {model.canManage && (
                 <ListToolbar
                     summary={`You are currently using ${model.allocations.length} of ${model.limit} allowed allocations for this server.`}

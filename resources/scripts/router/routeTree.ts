@@ -16,6 +16,7 @@ import { accountActivityFacetsQueryOptions, accountActivityLogsQueryOptions } fr
 import { currentUserQueryOptions } from '@/api/account/queries';
 import { accountServersQueryOptions } from '@/api/account/servers/queries';
 import { accountSshKeysQueryOptions } from '@/api/account/ssh-keys/queries';
+import { walletQueryOptions } from '@/api/account/wallet/queries';
 import {
     adminUserListQueryParams,
     adminUserWithServersQueryOptions,
@@ -49,6 +50,7 @@ import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
+import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
 import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
@@ -73,6 +75,7 @@ import { serverSubusersQueryOptions } from '@/api/server/users/queries';
 import { serverActivityFacetsQueryOptions, serverActivityLogsQueryOptions } from '@/api/server/activity/queries';
 import { systemPermissionsQueryOptions } from '@/api/system/queries';
 import { siteSettingsQueryOptions } from '@/api/settings/queries';
+import { storeCatalogQueryOptions } from '@/api/store/queries';
 import { getBootstrapExtensions, hasBootstrapSession } from '@/bootstrap';
 import { registerClassPrefixes } from '@/lib/cn';
 import RootLayout from '@/router/layouts/RootLayout';
@@ -196,6 +199,24 @@ const dashboardRoute = createRoute({
     component: pageRoute('page.dashboard'),
 });
 
+// The store prefetches its catalog without waiting on it, so the page draws its own loading state.
+const storeRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'store',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(storeCatalogQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/store/StoreContainer')),
+});
+const storeCheckoutRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: 'store/$planId',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(storeCatalogQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/store/CheckoutContainer')),
+});
+
 const accountRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
     path: 'account',
@@ -249,6 +270,15 @@ const accountChildren = [
             ]);
         },
         component: pageRoute('page.account.activity'),
+    }),
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'wallet',
+        staticData: { nav: { label: 'Wallet', icon: 'wallet' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...walletQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/account/wallet/WalletContainer')),
     }),
 ];
 
@@ -1031,6 +1061,43 @@ const panelChildren = [
             ['panel.servers.create.before', 'panel.servers.create.after']
         ),
     }),
+    // Phase 3 Task R: the Shop tab. Every sub-tab path renders ShopContainer, which picks the tab from the
+    // path (see components/admin/shop/shopTabs.ts), including token-packs (Task P) and tunnels (Task V).
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop',
+        staticData: { nav: { label: 'Shop', icon: 'store' } },
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminShopCategoriesQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminShopPlansQueryOptions(), revalidateIfStale: true }),
+            ]);
+        },
+        component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
+    }),
+    ...(['periods', 'multipliers', 'addons', 'limits', 'token-packs', 'tunnels'] as const).map((tab) =>
+        createRoute({
+            getParentRoute: () => panelRoute,
+            path: `shop/${tab}`,
+            component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
+        })
+    ),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/plans/new',
+        validateSearch: (search: { category?: string | number | boolean | null }): { category?: number } => {
+            const category = Number(search.category);
+
+            return Number.isInteger(category) && category > 0 ? { category } : {};
+        },
+        component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'shop/plans/$id',
+        params: idParam,
+        component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
+    }),
     createRoute({
         getParentRoute: () => panelRoute,
         path: 'databases',
@@ -1254,6 +1321,8 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
         authRoute.addChildren(authChildren),
         authenticatedRoute.addChildren([
             dashboardRoute,
+            storeRoute,
+            storeCheckoutRoute,
             accountRoute.addChildren(accountRouteChildren),
             serverRoute.addChildren(serverRouteChildren),
             panelRoute.addChildren(panelRouteChildren),

@@ -27,10 +27,12 @@ import {
     Settings,
     ShieldCheck,
     SquareTerminal,
+    Store,
     Tag,
     Terminal,
     UserRound,
     Users,
+    Wallet,
     type LucideIcon,
 } from 'lucide-react';
 import { Avatar, Badge, cn, Icon, NamedIcon, PanelLink } from '@/sdk';
@@ -88,6 +90,8 @@ const icons = new Map<string, LucideIcon>([
     ['blocks', Blocks],
     ['palette', Palette],
     ['user-cog', ShieldCheck],
+    ['wallet', Wallet],
+    ['store', Store],
 ]);
 
 /** A sidebar row: hover tints it, the active one is lit and carries a violet bar at its left edge. */
@@ -313,7 +317,7 @@ function CategorizedItems({
 }
 
 /** The core account pages the sidebar names itself, by their route. */
-const ACCOUNT_PAGES = new Set(['index', 'activity', 'api', 'ssh']);
+const ACCOUNT_PAGES = new Set(['index', 'activity', 'wallet', 'api', 'ssh']);
 
 const accountPage = (items: readonly NavItem[], id: string) =>
     items.find((item) => item.extensionId === undefined && item.id === id);
@@ -322,6 +326,7 @@ const accountPage = (items: readonly NavItem[], id: string) =>
 function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accountLink?: AppLayoutLink }) {
     const overview = accountPage(items, 'index');
     const activity = accountPage(items, 'activity');
+    const wallet = accountPage(items, 'wallet');
     const keys = [
         { item: accountPage(items, 'api'), label: 'API keys' },
         { item: accountPage(items, 'ssh'), label: 'SSH keys' },
@@ -333,6 +338,7 @@ function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accou
             {overview && <ItemLink item={overview} label='Account' />}
             {!overview && accountLink && <AppLink link={accountLink} label='Account' />}
             {activity && <ItemLink item={activity} label='Activity' />}
+            {wallet && <ItemLink item={wallet} label='Wallet' />}
             {keys.length + rest.length > 0 && <p className={groupLabelClass}>Developer</p>}
             {keys.map(({ item, label }) => (
                 <ItemLink key={item.id} item={item} label={label} />
@@ -365,6 +371,12 @@ function PanelNav({ model, area }: { model: AppLayoutModel; area: AccountArea | 
                         </>
                     )}
                 </AppLink>
+            )}
+            {model.storeEnabled && (
+                <PanelLink destination={{ to: '/store' }} className={sidebarItemClass}>
+                    <Glyph name='store' />
+                    <span className='min-w-0 flex-1 truncate'>Store</span>
+                </PanelLink>
             )}
             {area && <AreaSlot area={area} at='before' />}
             <AccountItems items={area?.nav.items ?? published.items} accountLink={link('account')} />

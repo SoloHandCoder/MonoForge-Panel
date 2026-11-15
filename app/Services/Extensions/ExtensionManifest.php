@@ -53,7 +53,7 @@ class ExtensionManifest
      */
     public const array RESERVED_ROOT_PREFIXES = [
         'account', 'admin', 'api', 'assets', 'auth', 'daemon', 'extension-files', 'extensions',
-        'favicons', 'locales', 'panel', 'sanctum', 'server', 'servers', 'storage', 'themes', 'up',
+        'favicons', 'locales', 'panel', 'sanctum', 'server', 'servers', 'storage', 'store', 'themes', 'up',
     ];
 
     /** The Tailwind prefix under `ui.prefix`: lowercase letters only, as Tailwind itself requires, with no trailing newline. */

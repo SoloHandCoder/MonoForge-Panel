@@ -8,6 +8,7 @@ use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvi
 use Pterodactyl\Events\Server\Installed as ServerInstalledEvent;
 use Pterodactyl\Listeners\AuthenticationListener;
 use Pterodactyl\Listeners\RevocationListener;
+use Pterodactyl\Listeners\TunnelListener;
 use Pterodactyl\Listeners\TwoFactorListener;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Subuser;
@@ -34,6 +35,7 @@ class EventServiceProvider extends ServiceProvider
     protected $subscribe = [
         AuthenticationListener::class,
         RevocationListener::class,
+        TunnelListener::class,
         TwoFactorListener::class,
     ];
 

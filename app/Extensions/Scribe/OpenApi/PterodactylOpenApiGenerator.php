@@ -1479,6 +1479,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'adminUpdateMinecraftVersionChangerSettings' => $this->enforceMinecraftVersionChangerSettingsBodySchema($properties),
             'adminUpdateExtensionSettings' => $this->enforceAdminExtensionSettingsBodySchema($properties),
             'adminUpdateThemeSettings' => $this->enforceAdminThemeSettingsBodySchema($properties),
+            'clientPurchaseServer', 'clientQuoteAServer' => $this->enforceStorePurchaseBodySchema($properties),
             default => null,
         };
 
@@ -1496,6 +1497,25 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
         $content[$contentType] = $media;
         $requestBody['content'] = $content;
         $pathItem['requestBody'] = $requestBody;
+    }
+
+    /**
+     * Add-ons are a map of add-on key to units, which Scribe reads as a list.
+     *
+     * @param  array<mixed>  $properties
+     */
+    private function enforceStorePurchaseBodySchema(array &$properties): void
+    {
+        if (! isset($properties['addons'])) {
+            return;
+        }
+
+        $properties['addons'] = [
+            'type' => 'object',
+            'description' => 'Add-on keys mapped to the units to buy; keys left out or at 0 buy none.',
+            'additionalProperties' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000],
+            'example' => ['backup' => 1],
+        ];
     }
 
     /**

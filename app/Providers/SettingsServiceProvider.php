@@ -56,6 +56,13 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:captcha:provider',
         'monoforge:captcha:turnstile:site_key',
         'monoforge:captcha:turnstile:secret_key',
+        // Phase 3 Task R: token shop switch, grace period and capacity limits.
+        'monoforge:shop:enabled',
+        'monoforge:shop:grace_days',
+        'monoforge:shop:low_balance_days',
+        'monoforge:shop:limits:memory_mb',
+        'monoforge:shop:limits:disk_mb',
+        'monoforge:shop:limits:cpu_percent',
         // Addresses hidden from activity entries.
         'monoforge:privacy:hidden_ips',
     ];

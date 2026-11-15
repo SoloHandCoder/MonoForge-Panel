@@ -4,6 +4,7 @@ import { useRouterState } from '@tanstack/react-router';
 import { useCurrentUser } from '@/api/account/queries';
 import { serverResourceUsageQueryOptions, useAccountServers } from '@/api/account/servers/queries';
 import { useLogout } from '@/api/auth/queries';
+import { storeCatalogQueryOptions } from '@/api/store/queries';
 import { useCurrentServer } from '@/api/server/queries';
 import type { Server } from '@/api/server/types';
 import { useSiteSettings } from '@/api/settings/queries';
@@ -64,6 +65,8 @@ export interface AppLayoutModel {
     readonly area: AppArea;
     /** The user's servers on every page of the dashboard's list, from its first page; null until that loads. */
     readonly serverCount: number | null;
+    /** Whether the token shop is open, so the Store can be offered; false until the store catalog loads. */
+    readonly storeEnabled: boolean;
     readonly user: {
         readonly uuid: string;
         readonly username: string;
@@ -285,6 +288,8 @@ function useAppLayoutModel(): AppLayoutModel {
     const { mutate, isPending } = useLogout();
     const area = useAppArea();
     const serverCount = useAccountServers({ page: 1 }).data?.meta.pagination.total ?? null;
+    const storeEnabled =
+        useQuery({ ...storeCatalogQueryOptions(), select: (catalog) => catalog.enabled }).data ?? false;
     const { notices, dismissNotice } = useAppNotices();
 
     return useMemo(
@@ -293,6 +298,7 @@ function useAppLayoutModel(): AppLayoutModel {
             links: appLinks(rootAdmin),
             area,
             serverCount,
+            storeEnabled,
             user: { uuid, username, email, rootAdmin },
             scheme,
             preference,
@@ -307,6 +313,7 @@ function useAppLayoutModel(): AppLayoutModel {
             brand,
             area,
             serverCount,
+            storeEnabled,
             uuid,
             username,
             email,
@@ -337,6 +344,7 @@ const appLayoutFixture = (
     links: appLinks(rootAdmin),
     area,
     serverCount: null,
+    storeEnabled: true,
     user: { uuid: '11111111-1111-4111-8111-111111111111', username: 'alex', email: 'alex@example.test', rootAdmin },
     scheme: schemes[0] ?? 'dark',
     preference: schemes[0] ?? 'dark',
@@ -424,7 +432,8 @@ const accountNav = (extension = false) =>
         ['api', 'API Credentials', 'key-round'],
         ['ssh', 'SSH Keys', 'terminal'],
         ['activity', 'Activity', 'history'],
-        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('account', 4)] as const] : []),
+        ['wallet', 'Wallet', 'wallet'],
+        ...(extension ? [['tickets', 'Tickets', 'life-buoy', extensionItem('account', 5)] as const] : []),
     ]);
 
 const serverPaths = [
@@ -477,6 +486,7 @@ const adminNav = (extension = false) =>
         ['usage', 'Live usage', 'activity'],
         ['storage', 'Storage', 'hard-drive'],
         ['servers', 'Servers', 'server'],
+        ['shop', 'Shop', 'store'],
         ['databases', 'Database Hosts', 'database'],
         ['mounts', 'Mounts', 'folder-tree'],
         ['eggs', 'Eggs', 'egg'],

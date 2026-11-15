@@ -24,6 +24,7 @@ use Pterodactyl\Exceptions\ApiErrorResponse;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Http\Controllers\Base\PublicNoticeController;
+use Pterodactyl\Http\Controllers\Webhooks\TebexWebhookController;
 use Pterodactyl\Http\Middleware\Activity\TrackAPIKey;
 use Pterodactyl\Http\Middleware\Api\Admin\AuthenticateAdmin;
 use Pterodactyl\Http\Middleware\Api\Application\AuthenticateApplicationUser;
@@ -75,6 +76,13 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
             ->get('/api/notices/public', PublicNoticeController::class)
             ->name('api.notices.public');
 
+        // Tebex payment webhooks: no session, no CSRF, checked by source address and signature instead.
+        // The address is $request->ip(): CF-Connecting-IP when the peer is the local tunnel (see
+        // TrustProxies). Never add 127.0.0.1 to the allowlist: every tunnelled request comes from it.
+        Route::middleware('throttle:tebex.webhook')
+            ->post('/api/webhooks/tebex', TebexWebhookController::class)
+            ->name('api.webhooks.tebex');
+
         Route::middleware('daemon')
             ->prefix('/api/remote')
             ->scopeBindings()
@@ -92,7 +100,7 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
             fn (Request $request): bool => $request->is('api/client/servers/*/files', 'api/client/servers/*/files/*'),
         ]);
 
-        $middleware->preventRequestForgery(except: ['remote/*', 'daemon/*']);
+        $middleware->preventRequestForgery(except: ['remote/*', 'daemon/*', 'api/webhooks/*']);
 
         $middleware->redirectGuestsTo('/auth/login');
 
