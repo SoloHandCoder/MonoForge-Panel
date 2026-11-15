@@ -16,6 +16,7 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Task;
+use Pterodactyl\Services\Sleep\ServerSleep;
 use Throwable;
 
 class RunTaskJob implements ShouldQueue
@@ -47,6 +48,7 @@ class RunTaskJob implements ShouldQueue
      */
     public function handle(
         InitiatesBackups $backupService,
+        ServerSleep $sleep,
     ): void {
         // Do not process a task that is not set to active, unless it's been manually triggered.
         if (! $this->task->schedule->is_active && ! $this->manualRun) {
@@ -75,6 +77,11 @@ class RunTaskJob implements ShouldQueue
                 Task::ACTION_BACKUP => $backupService->setIgnoredFiles(explode(PHP_EOL, $this->task->payload))->initiate($server, null, true),
                 default => throw new InvalidArgumentException('Invalid task action provided: '.$this->task->action),
             };
+
+            // A schedule that starts a sleeping server wakes it (pay-as-you-play).
+            if ($this->task->action === Task::ACTION_POWER && in_array(mb_trim($this->task->payload), ['start', 'restart'], true)) {
+                $sleep->markAwake($server);
+            }
         } catch (Throwable $throwable) {
             // If this isn't a DaemonConnectionException on a task that allows for failures
             // throw the exception back up the chain so that the task is stopped.

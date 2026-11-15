@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
+use Illuminate\Validation\ValidationException;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
@@ -19,6 +20,8 @@ use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\SubscriptionService;
+use Pterodactyl\Services\Query\ServerQuery;
+use Pterodactyl\Services\Sleep\ServerSleep;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
@@ -39,6 +42,18 @@ class SubscriptionController extends ClientApiController
             'suspended_at' => null,
             'delete_at' => null,
             'can_renew_now' => true,
+            'sleep' => [
+                'allowed' => true,
+                'supported' => true,
+                'enabled' => true,
+                'sleeping' => false,
+                'sleep_started_at' => null,
+                'idle_minutes' => 15,
+                'discount_percent' => 50,
+                'slept_seconds_this_period' => 432000,
+                'saved_this_period' => 41,
+                'last_saved_tokens' => 120,
+            ],
         ],
     ];
 
@@ -50,7 +65,7 @@ class SubscriptionController extends ClientApiController
     public function index(ClientApiRequest $request): ApiResourceCollection
     {
         $subscriptions = ServerSubscription::query()
-            ->with('server')
+            ->with(['server.egg', 'plan'])
             ->where('user_id', $request->user()->id)
             ->where('status', '!=', ServerSubscription::STATUS_CANCELLED)
             ->orderBy('id')
@@ -60,22 +75,44 @@ class SubscriptionController extends ClientApiController
     }
 
     /**
-     * Turn automatic renewal on or off.
+     * Turn automatic renewal or auto-sleep on or off.
      */
-    #[Endpoint('Update server subscription', 'Turns automatic renewal on or off. With it off, the server is suspended when its period ends.')]
-    #[BodyParam('auto_renew', 'boolean', 'Renew automatically from the token balance.', example: true)]
+    #[Endpoint('Update server subscription', 'Turns automatic renewal or auto-sleep on or off (send either or both). With automatic renewal off, the server is suspended when its period ends. With auto-sleep on, the server is stopped gracefully once nobody has played for the idle minutes of the plan, and the time it sleeps is discounted at the renewal; it needs a plan that allows it and a supported game (Minecraft Java); otherwise the answer is 422.')]
+    #[BodyParam('auto_renew', 'boolean', 'Renew automatically from the token balance. Required without auto_sleep.', required: false, example: true)]
+    #[BodyParam('auto_sleep', 'boolean', 'Let the server sleep while nobody plays. Required without auto_renew.', required: false, example: true)]
     #[ScribeResponse(self::SUBSCRIPTION_EXAMPLE, description: 'Subscription updated.')]
-    public function update(UpdateSubscriptionRequest $request, Server $server): ServerSubscriptionResource
+    public function update(UpdateSubscriptionRequest $request, ServerSleep $sleep, Server $server): ServerSubscriptionResource
     {
         $subscription = $this->subscriptionOf($request->user(), $server);
-        $subscription->forceFill(['auto_renew' => $request->boolean('auto_renew')])->save();
 
-        Activity::event('server:subscription.auto-renew')
-            ->subject($server)
-            ->property('auto_renew', $subscription->auto_renew ? 'on' : 'off')
-            ->log();
+        if ($request->has('auto_sleep')) {
+            $enable = $request->boolean('auto_sleep');
+            if ($enable && ! $sleep->allowed($subscription)) {
+                throw ValidationException::withMessages(['auto_sleep' => "This server's plan does not include auto-sleep."]);
+            }
 
-        return ServerSubscriptionResource::make($subscription->fresh(['server']) ?? $subscription);
+            if ($enable && ! ServerQuery::supports($server)) {
+                throw ValidationException::withMessages(['auto_sleep' => 'Auto-sleep is not supported for this game yet.']);
+            }
+
+            $subscription->forceFill(['auto_sleep' => $enable, 'idle_checks' => 0])->save();
+
+            Activity::event('server:subscription.auto-sleep')
+                ->subject($server)
+                ->property('auto_sleep', $enable ? 'on' : 'off')
+                ->log();
+        }
+
+        if ($request->has('auto_renew')) {
+            $subscription->forceFill(['auto_renew' => $request->boolean('auto_renew')])->save();
+
+            Activity::event('server:subscription.auto-renew')
+                ->subject($server)
+                ->property('auto_renew', $subscription->auto_renew ? 'on' : 'off')
+                ->log();
+        }
+
+        return ServerSubscriptionResource::make($subscription->fresh(['server.egg', 'plan']) ?? $subscription);
     }
 
     /**
@@ -96,7 +133,7 @@ class SubscriptionController extends ClientApiController
             ->property('price_tokens', $subscription->price_tokens)
             ->log();
 
-        return ServerSubscriptionResource::make($subscription->fresh(['server']) ?? $subscription);
+        return ServerSubscriptionResource::make($subscription->fresh(['server.egg', 'plan']) ?? $subscription);
     }
 
     /**
@@ -105,7 +142,7 @@ class SubscriptionController extends ClientApiController
     private function subscriptionOf(User $user, Server $server): ServerSubscription
     {
         $subscription = ServerSubscription::query()
-            ->with('server')
+            ->with(['server.egg', 'plan'])
             ->where('server_id', $server->id)
             ->where('user_id', $user->id)
             ->where('status', '!=', ServerSubscription::STATUS_CANCELLED)

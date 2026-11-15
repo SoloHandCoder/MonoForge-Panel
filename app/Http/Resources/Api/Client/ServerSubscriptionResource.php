@@ -6,10 +6,12 @@ namespace Pterodactyl\Http\Resources\Api\Client;
 
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Services\Query\ServerQuery;
+use Pterodactyl\Services\Sleep\ServerSleep;
 
 /**
  * A shop server's billing as its owner sees it: what is charged, when, and the countdown to the
- * deletion while it is suspended.
+ * deletion while it is suspended, and pay-as-you-play (auto-sleep) when the plan allows it.
  *
  * @extends ClientResource<ServerSubscription>
  */
@@ -23,6 +25,8 @@ class ServerSubscriptionResource extends ClientResource
     public function toArray(Request $request): array
     {
         $subscription = $this->resource;
+        $sleep = resolve(ServerSleep::class);
+        $bill = $sleep->bill($subscription);
 
         return [
             'server_identifier' => $subscription->server->uuidShort,
@@ -36,6 +40,18 @@ class ServerSubscriptionResource extends ClientResource
             'suspended_at' => $subscription->isSuspended() ? $subscription->suspended_at?->toAtomString() : null,
             'delete_at' => $subscription->delete_at?->toAtomString(),
             'can_renew_now' => $subscription->canRenewNow(),
+            'sleep' => [
+                'allowed' => $sleep->allowed($subscription),
+                'supported' => ServerQuery::supports($subscription->server),
+                'enabled' => $subscription->auto_sleep,
+                'sleeping' => $subscription->isSleeping(),
+                'sleep_started_at' => $subscription->isSleeping() ? $subscription->sleep_started_at?->toAtomString() : null,
+                'idle_minutes' => $subscription->plan?->sleepIdleMinutes() ?? 0,
+                'discount_percent' => $bill->discountPercent,
+                'slept_seconds_this_period' => $bill->sleptSeconds,
+                'saved_this_period' => $bill->saved,
+                'last_saved_tokens' => $subscription->last_sleep_saved_tokens,
+            ],
         ];
     }
 }

@@ -30,6 +30,10 @@ use Pterodactyl\Models\User;
  * @property bool $suspended_by_billing whether billing's suspension changed the server (it was not suspended already)
  * @property CarbonImmutable|null $delete_at
  * @property bool $auto_renew
+ * @property bool $auto_sleep the owner's auto-sleep switch (the plan must allow it as well)
+ * @property int $idle_checks consecutive checks that found nobody online
+ * @property CarbonImmutable|null $sleep_started_at set while auto-sleep keeps the server stopped
+ * @property int $last_sleep_saved_tokens what the last renewal saved thanks to sleeping
  * @property int|null $terms_version the Terms of Service version in force when the server was bought
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -53,6 +57,10 @@ use Pterodactyl\Models\User;
     'suspended_by_billing',
     'delete_at',
     'auto_renew',
+    'auto_sleep',
+    'idle_checks',
+    'sleep_started_at',
+    'last_sleep_saved_tokens',
     'terms_version',
 ])]
 class ServerSubscription extends Model
@@ -69,6 +77,9 @@ class ServerSubscription extends Model
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
         'auto_renew' => true,
+        'auto_sleep' => false,
+        'idle_checks' => 0,
+        'last_sleep_saved_tokens' => 0,
     ];
 
     /**
@@ -91,6 +102,10 @@ class ServerSubscription extends Model
             'suspended_by_billing' => 'bool',
             'delete_at' => 'immutable_datetime',
             'auto_renew' => 'bool',
+            'auto_sleep' => 'bool',
+            'idle_checks' => 'int',
+            'sleep_started_at' => 'immutable_datetime',
+            'last_sleep_saved_tokens' => 'int',
         ];
     }
 
@@ -134,6 +149,18 @@ class ServerSubscription extends Model
     public function isSuspended(): bool
     {
         return $this->status === self::STATUS_SUSPENDED;
+    }
+
+    /** Whether auto-sleep stopped the server and nobody has started it since. */
+    public function isSleeping(): bool
+    {
+        return $this->isActive() && $this->sleep_started_at !== null;
+    }
+
+    /** The start of the period that ends at `next_renewal_at` (the one its renewal bills). */
+    public function periodStart(): CarbonImmutable
+    {
+        return $this->next_renewal_at->subDays(max(1, $this->period_days));
     }
 
     /**

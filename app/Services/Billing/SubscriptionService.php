@@ -21,6 +21,7 @@ use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Legal\LegalSettings;
+use Pterodactyl\Services\Sleep\ServerSleep;
 use Throwable;
 
 /**
@@ -31,6 +32,9 @@ use Throwable;
  *
  * Every method locks the subscription row before it changes it, so the scheduler and a user's
  * "Renew now" can run at the same time, and every scheduler step is safe to run again.
+ *
+ * Pay-as-you-play: a renewal charges the full price less the plan's sleep discount on the time
+ * the server slept in the period that ends at the renewal (ServerSleep::bill()), rounded up.
  */
 class SubscriptionService
 {
@@ -67,6 +71,7 @@ class SubscriptionService
         private readonly TogglesServerSuspension $suspension,
         private readonly DeletesServers $deletion,
         private readonly BillingNotifier $notifier,
+        private readonly ServerSleep $sleep,
     ) {}
 
     /**
@@ -310,7 +315,7 @@ class SubscriptionService
                 ->where('status', ServerSubscription::STATUS_SUSPENDED)
                 ->where('auto_renew', true),
             function (ServerSubscription $subscription) use (&$restored): void {
-                if ($this->wallet->balance($subscription->user) >= $subscription->price_tokens && $this->unsuspendIfPaid($subscription)) {
+                if ($this->wallet->balance($subscription->user) >= $this->sleep->bill($subscription)->charge && $this->unsuspendIfPaid($subscription)) {
                     $restored++;
                 }
             },
@@ -367,7 +372,7 @@ class SubscriptionService
         $window = CarbonImmutable::now()->addDays(ShopSettings::lowBalanceDays());
 
         ServerSubscription::query()
-            ->with(['user', 'server'])
+            ->with(['user', 'server', 'plan'])
             ->where('status', ServerSubscription::STATUS_ACTIVE)
             ->where('auto_renew', true)
             ->where('next_renewal_at', '<=', $window)
@@ -391,7 +396,8 @@ class SubscriptionService
 
                 $due = 0;
                 foreach ($subscriptions as $subscription) {
-                    $due += $subscription->price_tokens;
+                    // Sleep so far: what is still to come can only lower the charge.
+                    $due += $this->sleep->bill($subscription)->charge;
                     if ($due > $balance && $this->notifier->renewalShort($subscription, $balance)) {
                         $warned++;
                     }
@@ -460,21 +466,36 @@ class SubscriptionService
     {
         $now = CarbonImmutable::now();
         $key = $locked->periodKey();
+        $saved = $locked->last_sleep_saved_tokens;
 
         // The period was charged already (a run that died before saving): only move on.
         if (! $this->wallet->hasTransaction(self::REFERENCE_TYPE, $key, self::CHARGE_TYPE)) {
-            try {
-                $this->wallet->debit(
-                    $locked->user,
-                    $locked->price_tokens,
-                    self::CHARGE_TYPE,
-                    "Renewal of {$locked->server->name} ({$locked->period_days} days)",
-                    self::REFERENCE_TYPE,
-                    $key,
-                    ['server_id' => $locked->server_id, 'period_days' => $locked->period_days],
-                );
-            } catch (InsufficientTokensException) {
-                return self::INSUFFICIENT;
+            // Read under the row lock, so concurrent runs agree; the period key keeps it to one charge.
+            $bill = $this->sleep->bill($locked);
+            $saved = $bill->saved;
+
+            // A period that slept entirely at a 100% discount costs nothing: no ledger row.
+            if ($bill->charge > 0) {
+                try {
+                    $this->wallet->debit(
+                        $locked->user,
+                        $bill->charge,
+                        self::CHARGE_TYPE,
+                        "Renewal of {$locked->server->name} ({$locked->period_days} days)".($bill->saved > 0 ? ", {$bill->saved} tokens saved by sleeping" : ''),
+                        self::REFERENCE_TYPE,
+                        $key,
+                        [
+                            'server_id' => $locked->server_id,
+                            'period_days' => $locked->period_days,
+                            'full_price' => $bill->fullPrice,
+                            'sleep_seconds' => $bill->sleptSeconds,
+                            'sleep_discount_percent' => $bill->discountPercent,
+                            'sleep_saved_tokens' => $bill->saved,
+                        ],
+                    );
+                } catch (InsufficientTokensException) {
+                    return self::INSUFFICIENT;
+                }
             }
         }
 
@@ -484,7 +505,7 @@ class SubscriptionService
             $next = $now->addDays($locked->period_days);
         }
 
-        $locked->fill(['status' => ServerSubscription::STATUS_ACTIVE, 'next_renewal_at' => $next, 'delete_at' => null])->save();
+        $locked->fill(['status' => ServerSubscription::STATUS_ACTIVE, 'next_renewal_at' => $next, 'delete_at' => null, 'last_sleep_saved_tokens' => $saved])->save();
         $s->setRawAttributes($locked->getAttributes(), true);
 
         return self::PAID;
@@ -547,7 +568,7 @@ class SubscriptionService
 
     private function lock(ServerSubscription $s): ?ServerSubscription
     {
-        return ServerSubscription::query()->with(['user', 'server'])->whereKey($s->getKey())->lockForUpdate()->first();
+        return ServerSubscription::query()->with(['user', 'server', 'plan'])->whereKey($s->getKey())->lockForUpdate()->first();
     }
 
     /**
@@ -647,7 +668,9 @@ class SubscriptionService
 
     private function shortMessage(ServerSubscription $s): string
     {
-        return "You need {$s->price_tokens} tokens to renew this server. Top up your wallet and try again.";
+        $charge = $this->sleep->bill($s)->charge;
+
+        return "You need {$charge} tokens to renew this server. Top up your wallet and try again.";
     }
 
     /**

@@ -31,7 +31,7 @@ final class ShopPresenter
     }
 
     /**
-     * @return array{id: int, category_id: int, name: string, description: string|null, visible: bool, sort: int, price_tokens: int, resources: array<string, int>, egg_ids: list<int>, node_ids: list<int>|null}
+     * @return array{id: int, category_id: int, name: string, description: string|null, visible: bool, sort: int, price_tokens: int, resources: array<string, int>, egg_ids: list<int>, node_ids: list<int>|null, sleep_allowed: bool, sleep_discount_percent: int, sleep_idle_minutes: int}
      */
     public static function plan(ShopPlan $plan): array
     {
@@ -46,6 +46,9 @@ final class ShopPresenter
             'resources' => $plan->resources(),
             'egg_ids' => $plan->eggIds(),
             'node_ids' => $plan->nodeIds(),
+            'sleep_allowed' => $plan->sleep_allowed,
+            'sleep_discount_percent' => $plan->sleepDiscountPercent(),
+            'sleep_idle_minutes' => $plan->sleepIdleMinutes(),
         ];
     }
 

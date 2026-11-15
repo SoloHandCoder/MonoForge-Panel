@@ -34,6 +34,9 @@ use Pterodactyl\Models\Node;
  * @property int $allocations
  * @property array<int, int|string> $egg_ids
  * @property array<int, int|string>|null $node_ids
+ * @property bool $sleep_allowed whether its servers may auto-sleep when nobody plays
+ * @property int $sleep_discount_percent the discount on the time a server slept (0-100)
+ * @property int $sleep_idle_minutes how long a server must be empty before it sleeps
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read ShopCategory $category
@@ -55,12 +58,17 @@ use Pterodactyl\Models\Node;
     'allocations',
     'egg_ids',
     'node_ids',
+    'sleep_allowed',
+    'sleep_discount_percent',
+    'sleep_idle_minutes',
 ])]
 #[RouteKey('id')]
 #[Table(name: 'shop_plans')]
 class ShopPlan extends Model
 {
     public const string RESOURCE_NAME = 'shop_plan';
+
+    public const int DEFAULT_SLEEP_IDLE_MINUTES = 15;
 
     protected $attributes = [
         'visible' => true,
@@ -71,6 +79,9 @@ class ShopPlan extends Model
         'backups' => 0,
         'allocations' => 0,
         'egg_ids' => '[]',
+        'sleep_allowed' => false,
+        'sleep_discount_percent' => 0,
+        'sleep_idle_minutes' => self::DEFAULT_SLEEP_IDLE_MINUTES,
     ];
 
     /**
@@ -93,6 +104,9 @@ class ShopPlan extends Model
             'allocations' => 'integer',
             'egg_ids' => 'array',
             'node_ids' => 'array',
+            'sleep_allowed' => 'boolean',
+            'sleep_discount_percent' => 'integer',
+            'sleep_idle_minutes' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
@@ -147,6 +161,18 @@ class ShopPlan extends Model
         }
 
         return array_values(array_map(intval(...), $this->node_ids));
+    }
+
+    /** The discount on sleeping time, kept inside 0-100 whatever the database holds. */
+    public function sleepDiscountPercent(): int
+    {
+        return max(0, min(100, $this->sleep_discount_percent));
+    }
+
+    /** How many empty minutes (one check a minute) put a server to sleep; at least one. */
+    public function sleepIdleMinutes(): int
+    {
+        return max(1, $this->sleep_idle_minutes);
     }
 
     /** Whether a server of this plan may be placed on the node. */
