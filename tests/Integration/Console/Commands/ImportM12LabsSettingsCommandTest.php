@@ -56,6 +56,7 @@ beforeEach(function (): void {
         'settings::modules:auth:discord:client_secret' => $old->encryptString($old->encryptString('discord-secret')),
         'settings::modules:email:resend:api_key' => $old->encryptString('re_old_key'),
         'settings::modules:email:from_email' => 'noreply@monoforge.example',
+        'settings::modules:email:primary' => 'resend',
     ] as $key => $value) {
         $admin->table("{$source}.settings")->insert(['key' => $key, 'value' => $value]);
     }
@@ -89,6 +90,20 @@ test('imports the settings and encrypts secrets with this panel key', function (
         ->and($encrypter->decrypt((string) Setting::fetch('settings::services:resend:key')))->toBe('re_old_key')
         ->and(Setting::fetch('settings::mail:default'))->toBe('resend')
         ->and(Setting::fetch('settings::mail:from:address'))->toBe('noreply@monoforge.example');
+});
+
+test('a wrong m12labs APP_KEY aborts without writing unless told to skip', function (): void {
+    $wrongKey = ['--source-key' => 'base64:'.base64_encode(str_repeat('w', 32)), '--assume-yes' => true];
+
+    runSettingsImport($this, $wrongKey)
+        ->expectsOutputToContain('Nothing was written')
+        ->assertExitCode(1);
+    expect(Setting::query()->count())->toBe(0);
+
+    runSettingsImport($this, [...$wrongKey, '--skip-undecryptable' => true])->assertExitCode(0);
+    expect(Setting::fetch('settings::monoforge:auth:discord:client_id'))->toBe('1234567890')
+        ->and(Setting::fetch('settings::monoforge:auth:discord:client_secret'))->toBeNull()
+        ->and(Setting::fetch('settings::services:resend:key'))->toBeNull();
 });
 
 test('refuses to write unattended without --assume-yes', function (): void {

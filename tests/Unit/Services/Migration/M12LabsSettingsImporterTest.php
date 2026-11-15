@@ -47,6 +47,7 @@ test('maps the old settings onto MonoForge keys', function (): void {
         'settings::modules:email:resend:api_key' => $old->encryptString('re_key'),
         'settings::modules:email:from_email' => 'noreply@example.com',
         'settings::modules:email:from_name' => '',
+        'settings::modules:email:primary' => 'resend',
         'settings::app:name' => 'MonoForge',
         'settings::modules:billing:keys:secret' => $old->encryptString('ignored'),
     ]);
@@ -78,4 +79,37 @@ test('skips values that do not decrypt with the m12labs key', function (): void 
 
     expect($settings)->toBe([])
         ->and($importer->undecryptable())->toBe(['settings::modules:email:resend:api_key']);
+});
+
+test('keeps captcha off and SMTP as the driver when m12labs had them that way', function (): void {
+    $old = oldKey();
+    $importer = importer();
+
+    $settings = $importer->map([
+        'settings::modules:auth:captcha:provider' => 'disabled',
+        'settings::modules:auth:captcha:site_key' => '0x4AAA',
+        'settings::modules:auth:captcha:secret_key' => $old->encryptString('turnstile-secret'),
+        'settings::modules:email:resend:api_key' => $old->encryptString('re_key'),
+        'settings::modules:email:primary' => 'smtp',
+        'settings::modules:email:backup' => 'resend',
+    ]);
+
+    expect(array_keys($settings))->toEqual(['monoforge:captcha:turnstile:site_key', 'monoforge:captcha:turnstile:secret_key', 'services:resend:key'])
+        ->and(array_column($importer->decisions(), 'decision', 'setting'))->toEqual([
+            'monoforge:captcha:provider' => 'left unchanged',
+            'mail:default' => 'left unchanged',
+        ])
+        ->and(implode(' ', array_column($importer->decisions(), 'because')))->not->toContain('re_key')->not->toContain('turnstile-secret');
+});
+
+test('uses Resend without a stored primary only when mail was enabled and SMTP never configured', function (): void {
+    $old = oldKey();
+    $rows = [
+        'settings::modules:email:resend:api_key' => $old->encryptString('re_key'),
+        'settings::modules:email:enabled' => 'true',
+    ];
+
+    expect(importer()->map($rows))->toHaveKey('mail:default')
+        ->and(importer()->map([...$rows, 'settings::modules:email:smtp:host' => 'smtp.example.com']))->not->toHaveKey('mail:default')
+        ->and(importer()->map([...$rows, 'settings::modules:email:enabled' => 'false']))->not->toHaveKey('mail:default');
 });

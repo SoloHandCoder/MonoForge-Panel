@@ -30,6 +30,7 @@ use Throwable;
     {--username= : m12labs database username}
     {--password= : m12labs database password (prefer the SOURCE_DB_PASSWORD environment variable)}
     {--source-key= : m12labs APP_KEY from its .env (prefer the SOURCE_APP_KEY environment variable)}
+    {--skip-undecryptable : Import the rest when some values do not decrypt with the m12labs APP_KEY (normally the run is aborted)}
     {--dry-run : List the settings that would be set (never their values) and write nothing}
     {--assume-yes : Answer the confirmation prompt with yes, for unattended runs}')]
 class ImportM12LabsSettingsCommand extends Command
@@ -59,8 +60,18 @@ class ImportM12LabsSettingsCommand extends Command
             $this->line('  · Keeping the panel name already set in MonoForge.');
         }
 
-        foreach ($importer->undecryptable() as $key) {
-            $this->warn("  ! {$key} could not be decrypted with the m12labs APP_KEY and was skipped.");
+        $undecryptable = $importer->undecryptable();
+        if ($undecryptable !== []) {
+            $skip = (bool) $this->option('skip-undecryptable');
+            foreach ($undecryptable as $key) {
+                $this->warn("  ! {$key} could not be decrypted with the m12labs APP_KEY".($skip ? ' and was skipped.' : '.'));
+            }
+
+            if (! $skip) {
+                $this->error('Is SOURCE_APP_KEY the APP_KEY of that m12labs panel? Nothing was written. Pass --skip-undecryptable to import the rest anyway.');
+
+                return self::FAILURE;
+            }
         }
 
         if ($settings === []) {
@@ -78,6 +89,13 @@ class ImportM12LabsSettingsCommand extends Command
                 $settings,
             ),
         );
+
+        if ($importer->decisions() !== []) {
+            $this->table(
+                ['Decision', 'Result', 'Based on'],
+                array_map(fn (array $decision): array => [$decision['setting'], $decision['decision'], $decision['because']], $importer->decisions()),
+            );
+        }
 
         if ($dryRun) {
             $this->info('Dry run: '.count($settings).' setting(s) would be set. Nothing was written.');

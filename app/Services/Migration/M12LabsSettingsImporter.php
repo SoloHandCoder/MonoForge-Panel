@@ -37,6 +37,10 @@ class M12LabsSettingsImporter
         'settings::modules:email:resend:api_key',
         'settings::modules:email:from_email',
         'settings::modules:email:from_name',
+        'settings::modules:email:enabled',
+        'settings::modules:email:primary',
+        'settings::modules:email:backup',
+        'settings::modules:email:smtp:host',
         'settings::app:name',
     ];
 
@@ -59,6 +63,9 @@ class M12LabsSettingsImporter
     /** @var list<string> Source keys whose value could not be decrypted. */
     private array $undecryptable = [];
 
+    /** @var list<array{setting: string, decision: string, because: string}> */
+    private array $decisions = [];
+
     public function __construct(private readonly Encrypter $source, private readonly Encrypter $target) {}
 
     public static function isSecret(string $key): bool
@@ -76,6 +83,7 @@ class M12LabsSettingsImporter
     public function map(array $rows): array
     {
         $this->undecryptable = [];
+        $this->decisions = [];
         $plain = [];
         foreach (self::SOURCE_KEYS as $key) {
             $value = $rows[$key] ?? null;
@@ -128,14 +136,38 @@ class M12LabsSettingsImporter
             $set('monoforge:captcha:turnstile:secret_key', $secretKey);
         }
 
+        // Captcha is only switched on when m12labs had it on (or never stored a provider).
+        $providerKey = 'settings::modules:auth:captcha:provider';
+        $oldProvider = isset($plain[$providerKey]) ? mb_strtolower($plain[$providerKey]) : null;
         if (isset($plain[$siteKey], $plain[$secretKey])) {
-            $set('monoforge:captcha:provider', $siteKey, 'turnstile');
+            $enable = $oldProvider === null || $oldProvider === 'turnstile';
+            if ($enable) {
+                $set('monoforge:captcha:provider', $providerKey, 'turnstile');
+            }
+
+            $this->decide('monoforge:captcha:provider', $enable ? 'set to turnstile' : 'left unchanged', 'old captcha:provider = '.($oldProvider ?? '(absent)'));
         }
 
+        // Resend only becomes the driver when m12labs sent mail with it.
         $resend = 'settings::modules:email:resend:api_key';
         if (isset($plain[$resend])) {
             $set('services:resend:key', $resend);
-            $set('mail:default', $resend, 'resend');
+
+            $primary = isset($plain['settings::modules:email:primary']) ? mb_strtolower($plain['settings::modules:email:primary']) : null;
+            $enabled = in_array(mb_strtolower($plain['settings::modules:email:enabled'] ?? ''), ['1', 'true', 'yes', 'on'], true);
+            $onlyResend = ! isset($plain['settings::modules:email:smtp:host']);
+            $useResend = $primary === 'resend' || ($primary === null && $enabled && $onlyResend);
+            if ($useResend) {
+                $set('mail:default', 'settings::modules:email:primary', 'resend');
+            }
+
+            $this->decide('mail:default', $useResend ? 'set to resend' : 'left unchanged', sprintf(
+                'old email:primary = %s, enabled = %s, backup = %s, smtp host %s',
+                $primary ?? '(absent)',
+                $plain['settings::modules:email:enabled'] ?? '(absent)',
+                $plain['settings::modules:email:backup'] ?? '(absent)',
+                $onlyResend ? 'absent' : 'present',
+            ));
         }
 
         if (isset($plain['settings::modules:email:from_email'])) {
@@ -152,6 +184,17 @@ class M12LabsSettingsImporter
         }
 
         return $settings;
+    }
+
+    /**
+     * Driver/provider decisions made by the last map() call, with the (non-secret)
+     * source values they were based on.
+     *
+     * @return list<array{setting: string, decision: string, because: string}>
+     */
+    public function decisions(): array
+    {
+        return $this->decisions;
     }
 
     /**
@@ -208,6 +251,11 @@ class M12LabsSettingsImporter
         }
 
         return $value;
+    }
+
+    private function decide(string $setting, string $decision, string $because): void
+    {
+        $this->decisions[] = ['setting' => $setting, 'decision' => $decision, 'because' => $because];
     }
 
     /**

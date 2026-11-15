@@ -74,3 +74,12 @@ test('refuses to send without an API key', function (): void {
     expect(fn (): ?SentMessage => (new ResendTransport($http, ''))->send(message()))->toThrow(TransportException::class);
     $http->assertNothingSent();
 });
+
+test('keeps a To recipient that is also copied', function (): void {
+    $http = new Factory;
+    $http->fake(['api.resend.com/*' => $http->response(['id' => 're_2'])]);
+
+    (new ResendTransport($http, 're_test_key'))->send(message()->addCc('player@example.com'));
+
+    $http->assertSent(fn (Request $request): bool => $request->data()['to'] === ['player@example.com']);
+});

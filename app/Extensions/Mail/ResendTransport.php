@@ -129,18 +129,27 @@ class ResendTransport extends AbstractTransport
     }
 
     /**
-     * The envelope recipients minus CC and BCC, which the API takes separately.
+     * The envelope recipients minus those only in CC or BCC, which the API takes
+     * separately. An address that is also a To recipient stays in "to".
      *
      * @return list<Address>
      */
     private function recipients(Email $email, Envelope $envelope): array
     {
-        $copies = array_map(fn (Address $address): string => $address->getAddress(), [...$email->getCc(), ...$email->getBcc()]);
+        $to = array_map(fn (Address $address): string => $address->getAddress(), $email->getTo());
+        $copies = array_diff(
+            array_map(fn (Address $address): string => $address->getAddress(), [...$email->getCc(), ...$email->getBcc()]),
+            $to,
+        );
 
-        return array_values(array_filter(
-            $envelope->getRecipients(),
-            fn (Address $address): bool => ! in_array($address->getAddress(), $copies, true),
-        ));
+        $recipients = [];
+        foreach ($envelope->getRecipients() as $address) {
+            if (! in_array($address->getAddress(), $copies, true)) {
+                $recipients[$address->getAddress()] ??= $address;
+            }
+        }
+
+        return array_values($recipients);
     }
 
     /**

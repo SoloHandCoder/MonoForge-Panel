@@ -131,6 +131,10 @@ class SettingsServiceProvider extends ServiceProvider
                 try {
                     $value = $encrypter->decrypt($value);
                 } catch (DecryptException) {
+                    // Task H: never hand ciphertext to the Resend transport as a key.
+                    if ($key === 'services:resend:key') {
+                        $value = null;
+                    }
                 }
             }
 

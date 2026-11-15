@@ -46,6 +46,7 @@ test('update general', function () {
 test('update mail', function () {
     // Payloads without a driver mean SMTP (the legacy smtp-only shape).
     config()->set('mail.default', 'smtp');
+    config()->set('pterodactyl.load_environment_only', false);
     $response = $this->putJson(route('api.admin.settings.mail'), validMailPayload());
     $response->assertStatus(Response::HTTP_NO_CONTENT);
     $this->assertDatabaseHas('settings', ['key' => 'settings::mail:mailers:smtp:host']);

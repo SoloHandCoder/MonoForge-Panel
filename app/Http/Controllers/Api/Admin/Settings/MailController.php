@@ -12,6 +12,7 @@ use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\UpdateMailSettingsRequest;
 use Pterodactyl\Models\Setting;
@@ -21,13 +22,26 @@ use Pterodactyl\Providers\SettingsServiceProvider;
 #[Subgroup('Settings', 'View and update global panel settings.')]
 class MailController extends AdminApiController
 {
+    private const array ENVIRONMENT_ONLY_EXAMPLE = [
+        'errors' => [
+            [
+                'code' => 'DisplayException',
+                'status' => '400',
+                'detail' => 'This panel reads its settings from the environment only; set the MAIL_* variables in .env instead.',
+            ],
+        ],
+    ];
+
     /**
      * Update mail settings.
      */
     #[Endpoint('Update mail settings', 'Selects the mail driver (SMTP, Resend or log), updates its settings and the sender, and restarts queued workers so they reload configuration. The SMTP password and Resend API key are write-only.')]
     #[ScribeResponse(status: 204, description: 'Mail settings updated.')]
+    #[ScribeResponse(self::ENVIRONMENT_ONLY_EXAMPLE, status: 400, description: 'The panel reads its settings from the environment only.')]
     public function __invoke(UpdateMailSettingsRequest $request, Kernel $kernel): Response
     {
+        throw_if(config('pterodactyl.load_environment_only'), DisplayException::class, 'This panel reads its settings from the environment only; set the MAIL_* variables in .env instead.');
+
         $values = $request->normalize();
         // "!e" clears a stored secret.
         foreach (['mail:mailers:smtp:password', 'services:resend:key'] as $secret) {

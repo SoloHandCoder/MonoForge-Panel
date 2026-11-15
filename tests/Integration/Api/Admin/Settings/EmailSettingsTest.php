@@ -16,6 +16,8 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
+beforeEach(fn () => config()->set('pterodactyl.load_environment_only', false));
+
 test('selecting Resend stores the driver, sender and an encrypted key that is never returned', function (): void {
     Setting::put('settings::mail:mailers:smtp:host', 'smtp.example.com');
 
@@ -54,6 +56,23 @@ test('the SMTP driver still requires its settings', function (): void {
 
     $this->putJson(route('api.admin.settings.mail'), ['driver' => 'carrier-pigeon', 'from_address' => 'noreply@example.com'])
         ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
+});
+
+test('mail settings cannot be changed when the panel reads the environment only', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+
+    $this->putJson(route('api.admin.settings.mail'), ['driver' => 'log', 'from_address' => 'noreply@example.com'])
+        ->assertStatus(Response::HTTP_BAD_REQUEST);
+    expect(Setting::fetch('settings::mail:default'))->toBeNull();
+});
+
+test('a Resend key that does not decrypt is dropped instead of used', function (): void {
+    Setting::put('settings::mail:default', 'resend');
+    Setting::put('settings::services:resend:key', 'not-a-valid-payload');
+
+    (new SettingsServiceProvider($this->app))->boot(config(), $this->app->make(Encrypter::class), $this->app->make(LoggerInterface::class));
+
+    expect(config('services.resend.key'))->toBeNull();
 });
 
 test('stored Resend settings are loaded onto the mail config', function (): void {
