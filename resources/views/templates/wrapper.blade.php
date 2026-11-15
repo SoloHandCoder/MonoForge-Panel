@@ -51,7 +51,13 @@
             {{-- data-theme-token: the SPA keeps this tag equal to the --theme-color token.
                  A theme-color registered by an extension is left exactly as rendered. --}}
             @unless ($extensionHead->replaces('meta', 'theme-color'))
-                <meta name="theme-color" content="{{ $seo['theme_color'] ?? '#0e0d15' }}" data-theme-token>
+                {{-- A public server page sets its banner colour (Discord's embed colour); the stock tag
+                     stays literal so it can be checked against the --theme-color token. --}}
+                @isset($seo['theme_color'])
+                    <meta name="theme-color" content="{{ $seo['theme_color'] }}" data-theme-token>
+                @else
+                    <meta name="theme-color" content="#0e0d15" data-theme-token>
+                @endisset
             @endunless
             {{ $extensionHead }}
         @show
