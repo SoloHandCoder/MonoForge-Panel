@@ -265,6 +265,10 @@ return [
                 'update' => 'Updated the ":name" shop add-on',
                 'delete' => 'Deleted the ":name" shop add-on',
             ],
+            'node' => [
+                'enable' => 'Made the ":name" node available in the shop',
+                'disable' => 'Took the ":name" node out of the shop',
+            ],
             'settings' => [
                 'update' => 'Updated the shop settings',
             ],

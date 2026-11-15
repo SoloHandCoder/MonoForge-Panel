@@ -106,7 +106,7 @@ class StoreController extends ClientApiController
         throw_unless($period instanceof ShopPeriod, InvalidQuoteException::class, 'This billing period is not available.');
 
         $node = $request->filled('node_id')
-            ? Node::query()->where('public', true)->find($request->integer('node_id'))
+            ? Node::query()->where('public', true)->where('shop_enabled', true)->find($request->integer('node_id'))
             : $this->catalog->cheapestNodeIn($plan, $request->integer('location_id'));
         throw_unless($node instanceof Node, InvalidQuoteException::class, 'This plan is not available in the selected location.');
 

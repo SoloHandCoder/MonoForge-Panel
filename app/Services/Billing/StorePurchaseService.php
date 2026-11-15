@@ -344,7 +344,7 @@ class StorePurchaseService
     }
 
     /**
-     * Public nodes out of maintenance that the plan allows, in the location or on the node the
+     * Public nodes available in the shop and out of maintenance that the plan allows, in the location or on the node the
      * player picked, and that accept the egg.
      *
      * @return Collection<int, Node>
@@ -386,6 +386,7 @@ class StorePurchaseService
     {
         return Node::query()
             ->where('nodes.public', true)
+            ->where('nodes.shop_enabled', true)
             ->where('nodes.maintenance_mode', false)
             ->forEggTags($egg->tagSlugs())
             ->forDeployTags([]);

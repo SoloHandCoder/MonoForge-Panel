@@ -28,9 +28,9 @@ beforeEach(function (): void {
     config()->set('monoforge.shop.limits', ['memory_mb' => 0, 'disk_mb' => 0, 'cpu_percent' => 0]);
 
     $this->location = Location::factory()->create(['short' => 'de']);
-    $this->home = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Home', 'public' => true]);
-    $this->pro = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Pro', 'public' => true]);
-    $this->hidden = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Private', 'public' => false]);
+    $this->home = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Home', 'public' => true, 'shop_enabled' => true]);
+    $this->pro = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Pro', 'public' => true, 'shop_enabled' => true]);
+    $this->hidden = Node::factory()->create(['location_id' => $this->location->id, 'name' => 'Private', 'public' => false, 'shop_enabled' => true]);
     ShopMultiplier::query()->create(['scope' => ShopMultiplierScope::Node, 'scope_id' => $this->pro->id, 'multiplier' => '1.50']);
 
     $this->egg = Egg::query()->firstOrFail();
@@ -150,6 +150,40 @@ test('refuses quotes the store does not sell', function (array $body): void {
     'too many add-on units' => [['addons' => ['backup' => 4]]],
     'an unknown add-on' => [['addons' => ['gpu' => 1]]],
 ]);
+
+test('nodes not available in the shop are left out of the catalog and refused in quotes', function (): void {
+    $this->pro->forceFill(['shop_enabled' => false])->save();
+    ($this->plan)(['name' => 'Anywhere']);
+    ($this->plan)(['name' => 'Pro only', 'node_ids' => [$this->pro->id]]);
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->getJson(route('api:client.store.catalog'))->assertOk();
+
+    // The plan that only runs on the disabled node has nowhere to run, so it is not offered.
+    expect(array_column($response->json('categories.0.plans'), 'name'))->toBe(['Anywhere'])
+        ->and(array_column($response->json('categories.0.plans.0.locations.0.nodes'), 'name'))->toBe(['Home']);
+
+    $plan = ShopPlan::query()->where('name', 'Anywhere')->sole();
+    $this->actingAs($user)->postJson(route('api:client.store.quote'), [
+        'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'node_id' => $this->pro->id,
+    ])->assertStatus(400);
+
+    // A location quote picks the enabled node, never the disabled one.
+    $this->actingAs($user)->postJson(route('api:client.store.quote'), [
+        'plan_id' => $plan->id, 'period_id' => $this->monthly->id, 'location_id' => $this->location->id,
+    ])->assertOk()->assertJsonPath('node_id', $this->home->id);
+
+});
+
+test('a store with no node available in the shop offers nothing', function (): void {
+    Node::query()->update(['shop_enabled' => false]);
+    ($this->plan)();
+
+    $this->actingAs(User::factory()->create())->getJson(route('api:client.store.catalog'))
+        ->assertOk()
+        ->assertJsonPath('enabled', true)
+        ->assertJsonPath('categories', []);
+});
 
 test('a plan without a node list only runs on deployable nodes', function (): void {
     $plan = ($this->plan)();

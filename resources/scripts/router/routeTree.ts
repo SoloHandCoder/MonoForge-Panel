@@ -1075,7 +1075,7 @@ const panelChildren = [
         },
         component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
     }),
-    ...(['periods', 'multipliers', 'addons', 'limits', 'token-packs', 'tunnels'] as const).map((tab) =>
+    ...(['periods', 'multipliers', 'addons', 'limits', 'nodes', 'token-packs', 'tunnels'] as const).map((tab) =>
         createRoute({
             getParentRoute: () => panelRoute,
             path: `shop/${tab}`,

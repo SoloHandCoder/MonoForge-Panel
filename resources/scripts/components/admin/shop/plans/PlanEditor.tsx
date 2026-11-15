@@ -12,6 +12,7 @@ import {
     useSaveShopPlan,
     type ShopCategory,
     type ShopMultiplier,
+    type ShopNodeOption,
     type ShopOptions,
     type ShopPeriod,
     type ShopPlan,
@@ -137,6 +138,12 @@ const eggGroups = (options: ShopOptions): SelectGroup[] => {
     return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
 };
 
+const nodeLabel = (node: ShopNodeOption): string => {
+    const notes = [!node.shop_enabled && 'not in the shop', node.maintenance && 'maintenance'].filter(Boolean);
+
+    return notes.length > 0 ? `${node.name} (${notes.join(', ')})` : node.name;
+};
+
 const nodeGroups = (options: ShopOptions): SelectGroup[] =>
     options.locations
         .map((location) => ({
@@ -147,7 +154,7 @@ const nodeGroups = (options: ShopOptions): SelectGroup[] =>
                 .map((node) => ({
                     value: node.id,
                     textLabel: node.name,
-                    label: node.maintenance ? `${node.name} (maintenance)` : node.name,
+                    label: nodeLabel(node),
                 })),
         }))
         .filter((group) => group.options.length > 0);
@@ -159,7 +166,10 @@ const multiplierRange = (
     restrict: boolean,
     nodeIds: number[]
 ): { min: number; max: number; nodes: number } => {
-    const nodes = options.nodes.filter((node) => (restrict ? nodeIds.includes(node.id) : node.public));
+    // The store only sells on public nodes that are available in the shop.
+    const nodes = options.nodes.filter(
+        (node) => node.public && node.shop_enabled && (!restrict || nodeIds.includes(node.id))
+    );
     const of = (scope: 'node' | 'location', id: number) =>
         multipliers.find((multiplier) => multiplier.scope === scope && multiplier.scope_id === id)?.multiplier;
     const values = nodes.map((node) => of('node', node.id) ?? of('location', node.location_id) ?? 1);
@@ -419,7 +429,7 @@ function PlanEditorForm({ plan, categories, periods, multipliers, options, initi
                                 {(field) => (
                                     <field.SwitchField
                                         label='Only on chosen nodes'
-                                        description='Off: any deployable (public) node that is not under maintenance.'
+                                        description='Off: any public node available in the shop (Shop → Nodes) that is not under maintenance.'
                                     />
                                 )}
                             </form.AppField>

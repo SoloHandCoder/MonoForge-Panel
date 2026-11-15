@@ -35,7 +35,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'shop_enabled'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -67,6 +67,7 @@ class Node extends Model implements Identifiable
         'daemonSFTP' => 2022,
         'daemonListen' => 8080,
         'maintenance_mode' => false,
+        'shop_enabled' => false,
     ];
 
     /**
@@ -88,6 +89,7 @@ class Node extends Model implements Identifiable
             'behind_proxy' => 'boolean',
             'public' => 'boolean',
             'maintenance_mode' => 'boolean',
+            'shop_enabled' => 'boolean',
             'playit_secret' => 'encrypted',
         ];
     }

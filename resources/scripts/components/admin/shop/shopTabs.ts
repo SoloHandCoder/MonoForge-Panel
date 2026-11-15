@@ -10,6 +10,7 @@ export const shopTabs = [
     { key: 'multipliers', label: 'Price multipliers', path: '/panel/shop/multipliers' },
     { key: 'addons', label: 'Add-ons', path: '/panel/shop/addons' },
     { key: 'limits', label: 'Limits', path: '/panel/shop/limits' },
+    { key: 'nodes', label: 'Nodes', path: '/panel/shop/nodes' },
     { key: 'token-packs', label: 'Token packs & Tebex', path: '/panel/shop/token-packs' },
     { key: 'tunnels', label: 'Tunnels', path: '/panel/shop/tunnels' },
 ] as const;

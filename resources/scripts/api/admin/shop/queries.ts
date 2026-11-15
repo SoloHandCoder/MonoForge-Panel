@@ -112,6 +112,8 @@ export interface ShopNodeOption {
     location_id: number;
     public: boolean;
     maintenance: boolean;
+    /** Whether the store may sell new servers on the node (Admin → Shop → Nodes). */
+    shop_enabled: boolean;
 }
 
 export interface ShopLocationOption {
@@ -131,6 +133,18 @@ export type ShopPlanInput = Omit<ShopPlan, 'id' | 'resources' | 'node_ids'> & Sh
 export type ShopPeriodInput = Omit<ShopPeriod, 'id'>;
 export type ShopMultiplierInput = Omit<ShopMultiplier, 'id'>;
 export type ShopAddonInput = Omit<ShopAddon, 'id'>;
+/** A node and whether the store may sell new servers on it (Admin → Shop → Nodes). */
+export interface ShopNode {
+    id: number;
+    name: string;
+    location: { id: number; short: string; long: string | null };
+    public: boolean;
+    maintenance: boolean;
+    shop_enabled: boolean;
+    /** Servers on the node that were bought in the shop. */
+    shop_servers: number;
+}
+
 export type ShopSettingsInput = Pick<ShopSettings, 'enabled' | 'grace_days' | 'low_balance_days' | 'limits'>;
 
 const base = '/api/admin/shop';
@@ -148,6 +162,7 @@ export const adminShopPlansQueryOptions = () => listQuery<ShopPlan>('plans');
 export const adminShopPeriodsQueryOptions = () => listQuery<ShopPeriod>('periods');
 export const adminShopMultipliersQueryOptions = () => listQuery<ShopMultiplier>('multipliers');
 export const adminShopAddonsQueryOptions = () => listQuery<ShopAddon>('addons');
+export const adminShopNodesQueryOptions = () => listQuery<ShopNode>('nodes');
 
 export const adminShopSettingsQueryOptions = () =>
     queryOptions({
@@ -169,6 +184,7 @@ export const useAdminShopPlans = () => useQuery(adminShopPlansQueryOptions());
 export const useAdminShopPeriods = () => useQuery(adminShopPeriodsQueryOptions());
 export const useAdminShopMultipliers = () => useQuery(adminShopMultipliersQueryOptions());
 export const useAdminShopAddons = () => useQuery(adminShopAddonsQueryOptions());
+export const useAdminShopNodes = () => useQuery(adminShopNodesQueryOptions());
 export const useAdminShopSettings = () => useQuery(adminShopSettingsQueryOptions());
 export const useAdminShopOptions = () => useQuery(adminShopOptionsQueryOptions());
 
@@ -226,6 +242,40 @@ export const useSaveShopMultiplier = () =>
 export const useDeleteShopMultiplier = () => useDeleteShopItem('multipliers', 'Multiplier');
 export const useSaveShopAddon = () => useSaveShopItem<ShopAddonInput, ShopAddon>('addons', 'Add-on');
 export const useDeleteShopAddon = () => useDeleteShopItem('addons', 'Add-on');
+
+/** Makes a node available in the shop or takes it out; the row updates at once. */
+export const useSetShopNodeEnabled = () => {
+    const queryClient = useQueryClient();
+    const key = adminShopNodesQueryOptions().queryKey;
+
+    return useMutation({
+        mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }): Promise<ShopNode> =>
+            (await http.put<ShopNode>(`${base}/nodes/${id}`, { shop_enabled: enabled })).data,
+        onMutate: async ({ id, enabled }) => {
+            await queryClient.cancelQueries({ queryKey: key });
+            const previous = queryClient.getQueryData<ShopNode[]>(key);
+
+            queryClient.setQueryData<ShopNode[]>(key, (nodes) =>
+                nodes?.map((node) => (node.id === id ? { ...node, shop_enabled: enabled } : node))
+            );
+
+            return { previous };
+        },
+        onError: (error, _variables, context) => {
+            queryClient.setQueryData(key, context?.previous);
+            notifyHttpError(error, 'Unable to change the node');
+        },
+        onSuccess: (node) => {
+            toast.success(
+                node.shop_enabled ? `${node.name} is available in the shop` : `${node.name} is out of the shop`
+            );
+        },
+        // The plan editor's node list and the store preview read the same flag.
+        onSettled: async () => {
+            await queryClient.invalidateQueries({ queryKey: shopKey });
+        },
+    });
+};
 
 export const useReorderShopCategories = () => {
     const queryClient = useQueryClient();

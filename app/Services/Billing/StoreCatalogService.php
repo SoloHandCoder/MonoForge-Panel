@@ -94,7 +94,7 @@ class StoreCatalogService
 
     /**
      * The nodes a plan may be placed on now: its own list, or every deployable node, never
-     * one under maintenance. Cheapest multiplier first.
+     * one under maintenance or one not available in the shop. Cheapest multiplier first.
      *
      * @return Collection<int, Node>
      */
@@ -168,14 +168,14 @@ class StoreCatalogService
     }
 
     /**
-     * Public nodes only: a plan that names a private node never shows (or quotes) it, like the
-     * purchase, which refuses it.
+     * Public nodes the admin made available in the shop only: a plan that names any other node
+     * never shows (or quotes) it, like the purchase, which refuses it.
      *
      * @return Collection<int, Node>
      */
     private function nodes(): Collection
     {
-        return $this->nodes ??= Node::query()->with('location')->where('public', true)->orderBy('id')->get();
+        return $this->nodes ??= Node::query()->with('location')->where('public', true)->where('shop_enabled', true)->orderBy('id')->get();
     }
 
     /**

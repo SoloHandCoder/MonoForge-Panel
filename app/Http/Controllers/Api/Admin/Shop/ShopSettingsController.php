@@ -35,7 +35,7 @@ class ShopSettingsController extends AdminApiController
 
     private const array OPTIONS_EXAMPLE = [
         'eggs' => [['id' => 1, 'name' => 'Paper', 'tags' => [['id' => 1, 'name' => 'Minecraft', 'color' => '#22c55e']]]],
-        'nodes' => [['id' => 1, 'name' => 'Home 1', 'location_id' => 1, 'public' => true, 'maintenance' => false]],
+        'nodes' => [['id' => 1, 'name' => 'Home 1', 'location_id' => 1, 'public' => true, 'maintenance' => false, 'shop_enabled' => true]],
         'locations' => [['id' => 1, 'short' => 'de', 'long' => 'Germany']],
     ];
 
@@ -75,6 +75,7 @@ class ShopSettingsController extends AdminApiController
             'location_id' => $node->location_id,
             'public' => $node->public,
             'maintenance' => $node->isUnderMaintenance(),
+            'shop_enabled' => (bool) $node->shop_enabled,
         ]);
 
         $locations = Location::query()->orderBy('short')->get()->map(fn (Location $location): array => [
