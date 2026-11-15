@@ -24,6 +24,7 @@ use Pterodactyl\Contracts\Files\ListsDirectories;
 use Pterodactyl\Contracts\Files\PullsFiles;
 use Pterodactyl\Contracts\Files\ReadsFileContents;
 use Pterodactyl\Contracts\Files\RenamesFiles;
+use Pterodactyl\Contracts\Files\SearchesFileNames;
 use Pterodactyl\Contracts\Files\WritesFileContents;
 use Pterodactyl\Enum\JwtScope;
 use Pterodactyl\Enum\Permissions;
@@ -41,6 +42,7 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Files\GetFileContentsRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Files\ListFilesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Files\PullFileRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Files\RenameFileRequest;
+use Pterodactyl\Http\Requests\Api\Client\Servers\Files\SearchFilesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;
 use Pterodactyl\Http\Resources\Api\ApiResourceCollection;
 use Pterodactyl\Http\Resources\Api\Client\FileObjectResource;
@@ -92,6 +94,22 @@ class FileController extends ClientApiController
         ],
     ];
 
+    private const array SEARCH_EXAMPLE = [
+        'object' => 'list',
+        'data' => [
+            [
+                'object' => 'file_search_result',
+                'attributes' => [
+                    'path' => '/plugins/Essentials/config.yml',
+                    'name' => 'config.yml',
+                    'is_file' => true,
+                    'size' => 2048,
+                ],
+            ],
+        ],
+        'meta' => ['truncated' => false],
+    ];
+
     private const array SIGNED_URL_EXAMPLE = [
         'object' => 'signed_url',
         'attributes' => [
@@ -124,6 +142,34 @@ class FileController extends ClientApiController
         $contents = $operation->list($server, $directory);
 
         return FileObjectResource::collection($contents);
+    }
+
+    /**
+     * Finds files by path below a directory, for the editor's quick open.
+     *
+     * @return array{object: string, data: list<array{object: string, attributes: array{path: string, name: string, is_file: bool, size: int}}>, meta: array{truncated: bool}}
+     *
+     * @throws DaemonConnectionException
+     */
+    #[Endpoint('Search files', 'Finds files (not folders) whose path contains every word of the query. The walk below the directory is bounded in depth and in the number of folders listed, skips large folders such as node_modules, does not follow symbolic links, and is cached for a minute, so it may not cover a very large server.')]
+    #[QueryParam('query', 'string', 'Words the path must contain, case-insensitively.', required: true, example: 'config.yml')]
+    #[QueryParam('directory', 'string', 'Directory to search below. Defaults to the server root.', required: false, example: '/plugins', nullable: true)]
+    #[ResponseField('data', 'object[]', 'Matching files, best matches first: the name starting with the last word, then the name containing it, then only the path; at most 50.')]
+    #[ResponseField('data[].attributes.path', 'string', 'Absolute path of the match.')]
+    #[ResponseField('data[].attributes.size', 'integer', 'Size in bytes.')]
+    #[ResponseField('data[].attributes.is_file', 'boolean', 'Always true: folders are not returned.')]
+    #[ResponseField('meta.truncated', 'boolean', 'More matches exist, or the walk stopped at its limits before covering every folder.')]
+    #[ScribeResponse(self::SEARCH_EXAMPLE, description: 'Matching files returned.')]
+    #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not list the directory.')]
+    public function search(SearchFilesRequest $request, SearchesFileNames $operation, Server $server): array
+    {
+        $result = $operation->search($server, $request->string('query')->toString(), $this->path($request, 'directory') ?? '/');
+
+        return [
+            'object' => 'list',
+            'data' => array_map(fn (array $match): array => ['object' => 'file_search_result', 'attributes' => $match], $result['matches']),
+            'meta' => ['truncated' => $result['truncated']],
+        ];
     }
 
     /**
