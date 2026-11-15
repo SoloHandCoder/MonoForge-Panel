@@ -61,6 +61,12 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopAddonController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopCategoryController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopMultiplierController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPeriodController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPlanController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Updates\UpdateController;
@@ -93,6 +99,50 @@ Route::prefix('/announcements')->name('api.admin.announcements')->group(function
     Route::put('/{announcement:id}', [AnnouncementController::class, 'update'])->name('.update');
 
     Route::delete('/{announcement:id}', [AnnouncementController::class, 'destroy'])->name('.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Shop Routes (phase 3 Task R)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/shop
+|
+| Task P (token packs, Tebex) and Task V (tunnels) add their own groups under
+| /api/admin/shop next to these.
+|
+*/
+Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
+    Route::get('/settings', [ShopSettingsController::class, 'index'])->name('.settings');
+    Route::put('/settings', [ShopSettingsController::class, 'update'])->name('.settings.update');
+    Route::get('/options', [ShopSettingsController::class, 'options'])->name('.options');
+
+    Route::get('/categories', [ShopCategoryController::class, 'index'])->name('.categories');
+    Route::post('/categories', [ShopCategoryController::class, 'store'])->name('.categories.store');
+    Route::put('/categories/order', [ShopCategoryController::class, 'reorder'])->name('.categories.reorder');
+    Route::put('/categories/{category:id}', [ShopCategoryController::class, 'update'])->name('.categories.update');
+    Route::delete('/categories/{category:id}', [ShopCategoryController::class, 'destroy'])->name('.categories.delete');
+
+    Route::get('/plans', [ShopPlanController::class, 'index'])->name('.plans');
+    Route::get('/plans/{plan:id}', [ShopPlanController::class, 'show'])->name('.plans.view');
+    Route::post('/plans', [ShopPlanController::class, 'store'])->name('.plans.store');
+    Route::put('/plans/{plan:id}', [ShopPlanController::class, 'update'])->name('.plans.update');
+    Route::delete('/plans/{plan:id}', [ShopPlanController::class, 'destroy'])->name('.plans.delete');
+
+    Route::get('/periods', [ShopPeriodController::class, 'index'])->name('.periods');
+    Route::post('/periods', [ShopPeriodController::class, 'store'])->name('.periods.store');
+    Route::put('/periods/{period:id}', [ShopPeriodController::class, 'update'])->name('.periods.update');
+    Route::delete('/periods/{period:id}', [ShopPeriodController::class, 'destroy'])->name('.periods.delete');
+
+    Route::get('/multipliers', [ShopMultiplierController::class, 'index'])->name('.multipliers');
+    Route::post('/multipliers', [ShopMultiplierController::class, 'store'])->name('.multipliers.store');
+    Route::put('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'update'])->name('.multipliers.update');
+    Route::delete('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'destroy'])->name('.multipliers.delete');
+
+    Route::get('/addons', [ShopAddonController::class, 'index'])->name('.addons');
+    Route::post('/addons', [ShopAddonController::class, 'store'])->name('.addons.store');
+    Route::put('/addons/{addon:id}', [ShopAddonController::class, 'update'])->name('.addons.update');
+    Route::delete('/addons/{addon:id}', [ShopAddonController::class, 'destroy'])->name('.addons.delete');
 });
 
 /*

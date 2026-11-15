@@ -30,6 +30,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\StartupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\SubuserController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\WebsocketController;
 use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
+use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Middleware\Activity\AccountSubject;
 use Pterodactyl\Http\Middleware\Activity\ServerSubject;
@@ -51,6 +52,10 @@ Route::get('/extension-progress/{extension}/{job}', [ExtensionProgressController
 
 Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
 Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
+
+// Phase 3 Task R: the store catalog and quotes. Task S adds the purchase endpoint here.
+Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');
+Route::post('/store/quote', [StoreController::class, 'quote'])->name('api:client.store.quote');
 
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function (): void {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function (): void {
