@@ -35,6 +35,7 @@ export const classicViews: ThemeViews = {
     'page.auth.checkpoint': lazyView(auth, 'CheckpointPage'),
     'page.auth.password': lazyView(auth, 'ForgotPasswordPage'),
     'page.auth.passwordReset': lazyView(auth, 'ResetPasswordPage'),
+    'page.auth.register': lazyView(auth, 'RegisterPage'),
 
     'page.account.overview': lazyView(account, 'AccountOverview'),
     'account.password': lazyView(account, 'PasswordCard'),

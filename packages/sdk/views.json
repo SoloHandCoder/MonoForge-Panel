@@ -450,6 +450,19 @@
             "export": "default"
         }
     },
+    "page.auth.register": {
+        "kind": "page",
+        "context": "auth",
+        "slots": [],
+        "fixtures": [
+            "default",
+            "invalid"
+        ],
+        "classic": {
+            "file": "views/auth/RegisterPage.tsx",
+            "export": "default"
+        }
+    },
     "page.dashboard": {
         "kind": "page",
         "context": "app",

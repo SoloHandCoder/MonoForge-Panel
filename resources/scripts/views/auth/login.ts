@@ -58,8 +58,9 @@ function useLoginFormModel(): LoginFormModel {
     const openCheckpoint = useOpenLoginCheckpoint();
     const route = useRouteSlotData();
     const login = useLogin();
-    const { Captcha, token } = useCaptcha();
+    const { Captcha, token } = useCaptcha('login');
     const providers = useSocialLogin(token);
+    const registration = useSiteSettings().registration?.enabled ?? false;
     const form = useForm({
         defaultValues: { username: '', password: '' },
         onSubmit: async ({ value }) => {
@@ -109,6 +110,7 @@ function useLoginFormModel(): LoginFormModel {
         submitting,
         Captcha,
         forgotPassword: { to: '/auth/password' },
+        register: registration ? { to: '/auth/register' } : null,
         route,
         providers,
     };
@@ -185,6 +187,7 @@ function loginFixture(
         submitting: false,
         Captcha: null,
         forgotPassword: { to: '/auth/password' },
+        register: { to: '/auth/register' },
         route,
         providers: [],
         ...overrides,

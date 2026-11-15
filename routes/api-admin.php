@@ -58,6 +58,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\AdvancedController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
@@ -468,6 +469,10 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     // Phase 2 Task G: Discord and Google login providers.
     Route::get('/login-providers', [LoginProvidersController::class, 'index'])->name('.login-providers');
     Route::put('/login-providers', [LoginProvidersController::class, 'update'])->name('.login-providers.update');
+
+    // Sign-up and captcha.
+    Route::get('/registration', [RegistrationController::class, 'index'])->name('.registration');
+    Route::put('/registration', [RegistrationController::class, 'update'])->name('.registration.update');
 });
 
 /*

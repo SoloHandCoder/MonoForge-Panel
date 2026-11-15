@@ -38,7 +38,7 @@ use Pterodactyl\Http\Middleware\RedirectIfAuthenticated;
 use Pterodactyl\Http\Middleware\RememberThemeFlags;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Http\Middleware\SetSecurityHeaders;
-use Pterodactyl\Http\Middleware\VerifyReCaptcha;
+use Pterodactyl\Http\Middleware\VerifyCaptcha;
 use Pterodactyl\Services\Themes\ThemeResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -114,7 +114,9 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
 
         $middleware->alias([
             'guest' => RedirectIfAuthenticated::class,
-            'recaptcha' => VerifyReCaptcha::class,
+            // reCAPTCHA or Cloudflare Turnstile, whichever the panel uses.
+            'captcha' => VerifyCaptcha::class,
+            'recaptcha' => VerifyCaptcha::class,
             'node.maintenance' => MaintenanceMiddleware::class,
         ]);
     })

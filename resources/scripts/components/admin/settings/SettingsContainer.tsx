@@ -6,13 +6,14 @@ import AdvancedSettingsForm from '@/components/admin/settings/AdvancedSettingsFo
 import GeneralSettingsForm from '@/components/admin/settings/GeneralSettingsForm';
 import LoginProvidersForm from '@/components/admin/settings/LoginProvidersForm';
 import MailSettingsForm from '@/components/admin/settings/MailSettingsForm';
+import RegistrationSettings from '@/components/admin/settings/RegistrationSettingsForm';
 import SettingsTabButton from '@/components/admin/settings/SettingsTabButton';
 import UpdateSettingsForm from '@/components/admin/settings/UpdateSettingsForm';
 import { httpErrorToHuman } from '@/api/http';
 import { ServerError } from '@/components/elements/ScreenBlock';
 import { Alert } from '@/components/elements/alert';
 
-type Tab = 'general' | 'mail' | 'advanced' | 'login-providers';
+type Tab = 'general' | 'mail' | 'advanced' | 'login-providers' | 'registration';
 type SettingsSearch = {
     tab?: string;
 };
@@ -22,6 +23,7 @@ const tabs: { key: Tab; label: string }[] = [
     { key: 'mail', label: 'Email' },
     { key: 'advanced', label: 'Advanced' },
     { key: 'login-providers', label: 'Login providers' },
+    { key: 'registration', label: 'Registration' },
 ];
 
 const tabPaths = {
@@ -29,6 +31,7 @@ const tabPaths = {
     mail: '/panel/settings/mail',
     advanced: '/panel/settings/advanced',
     'login-providers': '/panel/settings/login-providers',
+    registration: '/panel/settings/registration',
 } as const satisfies Record<Tab, string>;
 
 const tabFromPath = (pathname: string): Tab | undefined => {
@@ -44,11 +47,21 @@ const tabFromPath = (pathname: string): Tab | undefined => {
         return 'login-providers';
     }
 
+    if (pathname.endsWith('/registration')) {
+        return 'registration';
+    }
+
     return undefined;
 };
 
 const parseTab = (tab: string | undefined): Tab =>
-    tab === 'mail' || tab === 'advanced' || tab === 'general' || tab === 'login-providers' ? tab : 'general';
+    tab === 'mail' ||
+    tab === 'advanced' ||
+    tab === 'general' ||
+    tab === 'login-providers' ||
+    tab === 'registration'
+        ? tab
+        : 'general';
 
 export default function SettingsContainer() {
     const navigate = useNavigate();
@@ -104,6 +117,7 @@ export default function SettingsContainer() {
                     {tab === 'mail' && <MailSettingsForm settings={settings} />}
                     {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
                     {tab === 'login-providers' && <LoginProvidersForm readOnly={settings.meta.load_environment_only} />}
+                    {tab === 'registration' && <RegistrationSettings />}
                 </div>
             ) : (
                 <Spinner size='large' centered />

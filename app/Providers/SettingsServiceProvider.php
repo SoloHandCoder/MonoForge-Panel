@@ -51,6 +51,11 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:auth:google:enabled',
         'monoforge:auth:google:client_id',
         'monoforge:auth:google:client_secret',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:auth:registration:enabled',
+        'monoforge:captcha:provider',
+        'monoforge:captcha:turnstile:site_key',
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**
@@ -95,6 +100,8 @@ class SettingsServiceProvider extends ServiceProvider
         // Phase 2 Task G: Discord and Google login providers.
         'monoforge:auth:discord:client_secret',
         'monoforge:auth:google:client_secret',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**

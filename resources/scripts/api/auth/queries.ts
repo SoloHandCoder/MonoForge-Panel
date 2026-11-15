@@ -4,6 +4,7 @@ import {
     authCompleteLoginCheckpointMutation,
     authLoginMutation,
     authLogoutMutation,
+    authRegisterMutation,
     authRequestPasswordResetEmailMutation,
     authResetPasswordMutation,
 } from '@/api/generated/@tanstack/react-query.gen';
@@ -17,6 +18,15 @@ export const useLogin = () =>
             await authGetCsrfCookie();
         },
         onError: (error) => notifyHttpError(error, 'Unable to log in'),
+    });
+
+export const useRegister = () =>
+    useMutation({
+        ...authRegisterMutation(),
+        onMutate: async () => {
+            await authGetCsrfCookie();
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to create your account'),
     });
 
 export const useLoginCheckpoint = () =>

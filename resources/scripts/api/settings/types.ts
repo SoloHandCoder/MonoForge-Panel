@@ -5,6 +5,7 @@ export interface OAuthResult {
     /** The two-factor confirmation token, for `checkpoint`. */
     token: string | null;
 }
+export type CaptchaProvider = 'none' | 'recaptcha' | 'turnstile';
 
 export interface SiteSettings {
     name: string;
@@ -17,5 +18,14 @@ export interface SiteSettings {
     oauth?: {
         providers: Partial<Record<'discord' | 'google', boolean>>;
         result: OAuthResult | null;
+    };
+    /** The captcha the auth forms load. Older documents only carry `recaptcha`. */
+    captcha?: {
+        provider: CaptchaProvider;
+        siteKey: string;
+    };
+    /** Whether visitors may create their own account. */
+    registration?: {
+        enabled: boolean;
     };
 }

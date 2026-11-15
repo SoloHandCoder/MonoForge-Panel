@@ -2505,6 +2505,24 @@ export type AdminUpdateAdvancedSettingsRequest = {
      */
     'pterodactyl:client_features:allocations:range_end'?: number | null;
 };
+export type AdminUpdateRegistrationSettingsRequest = {
+    /**
+     * The registration enabled.
+     */
+    registration_enabled: boolean;
+    /**
+     * The captcha provider.
+     */
+    captcha_provider: 'none' | 'recaptcha' | 'turnstile';
+    /**
+     * The turnstile site key. This field is required when <code>captcha_provider</code> is <code>turnstile</code>. Must not be greater than 191 characters.
+     */
+    turnstile_site_key?: string | null;
+    /**
+     * The turnstile secret key. Must not be greater than 191 characters.
+     */
+    turnstile_secret_key?: string | null;
+};
 export type AdminCreateDatabaseHostRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -3198,6 +3216,32 @@ export type AuthResetPasswordRequest = {
     password_confirmation: string;
     /**
      * The reCAPTCHA token when reCAPTCHA is enabled.
+     */
+    'g-recaptcha-response'?: string | null;
+};
+export type AuthRegisterRequest = {
+    /**
+     * The new account username.
+     */
+    username: string;
+    /**
+     * The new account email address.
+     */
+    email: string;
+    /**
+     * The new account password.
+     */
+    password: string;
+    /**
+     * Whether the visitor agrees to the rules. Must be true.
+     */
+    terms: boolean;
+    /**
+     * The password again.
+     */
+    password_confirmation: string;
+    /**
+     * The captcha token (reCAPTCHA or Turnstile) when a captcha is enabled.
      */
     'g-recaptcha-response'?: string | null;
 };
@@ -3969,6 +4013,13 @@ export type AdminListEggCatalogResponseBody = {
  * Raw egg export JSON document returned as a text download.
  */
 export type AdminExportEggResponseBody = string;
+export type AdminGetRegistrationSettingsResponseBody = {
+    registration_enabled?: boolean;
+    captcha_provider?: string;
+    turnstile_site_key?: string;
+    turnstile_secret_key_set?: boolean;
+    load_environment_only?: boolean;
+};
 export type AdminGetUpdateStatusResponseBody = {
     /**
      * off, notify or auto.
@@ -9624,6 +9675,58 @@ export type AdminUpdateAdvancedSettingsResponses = {
     204: void;
 };
 export type AdminUpdateAdvancedSettingsResponse = AdminUpdateAdvancedSettingsResponses[keyof AdminUpdateAdvancedSettingsResponses];
+export type AdminGetRegistrationSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/registration';
+};
+export type AdminGetRegistrationSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetRegistrationSettingsError = AdminGetRegistrationSettingsErrors[keyof AdminGetRegistrationSettingsErrors];
+export type AdminGetRegistrationSettingsResponses = {
+    /**
+     * Registration settings returned.
+     */
+    200: AdminGetRegistrationSettingsResponseBody;
+};
+export type AdminGetRegistrationSettingsResponse = AdminGetRegistrationSettingsResponses[keyof AdminGetRegistrationSettingsResponses];
+export type AdminUpdateRegistrationSettingsData = {
+    body: AdminUpdateRegistrationSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/registration';
+};
+export type AdminUpdateRegistrationSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateRegistrationSettingsError = AdminUpdateRegistrationSettingsErrors[keyof AdminUpdateRegistrationSettingsErrors];
+export type AdminUpdateRegistrationSettingsResponses = {
+    /**
+     * Registration settings updated.
+     */
+    204: void;
+};
+export type AdminUpdateRegistrationSettingsResponse = AdminUpdateRegistrationSettingsResponses[keyof AdminUpdateRegistrationSettingsResponses];
 export type AdminListDatabaseHostsData = {
     body?: never;
     path?: never;
@@ -11863,6 +11966,38 @@ export type AuthResetPasswordResponses = {
     200: AuthResetPasswordResponse;
 };
 export type AuthResetPasswordResponse2 = AuthResetPasswordResponses[keyof AuthResetPasswordResponses];
+export type AuthRegisterData = {
+    body: AuthRegisterRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/register';
+};
+export type AuthRegisterErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * Sign-up is disabled.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * Too many sign-up attempts from this address or for this email.
+     */
+    429: ErrorEnvelope;
+};
+export type AuthRegisterError = AuthRegisterErrors[keyof AuthRegisterErrors];
+export type AuthRegisterResponses = {
+    /**
+     * The account was created and a browser session was established.
+     */
+    201: AuthLoginCompleteResponse;
+};
+export type AuthRegisterResponse = AuthRegisterResponses[keyof AuthRegisterResponses];
 export type AuthLogoutData = {
     body?: never;
     path?: never;
