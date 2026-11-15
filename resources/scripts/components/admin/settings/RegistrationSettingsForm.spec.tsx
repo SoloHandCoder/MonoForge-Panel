@@ -20,6 +20,19 @@ const settings: AdminRegistrationSettings = {
     turnstileSiteKey: 'site-key',
     turnstileSecretKeySet: true,
     loadEnvironmentOnly: false,
+    setInEnv: {
+        registrationEnabled: false,
+        captchaProvider: false,
+        turnstileSiteKey: false,
+        turnstileSecretKey: false,
+    },
+};
+
+const allSetInEnv = {
+    registrationEnabled: true,
+    captchaProvider: true,
+    turnstileSiteKey: true,
+    turnstileSecretKey: true,
 };
 
 afterEach(cleanup);
@@ -51,10 +64,15 @@ describe('registration settings', () => {
         expect(secret).toHaveValue('');
     });
 
-    it('hides the Turnstile keys for other providers and is read-only in environment-only mode', async () => {
+    it('hides the Turnstile keys for other providers and is read-only when .env sets every field', async () => {
         const { container } = render(
             <RegistrationSettingsForm
-                settings={{ ...settings, captchaProvider: 'recaptcha', loadEnvironmentOnly: true }}
+                settings={{
+                    ...settings,
+                    captchaProvider: 'recaptcha',
+                    loadEnvironmentOnly: true,
+                    setInEnv: allSetInEnv,
+                }}
             />
         );
 
@@ -65,5 +83,21 @@ describe('registration settings', () => {
         await act(async () => fireEvent.submit(container.querySelector('form')!));
 
         expect(update).not.toHaveBeenCalled();
+    });
+
+    it('in environment-only mode locks only the fields that .env sets', () => {
+        render(
+            <RegistrationSettingsForm
+                settings={{
+                    ...settings,
+                    loadEnvironmentOnly: true,
+                    setInEnv: { ...settings.setInEnv, captchaProvider: true },
+                }}
+            />
+        );
+
+        expect(screen.getByText(/Set in \.env \(MONOFORGE_CAPTCHA_PROVIDER\)/)).toBeInTheDocument();
+        expect(screen.getByLabelText('Turnstile Site Key')).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
     });
 });

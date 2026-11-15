@@ -18,6 +18,7 @@ use Pterodactyl\Http\Requests\Api\Admin\Settings\GetSettingsRequest;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\UpdateRegistrationSettingsRequest;
 use Pterodactyl\Models\Setting;
 use Pterodactyl\Services\Captcha\CaptchaSettings;
+use Pterodactyl\Services\Settings\EnvironmentSettings;
 
 #[Group('Admin API', 'Root administrator endpoints for managing panel configuration and resources.')]
 #[Subgroup('Settings', 'View and update global panel settings.')]
@@ -29,6 +30,15 @@ class RegistrationController extends AdminApiController
         'turnstile_site_key' => '0x4AAAAAAA',
         'turnstile_secret_key_set' => true,
         'load_environment_only' => false,
+        'set_in_env' => ['registration_enabled' => false, 'captcha_provider' => false, 'turnstile_site_key' => false, 'turnstile_secret_key' => false],
+    ];
+
+    /** The settings behind each field. */
+    private const array KEYS = [
+        'registration_enabled' => 'monoforge:auth:registration:enabled',
+        'captcha_provider' => 'monoforge:captcha:provider',
+        'turnstile_site_key' => 'monoforge:captcha:turnstile:site_key',
+        'turnstile_secret_key' => 'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**
@@ -45,6 +55,7 @@ class RegistrationController extends AdminApiController
             'turnstile_site_key' => config()->string('monoforge.captcha.turnstile.site_key'),
             'turnstile_secret_key_set' => $this->turnstileSecretSet(),
             'load_environment_only' => config()->boolean('pterodactyl.load_environment_only'),
+            'set_in_env' => array_map(EnvironmentSettings::locked(...), self::KEYS),
         ]);
     }
 
@@ -53,12 +64,15 @@ class RegistrationController extends AdminApiController
      *
      * @throws ValidationException
      */
-    #[Endpoint('Update registration settings', 'Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys.')]
+    #[Endpoint('Update registration settings', 'Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys. Fields set in .env (see set_in_env) are left as they are.')]
     #[ScribeResponse(status: 204, description: 'Registration settings updated.')]
     public function update(UpdateRegistrationSettingsRequest $request, Kernel $kernel): Response
     {
-        $provider = $request->string('captcha_provider')->toString();
-        $secret = $request->string('turnstile_secret_key')->trim()->toString();
+        $locked = array_map(EnvironmentSettings::locked(...), self::KEYS);
+
+        // A field set in .env keeps the environment's value, which is what applies.
+        $provider = $locked['captcha_provider'] ? CaptchaSettings::provider() : $request->string('captcha_provider')->toString();
+        $secret = $locked['turnstile_secret_key'] ? '' : $request->string('turnstile_secret_key')->trim()->toString();
 
         if ($provider === CaptchaSettings::TURNSTILE && $secret === '' && ! $this->turnstileSecretSet()) {
             throw ValidationException::withMessages([
@@ -66,17 +80,26 @@ class RegistrationController extends AdminApiController
             ]);
         }
 
-        Setting::put('settings::monoforge:auth:registration:enabled', $request->boolean('registration_enabled') ? 'true' : 'false');
-        Setting::put('settings::monoforge:captcha:provider', $provider);
-        // The legacy switch follows, so the Advanced tab shows the same state.
-        Setting::put('settings::recaptcha:enabled', $provider === CaptchaSettings::RECAPTCHA ? 'true' : 'false');
+        if (! $locked['registration_enabled']) {
+            Setting::put('settings::'.self::KEYS['registration_enabled'], $request->boolean('registration_enabled') ? 'true' : 'false');
+        }
 
-        if ($request->has('turnstile_site_key')) {
-            Setting::put('settings::monoforge:captcha:turnstile:site_key', $request->string('turnstile_site_key')->trim()->toString());
+        if (! $locked['captcha_provider']) {
+            Setting::put('settings::'.self::KEYS['captcha_provider'], $provider);
+        }
+
+        // The legacy switch follows, so the Advanced tab shows the same state. It is an upstream
+        // setting, which environment-only mode takes from the environment.
+        if (! EnvironmentSettings::environmentOnly()) {
+            Setting::put('settings::recaptcha:enabled', $provider === CaptchaSettings::RECAPTCHA ? 'true' : 'false');
+        }
+
+        if ($request->has('turnstile_site_key') && ! $locked['turnstile_site_key']) {
+            Setting::put('settings::'.self::KEYS['turnstile_site_key'], $request->string('turnstile_site_key')->trim()->toString());
         }
 
         if ($secret !== '') {
-            Setting::put('settings::monoforge:captcha:turnstile:secret_key', Crypt::encrypt($secret));
+            Setting::put('settings::'.self::KEYS['turnstile_secret_key'], Crypt::encrypt($secret));
         }
 
         $kernel->call('queue:restart');

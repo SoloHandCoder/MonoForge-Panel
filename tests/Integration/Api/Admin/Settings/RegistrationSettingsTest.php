@@ -10,6 +10,11 @@ use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
 
+// .env.example turns environment-only mode on; these tests use the settings UI unless they say otherwise.
+beforeEach(function (): void {
+    config()->set('pterodactyl.load_environment_only', false);
+});
+
 test('registration settings never return the turnstile secret', function (): void {
     config()->set('monoforge.auth.registration.enabled', true);
     config()->set('monoforge.captcha.provider', 'turnstile');
@@ -23,6 +28,7 @@ test('registration settings never return the turnstile secret', function (): voi
         'turnstile_site_key' => 'site-key',
         'turnstile_secret_key_set' => true,
         'load_environment_only' => false,
+        'set_in_env' => ['registration_enabled' => false, 'captcha_provider' => false, 'turnstile_site_key' => false, 'turnstile_secret_key' => false],
     ]);
 
     expect($response->getContent())->not->toContain('stored-turnstile-secret');
@@ -75,3 +81,25 @@ test('non admins cannot read or change registration settings', function (string 
 
     $this->assertAccessDeniedJson($this->{$method}(route($route)));
 })->with([['getJson', 'api.admin.settings.registration'], ['putJson', 'api.admin.settings.registration.update']]);
+
+test('in environment-only mode only the fields whose variable is unset are saved', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('monoforge.settings.set_in_env', ['monoforge:captcha:provider']);
+    config()->set('monoforge.captcha.provider', 'none');
+
+    $this->getJson(route('api.admin.settings.registration'))->assertOk()
+        ->assertJsonPath('set_in_env', ['registration_enabled' => false, 'captcha_provider' => true, 'turnstile_site_key' => false, 'turnstile_secret_key' => false]);
+
+    $this->putJson(route('api.admin.settings.registration.update'), [
+        'registration_enabled' => true,
+        'captcha_provider' => 'turnstile',
+        'turnstile_site_key' => 'site',
+        'turnstile_secret_key' => 'secret',
+    ])->assertNoContent();
+
+    expect(Setting::fetch('settings::monoforge:auth:registration:enabled'))->toBe('true')
+        ->and(Setting::fetch('settings::monoforge:captcha:turnstile:site_key'))->toBe('site')
+        // Set in .env: left alone, as is the upstream reCAPTCHA switch.
+        ->and(Setting::fetch('settings::monoforge:captcha:provider'))->toBeNull()
+        ->and(Setting::fetch('settings::recaptcha:enabled'))->toBeNull();
+});

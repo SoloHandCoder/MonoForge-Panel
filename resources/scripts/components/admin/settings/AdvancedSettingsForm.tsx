@@ -30,13 +30,17 @@ const advancedSettingsFormValues = (settings: AdminSettings): AdvancedSettingsFo
 });
 
 export default function AdvancedSettingsForm({ settings }: { settings: AdminSettings }) {
+    // Upstream settings come from .env in environment-only mode; the hidden IPs are MonoForge's
+    // own and stay editable unless MONOFORGE_HIDDEN_IPS is set.
     const readOnly = settings.meta.load_environment_only;
+    const hiddenIpsLocked = readOnly && settings.meta.set_in_env.includes('monoforge:privacy:hidden_ips');
+    const nothingEditable = readOnly && hiddenIpsLocked;
     const updateAdvancedSettings = useUpdateAdminAdvancedSettings();
 
     const form = useAppForm({
         defaultValues: advancedSettingsFormValues(settings),
         onSubmit: async ({ value }) => {
-            if (readOnly) {
+            if (nothingEditable) {
                 return;
             }
 
@@ -171,18 +175,22 @@ export default function AdvancedSettingsForm({ settings }: { settings: AdminSett
                         <field.TextAreaField
                             id='privacy_hidden_ips'
                             label='Hidden IP Addresses'
-                            description='One IP address or CIDR range per line (IPv4 or IPv6). Activity entries from these addresses show "Hidden". Loopback, private and link-local ranges and the addresses of your nodes are always hidden.'
+                            description={
+                                hiddenIpsLocked
+                                    ? 'Set in .env (MONOFORGE_HIDDEN_IPS). Change it there.'
+                                    : 'One IP address or CIDR range per line (IPv4 or IPv6). Activity entries from these addresses show "Hidden". Loopback, private and link-local ranges and the addresses of your nodes are always hidden.'
+                            }
                             rows={5}
                             spellCheck={false}
                             placeholder={'203.0.113.7\n2001:db8::/32'}
-                            disabled={readOnly}
+                            disabled={hiddenIpsLocked}
                         />
                     )}
                 </form.AppField>
             </TitledGreyBox>
             <div className='flex justify-end mt-6'>
                 <form.AppForm>
-                    <form.SubmitButton disabled={readOnly}>Save Changes</form.SubmitButton>
+                    <form.SubmitButton disabled={nothingEditable}>Save Changes</form.SubmitButton>
                 </form.AppForm>
             </div>
         </Form>

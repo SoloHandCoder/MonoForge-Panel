@@ -4456,7 +4456,7 @@ export const adminUpdateAdvancedSettingsMutationKey = (options?: Partial<Options
 /**
  * Update advanced settings
  *
- * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings.
+ * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings. On a panel that reads its settings from the environment only, just the hidden IP addresses are saved, and only while MONOFORGE_HIDDEN_IPS is unset.
  */
 export const adminUpdateAdvancedSettingsMutation = (options?: Partial<Options<AdminUpdateAdvancedSettingsData>>): UseMutationOptions<AdminUpdateAdvancedSettingsResponse, AxiosError<AdminUpdateAdvancedSettingsError>, Options<AdminUpdateAdvancedSettingsData>> => {
     const mutationOptions: UseMutationOptions<AdminUpdateAdvancedSettingsResponse, AxiosError<AdminUpdateAdvancedSettingsError>, Options<AdminUpdateAdvancedSettingsData>> = {
@@ -4540,7 +4540,7 @@ export const adminUpdateRegistrationSettingsMutationKey = (options?: Partial<Opt
 /**
  * Update registration settings
  *
- * Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys.
+ * Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys. Fields set in .env (see set_in_env) are left as they are.
  */
 export const adminUpdateRegistrationSettingsMutation = (options?: Partial<Options<AdminUpdateRegistrationSettingsData>>): UseMutationOptions<AdminUpdateRegistrationSettingsResponse, AxiosError<AdminUpdateRegistrationSettingsError>, Options<AdminUpdateRegistrationSettingsData>> => {
     const mutationOptions: UseMutationOptions<AdminUpdateRegistrationSettingsResponse, AxiosError<AdminUpdateRegistrationSettingsError>, Options<AdminUpdateRegistrationSettingsData>> = {

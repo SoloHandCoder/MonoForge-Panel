@@ -12,6 +12,11 @@ use Pterodactyl\Notifications\MailTested;
 use Pterodactyl\Tests\Integration\Api\Admin\AdminApiIntegrationTestCase;
 
 uses(AdminApiIntegrationTestCase::class);
+
+// .env.example turns environment-only mode on; these tests use the settings UI unless they say otherwise.
+beforeEach(function (): void {
+    config()->set('pterodactyl.load_environment_only', false);
+});
 /** Endpoints that should return a 403 error when accessed by a non-root-administrator. */
 dataset('settingsEndpointsDataProvider', fn (): array => [['getJson', 'api.admin.languages'], ['getJson', 'api.admin.settings'], ['putJson', 'api.admin.settings.general'], ['putJson', 'api.admin.settings.mail'], ['postJson', 'api.admin.settings.mail.test'], ['putJson', 'api.admin.settings.advanced']]);
 test('get settings', function (): void {
@@ -136,3 +141,26 @@ function validAdvancedPayload(): array
 {
     return ['recaptcha:enabled' => 'true', 'recaptcha:secret_key' => 'secret-key', 'recaptcha:website_key' => 'website-key', 'pterodactyl:guzzle:timeout' => 15, 'pterodactyl:guzzle:connect_timeout' => 5, 'pterodactyl:client_features:allocations:enabled' => 'true', 'pterodactyl:client_features:allocations:range_start' => 5000, 'pterodactyl:client_features:allocations:range_end' => 6000];
 }
+
+test('in environment-only mode the advanced tab saves only the hidden IPs, while MONOFORGE_HIDDEN_IPS is unset', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('monoforge.settings.set_in_env', []);
+
+    $this->getJson(route('api.admin.settings'))->assertOk()->assertJsonPath('meta.set_in_env', []);
+    $this->putJson(route('api.admin.settings.advanced'), array_merge(validAdvancedPayload(), ['monoforge:privacy:hidden_ips' => '203.0.113.7']))
+        ->assertStatus(Response::HTTP_NO_CONTENT);
+
+    expect(Setting::fetch('settings::monoforge:privacy:hidden_ips'))->toBe('203.0.113.7')
+        // Upstream settings come from the environment and are not stored.
+        ->and(Setting::fetch('settings::recaptcha:secret_key'))->toBeNull();
+});
+
+test('in environment-only mode the hidden IPs cannot be changed while MONOFORGE_HIDDEN_IPS is set', function (): void {
+    config()->set('pterodactyl.load_environment_only', true);
+    config()->set('monoforge.settings.set_in_env', ['monoforge:privacy:hidden_ips']);
+
+    $this->getJson(route('api.admin.settings'))->assertOk()->assertJsonPath('meta.set_in_env', ['monoforge:privacy:hidden_ips']);
+    $this->putJson(route('api.admin.settings.advanced'), array_merge(validAdvancedPayload(), ['monoforge:privacy:hidden_ips' => '203.0.113.7']))
+        ->assertStatus(Response::HTTP_BAD_REQUEST);
+    expect(Setting::fetch('settings::monoforge:privacy:hidden_ips'))->toBeNull();
+});

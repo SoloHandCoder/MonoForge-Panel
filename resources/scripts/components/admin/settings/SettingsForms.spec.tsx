@@ -46,7 +46,8 @@ const settings: AdminSettings = {
         'pterodactyl:client_features:allocations:range_end': null,
         'monoforge:privacy:hidden_ips': '',
     },
-    meta: { load_environment_only: true, show_recaptcha_warning: false },
+    // Environment-only, with .env also setting the one MonoForge key these forms hold.
+    meta: { load_environment_only: true, show_recaptcha_warning: false, set_in_env: ['monoforge:privacy:hidden_ips'] },
 };
 
 afterEach(cleanup);
@@ -128,6 +129,22 @@ describe('advanced settings', () => {
         expect(mutations.advanced).toHaveBeenCalledWith({
             body: expect.objectContaining({ 'monoforge:privacy:hidden_ips': '203.0.113.7\n2001:db8::/32' }),
         });
+    });
+});
+
+describe('advanced settings in environment-only mode', () => {
+    it('keeps the hidden IPs editable while MONOFORGE_HIDDEN_IPS is unset', async () => {
+        const user = userEvent.setup();
+
+        render(<AdvancedSettingsForm settings={{ ...settings, meta: { ...settings.meta, set_in_env: [] } }} />);
+
+        expect(screen.getByLabelText('reCAPTCHA Website Key')).toBeDisabled();
+        expect(screen.getByLabelText('Hidden IP Addresses')).toBeEnabled();
+
+        await user.type(screen.getByLabelText('Hidden IP Addresses'), '203.0.113.7');
+        await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+        expect(mutations.advanced).toHaveBeenCalledOnce();
     });
 });
 

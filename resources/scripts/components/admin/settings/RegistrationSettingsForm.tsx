@@ -21,8 +21,22 @@ const providerOptions: { value: CaptchaProvider; label: string }[] = [
 const isProvider = (value: string): value is CaptchaProvider =>
     value === 'none' || value === 'recaptcha' || value === 'turnstile';
 
+/** The note under a field that .env sets, so the panel cannot change it. */
+const setInEnv = (variable: string) => `Set in .env (${variable}). Change it there.`;
+
+function secretDescription(settings: AdminRegistrationSettings): string {
+    if (settings.setInEnv.turnstileSecretKey) {
+        return setInEnv('TURNSTILE_SECRET_KEY');
+    }
+
+    return settings.turnstileSecretKeySet
+        ? 'A secret key is stored. Leave blank to keep it.'
+        : 'No secret key is stored yet.';
+}
+
 export function RegistrationSettingsForm({ settings }: { settings: AdminRegistrationSettings }) {
-    const readOnly = settings.loadEnvironmentOnly;
+    const locked = settings.setInEnv;
+    const readOnly = Object.values(locked).every(Boolean);
     const update = useUpdateAdminRegistrationSettings();
 
     const form = useAppForm({
@@ -61,8 +75,12 @@ export function RegistrationSettingsForm({ settings }: { settings: AdminRegistra
                     {(field) => (
                         <field.SwitchField
                             label='Allow sign-up'
-                            description='Show "Create an account" on the login page so visitors can make their own account.'
-                            disabled={readOnly}
+                            description={
+                                locked.registrationEnabled
+                                    ? setInEnv('MONOFORGE_REGISTRATION_ENABLED')
+                                    : 'Show "Create an account" on the login page so visitors can make their own account.'
+                            }
+                            disabled={locked.registrationEnabled}
                         />
                     )}
                 </form.AppField>
@@ -73,9 +91,13 @@ export function RegistrationSettingsForm({ settings }: { settings: AdminRegistra
                         <field.SelectField
                             id='captcha_provider'
                             label='Captcha Provider'
-                            description='Protects login, sign-up, password reset and social login.'
+                            description={
+                                locked.captchaProvider
+                                    ? setInEnv('MONOFORGE_CAPTCHA_PROVIDER')
+                                    : 'Protects login, sign-up, password reset and social login.'
+                            }
                             options={providerOptions}
-                            disabled={readOnly}
+                            disabled={locked.captchaProvider}
                         />
                     )}
                 </form.AppField>
@@ -92,7 +114,8 @@ export function RegistrationSettingsForm({ settings }: { settings: AdminRegistra
                                     type='text'
                                     id='turnstile_site_key'
                                     label='Turnstile Site Key'
-                                    disabled={readOnly}
+                                    description={locked.turnstileSiteKey ? setInEnv('TURNSTILE_SITE_KEY') : undefined}
+                                    disabled={locked.turnstileSiteKey}
                                 />
                             )}
                         </form.AppField>
@@ -102,12 +125,8 @@ export function RegistrationSettingsForm({ settings }: { settings: AdminRegistra
                                     type='password'
                                     id='turnstile_secret_key'
                                     label='Turnstile Secret Key'
-                                    description={
-                                        settings.turnstileSecretKeySet
-                                            ? 'A secret key is stored. Leave blank to keep it.'
-                                            : 'No secret key is stored yet.'
-                                    }
-                                    disabled={readOnly}
+                                    description={secretDescription(settings)}
+                                    disabled={locked.turnstileSecretKey}
                                 />
                             )}
                         </form.AppField>

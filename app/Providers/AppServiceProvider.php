@@ -159,7 +159,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Settings stored in the database. With APP_ENVIRONMENT_ONLY the provider still runs,
-        // but only applies MonoForge's own settings, which can only be set in the panel.
+        // but only applies MonoForge's own settings whose environment variable is unset.
         if (! $this->app->environment('testing')) {
             $this->app->register(SettingsServiceProvider::class);
         }

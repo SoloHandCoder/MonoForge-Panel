@@ -23,6 +23,15 @@ export interface AdminRegistrationSettings {
     turnstileSiteKey: string;
     turnstileSecretKeySet: boolean;
     loadEnvironmentOnly: boolean;
+    /** Fields set in .env on a panel that reads its settings from the environment only; they cannot be changed here. */
+    setInEnv: RegistrationSetInEnv;
+}
+
+export interface RegistrationSetInEnv {
+    registrationEnabled: boolean;
+    captchaProvider: boolean;
+    turnstileSiteKey: boolean;
+    turnstileSecretKey: boolean;
 }
 
 export interface RegistrationSettingsValues {
@@ -44,6 +53,12 @@ export const toAdminRegistrationSettings = (
     turnstileSiteKey: response.turnstile_site_key ?? '',
     turnstileSecretKeySet: response.turnstile_secret_key_set ?? false,
     loadEnvironmentOnly: response.load_environment_only ?? false,
+    setInEnv: {
+        registrationEnabled: response.set_in_env?.registration_enabled ?? false,
+        captchaProvider: response.set_in_env?.captcha_provider ?? false,
+        turnstileSiteKey: response.set_in_env?.turnstile_site_key ?? false,
+        turnstileSecretKey: response.set_in_env?.turnstile_secret_key ?? false,
+    },
 });
 
 export const updateAdminRegistrationSettingsInput = (

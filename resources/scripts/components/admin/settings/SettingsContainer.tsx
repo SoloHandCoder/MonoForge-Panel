@@ -81,8 +81,9 @@ export default function SettingsContainer() {
                 <Alert type='danger' className='mb-6 text-sm'>
                     <span>
                         This Panel reads settings from the environment only. Set <code>APP_ENVIRONMENT_ONLY=false</code>{' '}
-                        in your environment file to load settings dynamically. MonoForge settings whose variable is not
-                        set in the environment can still be changed here.
+                        in your environment file to load settings dynamically. MonoForge's own settings (updates, login
+                        providers, sign-up and captcha, hidden IPs, shop and AI) can still be changed here unless their
+                        variable is set in the environment; those fields say so.
                     </span>
                 </Alert>
             )}

@@ -2619,7 +2619,7 @@ export const adminSendTestMail = <ThrowOnError extends boolean = true>(options?:
 /**
  * Update advanced settings
  *
- * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings.
+ * Updates reCAPTCHA, HTTP client timeout, client allocation feature and hidden IP address settings. On a panel that reads its settings from the environment only, just the hidden IP addresses are saved, and only while MONOFORGE_HIDDEN_IPS is unset.
  */
 export const adminUpdateAdvancedSettings = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateAdvancedSettingsData, ThrowOnError>): RequestResult<AdminUpdateAdvancedSettingsResponses, AdminUpdateAdvancedSettingsErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateAdvancedSettingsResponses, AdminUpdateAdvancedSettingsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -2673,7 +2673,7 @@ export const adminGetRegistrationSettings = <ThrowOnError extends boolean = true
 /**
  * Update registration settings
  *
- * Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys.
+ * Turns sign-up on or off and sets the captcha provider and its Cloudflare Turnstile keys. Fields set in .env (see set_in_env) are left as they are.
  */
 export const adminUpdateRegistrationSettings = <ThrowOnError extends boolean = true>(options: Options<AdminUpdateRegistrationSettingsData, ThrowOnError>): RequestResult<AdminUpdateRegistrationSettingsResponses, AdminUpdateRegistrationSettingsErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateRegistrationSettingsResponses, AdminUpdateRegistrationSettingsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

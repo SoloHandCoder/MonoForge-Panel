@@ -2633,10 +2633,11 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
                 ],
                 'meta' => [
                     'type' => 'object',
-                    'required' => ['load_environment_only', 'show_recaptcha_warning'],
+                    'required' => ['load_environment_only', 'show_recaptcha_warning', 'set_in_env'],
                     'properties' => [
                         'load_environment_only' => ['type' => 'boolean', 'example' => false],
                         'show_recaptcha_warning' => ['type' => 'boolean', 'example' => false],
+                        'set_in_env' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'MonoForge setting keys that .env sets on a panel that reads its settings from the environment only; they cannot be changed here.', 'example' => []],
                     ],
                 ],
             ],

@@ -30,12 +30,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | set_in_env is worked out when the configuration loads (and is cached with
-    | it), so it stays right after "php artisan config:cache".
+    | it), so it stays right after "php artisan config:cache". A variable that is
+    | empty counts as unset.
     |
     */
     'settings' => [
         'environment_variables' => $environmentVariables,
-        'set_in_env' => array_keys(array_filter($environmentVariables, fn (string $name): bool => env($name) !== null)),
+        // An empty variable ("DISCORD_CLIENT_ID=", as copied from an example) counts as unset.
+        'set_in_env' => array_keys(array_filter($environmentVariables, fn (string $name): bool => ! in_array(env($name), [null, ''], true))),
     ],
 
     /*

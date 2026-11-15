@@ -182,14 +182,18 @@ test('outside environment-only mode stored values still win over the environment
 
 test('the configuration records which MonoForge variables are set in the environment', function (): void {
     putenv('MONOFORGE_UPDATE_MODE=off');
+    putenv('DISCORD_CLIENT_ID=');
 
     try {
         $config = require config_path('monoforge.php');
     } finally {
         putenv('MONOFORGE_UPDATE_MODE');
+        putenv('DISCORD_CLIENT_ID');
     }
 
     expect($config['settings']['set_in_env'])->toContain('monoforge:update:mode')
         ->not->toContain('monoforge:auth:google:enabled')
+        // An empty variable counts as unset.
+        ->not->toContain('monoforge:auth:discord:client_id')
         ->and($config['settings']['environment_variables']['monoforge:auth:discord:client_secret'])->toBe('DISCORD_CLIENT_SECRET');
 });

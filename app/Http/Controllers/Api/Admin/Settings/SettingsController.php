@@ -11,6 +11,7 @@ use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Pterodactyl\Http\Controllers\Api\Admin\AdminApiController;
 use Pterodactyl\Http\Requests\Api\Admin\Settings\GetSettingsRequest;
+use Pterodactyl\Services\Settings\EnvironmentSettings;
 
 #[Group('Admin API', 'Root administrator endpoints for managing panel configuration and resources.')]
 #[Subgroup('Settings', 'View and update global panel settings.')]
@@ -47,6 +48,7 @@ class SettingsController extends AdminApiController
         'meta' => [
             'load_environment_only' => false,
             'show_recaptcha_warning' => false,
+            'set_in_env' => [],
         ],
     ];
 
@@ -91,6 +93,8 @@ class SettingsController extends AdminApiController
                 'load_environment_only' => config('pterodactyl.load_environment_only'),
                 'show_recaptcha_warning' => config('recaptcha._shipped_secret_key') === config('recaptcha.secret_key')
                     || config('recaptcha._shipped_website_key') === config('recaptcha.website_key'),
+                // MonoForge settings that .env sets, which the panel cannot change in environment-only mode.
+                'set_in_env' => EnvironmentSettings::environmentOnly() ? EnvironmentSettings::setInEnvironment() : [],
             ],
         ]);
     }

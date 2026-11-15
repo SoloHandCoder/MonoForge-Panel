@@ -716,6 +716,10 @@ export type AdminSettingsResponse = {
     meta: {
         load_environment_only: boolean;
         show_recaptcha_warning: boolean;
+        /**
+         * MonoForge setting keys that .env sets on a panel that reads its settings from the environment only; they cannot be changed here.
+         */
+        set_in_env: Array<string>;
     };
 };
 export type AdminTagAttributes = {
@@ -5732,6 +5736,12 @@ export type AdminGetRegistrationSettingsResponseBody = {
     turnstile_site_key?: string;
     turnstile_secret_key_set?: boolean;
     load_environment_only?: boolean;
+    set_in_env?: {
+        registration_enabled?: boolean;
+        captcha_provider?: boolean;
+        turnstile_site_key?: boolean;
+        turnstile_secret_key?: boolean;
+    };
 };
 export type AdminGetUpdateStatusResponseBody = {
     /**
@@ -13848,6 +13858,10 @@ export type AdminUpdateAdvancedSettingsData = {
     url: '/api/admin/settings/advanced';
 };
 export type AdminUpdateAdvancedSettingsErrors = {
+    /**
+     * MONOFORGE_HIDDEN_IPS is set in the environment of a panel that reads its settings from the environment only.
+     */
+    400: ErrorEnvelope;
     /**
      * Authentication credentials were missing or invalid.
      */
