@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pterodactyl\Http\Requests\Api;
+namespace Pterodactyl\Services\Subusers;
 
 use Illuminate\Validation\Rule;
 use Pterodactyl\Services\Servers\SubuserPermissionCatalog;

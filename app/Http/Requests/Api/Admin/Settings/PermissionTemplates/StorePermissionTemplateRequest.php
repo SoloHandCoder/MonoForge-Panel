@@ -6,7 +6,7 @@ namespace Pterodactyl\Http\Requests\Api\Admin\Settings\PermissionTemplates;
 
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Http\Requests\Api\Admin\AdminApiRequest;
-use Pterodactyl\Http\Requests\Api\PermissionTemplateRules;
+use Pterodactyl\Services\Subusers\PermissionTemplateRules;
 
 /**
  * Creates or updates a global subuser permission template.

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\ServerPages;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Models\Share\ServerPageVote;
 
@@ -18,8 +18,6 @@ use Pterodactyl\Models\Share\ServerPageVote;
  */
 final readonly class ServerPageVotes
 {
-    public function __construct(private ConnectionInterface $connection) {}
-
     /**
      * @return array{counted: bool, votes: int, next_vote_at: CarbonImmutable}
      */
@@ -29,7 +27,7 @@ final readonly class ServerPageVotes
         $address = $visitor->addressKey('vote', $scope);
         $cookie = $visitor->cookieKey('vote', $scope);
 
-        return $this->connection->transaction(function () use ($page, $address, $cookie): array {
+        return DB::transaction(function () use ($page, $address, $cookie): array {
             $locked = ServerPage::query()->whereKey($page->id)->lockForUpdate()->firstOrFail();
             $now = CarbonImmutable::now();
 

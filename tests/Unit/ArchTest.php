@@ -36,6 +36,7 @@ use Pterodactyl\Exceptions\ApiErrorResponse;
 use Pterodactyl\Extensions\ExtensionProvider;
 use Pterodactyl\Http\Requests\Api\Remote\RemoteRequestNode;
 use Pterodactyl\Http\Resources\Api\Admin\UserResource as AdminUserResource;
+use Pterodactyl\Http\Resources\Api\Client\FriendListResource;
 use Pterodactyl\Http\Resources\Api\Client\UserResource as ClientUserResource;
 use Pterodactyl\Http\Resources\Api\Concerns\FormatsActivityLogs;
 use Pterodactyl\Services\Extensions\ExtensionRepository;
@@ -51,6 +52,7 @@ arch()->preset()->php()->ignoring('Rules');
 arch()->preset()->security()->ignoring([
     AdminUserResource::class,
     ClientUserResource::class,
+    FriendListResource::class,
     FormatsActivityLogs::class,
     'Rules',
 ]);

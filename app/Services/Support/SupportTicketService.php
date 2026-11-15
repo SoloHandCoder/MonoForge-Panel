@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Support;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Pterodactyl\Enum\SupportTicketStatus;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Support\SupportCategory;
@@ -28,7 +28,6 @@ class SupportTicketService
     private array $stored = [];
 
     public function __construct(
-        private readonly ConnectionInterface $connection,
         private readonly SupportAttachmentStore $attachments,
         private readonly SupportNotifier $notifier,
     ) {}
@@ -148,7 +147,7 @@ class SupportTicketService
             return;
         }
 
-        $this->connection->table('support_ticket_reads')->upsert(
+        DB::table('support_ticket_reads')->upsert(
             [['ticket_id' => $ticket->id, 'user_id' => $user->id, 'message_id' => $ticket->last_message_id]],
             ['ticket_id', 'user_id'],
             ['message_id'],
@@ -196,7 +195,7 @@ class SupportTicketService
         $this->stored = [];
 
         try {
-            return $this->connection->transaction(fn (): mixed => $work());
+            return DB::transaction(fn (): mixed => $work());
         } catch (Throwable $throwable) {
             $this->attachments->delete($this->stored);
 
