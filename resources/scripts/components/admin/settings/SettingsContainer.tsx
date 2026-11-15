@@ -5,13 +5,14 @@ import Spinner from '@/components/elements/Spinner';
 import AdvancedSettingsForm from '@/components/admin/settings/AdvancedSettingsForm';
 import GeneralSettingsForm from '@/components/admin/settings/GeneralSettingsForm';
 import MailSettingsForm from '@/components/admin/settings/MailSettingsForm';
+import RegistrationSettings from '@/components/admin/settings/RegistrationSettingsForm';
 import SettingsTabButton from '@/components/admin/settings/SettingsTabButton';
 import UpdateSettingsForm from '@/components/admin/settings/UpdateSettingsForm';
 import { httpErrorToHuman } from '@/api/http';
 import { ServerError } from '@/components/elements/ScreenBlock';
 import { Alert } from '@/components/elements/alert';
 
-type Tab = 'general' | 'mail' | 'advanced';
+type Tab = 'general' | 'mail' | 'advanced' | 'registration';
 type SettingsSearch = {
     tab?: string;
 };
@@ -20,12 +21,14 @@ const tabs: { key: Tab; label: string }[] = [
     { key: 'general', label: 'General' },
     { key: 'mail', label: 'Mail' },
     { key: 'advanced', label: 'Advanced' },
+    { key: 'registration', label: 'Registration' },
 ];
 
 const tabPaths = {
     general: '/panel/settings',
     mail: '/panel/settings/mail',
     advanced: '/panel/settings/advanced',
+    registration: '/panel/settings/registration',
 } as const satisfies Record<Tab, string>;
 
 const tabFromPath = (pathname: string): Tab | undefined => {
@@ -37,11 +40,15 @@ const tabFromPath = (pathname: string): Tab | undefined => {
         return 'advanced';
     }
 
+    if (pathname.endsWith('/registration')) {
+        return 'registration';
+    }
+
     return undefined;
 };
 
 const parseTab = (tab: string | undefined): Tab =>
-    tab === 'mail' || tab === 'advanced' || tab === 'general' ? tab : 'general';
+    tab === 'mail' || tab === 'advanced' || tab === 'general' || tab === 'registration' ? tab : 'general';
 
 export default function SettingsContainer() {
     const navigate = useNavigate();
@@ -96,6 +103,7 @@ export default function SettingsContainer() {
                     )}
                     {tab === 'mail' && <MailSettingsForm settings={settings} />}
                     {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
+                    {tab === 'registration' && <RegistrationSettings />}
                 </div>
             ) : (
                 <Spinner size='large' centered />

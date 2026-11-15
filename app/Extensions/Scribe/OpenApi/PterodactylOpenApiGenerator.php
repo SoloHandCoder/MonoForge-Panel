@@ -926,6 +926,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'adminGetVersionInformation' => 'AdminVersionInformationResponse',
             'authCompleteLoginCheckpoint' => 'AuthLoginCompleteResponse',
             'authLogin' => 'AuthLoginResponse',
+            'authRegister' => 'AuthLoginCompleteResponse',
             'authRequestPasswordResetEmail' => 'AuthPasswordResetEmailResponse',
             'authResetPassword' => 'AuthResetPasswordResponse',
             'clientListServerPermissions' => 'ClientSystemPermissionsResponse',

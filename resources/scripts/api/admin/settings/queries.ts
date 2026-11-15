@@ -169,13 +169,22 @@ export const useUpdateAdminAdvancedSettings = () => {
     return useMutation({
         ...adminUpdateAdvancedSettingsMutation(),
         onSuccess: async (_data, { body }) => {
-            setSiteSettingsQueryData(queryClient, (settings) => ({
-                ...settings,
-                recaptcha: {
-                    enabled: body['recaptcha:enabled'] === 'true',
-                    siteKey: body['recaptcha:website_key'],
-                },
-            }));
+            setSiteSettingsQueryData(queryClient, (settings) => {
+                const enabled = body['recaptcha:enabled'] === 'true';
+                const siteKey = body['recaptcha:website_key'];
+                const recaptcha = { enabled, siteKey };
+
+                // Turning reCAPTCHA on makes it the captcha provider; turning it off leaves Turnstile alone.
+                if (enabled) {
+                    return { ...settings, recaptcha, captcha: { provider: 'recaptcha', siteKey } };
+                }
+
+                if (settings.captcha?.provider === 'turnstile') {
+                    return { ...settings, recaptcha };
+                }
+
+                return { ...settings, recaptcha, captcha: { provider: 'none', siteKey: '' } };
+            });
             await queryClient.invalidateQueries({ queryKey: adminGetSettingsQueryKey() });
             const notification = adminSettingsUpdateToast('Advanced');
 

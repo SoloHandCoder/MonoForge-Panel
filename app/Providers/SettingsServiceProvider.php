@@ -36,6 +36,11 @@ class SettingsServiceProvider extends ServiceProvider
         'pterodactyl:client_features:allocations:range_start',
         'pterodactyl:client_features:allocations:range_end',
         'monoforge:update:mode',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:auth:registration:enabled',
+        'monoforge:captcha:provider',
+        'monoforge:captcha:turnstile:site_key',
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**
@@ -62,6 +67,8 @@ class SettingsServiceProvider extends ServiceProvider
      */
     protected static array $encrypted = [
         'mail:mailers:smtp:password',
+        // Phase 2 Task F: sign-up and captcha.
+        'monoforge:captcha:turnstile:secret_key',
     ];
 
     /**

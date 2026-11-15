@@ -1522,6 +1522,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | `page.auth.login` | auth | `LoginFormModel` |  | `auth.login.form.after` | `auth.login.before` `auth.login.after` | default, invalid, submitting |
 | `page.auth.password` | auth | `ForgotPasswordFormModel` |  |  | `auth.password.before` `auth.password.after` | default, invalid |
 | `page.auth.passwordReset` | auth | `ResetPasswordFormModel` |  |  | `auth.passwordReset.before` `auth.passwordReset.after` | default, mismatch |
+| `page.auth.register` | auth | `RegisterFormModel` |  |  |  | default, invalid |
 | `page.dashboard` | app | `PageStatusModel` |  |  |  | default, loading, error |
 | `page.server.activity` | server | `ActivityPageModel` |  |  | `server.activity.before` `server.activity.after` | default |
 | `page.server.backups` | server | `PageStatusModel` |  |  | `server.backups.before` `server.backups.after` | default, loading, error |

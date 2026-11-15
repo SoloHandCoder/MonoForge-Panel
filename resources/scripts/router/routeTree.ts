@@ -46,6 +46,7 @@ import { adminExtensionsQueryOptions } from '@/api/admin/extensions/queries';
 import { adminThemesQueryOptions } from '@/api/admin/themes/queries';
 import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags/queries';
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
+import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '@/api/admin/activity/queries';
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
@@ -144,6 +145,19 @@ const authChildren = [
         path: 'password/reset/$token',
         component: pageRoute('page.auth.passwordReset'),
         validateSearch: parseEmailSearch,
+    }),
+    createRoute({
+        getParentRoute: () => authRoute,
+        path: 'register',
+        component: pageRoute('page.auth.register'),
+        // Sign-up only exists while the panel allows it.
+        beforeLoad: async ({ context }) => {
+            const settings = await context.queryClient.ensureQueryData(siteSettingsQueryOptions());
+
+            if (!settings.registration?.enabled) {
+                throw redirect({ to: '/auth/login', replace: true });
+            }
+        },
     }),
 ];
 
@@ -853,6 +867,23 @@ const panelChildren = [
         path: 'settings/advanced',
         loader: async ({ context }) => {
             await context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'settings/registration',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({
+                    ...adminRegistrationSettingsQueryOptions(),
+                    revalidateIfStale: true,
+                }),
+            ]);
         },
         component: componentRoute(
             () => import('@/components/admin/settings/SettingsContainer'),

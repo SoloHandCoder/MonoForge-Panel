@@ -24,6 +24,13 @@ export default function LoginPage({ model, className }: ViewProps<'page.auth.log
                     Forgot password?
                 </PanelLink>
             </div>
+            {model.register && (
+                <div className='mt-3 text-center'>
+                    <PanelLink destination={model.register} className={authLinkClass}>
+                        Create an account
+                    </PanelLink>
+                </div>
+            )}
         </AuthCard>
     );
 }

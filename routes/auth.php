@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Auth\ForgotPasswordController;
 use Pterodactyl\Http\Controllers\Auth\LoginCheckpointController;
 use Pterodactyl\Http\Controllers\Auth\LoginController;
+use Pterodactyl\Http\Controllers\Auth\RegisterController;
 use Pterodactyl\Http\Controllers\Auth\ResetPasswordController;
+use Pterodactyl\Http\Middleware\EnsureRegistrationIsEnabled;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,6 +24,9 @@ use Pterodactyl\Http\Controllers\Auth\ResetPasswordController;
 Route::get('/login', [LoginController::class, 'index'])->name('auth.login');
 Route::get('/password', [LoginController::class, 'index'])->name('auth.forgot-password');
 Route::get('/password/reset/{token}', [LoginController::class, 'index'])->name('auth.reset');
+Route::get('/register', [LoginController::class, 'index'])
+    ->name('auth.register')
+    ->middleware(EnsureRegistrationIsEnabled::class);
 
 // Apply a throttle to authentication action endpoints, in addition to the
 // recaptcha endpoints to slow down manual attack spammers even more. 🤷‍
@@ -44,6 +49,11 @@ Route::middleware(['throttle:authentication'])->group(function (): void {
     Route::post('/password/reset', ResetPasswordController::class)
         ->name('auth.reset-password')
         ->middleware('recaptcha');
+
+    // Sign-up, only while the admin allows it.
+    Route::post('/register', RegisterController::class)
+        ->name('auth.post.register')
+        ->middleware([EnsureRegistrationIsEnabled::class, 'captcha']);
 });
 
 // Remove the guest middleware and apply the authenticated middleware to this endpoint,

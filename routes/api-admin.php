@@ -57,6 +57,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferProgressController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\AdvancedController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
@@ -464,6 +465,9 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     Route::put('/mail', MailController::class)->name('.mail');
     Route::post('/mail/test', TestMailController::class)->name('.mail.test');
     Route::put('/advanced', AdvancedController::class)->name('.advanced');
+    // Sign-up and captcha.
+    Route::get('/registration', [RegistrationController::class, 'index'])->name('.registration');
+    Route::put('/registration', [RegistrationController::class, 'update'])->name('.registration.update');
 });
 
 /*

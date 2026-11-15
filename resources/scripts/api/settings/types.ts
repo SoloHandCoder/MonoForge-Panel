@@ -1,8 +1,19 @@
+export type CaptchaProvider = 'none' | 'recaptcha' | 'turnstile';
+
 export interface SiteSettings {
     name: string;
     locale: string;
     recaptcha: {
         enabled: boolean;
         siteKey: string;
+    };
+    /** The captcha the auth forms load. Older documents only carry `recaptcha`. */
+    captcha?: {
+        provider: CaptchaProvider;
+        siteKey: string;
+    };
+    /** Whether visitors may create their own account. */
+    registration?: {
+        enabled: boolean;
     };
 }

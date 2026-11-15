@@ -20,6 +20,7 @@ export const VIEW_PAGES = {
     'page.auth.checkpoint': { context: 'auth', slots: ['auth.checkpoint.before', 'auth.checkpoint.after'] },
     'page.auth.password': { context: 'auth', slots: ['auth.password.before', 'auth.password.after'] },
     'page.auth.passwordReset': { context: 'auth', slots: ['auth.passwordReset.before', 'auth.passwordReset.after'] },
+    'page.auth.register': { context: 'auth' },
 
     'page.account.overview': { context: 'account' },
     'page.account.api': { context: 'account', slots: ['account.api.before', 'account.api.after'] },

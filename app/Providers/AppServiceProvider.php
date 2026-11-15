@@ -23,6 +23,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Knuckles\Scribe\Scribe;
+use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Enum\ResourceLimit;
 use Pterodactyl\Extensions\Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Pterodactyl\Extensions\Scribe\Support\PathParameterNames;
@@ -42,6 +43,7 @@ use Pterodactyl\Models\Tag;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserSSHKey;
+use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Daemon\DaemonManager;
 use Pterodactyl\Services\Servers\EnvironmentService;
 use ReflectionFunctionAbstract;
@@ -120,6 +122,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(DaemonManager::class);
+
+        $this->app->bind(VerifiesCaptcha::class, HttpCaptchaVerifier::class);
 
         // Keys registered through setEnvironmentKey() must survive to every consumer,
         // so the service is shared rather than rebuilt on each resolve.

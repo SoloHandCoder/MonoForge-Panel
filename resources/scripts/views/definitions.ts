@@ -10,6 +10,7 @@ const search = { load: () => import('./search') };
 const dashboard = { load: () => import('./dashboard') };
 const login = { load: () => import('./auth/login') };
 const password = { load: () => import('./auth/password') };
+const register = { load: () => import('./auth/register') };
 const overview = { load: () => import('./account/overview') };
 const keys = { load: () => import('./account/keys') };
 const activity = { load: () => import('./activity') };
@@ -82,6 +83,7 @@ defineView('page.auth.login', {
 defineView('page.auth.checkpoint', { ...VIEW_PAGES['page.auth.checkpoint'], ...login });
 defineView('page.auth.password', { ...VIEW_PAGES['page.auth.password'], ...password });
 defineView('page.auth.passwordReset', { ...VIEW_PAGES['page.auth.passwordReset'], ...password });
+defineView('page.auth.register', { ...VIEW_PAGES['page.auth.register'], ...register });
 
 defineView('page.account.overview', {
     ...VIEW_PAGES['page.account.overview'],

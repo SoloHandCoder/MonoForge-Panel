@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useField, useForm, useStore } from '@tanstack/react-form';
 import { useLocation, useSearch } from '@tanstack/react-router';
 import { useLogin, useLoginCheckpoint } from '@/api/auth/queries';
+import { useSiteSettings } from '@/api/settings/queries';
 import { isString } from '@/lib/objects';
 import { parseRedirectSearch } from '@/router/redirect';
 import { useRouteSlotData } from '@/router/routeSlots';
@@ -21,6 +22,7 @@ function useLoginFormModel(): LoginFormModel {
     const route = useRouteSlotData();
     const login = useLogin();
     const { Captcha, token } = useCaptcha();
+    const registration = useSiteSettings().registration?.enabled ?? false;
     const form = useForm({
         defaultValues: { username: '', password: '' },
         onSubmit: async ({ value }) => {
@@ -70,6 +72,7 @@ function useLoginFormModel(): LoginFormModel {
         submitting,
         Captcha,
         forgotPassword: { to: '/auth/password' },
+        register: registration ? { to: '/auth/register' } : null,
         route,
     };
 }
@@ -145,6 +148,7 @@ function loginFixture(
         submitting: false,
         Captcha: null,
         forgotPassword: { to: '/auth/password' },
+        register: { to: '/auth/register' },
         route,
         ...overrides,
     };
