@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
-import { useAdminSettings } from '@/api/admin/settings/queries';
+import { type AdminSettings, useAdminSettings } from '@/api/admin/settings/queries';
 import AdminContentBlock from '@/components/admin/AdminContentBlock';
 import Spinner from '@/components/elements/Spinner';
 import AdvancedSettingsForm from '@/components/admin/settings/AdvancedSettingsForm';
@@ -83,6 +83,7 @@ const tabFromPath = (pathname: string): Tab | undefined => {
     if (pathname.endsWith('/plugins')) {
         return 'plugins';
     }
+
     if (pathname.endsWith('/templates')) {
         return 'templates';
     }
@@ -102,6 +103,27 @@ const parseTab = (tab: string | undefined): Tab =>
     tab === 'templates'
         ? tab
         : 'general';
+
+function SettingsTabPanel({ tab, settings }: { tab: Tab; settings: AdminSettings }) {
+    return (
+        <>
+            {tab === 'general' && (
+                <>
+                    <GeneralSettingsForm settings={settings} />
+                    <UpdateSettingsForm />
+                </>
+            )}
+            {tab === 'mail' && <MailSettingsForm settings={settings} />}
+            {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
+            {tab === 'login-providers' && <LoginProvidersForm />}
+            {tab === 'registration' && <RegistrationSettings />}
+            {tab === 'legal' && <LegalSettings />}
+            {tab === 'status' && <StatusPageSettings />}
+            {tab === 'plugins' && <PluginSettingsForm />}
+            {tab === 'templates' && <PermissionTemplateSettings />}
+        </>
+    );
+}
 
 export default function SettingsContainer() {
     const navigate = useNavigate();
@@ -150,20 +172,7 @@ export default function SettingsContainer() {
             </div>
             {settings ? (
                 <div aria-busy={isFetching}>
-                    {tab === 'general' && (
-                        <>
-                            <GeneralSettingsForm settings={settings} />
-                            <UpdateSettingsForm />
-                        </>
-                    )}
-                    {tab === 'mail' && <MailSettingsForm settings={settings} />}
-                    {tab === 'advanced' && <AdvancedSettingsForm settings={settings} />}
-                    {tab === 'login-providers' && <LoginProvidersForm />}
-                    {tab === 'registration' && <RegistrationSettings />}
-                    {tab === 'legal' && <LegalSettings />}
-                    {tab === 'status' && <StatusPageSettings />}
-                    {tab === 'plugins' && <PluginSettingsForm />}
-                    {tab === 'templates' && <PermissionTemplateSettings />}
+                    <SettingsTabPanel tab={tab} settings={settings} />
                 </div>
             ) : (
                 <Spinner size='large' centered />
