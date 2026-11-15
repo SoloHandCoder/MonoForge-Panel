@@ -82,6 +82,7 @@ describe('TunnelsTab', () => {
         expect(mutate).toHaveBeenCalledOnce();
 
         const dialog = await screen.findByRole('dialog');
+
         expect(dialog.textContent).toContain('1 imported, 1 skipped.');
         expect(dialog.textContent).toContain('node-2: playit rejected this agent key.');
         expect(dialog.textContent).toContain('survival');
