@@ -19,6 +19,7 @@ const plan = (overrides: Partial<StorePlan> = {}): StorePlan => ({
     eggs: [],
     nodeIds: null,
     sort: 0,
+    canProvision: true,
     ...overrides,
 });
 
@@ -83,37 +84,89 @@ describe('store formatting and checks', () => {
         expect(planLocations(plan({ nodeIds: [20] }), locations).map((each) => each.id)).toEqual([2]);
     });
 
-    it('reads the catalog envelope', () => {
+    it('reads the catalog the store endpoint returns', () => {
+        const resources = {
+            memory: 2048,
+            swap: 0,
+            disk: 10240,
+            io: 500,
+            cpu: 100,
+            databases: 1,
+            backups: 1,
+            allocations: 0,
+        };
+        const eu = (nodes: { id: number; name: string; multiplier: number }[]) => ({
+            id: 2,
+            short: 'eu',
+            long: null,
+            multiplier: '1.50',
+            nodes,
+        });
         const raw: RawStoreCatalog = {
+            enabled: true,
+            subdomains_enabled: true,
+            subdomain_base: 'monoforge.net',
+            balance: 300,
             categories: [
                 {
                     id: 1,
                     name: 'Minecraft',
+                    slug: 'minecraft',
+                    description: null,
+                    sort: 0,
+                    visible: true,
                     plans: [
                         {
                             id: 4,
                             name: 'Starter',
+                            description: null,
                             price_tokens: 500,
-                            memory: 2048,
-                            disk: 10240,
-                            cpu: 100,
-                            databases: 1,
-                            backups: 1,
-                            allocations: 0,
+                            from_price_tokens: 750,
+                            resources,
+                            can_provision: false,
+                            eggs: [{ id: 7, name: 'Paper', description: null, image: null }],
+                            locations: [eu([{ id: 20, name: 'eu-1', multiplier: 1.5 }])],
+                        },
+                        {
+                            id: 5,
+                            name: 'Big',
+                            description: 'More room',
+                            price_tokens: 900,
+                            from_price_tokens: 1350,
+                            resources: { ...resources, memory: 8192 },
+                            can_provision: false,
+                            eggs: [],
+                            locations: [eu([{ id: 21, name: 'eu-2', multiplier: 1.5 }])],
                         },
                     ],
                 },
             ],
             periods: [{ id: 1, name: 'Monthly', days: 30, price_modifier_percent: 0 }],
-            locations: [{ id: 2, short: 'eu', multiplier: '1.50' }],
-            can_provision: false,
+            addons: [],
         };
 
-        const catalog = mapCatalog({ object: 'store_catalog', attributes: raw });
+        const catalog = mapCatalog(raw);
+        const [starter, big] = catalog.categories[0].plans;
 
-        expect(catalog.categories[0].plans[0].priceTokens).toBe(500);
-        expect(catalog.locations[0]).toMatchObject({ name: 'eu', multiplier: 1.5 });
-        expect(catalog.canProvision).toBe(false);
-        expect(catalog.subdomainsEnabled).toBe(false);
+        expect(starter).toMatchObject({ priceTokens: 500, memory: 2048, nodeIds: [20], sort: 0, canProvision: false });
+        expect(big).toMatchObject({ memory: 8192, nodeIds: [21], sort: 1 });
+        expect(catalog.locations).toEqual([
+            {
+                id: 2,
+                name: 'eu',
+                multiplier: 1.5,
+                nodes: [
+                    { id: 20, name: 'eu-1', multiplier: 1.5 },
+                    { id: 21, name: 'eu-2', multiplier: 1.5 },
+                ],
+            },
+        ]);
+        expect(planLocations(starter, catalog.locations)[0].nodes.map((node) => node.id)).toEqual([20]);
+        expect(catalog).toMatchObject({
+            canProvision: false,
+            subdomainsEnabled: true,
+            subdomainBase: 'monoforge.net',
+            balance: 300,
+        });
     });
 });

@@ -20,7 +20,8 @@ const QUOTE_DEBOUNCE_MS = 250;
 
 export const NAME_MAX = 60;
 
-const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
+/** A DNS label, as TunnelSettings::SUBDOMAIN_PATTERN checks it on the server. */
+const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, Math.max(0, ms)));
 
@@ -52,7 +53,9 @@ export function validateName(name: string): string | null {
 }
 
 export const validateSubdomain = (subdomain: string): string | null =>
-    subdomain === '' || SUBDOMAIN_PATTERN.test(subdomain) ? null : 'Use 3–32 lowercase letters, digits or hyphens.';
+    subdomain === '' || SUBDOMAIN_PATTERN.test(subdomain)
+        ? null
+        : 'Use 1–63 lowercase letters, digits or hyphens, not starting or ending with a hyphen.';
 
 /** The plan's resources with the chosen add-ons on top. */
 export function withAddons(plan: StorePlan, addons: StoreAddon[], units: Record<string, number>): StoreResources {
@@ -149,7 +152,7 @@ export function useCheckoutPrice(
         updating: data === null && quote.fetchStatus === 'fetching',
         balance,
         short: balance !== null && balance < total,
-        soldOut: !catalog.canProvision || data?.canProvision === false,
+        soldOut: !plan.canProvision || data?.canProvision === false,
     };
 }
 

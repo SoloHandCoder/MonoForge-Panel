@@ -3955,9 +3955,11 @@ export type ClientQuoteAServerRequest = {
      */
     location_id?: number | null;
     /**
-     * Must be at least 0. Must not be greater than 1000.
+     * Add-on keys mapped to the units to buy; keys left out or at 0 buy none.
      */
-    addons?: Array<number>;
+    addons?: {
+        [key: string]: number;
+    };
 };
 export type ClientPurchaseServerRequest = {
     /**

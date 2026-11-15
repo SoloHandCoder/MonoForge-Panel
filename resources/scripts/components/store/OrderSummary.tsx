@@ -1,5 +1,4 @@
 import { Check, Coins, ShieldCheck } from 'lucide-react';
-import { WALLET_PATH } from '@/api/store/queries';
 import type { StoreResources } from '@/api/store/types';
 import { Alert } from '@/components/elements/alert';
 import Button from '@/components/elements/Button';
@@ -10,6 +9,7 @@ import { CapacityNotice } from '@/components/store/StoreNotices';
 import { everyDays, planResources, tokens } from '@/components/store/storeFormat';
 import type { CheckoutError } from '@/components/store/useCheckout';
 import { cn } from '@/lib/cn';
+import { PanelLink } from '@/sdk/navigation';
 
 export interface OrderPrice {
     total: number;
@@ -37,9 +37,12 @@ function ResourceList({ resources, className }: { resources: StoreResources; cla
 
 function WalletLink() {
     return (
-        <a href={WALLET_PATH} className='font-medium text-accent underline-offset-2 hover:underline'>
+        <PanelLink
+            destination={{ to: '/account/wallet' }}
+            className='font-medium text-accent underline-offset-2 hover:underline'
+        >
             Top up your wallet
-        </a>
+        </PanelLink>
     );
 }
 

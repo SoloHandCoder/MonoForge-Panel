@@ -1,11 +1,10 @@
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientGetTheStoreCatalog, clientQuoteAServer } from '@/api/generated';
 import { clientPurchaseServerMutation } from '@/api/generated/@tanstack/react-query.gen';
-import http from '@/api/http';
 import { invalidateGeneratedOperations } from '@/api/mutationUtils';
 import {
     mapCatalog,
     mapQuote,
-    type Envelope,
     type RawStoreCatalog,
     type RawStoreQuoteResponse,
     type StoreCatalog,
@@ -14,9 +13,6 @@ import {
 } from '@/api/store/types';
 
 export const storeQueryKey = ['store'] as const;
-
-/** Where Task Q's Wallet page lives, linked when the balance is short. */
-export const WALLET_PATH = '/wallet';
 
 /** The selection as the quote and purchase endpoints take it. */
 export const selectionBody = (selection: StoreSelection) => ({
@@ -28,27 +24,22 @@ export const selectionBody = (selection: StoreSelection) => ({
     addons: selection.addons,
 });
 
-// The catalog and quote endpoints belong to Task R and are not in the generated client on this
-// branch; once the client is regenerated after the merge these two calls can use it.
+// The generated response types mark every field optional (they come from examples), so the payloads
+// are read through the exact shapes in types.ts.
 export const storeCatalogQueryOptions = () =>
     queryOptions({
         queryKey: [...storeQueryKey, 'catalog'],
         queryFn: async ({ signal }): Promise<StoreCatalog> =>
-            mapCatalog(
-                // oxlint-disable-next-line no-restricted-properties
-                (await http.get<Envelope<RawStoreCatalog>>('/api/client/store/catalog', { signal })).data
-            ),
+            mapCatalog((await clientGetTheStoreCatalog({ signal })).data as RawStoreCatalog),
         staleTime: 30_000,
     });
 
 export const useStoreCatalog = () => useQuery(storeCatalogQueryOptions());
 
 async function fetchQuote(selection: StoreSelection, signal: AbortSignal): Promise<StoreQuote> {
-    const body = selectionBody(selection);
-    // oxlint-disable-next-line no-restricted-properties
-    const response = await http.post<Envelope<RawStoreQuoteResponse>>('/api/client/store/quote', body, { signal });
+    const { data } = await clientQuoteAServer({ body: selectionBody(selection), signal });
 
-    return mapQuote(response.data);
+    return mapQuote(data as RawStoreQuoteResponse);
 }
 
 /** The server's quote for a selection; the previous quote stays on screen while the next one loads. */

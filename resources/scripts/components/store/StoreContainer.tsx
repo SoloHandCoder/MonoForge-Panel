@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Coins, Store as StoreIcon } from 'lucide-react';
 import { httpErrorToHuman } from '@/api/http';
-import { useStoreCatalog, WALLET_PATH } from '@/api/store/queries';
+import { useStoreCatalog } from '@/api/store/queries';
 import type { StoreCatalog } from '@/api/store/types';
 import Icon from '@/components/elements/Icon';
 import PageContentBlock from '@/components/elements/PageContentBlock';
@@ -10,6 +10,7 @@ import PlanCard from '@/components/store/PlanCard';
 import { CapacityNotice } from '@/components/store/StoreNotices';
 import { bestDiscount, sortPlans, tokens } from '@/components/store/storeFormat';
 import { cn } from '@/lib/cn';
+import { PanelLink } from '@/sdk/navigation';
 
 function PlanSkeletons() {
     return (
@@ -23,14 +24,14 @@ function PlanSkeletons() {
 
 export function BalanceChip({ balance }: { balance: number | null }) {
     return (
-        <a
-            href={WALLET_PATH}
+        <PanelLink
+            destination={{ to: '/account/wallet' }}
             className='inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm text-foreground no-underline transition-colors duration-150 hover:border-primary/50 hover:bg-(--hover-row)'
         >
             <Icon icon={Coins} className='size-4 text-(--accent-soft)' aria-hidden />
             {balance === null ? 'Wallet' : <span className='tabular-nums'>{tokens(balance)}</span>}
             <span className='text-muted-foreground'>· Buy tokens</span>
-        </a>
+        </PanelLink>
     );
 }
 

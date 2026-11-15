@@ -12,9 +12,7 @@ import Button from '@/components/elements/Button';
 import Switch from '@/components/ui/Switch';
 import { formatDate } from '@/lib/dates';
 import { useNow } from '@/plugins/useNow';
-
-/** The client Wallet page (Task Q), where tokens are bought. */
-export const WALLET_PATH = '/wallet';
+import { PanelLink } from '@/sdk/navigation';
 
 const dateFormat = 'MMM D, YYYY HH:mm';
 
@@ -54,9 +52,12 @@ function SuspendedBanner({ subscription, now }: { subscription: ServerSubscripti
             </p>
             <div className='mt-3 flex flex-wrap items-center gap-2'>
                 <RenewButton subscription={subscription} />
-                <a href={WALLET_PATH} className='text-sm font-medium underline underline-offset-2'>
+                <PanelLink
+                    destination={{ to: '/account/wallet' }}
+                    className='text-sm font-medium underline underline-offset-2'
+                >
                     Top up
-                </a>
+                </PanelLink>
             </div>
         </Alert>
     );

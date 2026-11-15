@@ -19,7 +19,7 @@ export type CorePanelPath =
     | '/auth/register'
     | '/store'
     | '/store/$planId'
-    | `/account${'' | '/api' | '/ssh' | '/activity'}`
+    | `/account${'' | '/api' | '/ssh' | '/activity' | '/wallet'}`
     | `/server/$id${'' | '/files' | '/databases' | '/schedules' | '/users' | '/users/new' | '/backups' | '/network' | '/startup' | '/settings' | '/activity'}`
     | '/server/$id/files/$action'
     | '/server/$id/schedules/$scheduleId'

@@ -1479,7 +1479,7 @@ class PterodactylOpenApiGenerator extends OpenApiGenerator
             'adminUpdateMinecraftVersionChangerSettings' => $this->enforceMinecraftVersionChangerSettingsBodySchema($properties),
             'adminUpdateExtensionSettings' => $this->enforceAdminExtensionSettingsBodySchema($properties),
             'adminUpdateThemeSettings' => $this->enforceAdminThemeSettingsBodySchema($properties),
-            'clientPurchaseServer' => $this->enforceStorePurchaseBodySchema($properties),
+            'clientPurchaseServer', 'clientQuoteAServer' => $this->enforceStorePurchaseBodySchema($properties),
             default => null,
         };
 
