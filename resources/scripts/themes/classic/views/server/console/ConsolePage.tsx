@@ -16,24 +16,24 @@ export default function ConsolePage({ model, active, className }: ViewProps<'pag
                 </Alert>
             )}
             <Slot name='server.console.before' data={model.server} />
-            <div className='grid grid-cols-4 gap-4 mb-4'>
-                <div className='hidden sm:block sm:col-span-2 lg:col-span-3 pr-4'>
-                    <h1 className='font-header font-medium text-2xl text-foreground leading-relaxed line-clamp-1'>
+            <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
+                <div className='min-w-0'>
+                    <h1 className='font-header text-2xl leading-relaxed font-medium text-foreground line-clamp-1'>
                         {model.name}
                     </h1>
-                    <p className='text-sm line-clamp-2'>{model.description}</p>
+                    {model.description && (
+                        <p className='text-sm text-muted-foreground line-clamp-2'>{model.description}</p>
+                    )}
                 </div>
-                <div className='col-span-4 sm:col-span-2 lg:col-span-1 self-end'>
-                    <View name='server.power' />
-                </div>
+                <View name='server.power' className='shrink-0' />
             </div>
-            <div className='grid grid-cols-4 gap-2 sm:gap-4 mb-4'>
-                <div className='flex col-span-4 lg:col-span-3'>
-                    <View name='server.terminal' />
-                </div>
-                <View name='server.stats' className='col-span-4 lg:col-span-1 order-last lg:order-0' />
+            <div className='mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_21rem]'>
+                <View name='server.terminal' className='min-w-0' />
+                <aside aria-label='Server status' className='flex min-w-0 flex-col gap-3'>
+                    <View name='server.stats' />
+                    <View name='server.graphs' />
+                </aside>
             </div>
-            <View name='server.graphs' />
             <Slot name='server.console.after' data={model.server} />
             {model.features.map((name) => (
                 <View key={name} name={name} />

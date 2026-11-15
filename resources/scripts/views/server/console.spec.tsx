@@ -99,6 +99,7 @@ describe('server.power', () => {
         expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled();
 
         await status('running');
+        expect(screen.getByRole('status')).toHaveTextContent('Running');
         expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
         fireEvent.click(screen.getByRole('button', { name: 'Restart' }));
         expect(send).toHaveBeenLastCalledWith('set state', 'restart');
@@ -112,7 +113,7 @@ describe('server.power', () => {
         const dialog = await screen.findByRole('dialog');
 
         expect(send).not.toHaveBeenCalledWith('set state', 'kill');
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Kill' }));
         expect(send).toHaveBeenCalledWith('set state', 'kill');
     });
 
@@ -142,10 +143,31 @@ describe('server.stats', () => {
 
         const header = within(screen.getByTestId('header'));
 
-        expect(header.getByText('42.50%')).toBeVisible();
-        expect(screen.getAllByText('512 MiB')).toHaveLength(2);
         expect(header.getByText('1h 2m 3s')).toBeVisible();
-        expect(header.getByText('/ 100%')).toBeVisible();
+        expect(screen.getAllByText('1h 2m 3s')).toHaveLength(2);
+    });
+
+    it('counts the players the console reports while the server runs', async () => {
+        await renderServer(
+            <>
+                <View name='server.terminal' />
+                <View name='server.stats' />
+            </>,
+            { eggFeatures: ['eula'] }
+        );
+        await status('running');
+
+        expect(screen.queryByText('Players')).not.toBeInTheDocument();
+        act(() =>
+            host!.emitWebsocket('console output', '[12:00:00 INFO]: There are 2 of a max of 20 players online: a, b')
+        );
+        expect(await screen.findByText('2 / 20')).toBeVisible();
+
+        act(() => host!.emitWebsocket('console output', '[12:00:01 INFO]: Steve joined the game'));
+        expect(await screen.findByText('3 / 20')).toBeVisible();
+
+        await status('offline');
+        expect(screen.queryByText('Players')).not.toBeInTheDocument();
     });
 
     it('flags usage close to the limits', async () => {
@@ -195,6 +217,8 @@ describe('server.graphs', () => {
             expect(model?.cpu.points.map((point) => point.value)).toEqual([10, 20]);
             expect(model?.memory.limit).toBe(1024);
             expect(model?.network.points.at(-1)).toMatchObject({ rx: 0, tx: 0 });
+            expect(model?.disk.points.at(-1)?.value).toBe(256);
+            expect(model?.disk.limit).toBe(1024);
 
             await status('offline');
             expect(model?.live).toBe(false);
@@ -209,7 +233,7 @@ describe('server.terminal', () => {
     it('sends commands and steps through their history', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         await renderServer(<View name='server.terminal' />);
-        const input = screen.getByRole('textbox', { name: 'Console command input.' });
+        const input = screen.getByRole('combobox', { name: 'Console command input.' });
 
         fireEvent.change(input, { target: { value: 'say hello' } });
         fireEvent.keyDown(input, { key: 'Enter' });
@@ -230,7 +254,83 @@ describe('server.terminal', () => {
     it('has no command line without the console permission', async () => {
         await renderServer(<View name='server.terminal' />, { owner: false, permissions: ['control.start'] });
 
-        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+
+    it('completes the common commands of the egg with Tab', async () => {
+        await renderServer(<View name='server.terminal' />, { eggFeatures: ['eula'] });
+        const input = screen.getByRole('combobox', { name: 'Console command input.' });
+
+        fireEvent.change(input, { target: { value: 'white' } });
+        expect(screen.getByRole('option', { name: 'whitelist' })).toBeVisible();
+        fireEvent.keyDown(input, { key: 'Tab' });
+        expect(input).toHaveValue('whitelist ');
+        expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+            'whitelist add',
+            'whitelist remove',
+            'whitelist list',
+            'whitelist on',
+            'whitelist off',
+        ]);
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        fireEvent.keyDown(input, { key: 'Tab' });
+        expect(input).toHaveValue('whitelist remove ');
+    });
+
+    it('shows the output as text, with only https links clickable', async () => {
+        await renderServer(<View name='server.terminal' />);
+
+        act(() => {
+            host!.emitWebsocket('console output', '<img src=x onerror="alert(1)"> [31mred[0m');
+            host!.emitWebsocket(
+                'console output',
+                'see https://example.com/docs. or javascript:alert(1) or http://plain.example'
+            );
+            host!.emitWebsocket('console output', ']8;;javascript:alert(1)click]8;; me');
+        });
+
+        const log = await screen.findByRole('log', { name: 'Console output' });
+
+        await waitFor(() => expect(log).toHaveTextContent('click me'));
+        expect(log.querySelector('img')).toBeNull();
+        expect(log).toHaveTextContent('<img src=x onerror="alert(1)"> red');
+        expect(within(log).getByText('red')).toHaveStyle({ color: 'var(--terminal-ansi-red)' });
+
+        const links = within(log).getAllByRole('link');
+
+        expect(links).toHaveLength(1);
+        expect(links[0]).toHaveAttribute('href', 'https://example.com/docs');
+        expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+        expect(links[0]).toHaveAttribute('target', '_blank');
+    });
+
+    it('filters the output by a search and pauses it', async () => {
+        await renderServer(<View name='server.terminal' />);
+
+        act(() => {
+            host!.emitWebsocket('console output', '[12:00:00 INFO]: Loading world');
+            host!.emitWebsocket('console output', '[12:00:01 WARN]: Can not keep up!');
+        });
+
+        const log = await screen.findByRole('log', { name: 'Console output' });
+
+        await waitFor(() => expect(log).toHaveTextContent('Can not keep up!'));
+        expect(log.querySelector('[data-level="warn"]')).toHaveTextContent('Can not keep up!');
+
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search the console output' }), {
+            target: { value: 'keep' },
+        });
+        await waitFor(() => expect(log.querySelector('mark')).toHaveTextContent('keep'));
+        fireEvent.click(screen.getByRole('button', { name: 'Only show matching lines' }));
+        expect(log).not.toHaveTextContent('Loading world');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pause the console' }));
+        act(() => host!.emitWebsocket('console output', 'keep this for later'));
+        expect(await screen.findByRole('button', { name: /Paused · 1 new line/ })).toBeVisible();
+        expect(log).not.toHaveTextContent('keep this for later');
+
+        fireEvent.click(screen.getByRole('button', { name: /Paused/ }));
+        await waitFor(() => expect(log).toHaveTextContent('keep this for later'));
     });
 });
 
