@@ -2441,10 +2441,10 @@ export type AdminCreateAnAiProviderRequest = {
      */
     model: string;
     /**
-     * The extra headers. Must not have more than 20 items.
+     * Header values keyed by header name. Every header is listed: a value sets it, null (or an empty string) keeps the stored value, and a header left out is removed.
      */
     extra_headers?: {
-        [key: string]: unknown;
+        [key: string]: string | null;
     } | null;
     /**
      * The context window. Must be at least 1024. Must not be greater than 10000000.
@@ -2482,10 +2482,10 @@ export type AdminUpdateAnAiProviderRequest = {
      */
     model?: string;
     /**
-     * The extra headers. Must not have more than 20 items.
+     * Header values keyed by header name. Every header is listed: a value sets it, null (or an empty string) keeps the stored value, and a header left out is removed.
      */
     extra_headers?: {
-        [key: string]: unknown;
+        [key: string]: string | null;
     } | null;
     /**
      * The context window. Must be at least 1024. Must not be greater than 10000000.
@@ -5377,7 +5377,11 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -5390,7 +5394,11 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -5422,7 +5430,11 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -5435,7 +5447,11 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -5467,7 +5483,11 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -5480,7 +5500,11 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -5512,7 +5536,11 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -5525,7 +5553,11 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -5557,7 +5589,11 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -5570,7 +5606,11 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -6670,7 +6710,11 @@ export type ClientStartAnAssistantConversationResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -6683,7 +6727,11 @@ export type ClientStartAnAssistantConversationResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -6715,7 +6763,11 @@ export type ClientGetAnAssistantConversationResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -6728,7 +6780,11 @@ export type ClientGetAnAssistantConversationResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -6760,7 +6816,11 @@ export type ClientSendAnAssistantMessageResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -6773,7 +6833,11 @@ export type ClientSendAnAssistantMessageResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -6805,7 +6869,11 @@ export type ClientAllowAnAssistantActionResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -6818,7 +6886,11 @@ export type ClientAllowAnAssistantActionResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
@@ -6850,7 +6922,11 @@ export type ClientDenyAnAssistantActionResponseBody = {
             name: string;
             label: string;
             arguments: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             };
             /**
              * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
@@ -6863,7 +6939,11 @@ export type ClientDenyAnAssistantActionResponseBody = {
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
-                [key: string]: unknown;
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
             } | null;
         }>;
     }>;
