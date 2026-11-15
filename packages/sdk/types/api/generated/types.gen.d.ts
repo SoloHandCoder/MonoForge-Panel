@@ -1539,7 +1539,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type ClientServerSubuserListResponse = {
     object: string;
@@ -2188,6 +2188,140 @@ export type AdminUpdateTokenPackRequest = {
      * The sort. Must be at least -100000. Must not be greater than 100000.
      */
     sort?: number;
+};
+export type AdminStartAnAdminAssistantConversationRequest = {
+    /**
+     * The message. Must be at least 1 character. Must not be greater than 8000 characters.
+     */
+    message: string;
+};
+export type AdminSendAnAdminAssistantMessageRequest = {
+    /**
+     * The message. Must be at least 1 character. Must not be greater than 8000 characters.
+     */
+    message: string;
+};
+export type AdminCreateAnAiProviderRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 191 characters.
+     */
+    name: string;
+    /**
+     * The preset.
+     */
+    preset: 'cline' | 'clinepass' | 'ollama' | 'openrouter' | 'deepseek' | 'openai' | 'custom';
+    /**
+     * The base url. Must be a valid URL. Must not be greater than 191 characters.
+     */
+    base_url: string;
+    /**
+     * The api key. Must not be greater than 4096 characters.
+     */
+    api_key?: string | null;
+    /**
+     * The model. Must be at least 1 character. Must not be greater than 191 characters.
+     */
+    model: string;
+    /**
+     * The extra headers. Must not have more than 20 items.
+     */
+    extra_headers?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The context window. Must be at least 1024. Must not be greater than 10000000.
+     */
+    context_window?: number;
+    /**
+     * The supports tools.
+     */
+    supports_tools?: boolean;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminUpdateAnAiProviderRequest = {
+    /**
+     * The display name. Must be at least 1 character. Must not be greater than 191 characters.
+     */
+    name?: string;
+    /**
+     * The preset.
+     */
+    preset?: 'cline' | 'clinepass' | 'ollama' | 'openrouter' | 'deepseek' | 'openai' | 'custom';
+    /**
+     * The base url. Must be a valid URL. Must not be greater than 191 characters.
+     */
+    base_url?: string;
+    /**
+     * The api key. Must not be greater than 4096 characters.
+     */
+    api_key?: string | null;
+    /**
+     * The model. Must be at least 1 character. Must not be greater than 191 characters.
+     */
+    model?: string;
+    /**
+     * The extra headers. Must not have more than 20 items.
+     */
+    extra_headers?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The context window. Must be at least 1024. Must not be greater than 10000000.
+     */
+    context_window?: number;
+    /**
+     * The supports tools.
+     */
+    supports_tools?: boolean;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+export type AdminUpdateAiAssistantSettingsRequest = {
+    /**
+     * The enabled.
+     */
+    enabled: boolean;
+    /**
+     * The server enabled.
+     */
+    server_enabled: boolean;
+    /**
+     * The admin enabled.
+     */
+    admin_enabled: boolean;
+    /**
+     * The default provider id. Must match an existing stored value.
+     */
+    default_provider_id?: number | null;
+    /**
+     * The ratio. Must be at least 1. Must not be greater than 1000000.
+     */
+    ratio: number;
+    /**
+     * The free tokens monthly. Must be at least 0. Must not be greater than 100000000.
+     */
+    free_tokens_monthly: number;
+    /**
+     * The warn percent. Must be at least 1. Must not be greater than 100.
+     */
+    warn_percent: number;
+    /**
+     * The max tool iterations. Must be at least 1. Must not be greater than 25.
+     */
+    max_tool_iterations: number;
+    /**
+     * The context tokens. Must be at least 2000. Must not be greater than 1000000.
+     */
+    context_tokens: number;
+    /**
+     * The max output tokens. Must be at least 64. Must not be greater than 32768.
+     */
+    max_output_tokens: number;
 };
 export type AdminInstallExtensionRequest = {
     /**
@@ -4386,13 +4520,13 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | string>;
 };
 export type ClientCreateServerBackupRequest = {
     /**
@@ -4423,6 +4557,18 @@ export type ClientUpdateStartupVariableRequest = {
      * The value.
      */
     value?: string;
+};
+export type ClientStartAnAssistantConversationRequest = {
+    /**
+     * The message. Must be at least 1 character. Must not be greater than 8000 characters.
+     */
+    message: string;
+};
+export type ClientSendAnAssistantMessageRequest = {
+    /**
+     * The message. Must be at least 1 character. Must not be greater than 8000 characters.
+     */
+    message: string;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -4803,6 +4949,305 @@ export type AdminUpdateTokenPackResponseBody = {
     bonus_tokens?: number;
     visible?: boolean;
     sort?: number;
+};
+export type AdminListAdminAssistantConversationsResponseBody = {
+    data?: Array<{
+        uuid?: string;
+        title?: string;
+        status?: string;
+        updated_at?: string;
+    }>;
+};
+export type AdminStartAnAdminAssistantConversationResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminGetAnAdminAssistantConversationResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminSendAnAdminAssistantMessageResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminAllowAnAdminAssistantActionResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminDenyAnAdminAssistantActionResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminListAiProvidersResponseBody = {
+    data?: Array<{
+        id?: number;
+        name?: string;
+        preset?: string;
+        base_url?: string;
+        has_key?: boolean;
+        model?: string;
+        extra_headers?: Array<unknown>;
+        context_window?: number;
+        supports_tools?: boolean;
+        enabled?: boolean;
+        created_at?: string;
+        updated_at?: string;
+    }>;
+    meta?: {
+        default_provider_id?: number;
+        presets?: Array<{
+            preset?: string;
+            label?: string;
+            base_url?: string;
+            model?: string;
+            key_optional?: boolean;
+        }>;
+    };
+};
+export type AdminCreateAnAiProviderResponseBody = {
+    id?: number;
+    name?: string;
+    preset?: string;
+    base_url?: string;
+    has_key?: boolean;
+    model?: string;
+    extra_headers?: Array<unknown>;
+    context_window?: number;
+    supports_tools?: boolean;
+    enabled?: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+export type AdminUpdateAnAiProviderResponseBody = {
+    id?: number;
+    name?: string;
+    preset?: string;
+    base_url?: string;
+    has_key?: boolean;
+    model?: string;
+    extra_headers?: Array<unknown>;
+    context_window?: number;
+    supports_tools?: boolean;
+    enabled?: boolean;
+    created_at?: string;
+    updated_at?: string;
+};
+export type AdminTestAnAiProviderResponseBody = {
+    ok?: boolean;
+    latency_ms?: number;
+    error?: string | null;
+    reply?: string;
+};
+export type AdminGetAiAssistantSettingsResponseBody = {
+    enabled?: boolean;
+    server_enabled?: boolean;
+    admin_enabled?: boolean;
+    default_provider_id?: number;
+    ratio?: number;
+    free_tokens_monthly?: number;
+    warn_percent?: number;
+    max_tool_iterations?: number;
+    context_tokens?: number;
+    max_output_tokens?: number;
+};
+export type AdminUpdateAiAssistantSettingsResponseBody = {
+    enabled?: boolean;
+    server_enabled?: boolean;
+    admin_enabled?: boolean;
+    default_provider_id?: number;
+    ratio?: number;
+    free_tokens_monthly?: number;
+    warn_percent?: number;
+    max_tool_iterations?: number;
+    context_tokens?: number;
+    max_output_tokens?: number;
+};
+export type AdminGetAiAssistantUsageResponseBody = {
+    period?: string;
+    data?: Array<{
+        user?: {
+            id?: number;
+            username?: string;
+            email?: string;
+        };
+        ai_tokens?: number;
+        free_tokens?: number;
+        panel_tokens_charged?: number;
+        admin_ai_tokens?: number;
+        calls?: number;
+    }>;
+    totals?: {
+        ai_tokens?: number;
+        free_tokens?: number;
+        panel_tokens_charged?: number;
+        admin_ai_tokens?: number;
+        calls?: number;
+    };
 };
 export type AdminListExtensionsResponseBody = {
     data?: Array<{
@@ -5446,6 +5891,15 @@ export type ClientGetExtensionJobProgressResponseBody = {
         updated_at: string;
     };
 };
+export type ClientGetAssistantStatusResponseBody = {
+    enabled?: boolean;
+    server_enabled?: boolean;
+    free_limit?: number;
+    free_used?: number;
+    ratio?: number;
+    balance?: number;
+    warning?: string;
+};
 export type ClientGetTheStoreCatalogResponseBody = {
     enabled?: boolean;
     /**
@@ -5642,6 +6096,199 @@ export type ClientListServerActivityFilterOptionsResponseBody = {
     };
 };
 export type ClientGetFileContentsResponseBody = string;
+export type ClientListAssistantConversationsResponseBody = {
+    data?: Array<{
+        uuid?: string;
+        title?: string;
+        status?: string;
+        updated_at?: string;
+    }>;
+};
+export type ClientStartAnAssistantConversationResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientGetAnAssistantConversationResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientSendAnAssistantMessageResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientAllowAnAssistantActionResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientDenyAnAssistantActionResponseBody = {
+    uuid?: string;
+    title?: string;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            needs_confirmation: boolean;
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: unknown;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
 /**
  * Filter activity by event name.
  */
@@ -5707,6 +6354,18 @@ export type AdminListTebexPaymentsPerPageQueryParameter = number;
 export type AdminApproveAndCreditATebexPaymentPaymentIdPathParameter = number;
 export type AdminUpdateTokenPackTokenPackIdPathParameter = number;
 export type AdminUpdateTokenPackTokenPackPathParameter = number;
+export type AdminGetAnAdminAssistantConversationConversationUuidPathParameter = string;
+export type AdminSendAnAdminAssistantMessageConversationUuidPathParameter = string;
+export type AdminAllowAnAdminAssistantActionConversationUuidPathParameter = string;
+export type AdminAllowAnAdminAssistantActionToolCallIdPathParameter = number;
+export type AdminDenyAnAdminAssistantActionConversationUuidPathParameter = string;
+export type AdminDenyAnAdminAssistantActionToolCallIdPathParameter = number;
+export type AdminUpdateAnAiProviderProviderIdPathParameter = number;
+export type AdminTestAnAiProviderProviderIdPathParameter = number;
+/**
+ * The month, as YYYY-MM.
+ */
+export type AdminGetAiAssistantUsagePeriodQueryParameter = string;
 export type AdminGetExtensionSettingsExtensionPathParameter = string;
 export type AdminGetExtensionIconExtensionPathParameter = string;
 export type AdminUploadExtensionSettingFileExtensionPathParameter = string;
@@ -6663,6 +7322,17 @@ export type ClientRestoreServerBackupServerUuidPathParameter = string;
 export type ClientRestoreServerBackupBackupUuidPathParameter = string;
 export type ClientGetStartupConfigurationServerUuidPathParameter = string;
 export type ClientUpdateStartupVariableServerUuidPathParameter = string;
+export type ClientListAssistantConversationsServerUuidPathParameter = string;
+export type ClientGetAnAssistantConversationServerUuidPathParameter = string;
+export type ClientGetAnAssistantConversationConversationUuidPathParameter = string;
+export type ClientSendAnAssistantMessageServerUuidPathParameter = string;
+export type ClientSendAnAssistantMessageConversationUuidPathParameter = string;
+export type ClientAllowAnAssistantActionServerUuidPathParameter = string;
+export type ClientAllowAnAssistantActionConversationUuidPathParameter = string;
+export type ClientAllowAnAssistantActionToolCallIdPathParameter = number;
+export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
+export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
+export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
@@ -7950,6 +8620,487 @@ export type AdminUpdateTokenPackResponses = {
     200: AdminUpdateTokenPackResponseBody;
 };
 export type AdminUpdateTokenPackResponse = AdminUpdateTokenPackResponses[keyof AdminUpdateTokenPackResponses];
+export type AdminListAdminAssistantConversationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/conversations';
+};
+export type AdminListAdminAssistantConversationsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListAdminAssistantConversationsError = AdminListAdminAssistantConversationsErrors[keyof AdminListAdminAssistantConversationsErrors];
+export type AdminListAdminAssistantConversationsResponses = {
+    /**
+     * Conversations returned.
+     */
+    200: AdminListAdminAssistantConversationsResponseBody;
+};
+export type AdminListAdminAssistantConversationsResponse = AdminListAdminAssistantConversationsResponses[keyof AdminListAdminAssistantConversationsResponses];
+export type AdminStartAnAdminAssistantConversationData = {
+    body: AdminStartAnAdminAssistantConversationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/conversations';
+};
+export type AdminStartAnAdminAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminStartAnAdminAssistantConversationError = AdminStartAnAdminAssistantConversationErrors[keyof AdminStartAnAdminAssistantConversationErrors];
+export type AdminStartAnAdminAssistantConversationResponses = {
+    /**
+     * Conversation started.
+     */
+    200: AdminStartAnAdminAssistantConversationResponseBody;
+};
+export type AdminStartAnAdminAssistantConversationResponse = AdminStartAnAdminAssistantConversationResponses[keyof AdminStartAnAdminAssistantConversationResponses];
+export type AdminDeleteAnAdminAssistantConversationData = {
+    body?: never;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminGetAnAdminAssistantConversationConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}';
+};
+export type AdminDeleteAnAdminAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteAnAdminAssistantConversationError = AdminDeleteAnAdminAssistantConversationErrors[keyof AdminDeleteAnAdminAssistantConversationErrors];
+export type AdminDeleteAnAdminAssistantConversationResponses = {
+    /**
+     * Conversation deleted.
+     */
+    204: void;
+};
+export type AdminDeleteAnAdminAssistantConversationResponse = AdminDeleteAnAdminAssistantConversationResponses[keyof AdminDeleteAnAdminAssistantConversationResponses];
+export type AdminGetAnAdminAssistantConversationData = {
+    body?: never;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminGetAnAdminAssistantConversationConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}';
+};
+export type AdminGetAnAdminAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetAnAdminAssistantConversationError = AdminGetAnAdminAssistantConversationErrors[keyof AdminGetAnAdminAssistantConversationErrors];
+export type AdminGetAnAdminAssistantConversationResponses = {
+    /**
+     * Conversation returned.
+     */
+    200: AdminGetAnAdminAssistantConversationResponseBody;
+};
+export type AdminGetAnAdminAssistantConversationResponse = AdminGetAnAdminAssistantConversationResponses[keyof AdminGetAnAdminAssistantConversationResponses];
+export type AdminSendAnAdminAssistantMessageData = {
+    body: AdminSendAnAdminAssistantMessageRequest;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminSendAnAdminAssistantMessageConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}/messages';
+};
+export type AdminSendAnAdminAssistantMessageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The assistant is still working on this conversation.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminSendAnAdminAssistantMessageError = AdminSendAnAdminAssistantMessageErrors[keyof AdminSendAnAdminAssistantMessageErrors];
+export type AdminSendAnAdminAssistantMessageResponses = {
+    /**
+     * Message sent.
+     */
+    200: AdminSendAnAdminAssistantMessageResponseBody;
+};
+export type AdminSendAnAdminAssistantMessageResponse = AdminSendAnAdminAssistantMessageResponses[keyof AdminSendAnAdminAssistantMessageResponses];
+export type AdminAllowAnAdminAssistantActionData = {
+    body?: never;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminAllowAnAdminAssistantActionConversationUuidPathParameter;
+        /**
+         * The assistant tool call ID.
+         */
+        toolCall_id: AdminAllowAnAdminAssistantActionToolCallIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}/tool-calls/{toolCall_id}/approve';
+};
+export type AdminAllowAnAdminAssistantActionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The tool call is not waiting for a decision.
+     */
+    409: ErrorEnvelope;
+};
+export type AdminAllowAnAdminAssistantActionError = AdminAllowAnAdminAssistantActionErrors[keyof AdminAllowAnAdminAssistantActionErrors];
+export type AdminAllowAnAdminAssistantActionResponses = {
+    /**
+     * Action allowed.
+     */
+    200: AdminAllowAnAdminAssistantActionResponseBody;
+};
+export type AdminAllowAnAdminAssistantActionResponse = AdminAllowAnAdminAssistantActionResponses[keyof AdminAllowAnAdminAssistantActionResponses];
+export type AdminDenyAnAdminAssistantActionData = {
+    body?: never;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminDenyAnAdminAssistantActionConversationUuidPathParameter;
+        /**
+         * The assistant tool call ID.
+         */
+        toolCall_id: AdminDenyAnAdminAssistantActionToolCallIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}/tool-calls/{toolCall_id}/deny';
+};
+export type AdminDenyAnAdminAssistantActionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The tool call is not waiting for a decision.
+     */
+    409: ErrorEnvelope;
+};
+export type AdminDenyAnAdminAssistantActionError = AdminDenyAnAdminAssistantActionErrors[keyof AdminDenyAnAdminAssistantActionErrors];
+export type AdminDenyAnAdminAssistantActionResponses = {
+    /**
+     * Action denied.
+     */
+    200: AdminDenyAnAdminAssistantActionResponseBody;
+};
+export type AdminDenyAnAdminAssistantActionResponse = AdminDenyAnAdminAssistantActionResponses[keyof AdminDenyAnAdminAssistantActionResponses];
+export type AdminListAiProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/providers';
+};
+export type AdminListAiProvidersErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListAiProvidersError = AdminListAiProvidersErrors[keyof AdminListAiProvidersErrors];
+export type AdminListAiProvidersResponses = {
+    /**
+     * Providers returned.
+     */
+    200: AdminListAiProvidersResponseBody;
+};
+export type AdminListAiProvidersResponse = AdminListAiProvidersResponses[keyof AdminListAiProvidersResponses];
+export type AdminCreateAnAiProviderData = {
+    body: AdminCreateAnAiProviderRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/providers';
+};
+export type AdminCreateAnAiProviderErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateAnAiProviderError = AdminCreateAnAiProviderErrors[keyof AdminCreateAnAiProviderErrors];
+export type AdminCreateAnAiProviderResponses = {
+    /**
+     * Provider created.
+     */
+    201: AdminCreateAnAiProviderResponseBody;
+};
+export type AdminCreateAnAiProviderResponse = AdminCreateAnAiProviderResponses[keyof AdminCreateAnAiProviderResponses];
+export type AdminDeleteAnAiProviderData = {
+    body?: never;
+    path: {
+        /**
+         * The AI provider ID.
+         */
+        provider_id: AdminUpdateAnAiProviderProviderIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/providers/{provider_id}';
+};
+export type AdminDeleteAnAiProviderErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteAnAiProviderError = AdminDeleteAnAiProviderErrors[keyof AdminDeleteAnAiProviderErrors];
+export type AdminDeleteAnAiProviderResponses = {
+    /**
+     * Provider deleted.
+     */
+    204: void;
+};
+export type AdminDeleteAnAiProviderResponse = AdminDeleteAnAiProviderResponses[keyof AdminDeleteAnAiProviderResponses];
+export type AdminUpdateAnAiProviderData = {
+    body?: AdminUpdateAnAiProviderRequest;
+    path: {
+        /**
+         * The AI provider ID.
+         */
+        provider_id: AdminUpdateAnAiProviderProviderIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/providers/{provider_id}';
+};
+export type AdminUpdateAnAiProviderErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateAnAiProviderError = AdminUpdateAnAiProviderErrors[keyof AdminUpdateAnAiProviderErrors];
+export type AdminUpdateAnAiProviderResponses = {
+    /**
+     * Provider updated.
+     */
+    200: AdminUpdateAnAiProviderResponseBody;
+};
+export type AdminUpdateAnAiProviderResponse = AdminUpdateAnAiProviderResponses[keyof AdminUpdateAnAiProviderResponses];
+export type AdminTestAnAiProviderData = {
+    body?: never;
+    path: {
+        /**
+         * The AI provider ID.
+         */
+        provider_id: AdminTestAnAiProviderProviderIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/providers/{provider_id}/test';
+};
+export type AdminTestAnAiProviderErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminTestAnAiProviderError = AdminTestAnAiProviderErrors[keyof AdminTestAnAiProviderErrors];
+export type AdminTestAnAiProviderResponses = {
+    /**
+     * Test finished.
+     */
+    200: AdminTestAnAiProviderResponseBody;
+};
+export type AdminTestAnAiProviderResponse = AdminTestAnAiProviderResponses[keyof AdminTestAnAiProviderResponses];
+export type AdminGetAiAssistantSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/settings';
+};
+export type AdminGetAiAssistantSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetAiAssistantSettingsError = AdminGetAiAssistantSettingsErrors[keyof AdminGetAiAssistantSettingsErrors];
+export type AdminGetAiAssistantSettingsResponses = {
+    /**
+     * Settings returned.
+     */
+    200: AdminGetAiAssistantSettingsResponseBody;
+};
+export type AdminGetAiAssistantSettingsResponse = AdminGetAiAssistantSettingsResponses[keyof AdminGetAiAssistantSettingsResponses];
+export type AdminUpdateAiAssistantSettingsData = {
+    body: AdminUpdateAiAssistantSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/assistant/settings';
+};
+export type AdminUpdateAiAssistantSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateAiAssistantSettingsError = AdminUpdateAiAssistantSettingsErrors[keyof AdminUpdateAiAssistantSettingsErrors];
+export type AdminUpdateAiAssistantSettingsResponses = {
+    /**
+     * Settings updated.
+     */
+    200: AdminUpdateAiAssistantSettingsResponseBody;
+};
+export type AdminUpdateAiAssistantSettingsResponse = AdminUpdateAiAssistantSettingsResponses[keyof AdminUpdateAiAssistantSettingsResponses];
+export type AdminGetAiAssistantUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * The month, as YYYY-MM.
+         */
+        period?: AdminGetAiAssistantUsagePeriodQueryParameter;
+    };
+    url: '/api/admin/assistant/usage';
+};
+export type AdminGetAiAssistantUsageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminGetAiAssistantUsageError = AdminGetAiAssistantUsageErrors[keyof AdminGetAiAssistantUsageErrors];
+export type AdminGetAiAssistantUsageResponses = {
+    /**
+     * Usage returned.
+     */
+    200: AdminGetAiAssistantUsageResponseBody;
+};
+export type AdminGetAiAssistantUsageResponse = AdminGetAiAssistantUsageResponses[keyof AdminGetAiAssistantUsageResponses];
 export type AdminListExtensionsData = {
     body?: never;
     path?: never;
@@ -15188,6 +16339,30 @@ export type ClientListServerResourcesResponses = {
     200: ClientServerResourcesResponse;
 };
 export type ClientListServerResourcesResponse = ClientListServerResourcesResponses[keyof ClientListServerResourcesResponses];
+export type ClientGetAssistantStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/assistant';
+};
+export type ClientGetAssistantStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientGetAssistantStatusError = ClientGetAssistantStatusErrors[keyof ClientGetAssistantStatusErrors];
+export type ClientGetAssistantStatusResponses = {
+    /**
+     * Assistant status returned.
+     */
+    200: ClientGetAssistantStatusResponseBody;
+};
+export type ClientGetAssistantStatusResponse = ClientGetAssistantStatusResponses[keyof ClientGetAssistantStatusResponses];
 export type ClientListNoticesData = {
     body?: never;
     path?: never;
@@ -18239,6 +19414,293 @@ export type ClientUpdateStartupVariableResponses = {
     200: ClientEggVariableResource;
 };
 export type ClientUpdateStartupVariableResponse = ClientUpdateStartupVariableResponses[keyof ClientUpdateStartupVariableResponses];
+export type ClientListAssistantConversationsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListAssistantConversationsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations';
+};
+export type ClientListAssistantConversationsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientListAssistantConversationsError = ClientListAssistantConversationsErrors[keyof ClientListAssistantConversationsErrors];
+export type ClientListAssistantConversationsResponses = {
+    /**
+     * Conversations returned.
+     */
+    200: ClientListAssistantConversationsResponseBody;
+};
+export type ClientListAssistantConversationsResponse = ClientListAssistantConversationsResponses[keyof ClientListAssistantConversationsResponses];
+export type ClientStartAnAssistantConversationData = {
+    body: ClientStartAnAssistantConversationRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListAssistantConversationsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations';
+};
+export type ClientStartAnAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No free AI tokens and no token balance left.
+     */
+    402: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientStartAnAssistantConversationError = ClientStartAnAssistantConversationErrors[keyof ClientStartAnAssistantConversationErrors];
+export type ClientStartAnAssistantConversationResponses = {
+    /**
+     * Conversation started.
+     */
+    200: ClientStartAnAssistantConversationResponseBody;
+};
+export type ClientStartAnAssistantConversationResponse = ClientStartAnAssistantConversationResponses[keyof ClientStartAnAssistantConversationResponses];
+export type ClientDeleteAnAssistantConversationData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetAnAssistantConversationServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientGetAnAssistantConversationConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}';
+};
+export type ClientDeleteAnAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientDeleteAnAssistantConversationError = ClientDeleteAnAssistantConversationErrors[keyof ClientDeleteAnAssistantConversationErrors];
+export type ClientDeleteAnAssistantConversationResponses = {
+    /**
+     * Conversation deleted.
+     */
+    204: void;
+};
+export type ClientDeleteAnAssistantConversationResponse = ClientDeleteAnAssistantConversationResponses[keyof ClientDeleteAnAssistantConversationResponses];
+export type ClientGetAnAssistantConversationData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetAnAssistantConversationServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientGetAnAssistantConversationConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}';
+};
+export type ClientGetAnAssistantConversationErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetAnAssistantConversationError = ClientGetAnAssistantConversationErrors[keyof ClientGetAnAssistantConversationErrors];
+export type ClientGetAnAssistantConversationResponses = {
+    /**
+     * Conversation returned.
+     */
+    200: ClientGetAnAssistantConversationResponseBody;
+};
+export type ClientGetAnAssistantConversationResponse = ClientGetAnAssistantConversationResponses[keyof ClientGetAnAssistantConversationResponses];
+export type ClientSendAnAssistantMessageData = {
+    body: ClientSendAnAssistantMessageRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientSendAnAssistantMessageServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientSendAnAssistantMessageConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}/messages';
+};
+export type ClientSendAnAssistantMessageErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * No free AI tokens and no token balance left.
+     */
+    402: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The assistant is still working on this conversation.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientSendAnAssistantMessageError = ClientSendAnAssistantMessageErrors[keyof ClientSendAnAssistantMessageErrors];
+export type ClientSendAnAssistantMessageResponses = {
+    /**
+     * Message sent.
+     */
+    200: ClientSendAnAssistantMessageResponseBody;
+};
+export type ClientSendAnAssistantMessageResponse = ClientSendAnAssistantMessageResponses[keyof ClientSendAnAssistantMessageResponses];
+export type ClientAllowAnAssistantActionData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientAllowAnAssistantActionServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientAllowAnAssistantActionConversationUuidPathParameter;
+        /**
+         * The assistant tool call ID.
+         */
+        toolCall_id: ClientAllowAnAssistantActionToolCallIdPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}/tool-calls/{toolCall_id}/approve';
+};
+export type ClientAllowAnAssistantActionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The tool call is not waiting for a decision.
+     */
+    409: ErrorEnvelope;
+};
+export type ClientAllowAnAssistantActionError = ClientAllowAnAssistantActionErrors[keyof ClientAllowAnAssistantActionErrors];
+export type ClientAllowAnAssistantActionResponses = {
+    /**
+     * Action allowed.
+     */
+    200: ClientAllowAnAssistantActionResponseBody;
+};
+export type ClientAllowAnAssistantActionResponse = ClientAllowAnAssistantActionResponses[keyof ClientAllowAnAssistantActionResponses];
+export type ClientDenyAnAssistantActionData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientDenyAnAssistantActionServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientDenyAnAssistantActionConversationUuidPathParameter;
+        /**
+         * The assistant tool call ID.
+         */
+        toolCall_id: ClientDenyAnAssistantActionToolCallIdPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}/tool-calls/{toolCall_id}/deny';
+};
+export type ClientDenyAnAssistantActionErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The tool call is not waiting for a decision.
+     */
+    409: ErrorEnvelope;
+};
+export type ClientDenyAnAssistantActionError = ClientDenyAnAssistantActionErrors[keyof ClientDenyAnAssistantActionErrors];
+export type ClientDenyAnAssistantActionResponses = {
+    /**
+     * Action denied.
+     */
+    200: ClientDenyAnAssistantActionResponseBody;
+};
+export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {
