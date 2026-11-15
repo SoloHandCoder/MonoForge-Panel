@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Pterodactyl\Models\Node;
 
 /**
  * Keeps the shop within the memory, disk and CPU the owner is willing to sell. Only
  * servers sold through the shop count: those with an active or suspended row in
  * server_subscriptions. A limit of 0 is no limit.
+ *
+ * Each node may also have its own shop limits (nodes.shop_limit_*), counted over the shop
+ * servers on that node only, and a purchase has to fit both. The node's own Pterodactyl memory
+ * and disk (and their overallocation) never decide what the shop sells.
  */
 class CapacityService
 {
@@ -37,13 +43,43 @@ class CapacityService
     }
 
     /**
-     * Whether a server with these resources still fits within every limit.
+     * The shop limits of one node; 0 means no limit.
+     *
+     * @return array{memory: int, disk: int, cpu: int}
+     */
+    public static function nodeLimits(Node $node): array
+    {
+        return [
+            'memory' => max(0, (int) $node->shop_limit_memory_mb),
+            'disk' => max(0, (int) $node->shop_limit_disk_mb),
+            'cpu' => max(0, (int) $node->shop_limit_cpu_percent),
+        ];
+    }
+
+    /**
+     * Whether a server with these resources still fits within every shop-wide limit.
      *
      * @param  array<string, int>  $resources  memory (MB), disk (MB) and cpu (percent); other keys are ignored
      */
     public function canProvision(array $resources): bool
     {
         return self::fits(ShopSettings::limits(), $this->used(), $resources);
+    }
+
+    /**
+     * Whether a server with these resources still fits within the node's own shop limits. The
+     * shop-wide limits are canProvision()'s job.
+     *
+     * @param  array<string, int>  $resources  memory (MB), disk (MB) and cpu (percent); other keys are ignored
+     */
+    public function canProvisionOn(Node $node, array $resources): bool
+    {
+        $limits = self::nodeLimits($node);
+        if (max($limits) === 0) {
+            return true;
+        }
+
+        return self::fits($limits, $this->usedOn($node->id), $resources);
     }
 
     /**
@@ -72,16 +108,52 @@ class CapacityService
      */
     public function used(): array
     {
-        $row = DB::table('servers')
+        return $this->row($this->usage()->first());
+    }
+
+    /**
+     * The memory, disk and CPU held by the shop servers on one node.
+     *
+     * @return array{memory: int, disk: int, cpu: int}
+     */
+    public function usedOn(int $nodeId): array
+    {
+        return $this->row($this->usage()->where('servers.node_id', $nodeId)->first());
+    }
+
+    /**
+     * What the shop servers hold on each node, by node id; nodes without any are left out.
+     *
+     * @return array<int, array{memory: int, disk: int, cpu: int}>
+     */
+    public function usedByNode(): array
+    {
+        $used = [];
+        foreach ($this->usage()->addSelect('servers.node_id')->groupBy('servers.node_id')->get() as $row) {
+            $used[$this->toInt($row->node_id ?? null)] = $this->row($row);
+        }
+
+        return $used;
+    }
+
+    /** The shop servers' memory, disk and CPU, summed. */
+    private function usage(): Builder
+    {
+        return DB::table('servers')
             ->join('server_subscriptions', 'server_subscriptions.server_id', '=', 'servers.id')
             ->whereIn('server_subscriptions.status', self::COUNTED_STATUSES)
-            ->selectRaw('COALESCE(SUM(servers.memory), 0) AS memory, COALESCE(SUM(servers.disk), 0) AS disk, COALESCE(SUM(servers.cpu), 0) AS cpu')
-            ->first();
+            ->selectRaw('COALESCE(SUM(servers.memory), 0) AS memory, COALESCE(SUM(servers.disk), 0) AS disk, COALESCE(SUM(servers.cpu), 0) AS cpu');
+    }
 
+    /**
+     * @return array{memory: int, disk: int, cpu: int}
+     */
+    private function row(?object $row): array
+    {
         return [
-            'memory' => $this->toInt($row?->memory),
-            'disk' => $this->toInt($row?->disk),
-            'cpu' => $this->toInt($row?->cpu),
+            'memory' => $this->toInt($row->memory ?? null),
+            'disk' => $this->toInt($row->disk ?? null),
+            'cpu' => $this->toInt($row->cpu ?? null),
         ];
     }
 

@@ -47,7 +47,7 @@ class StoreController extends ClientApiController
                 'resources' => ['memory' => 2048, 'swap' => 0, 'disk' => 10240, 'io' => 500, 'cpu' => 100, 'databases' => 1, 'backups' => 1, 'allocations' => 0],
                 'can_provision' => true,
                 'eggs' => [['id' => 1, 'name' => 'Paper', 'description' => 'High performance Spigot fork.', 'image' => null, 'tags' => [['name' => 'Minecraft', 'color' => '#22c55e']]]],
-                'locations' => [['id' => 1, 'short' => 'de-fra', 'long' => 'Frankfurt', 'multiplier' => 1.0, 'nodes' => [['id' => 2, 'name' => 'Frankfurt 1', 'multiplier' => 1.0]]]],
+                'locations' => [['id' => 1, 'short' => 'de-fra', 'long' => 'Frankfurt', 'multiplier' => 1.0, 'can_provision' => true, 'nodes' => [['id' => 2, 'name' => 'Frankfurt 1', 'multiplier' => 1.0, 'can_provision' => true]]]],
             ]],
         ]],
         'periods' => [['id' => 1, 'name' => 'Monthly', 'days' => 30, 'price_modifier_percent' => 0]],
@@ -79,7 +79,7 @@ class StoreController extends ClientApiController
         private readonly TokenWallet $wallet,
     ) {}
 
-    #[Endpoint('Get the store catalog', 'Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells.')]
+    #[Endpoint('Get the store catalog', 'Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells. A node or location at its own shop limits stays listed with can_provision false.')]
     #[ResponseField('subdomains_enabled', 'boolean', 'Whether checkout offers a custom subdomain (Tunnels settings).')]
     #[ResponseField('subdomain_base', 'string', 'The domain a custom subdomain is created under, or null when subdomains are off.', required: false)]
     #[ResponseField('balance', 'integer', 'The token balance of the requesting user.')]
@@ -92,7 +92,7 @@ class StoreController extends ClientApiController
     /**
      * @throws InvalidQuoteException
      */
-    #[Endpoint('Quote a server', 'Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it.')]
+    #[Endpoint('Quote a server', 'Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it within the shop-wide limits and within the limits of the node itself. In a location, the cheapest node with room is quoted.')]
     #[ResponseField('balance', 'integer', 'The token balance of the requesting user.')]
     #[ScribeResponse(self::QUOTE_EXAMPLE, description: 'Quote returned.')]
     public function quote(GetStoreQuoteRequest $request): JsonResponse
@@ -113,9 +113,18 @@ class StoreController extends ClientApiController
         $this->pricing->assertSellable($plan, $period, $node);
         $quote = $this->pricing->quote($plan, $period, $node, $request->addons());
 
+        // In a location, prefer the cheapest node that still has room within its own shop limits.
+        if (! $request->filled('node_id')) {
+            $roomy = $this->catalog->cheapestNodeIn($plan, $request->integer('location_id'), $quote->resources);
+            if ($roomy instanceof Node && $roomy->id !== $node->id) {
+                $node = $roomy;
+                $quote = $this->pricing->quote($plan, $period, $node, $request->addons());
+            }
+        }
+
         return new JsonResponse([
             'node_id' => $node->id,
-            'can_provision' => $this->capacity->canProvision($quote->resources),
+            'can_provision' => $this->capacity->canProvision($quote->resources) && $this->capacity->canProvisionOn($node, $quote->resources),
             'balance' => $this->wallet->balance($request->user()),
             'quote' => $quote->toArray(),
         ]);

@@ -35,7 +35,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'shop_enabled'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -68,6 +68,9 @@ class Node extends Model implements Identifiable
         'daemonListen' => 8080,
         'maintenance_mode' => false,
         'shop_enabled' => false,
+        'shop_limit_memory_mb' => 0,
+        'shop_limit_disk_mb' => 0,
+        'shop_limit_cpu_percent' => 0,
     ];
 
     /**
@@ -90,6 +93,9 @@ class Node extends Model implements Identifiable
             'public' => 'boolean',
             'maintenance_mode' => 'boolean',
             'shop_enabled' => 'boolean',
+            'shop_limit_memory_mb' => 'integer',
+            'shop_limit_disk_mb' => 'integer',
+            'shop_limit_cpu_percent' => 'integer',
             'playit_secret' => 'encrypted',
         ];
     }

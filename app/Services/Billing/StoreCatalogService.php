@@ -32,6 +32,9 @@ class StoreCatalogService
     /** @var array{memory: int, disk: int, cpu: int}|null */
     private ?array $used = null;
 
+    /** @var array<int, array{memory: int, disk: int, cpu: int}>|null */
+    private ?array $usedByNode = null;
+
     public function __construct(private readonly CapacityService $capacity) {}
 
     /**
@@ -106,10 +109,32 @@ class StoreCatalogService
             ->values();
     }
 
-    /** The cheapest node the plan may use in the location, if any. */
-    public function cheapestNodeIn(ShopPlan $plan, int $locationId): ?Node
+    /**
+     * The cheapest node the plan may use in the location, if any. Given the resources of an order,
+     * the cheapest one that still has room for them within its own shop limits comes first.
+     *
+     * @param  array<string, int>|null  $resources
+     */
+    public function cheapestNodeIn(ShopPlan $plan, int $locationId, ?array $resources = null): ?Node
     {
-        return $this->nodesFor($plan)->first(fn (Node $node): bool => $node->location_id === $locationId);
+        $nodes = $this->nodesFor($plan)->filter(fn (Node $node): bool => $node->location_id === $locationId)->values();
+        if ($resources === null) {
+            return $nodes->first();
+        }
+
+        return $nodes->first(fn (Node $node): bool => $this->nodeFits($node, $resources)) ?? $nodes->first();
+    }
+
+    /**
+     * Whether a server with these resources fits within the node's own shop limits.
+     *
+     * @param  array<string, int>  $resources
+     */
+    public function nodeFits(Node $node, array $resources): bool
+    {
+        $this->usedByNode ??= $this->capacity->usedByNode();
+
+        return CapacityService::fits(CapacityService::nodeLimits($node), $this->usedByNode[$node->id] ?? ['memory' => 0, 'disk' => 0, 'cpu' => 0], $resources);
     }
 
     public function multiplierOf(Node $node): float
@@ -126,7 +151,9 @@ class StoreCatalogService
     private function plan(ShopPlan $plan, \Illuminate\Support\Collection $eggs): array
     {
         $nodes = $this->nodesFor($plan);
+        $resources = $plan->resources();
         $locations = [];
+        $anyNodeFits = false;
         foreach ($nodes as $node) {
             $location = $node->location;
             $locations[$location->id] ??= [
@@ -134,9 +161,14 @@ class StoreCatalogService
                 'short' => $location->short,
                 'long' => $location->long,
                 'multiplier' => $this->multipliers()['location'][$location->id] ?? 1.0,
+                'can_provision' => false,
                 'nodes' => [],
             ];
-            $locations[$location->id]['nodes'][] = ['id' => $node->id, 'name' => $node->name, 'multiplier' => $this->multiplierOf($node)];
+            // A node at its own shop limits stays listed, marked so the store can grey it out.
+            $fits = $this->nodeFits($node, $resources);
+            $anyNodeFits = $anyNodeFits || $fits;
+            $locations[$location->id]['can_provision'] = $locations[$location->id]['can_provision'] || $fits;
+            $locations[$location->id]['nodes'][] = ['id' => $node->id, 'name' => $node->name, 'multiplier' => $this->multiplierOf($node), 'can_provision' => $fits];
         }
 
         $lowest = $nodes->isEmpty() ? 1.0 : $this->multiplierOf($nodes->first());
@@ -148,8 +180,9 @@ class StoreCatalogService
             'price_tokens' => $plan->price_tokens,
             // What the plan costs per 30 days on its cheapest node.
             'from_price_tokens' => max(1, (int) ceil($plan->price_tokens * $lowest - 1e-6)),
-            'resources' => $plan->resources(),
-            'can_provision' => CapacityService::fits(ShopSettings::limits(), $this->used ??= $this->capacity->used(), $plan->resources()),
+            'resources' => $resources,
+            // Within the shop-wide limits and on at least one node within its own.
+            'can_provision' => $anyNodeFits && CapacityService::fits(ShopSettings::limits(), $this->used ??= $this->capacity->used(), $resources),
             'eggs' => collect($plan->eggIds())
                 ->map(fn (int $id): ?Egg => $eggs->get($id))
                 ->filter()

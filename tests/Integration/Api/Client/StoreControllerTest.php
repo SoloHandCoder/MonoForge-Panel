@@ -74,7 +74,7 @@ test('the catalog lists visible plans cheapest first with where they can run', f
     $nodes = $response->json('categories.0.plans.0.locations.0.nodes');
     expect(array_column($nodes, 'name'))->toBe(['Home', 'Pro'])
         ->and(array_column($nodes, 'multiplier'))->toBe([1, 1.5])
-        ->and(array_keys($nodes[0]))->toBe(['id', 'name', 'multiplier']);
+        ->and(array_keys($nodes[0]))->toBe(['id', 'name', 'multiplier', 'can_provision']);
 });
 
 test('a closed store shows nothing and refuses quotes', function (): void {

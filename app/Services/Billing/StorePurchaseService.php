@@ -140,7 +140,13 @@ class StorePurchaseService
 
         // Resources do not depend on the node, only the price does, so any candidate sizes the order.
         $quote = $this->sellableQuote($plan, $period, $candidates->firstOrFail(), $addons);
-        $node = $this->chooseNode($candidates, $quote);
+
+        // Only the shop's limits decide where a server can be sold: each node's own shop limits
+        // here, the shop-wide ones (and these again) under the capacity lock.
+        $candidates = $candidates->filter(fn (Node $node): bool => $this->capacity->canProvisionOn($node, $quote->resources))->values();
+        throw_if($candidates->isEmpty(), StorePurchaseException::capacity());
+
+        $node = $this->chooseNode($candidates);
         if ($node->id !== $candidates->firstOrFail()->id) {
             $quote = $this->sellableQuote($plan, $period, $node, $addons);
         }
@@ -157,36 +163,65 @@ class StorePurchaseService
 
     /**
      * A safety net behind the lock: once the server is committed, the shop servers must still
-     * fit the limits. If they do not (a lock that expired, a limit lowered meanwhile), the
-     * server is kept and root administrators are told, so they can raise the limit or move it.
+     * fit the shop-wide limits and those of the server's node. If they do not (a lock that
+     * expired, a limit lowered meanwhile), the server is kept and root administrators are
+     * told, so they can raise the limit or move it.
      */
     private function warnIfOversold(StorePurchaseResult $result): void
     {
         try {
+            $server = $result->server;
             $limits = ShopSettings::limits();
             $used = $this->capacity->used();
-            if (CapacityService::fits($limits, $used, [])) {
-                return;
+            if (! CapacityService::fits($limits, $used, [])) {
+                Log::warning('The store sold past its capacity limits.', ['server' => $server->uuid, 'used' => $used, 'limits' => $limits]);
+                $this->warnAdmins(sprintf(
+                    'The store sold server "%s" past its limits: %s. The server was kept; raise the limits in Shop > Limits or move servers.',
+                    $server->name,
+                    $this->usage($used, $limits),
+                ), 'Open shop limits', '/panel/shop/limits');
             }
 
-            Log::warning('The store sold past its capacity limits.', ['server' => $result->server->uuid, 'used' => $used, 'limits' => $limits]);
-            $body = sprintf(
-                'The store sold server "%s" past its limits: %s MB memory, %s MB disk and %s%% CPU are in use (limits %s, %s, %s; 0 = none). The server was kept; raise the limits in Shop > Limits or move servers.',
-                $result->server->name,
-                number_format($used['memory']),
-                number_format($used['disk']),
-                number_format($used['cpu']),
-                number_format($limits['memory']),
-                number_format($limits['disk']),
-                number_format($limits['cpu']),
-            );
-            User::query()->where('root_admin', true)->each(function (User $admin) use ($body): void {
-                $this->notices->notify($admin, 'warning', 'Store over capacity', $body, null, 'Open shop limits', '/panel/shop/limits');
-            });
+            $node = $server->loadMissing('node')->node;
+            $nodeLimits = CapacityService::nodeLimits($node);
+            $nodeUsed = $this->capacity->usedOn($node->id);
+            if (! CapacityService::fits($nodeLimits, $nodeUsed, [])) {
+                Log::warning('The store sold past the capacity limits of a node.', ['server' => $server->uuid, 'node' => $node->id, 'used' => $nodeUsed, 'limits' => $nodeLimits]);
+                $this->warnAdmins(sprintf(
+                    'The store sold server "%s" past the shop limits of node "%s": %s. The server was kept; raise the node\'s limits in Shop > Nodes or move servers.',
+                    $server->name,
+                    $node->name,
+                    $this->usage($nodeUsed, $nodeLimits),
+                ), 'Open shop nodes', '/panel/shop/nodes');
+            }
         } catch (Throwable $throwable) {
             // The purchase itself succeeded; a failed warning must not turn it into an error.
             report($throwable);
         }
+    }
+
+    /**
+     * @param  array{memory: int, disk: int, cpu: int}  $used
+     * @param  array{memory: int, disk: int, cpu: int}  $limits
+     */
+    private function usage(array $used, array $limits): string
+    {
+        return sprintf(
+            '%s MB memory, %s MB disk and %s%% CPU are in use (limits %s, %s, %s; 0 = none)',
+            number_format($used['memory']),
+            number_format($used['disk']),
+            number_format($used['cpu']),
+            number_format($limits['memory']),
+            number_format($limits['disk']),
+            number_format($limits['cpu']),
+        );
+    }
+
+    private function warnAdmins(string $body, string $action, string $url): void
+    {
+        User::query()->where('root_admin', true)->each(function (User $admin) use ($body, $action, $url): void {
+            $this->notices->notify($admin, 'warning', 'Store over capacity', $body, null, $action, $url);
+        });
     }
 
     /**
@@ -223,7 +258,10 @@ class StorePurchaseService
      */
     private function charge(User $user, StorePurchaseOrder $order, ShopPlan $plan, ShopPeriod $period, Egg $egg, string $image, Node $node, Quote $quote, array $addons, ?string $subdomain, string $reference): StorePurchaseResult
     {
-        throw_unless($this->capacity->canProvision($quote->resources), StorePurchaseException::capacity());
+        throw_unless(
+            $this->capacity->canProvision($quote->resources) && $this->capacity->canProvisionOn($node, $quote->resources),
+            StorePurchaseException::capacity(),
+        );
         // Taken by a purchase that held the lock before this one.
         $problem = $subdomain === null ? null : TunnelSettings::subdomainProblem($subdomain);
         throw_if($problem !== null, StorePurchaseException::unavailable((string) $problem));
@@ -362,19 +400,19 @@ class StorePurchaseService
     }
 
     /**
-     * The candidate with room for the quoted memory and disk and a free allocation, the least
-     * loaded first.
+     * The candidate with a free allocation, the least loaded first. The node's own memory and
+     * disk allocation (and overallocation) is not checked: for store purchases only the shop's
+     * limits decide, and the candidates already fit them.
      *
      * @param  Collection<int, Node>  $candidates
      */
-    private function chooseNode(Collection $candidates, Quote $quote): Node
+    private function chooseNode(Collection $candidates): Node
     {
         $node = Node::query()
-            ->viableFor($this->resource($quote, 'memory'), $this->resource($quote, 'disk'))
             ->where('nodes.maintenance_mode', false)
             ->whereIn('nodes.id', $candidates->modelKeys())
             ->whereHas('allocations', fn (Builder $query) => $query->whereNull('server_id'))
-            ->orderByRaw('IFNULL(SUM(servers.memory), 0) / GREATEST(nodes.memory, 1)')
+            ->orderByRaw('(SELECT IFNULL(SUM(servers.memory), 0) FROM servers WHERE servers.node_id = nodes.id) / GREATEST(nodes.memory, 1)')
             ->orderBy('nodes.id')
             ->first();
 

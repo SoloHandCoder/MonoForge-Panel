@@ -282,6 +282,7 @@ return [
             'node' => [
                 'enable' => 'Made the ":name" node available in the shop',
                 'disable' => 'Took the ":name" node out of the shop',
+                'limits' => 'Set the shop limits of the ":name" node to :memory MB memory, :disk MB disk and :cpu% CPU',
             ],
             'settings' => [
                 'update' => 'Updated the shop settings',

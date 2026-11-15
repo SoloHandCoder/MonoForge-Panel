@@ -34,6 +34,8 @@ test('lists every node with its shop availability, location and shop servers', f
             'maintenance' => false,
             'shop_enabled' => true,
             'shop_servers' => 1,
+            'limits' => ['memory' => 0, 'disk' => 0, 'cpu' => 0],
+            'used' => ['memory' => $shop->memory, 'disk' => $shop->disk, 'cpu' => $shop->cpu],
         ]);
 });
 
@@ -56,13 +58,36 @@ test('toggles a node in and out of the shop', function (): void {
     $this->putJson(route('api.admin.shop.nodes.update', $node->id), [])->assertUnprocessable();
 });
 
-test('shop availability stays out of the node API', function (): void {
+test('sets the node shop limits without touching its availability', function (): void {
     $node = Node::factory()->withLocation()->create(['shop_enabled' => true]);
 
-    $this->getJson(route('api.admin.nodes.view', $node->id))->assertOk()->assertJsonMissingPath('attributes.shop_enabled');
+    $this->putJson(route('api.admin.shop.nodes.update', $node->id), ['limits' => ['memory' => 32768, 'disk' => 512000, 'cpu' => 1600]])
+        ->assertOk()
+        ->assertJsonPath('shop_enabled', true)
+        ->assertJsonPath('limits', ['memory' => 32768, 'disk' => 512000, 'cpu' => 1600])
+        ->assertJsonPath('used', ['memory' => 0, 'disk' => 0, 'cpu' => 0]);
+
+    $node->refresh();
+    expect([$node->shop_limit_memory_mb, $node->shop_limit_disk_mb, $node->shop_limit_cpu_percent])->toBe([32768, 512000, 1600])
+        ->and($node->shop_enabled)->toBeTrue();
+    $this->assertActivityLogged('admin:shop.node.limits');
+
+    $this->putJson(route('api.admin.shop.nodes.update', $node->id), ['limits' => ['memory' => -1, 'disk' => 0, 'cpu' => 0]])->assertUnprocessable();
+    $this->putJson(route('api.admin.shop.nodes.update', $node->id), ['limits' => ['memory' => 1]])->assertUnprocessable();
+    expect($node->refresh()->shop_limit_memory_mb)->toBe(32768);
 });
 
-test('the toggle needs the shop update permission', function (): void {
+test('shop availability and limits stay out of the node API', function (): void {
+    $node = Node::factory()->withLocation()->create(['shop_enabled' => true, 'shop_limit_memory_mb' => 1024]);
+
+    $this->getJson(route('api.admin.nodes.view', $node->id))->assertOk()
+        ->assertJsonMissingPath('attributes.shop_enabled')
+        ->assertJsonMissingPath('attributes.shop_limit_memory_mb')
+        ->assertJsonMissingPath('attributes.shop_limit_disk_mb')
+        ->assertJsonMissingPath('attributes.shop_limit_cpu_percent');
+});
+
+test('the toggle and the limits need the shop update permission', function (): void {
     $node = Node::factory()->withLocation()->create();
 
     $user = $this->actingAsNonAdmin();
@@ -72,6 +97,8 @@ test('the toggle needs the shop update permission', function (): void {
     // Reading the shop is not enough to change it.
     Gate::define(Permissions::AdminShopRead->value, fn (User $actor): bool => $actor->is($user));
     $this->putJson(route('api.admin.shop.nodes.update', $node->id), ['shop_enabled' => true])->assertForbidden();
+    $this->putJson(route('api.admin.shop.nodes.update', $node->id), ['limits' => ['memory' => 1024, 'disk' => 0, 'cpu' => 0]])->assertForbidden();
 
-    expect($node->refresh()->shop_enabled)->toBeFalse();
+    expect($node->refresh()->shop_enabled)->toBeFalse()
+        ->and($node->shop_limit_memory_mb)->toBe(0);
 });
