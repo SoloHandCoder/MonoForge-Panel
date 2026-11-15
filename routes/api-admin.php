@@ -82,6 +82,9 @@ use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexPaymentController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TokenPackController;
+use Pterodactyl\Http\Controllers\Api\Admin\Support\CannedReplyController;
+use Pterodactyl\Http\Controllers\Api\Admin\Support\SupportCategoryController;
+use Pterodactyl\Http\Controllers\Api\Admin\Support\SupportTicketController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tags\TagController;
 use Pterodactyl\Http\Controllers\Api\Admin\Themes\ThemeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Tunnels\TunnelController;
@@ -117,6 +120,35 @@ Route::prefix('/announcements')->name('api.admin.announcements')->group(function
     Route::put('/{announcement:id}', [AnnouncementController::class, 'update'])->name('.update');
 
     Route::delete('/{announcement:id}', [AnnouncementController::class, 'destroy'])->name('.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Support Routes (phase 6 Task K)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/support
+|
+*/
+Route::prefix('/support')->name('api.admin.support')->group(function (): void {
+    Route::get('/summary', [SupportTicketController::class, 'summary'])->name('.summary');
+    Route::get('/options', [SupportTicketController::class, 'options'])->name('.options');
+
+    Route::get('/tickets', [SupportTicketController::class, 'index'])->name('.tickets');
+    Route::get('/tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('.tickets.view');
+    Route::patch('/tickets/{ticket}', [SupportTicketController::class, 'update'])->whereNumber('ticket')->name('.tickets.update');
+    Route::post('/tickets/{ticket}/messages', [SupportTicketController::class, 'reply'])->whereNumber('ticket')->middleware('throttle:support.staff-reply')->name('.tickets.reply');
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'attachment'])->whereNumber(['ticket', 'attachment'])->name('.tickets.attachment');
+
+    Route::get('/canned-replies', [CannedReplyController::class, 'index'])->name('.canned-replies');
+    Route::post('/canned-replies', [CannedReplyController::class, 'store'])->name('.canned-replies.store');
+    Route::put('/canned-replies/{canned_reply}', [CannedReplyController::class, 'update'])->whereNumber('canned_reply')->name('.canned-replies.update');
+    Route::delete('/canned-replies/{canned_reply}', [CannedReplyController::class, 'destroy'])->whereNumber('canned_reply')->name('.canned-replies.delete');
+
+    Route::get('/categories', [SupportCategoryController::class, 'index'])->name('.categories');
+    Route::post('/categories', [SupportCategoryController::class, 'store'])->name('.categories.store');
+    Route::put('/categories/{support_category}', [SupportCategoryController::class, 'update'])->whereNumber('support_category')->name('.categories.update');
+    Route::delete('/categories/{support_category}', [SupportCategoryController::class, 'destroy'])->whereNumber('support_category')->name('.categories.delete');
 });
 
 /*

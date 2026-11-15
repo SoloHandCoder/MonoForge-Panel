@@ -1840,6 +1840,74 @@ export type AdminUpdateAnnouncementRequest = {
      */
     dismissible?: boolean;
 };
+export type AdminUpdateASupportTicketRequest = {
+    /**
+     * The new status.
+     */
+    status?: 'open' | 'answered' | 'waiting_staff' | 'closed';
+    /**
+     * The ID of the root administrator to assign, or null to unassign.
+     */
+    assigned_to?: number | null;
+    /**
+     * The category ID, or null for none.
+     */
+    category_id?: number | null;
+};
+export type AdminReplyToASupportTicketRequest = {
+    /**
+     * The message, in markdown.
+     */
+    body: string;
+    /**
+     * An internal note only staff see. It does not change the status or notify the player.
+     */
+    internal?: boolean;
+    /**
+     * Up to 3 images.
+     */
+    attachments?: Array<Blob | File>;
+};
+export type AdminCreateACannedReplyRequest = {
+    /**
+     * The title. Must not be greater than 100 characters.
+     */
+    title: string;
+    /**
+     * The body. Must not be greater than 10000 characters.
+     */
+    body: string;
+};
+export type AdminUpdateACannedReplyRequest = {
+    /**
+     * The title. Must not be greater than 100 characters.
+     */
+    title: string;
+    /**
+     * The body. Must not be greater than 10000 characters.
+     */
+    body: string;
+};
+export type AdminCreateASupportCategoryRequest = {
+    /**
+     * The display name. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 1000.
+     */
+    sort?: number;
+};
+export type AdminUpdateASupportCategoryRequest = {
+    /**
+     * The display name. Must not be greater than 64 characters.
+     */
+    name: string;
+    /**
+     * The sort. Must be at least 0. Must not be greater than 1000.
+     */
+    sort?: number;
+};
 export type AdminUpdateShopSettingsRequest = {
     /**
      * The enabled.
@@ -4290,6 +4358,38 @@ export type AuthRegisterRequest = {
      */
     'g-recaptcha-response'?: string | null;
 };
+export type ClientOpenASupportTicketRequest = {
+    /**
+     * What the ticket is about.
+     */
+    subject: string;
+    /**
+     * The ticket category, from the support options.
+     */
+    category_id: number;
+    /**
+     * The short identifier of a server the user owns or is a subuser of.
+     */
+    server?: string;
+    /**
+     * The first message, in markdown.
+     */
+    body: string;
+    /**
+     * Up to 3 images.
+     */
+    attachments?: Array<Blob | File>;
+};
+export type ClientReplyToASupportTicketRequest = {
+    /**
+     * The message, in markdown.
+     */
+    body: string;
+    /**
+     * Up to 3 images.
+     */
+    attachments?: Array<Blob | File>;
+};
 export type ClientQuoteAServerRequest = {
     /**
      * The plan id.
@@ -4812,6 +4912,342 @@ export type AdminListActivityFilterOptionsResponseBody = {
             username?: string;
             email?: string;
         }>;
+    };
+};
+export type AdminGetTheSupportSummaryResponseBody = {
+    /**
+     * The summary.
+     */
+    data: {
+        /**
+         * Tickets waiting on you.
+         */
+        unread: number;
+    };
+};
+export type AdminGetSupportOptionsResponseBody = {
+    /**
+     * The categories and staff members.
+     */
+    data: {
+        categories: Array<{
+            id: number;
+            name: string;
+        }>;
+        staff: Array<{
+            id: number;
+            username: string;
+        }>;
+    };
+};
+export type AdminListSupportTicketsResponseBody = {
+    /**
+     * The tickets.
+     */
+    data: Array<{
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        user: {
+            id: number;
+            username: string;
+            email: string;
+        };
+        assignee: {
+            id: number;
+            username: string;
+        } | null;
+    }>;
+    /**
+     * The page.
+     */
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+};
+export type AdminGetASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        user: {
+            id: number;
+            username: string;
+            email: string;
+        };
+        assignee: {
+            id: number;
+            username: string;
+        } | null;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+            /**
+             * A staff-only internal note.
+             */
+            is_internal: boolean;
+        }>;
+    };
+};
+export type AdminUpdateASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        user: {
+            id: number;
+            username: string;
+            email: string;
+        };
+        assignee: {
+            id: number;
+            username: string;
+        } | null;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+            /**
+             * A staff-only internal note.
+             */
+            is_internal: boolean;
+        }>;
+    };
+};
+export type AdminReplyToASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        user: {
+            id: number;
+            username: string;
+            email: string;
+        };
+        assignee: {
+            id: number;
+            username: string;
+        } | null;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+            /**
+             * A staff-only internal note.
+             */
+            is_internal: boolean;
+        }>;
+    };
+};
+export type AdminGetASupportAttachmentResponseBody = string;
+export type AdminListCannedRepliesResponseBody = {
+    /**
+     * The canned replies.
+     */
+    data: Array<{
+        id: number;
+        title: string;
+        body: string;
+    }>;
+};
+export type AdminCreateACannedReplyResponseBody = {
+    /**
+     * The canned reply.
+     */
+    data: {
+        id: number;
+        title: string;
+        body: string;
+    };
+};
+export type AdminUpdateACannedReplyResponseBody = {
+    /**
+     * The canned reply.
+     */
+    data: {
+        id: number;
+        title: string;
+        body: string;
+    };
+};
+export type AdminListSupportCategoriesResponseBody = {
+    /**
+     * The categories.
+     */
+    data: Array<{
+        id: number;
+        name: string;
+        /**
+         * Lower sorts first.
+         */
+        sort: number;
+        /**
+         * How many tickets have this category.
+         */
+        tickets: number;
+    }>;
+};
+export type AdminCreateASupportCategoryResponseBody = {
+    /**
+     * The category.
+     */
+    data: {
+        id: number;
+        name: string;
+        /**
+         * Lower sorts first.
+         */
+        sort: number;
+        /**
+         * How many tickets have this category.
+         */
+        tickets: number;
+    };
+};
+export type AdminUpdateASupportCategoryResponseBody = {
+    /**
+     * The category.
+     */
+    data: {
+        id: number;
+        name: string;
+        /**
+         * Lower sorts first.
+         */
+        sort: number;
+        /**
+         * How many tickets have this category.
+         */
+        tickets: number;
     };
 };
 export type AdminGetShopSettingsResponseBody = {
@@ -6360,6 +6796,250 @@ export type ClientGetAssistantStatusResponseBody = {
     balance?: number;
     warning?: string;
 };
+export type ClientGetSupportOptionsResponseBody = {
+    /**
+     * The categories and servers.
+     */
+    data: {
+        categories: Array<{
+            id: number;
+            name: string;
+        }>;
+        servers: Array<{
+            identifier: string;
+            name: string;
+        }>;
+    };
+};
+export type ClientListSupportTicketsResponseBody = {
+    /**
+     * The tickets.
+     */
+    data: Array<{
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+    }>;
+    /**
+     * The page.
+     */
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+};
+export type ClientOpenASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+        }>;
+    };
+};
+export type ClientGetASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+        }>;
+    };
+};
+export type ClientReplyToASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+        }>;
+    };
+};
+export type ClientCloseASupportTicketResponseBody = {
+    /**
+     * The ticket and its messages, oldest first.
+     */
+    data: {
+        id: number;
+        subject: string;
+        status: 'open' | 'answered' | 'waiting_staff' | 'closed';
+        category: {
+            id: number;
+            name: string;
+        } | null;
+        server: {
+            identifier: string;
+            name: string;
+        } | null;
+        unread: boolean;
+        /**
+         * Whether the player can still reply: the ticket is not closed, or was closed less than 7 days ago.
+         */
+        can_reply: boolean;
+        last_message_at: string | null;
+        last_message_by_staff: boolean;
+        closed_at: string | null;
+        created_at: string;
+        messages: Array<{
+            id: number;
+            /**
+             * Markdown. Render it with the safe markdown renderer, never as HTML.
+             */
+            body: string;
+            /**
+             * The username of the author.
+             */
+            author: string;
+            is_staff: boolean;
+            attachments: Array<{
+                id: number;
+                name: string;
+                mime: 'image/png' | 'image/jpeg' | 'image/webp';
+                size: number;
+                width: number;
+                height: number;
+            }>;
+            created_at: string;
+        }>;
+    };
+};
+export type ClientGetASupportAttachmentResponseBody = string;
 export type ClientGetTheStoreCatalogResponseBody = {
     enabled?: boolean;
     /**
@@ -7045,6 +7725,36 @@ export type AdminListAnnouncementsPageQueryParameter = number;
  */
 export type AdminListAnnouncementsPerPageQueryParameter = number;
 export type AdminGetAnnouncementAnnouncementIdPathParameter = number;
+/**
+ * Only tickets with this status; `active` means every status but closed.
+ */
+export type AdminListSupportTicketsStatusQueryParameter = 'active' | 'open' | 'answered' | 'waiting_staff' | 'closed';
+/**
+ * Only tickets in this category.
+ */
+export type AdminListSupportTicketsCategoryQueryParameter = number;
+/**
+ * Only tickets assigned to you (`me`), to nobody (`none`), or to the staff member with this ID.
+ */
+export type AdminListSupportTicketsAssignedQueryParameter = string;
+/**
+ * Matches the ticket number, the subject, or the username or email of the player.
+ */
+export type AdminListSupportTicketsSearchQueryParameter = string;
+/**
+ * Page number to return.
+ */
+export type AdminListSupportTicketsPageQueryParameter = number;
+/**
+ * Results to return per page. The maximum is 100.
+ */
+export type AdminListSupportTicketsPerPageQueryParameter = number;
+export type AdminGetASupportTicketTicketPathParameter = number;
+export type AdminReplyToASupportTicketTicketPathParameter = number;
+export type AdminGetASupportAttachmentTicketPathParameter = number;
+export type AdminGetASupportAttachmentAttachmentPathParameter = number;
+export type AdminUpdateACannedReplyCannedReplyPathParameter = number;
+export type AdminUpdateASupportCategorySupportCategoryPathParameter = number;
 export type AdminUpdateShopCategoryCategoryIdPathParameter = number;
 export type AdminGetShopPlanPlanIdPathParameter = number;
 export type AdminUpdateBillingPeriodPeriodIdPathParameter = number;
@@ -7857,6 +8567,19 @@ export type ClientGetExtensionJobProgressJobPathParameter = string;
  */
 export type ClientListServerResourcesServersQueryParameter = string;
 export type ClientMarkNoticeReadNoticePathParameter = string;
+/**
+ * Page number to return.
+ */
+export type ClientListSupportTicketsPageQueryParameter = number;
+/**
+ * Results to return per page. The maximum is 100.
+ */
+export type ClientListSupportTicketsPerPageQueryParameter = number;
+export type ClientGetASupportTicketTicketPathParameter = number;
+export type ClientReplyToASupportTicketTicketPathParameter = number;
+export type ClientCloseASupportTicketTicketPathParameter = number;
+export type ClientGetASupportAttachmentTicketPathParameter = number;
+export type ClientGetASupportAttachmentAttachmentPathParameter = number;
 export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
 export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
 /**
@@ -8350,6 +9073,495 @@ export type AdminUpdateAnnouncementResponses = {
     200: AdminAnnouncementResource;
 };
 export type AdminUpdateAnnouncementResponse = AdminUpdateAnnouncementResponses[keyof AdminUpdateAnnouncementResponses];
+export type AdminGetTheSupportSummaryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/summary';
+};
+export type AdminGetTheSupportSummaryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetTheSupportSummaryError = AdminGetTheSupportSummaryErrors[keyof AdminGetTheSupportSummaryErrors];
+export type AdminGetTheSupportSummaryResponses = {
+    /**
+     * Summary returned.
+     */
+    200: AdminGetTheSupportSummaryResponseBody;
+};
+export type AdminGetTheSupportSummaryResponse = AdminGetTheSupportSummaryResponses[keyof AdminGetTheSupportSummaryResponses];
+export type AdminGetSupportOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/options';
+};
+export type AdminGetSupportOptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetSupportOptionsError = AdminGetSupportOptionsErrors[keyof AdminGetSupportOptionsErrors];
+export type AdminGetSupportOptionsResponses = {
+    /**
+     * Options returned.
+     */
+    200: AdminGetSupportOptionsResponseBody;
+};
+export type AdminGetSupportOptionsResponse = AdminGetSupportOptionsResponses[keyof AdminGetSupportOptionsResponses];
+export type AdminListSupportTicketsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only tickets with this status; `active` means every status but closed.
+         */
+        status?: AdminListSupportTicketsStatusQueryParameter;
+        /**
+         * Only tickets in this category.
+         */
+        category?: AdminListSupportTicketsCategoryQueryParameter;
+        /**
+         * Only tickets assigned to you (`me`), to nobody (`none`), or to the staff member with this ID.
+         */
+        assigned?: AdminListSupportTicketsAssignedQueryParameter;
+        /**
+         * Matches the ticket number, the subject, or the username or email of the player.
+         */
+        search?: AdminListSupportTicketsSearchQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListSupportTicketsPageQueryParameter;
+        /**
+         * Results to return per page. The maximum is 100.
+         */
+        per_page?: AdminListSupportTicketsPerPageQueryParameter;
+    };
+    url: '/api/admin/support/tickets';
+};
+export type AdminListSupportTicketsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminListSupportTicketsError = AdminListSupportTicketsErrors[keyof AdminListSupportTicketsErrors];
+export type AdminListSupportTicketsResponses = {
+    /**
+     * Tickets returned.
+     */
+    200: AdminListSupportTicketsResponseBody;
+};
+export type AdminListSupportTicketsResponse = AdminListSupportTicketsResponses[keyof AdminListSupportTicketsResponses];
+export type AdminGetASupportTicketData = {
+    body?: never;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: AdminGetASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/tickets/{ticket}';
+};
+export type AdminGetASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetASupportTicketError = AdminGetASupportTicketErrors[keyof AdminGetASupportTicketErrors];
+export type AdminGetASupportTicketResponses = {
+    /**
+     * Ticket returned.
+     */
+    200: AdminGetASupportTicketResponseBody;
+};
+export type AdminGetASupportTicketResponse = AdminGetASupportTicketResponses[keyof AdminGetASupportTicketResponses];
+export type AdminUpdateASupportTicketData = {
+    body?: AdminUpdateASupportTicketRequest;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: AdminGetASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/tickets/{ticket}';
+};
+export type AdminUpdateASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateASupportTicketError = AdminUpdateASupportTicketErrors[keyof AdminUpdateASupportTicketErrors];
+export type AdminUpdateASupportTicketResponses = {
+    /**
+     * Ticket updated.
+     */
+    200: AdminUpdateASupportTicketResponseBody;
+};
+export type AdminUpdateASupportTicketResponse = AdminUpdateASupportTicketResponses[keyof AdminUpdateASupportTicketResponses];
+export type AdminReplyToASupportTicketData = {
+    body: AdminReplyToASupportTicketRequest;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: AdminReplyToASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/tickets/{ticket}/messages';
+};
+export type AdminReplyToASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminReplyToASupportTicketError = AdminReplyToASupportTicketErrors[keyof AdminReplyToASupportTicketErrors];
+export type AdminReplyToASupportTicketResponses = {
+    /**
+     * Reply added.
+     */
+    201: AdminReplyToASupportTicketResponseBody;
+};
+export type AdminReplyToASupportTicketResponse = AdminReplyToASupportTicketResponses[keyof AdminReplyToASupportTicketResponses];
+export type AdminGetASupportAttachmentData = {
+    body?: never;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: AdminGetASupportAttachmentTicketPathParameter;
+        /**
+         * The support attachment ID.
+         */
+        attachment: AdminGetASupportAttachmentAttachmentPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/tickets/{ticket}/attachments/{attachment}';
+};
+export type AdminGetASupportAttachmentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetASupportAttachmentError = AdminGetASupportAttachmentErrors[keyof AdminGetASupportAttachmentErrors];
+export type AdminGetASupportAttachmentResponses = {
+    /**
+     * Image returned.
+     */
+    200: AdminGetASupportAttachmentResponseBody;
+};
+export type AdminGetASupportAttachmentResponse = AdminGetASupportAttachmentResponses[keyof AdminGetASupportAttachmentResponses];
+export type AdminListCannedRepliesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/canned-replies';
+};
+export type AdminListCannedRepliesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListCannedRepliesError = AdminListCannedRepliesErrors[keyof AdminListCannedRepliesErrors];
+export type AdminListCannedRepliesResponses = {
+    /**
+     * Canned replies returned.
+     */
+    200: AdminListCannedRepliesResponseBody;
+};
+export type AdminListCannedRepliesResponse = AdminListCannedRepliesResponses[keyof AdminListCannedRepliesResponses];
+export type AdminCreateACannedReplyData = {
+    body: AdminCreateACannedReplyRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/canned-replies';
+};
+export type AdminCreateACannedReplyErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateACannedReplyError = AdminCreateACannedReplyErrors[keyof AdminCreateACannedReplyErrors];
+export type AdminCreateACannedReplyResponses = {
+    /**
+     * Canned reply created.
+     */
+    201: AdminCreateACannedReplyResponseBody;
+};
+export type AdminCreateACannedReplyResponse = AdminCreateACannedReplyResponses[keyof AdminCreateACannedReplyResponses];
+export type AdminDeleteACannedReplyData = {
+    body?: never;
+    path: {
+        /**
+         * The canned reply ID.
+         */
+        canned_reply: AdminUpdateACannedReplyCannedReplyPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/canned-replies/{canned_reply}';
+};
+export type AdminDeleteACannedReplyErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteACannedReplyError = AdminDeleteACannedReplyErrors[keyof AdminDeleteACannedReplyErrors];
+export type AdminDeleteACannedReplyResponses = {
+    /**
+     * Canned reply deleted.
+     */
+    204: void;
+};
+export type AdminDeleteACannedReplyResponse = AdminDeleteACannedReplyResponses[keyof AdminDeleteACannedReplyResponses];
+export type AdminUpdateACannedReplyData = {
+    body: AdminUpdateACannedReplyRequest;
+    path: {
+        /**
+         * The canned reply ID.
+         */
+        canned_reply: AdminUpdateACannedReplyCannedReplyPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/canned-replies/{canned_reply}';
+};
+export type AdminUpdateACannedReplyErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateACannedReplyError = AdminUpdateACannedReplyErrors[keyof AdminUpdateACannedReplyErrors];
+export type AdminUpdateACannedReplyResponses = {
+    /**
+     * Canned reply updated.
+     */
+    200: AdminUpdateACannedReplyResponseBody;
+};
+export type AdminUpdateACannedReplyResponse = AdminUpdateACannedReplyResponses[keyof AdminUpdateACannedReplyResponses];
+export type AdminListSupportCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/categories';
+};
+export type AdminListSupportCategoriesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListSupportCategoriesError = AdminListSupportCategoriesErrors[keyof AdminListSupportCategoriesErrors];
+export type AdminListSupportCategoriesResponses = {
+    /**
+     * Categories returned.
+     */
+    200: AdminListSupportCategoriesResponseBody;
+};
+export type AdminListSupportCategoriesResponse = AdminListSupportCategoriesResponses[keyof AdminListSupportCategoriesResponses];
+export type AdminCreateASupportCategoryData = {
+    body: AdminCreateASupportCategoryRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/support/categories';
+};
+export type AdminCreateASupportCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateASupportCategoryError = AdminCreateASupportCategoryErrors[keyof AdminCreateASupportCategoryErrors];
+export type AdminCreateASupportCategoryResponses = {
+    /**
+     * Category created.
+     */
+    201: AdminCreateASupportCategoryResponseBody;
+};
+export type AdminCreateASupportCategoryResponse = AdminCreateASupportCategoryResponses[keyof AdminCreateASupportCategoryResponses];
+export type AdminDeleteASupportCategoryData = {
+    body?: never;
+    path: {
+        /**
+         * The support category ID.
+         */
+        support_category: AdminUpdateASupportCategorySupportCategoryPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/categories/{support_category}';
+};
+export type AdminDeleteASupportCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteASupportCategoryError = AdminDeleteASupportCategoryErrors[keyof AdminDeleteASupportCategoryErrors];
+export type AdminDeleteASupportCategoryResponses = {
+    /**
+     * Category deleted.
+     */
+    204: void;
+};
+export type AdminDeleteASupportCategoryResponse = AdminDeleteASupportCategoryResponses[keyof AdminDeleteASupportCategoryResponses];
+export type AdminUpdateASupportCategoryData = {
+    body: AdminUpdateASupportCategoryRequest;
+    path: {
+        /**
+         * The support category ID.
+         */
+        support_category: AdminUpdateASupportCategorySupportCategoryPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/support/categories/{support_category}';
+};
+export type AdminUpdateASupportCategoryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateASupportCategoryError = AdminUpdateASupportCategoryErrors[keyof AdminUpdateASupportCategoryErrors];
+export type AdminUpdateASupportCategoryResponses = {
+    /**
+     * Category updated.
+     */
+    200: AdminUpdateASupportCategoryResponseBody;
+};
+export type AdminUpdateASupportCategoryResponse = AdminUpdateASupportCategoryResponses[keyof AdminUpdateASupportCategoryResponses];
 export type AdminGetShopSettingsData = {
     body?: never;
     path?: never;
@@ -17490,6 +18702,239 @@ export type ClientMarkNoticeReadResponses = {
     204: void;
 };
 export type ClientMarkNoticeReadResponse = ClientMarkNoticeReadResponses[keyof ClientMarkNoticeReadResponses];
+export type ClientGetSupportOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/support/options';
+};
+export type ClientGetSupportOptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type ClientGetSupportOptionsError = ClientGetSupportOptionsErrors[keyof ClientGetSupportOptionsErrors];
+export type ClientGetSupportOptionsResponses = {
+    /**
+     * Options returned.
+     */
+    200: ClientGetSupportOptionsResponseBody;
+};
+export type ClientGetSupportOptionsResponse = ClientGetSupportOptionsResponses[keyof ClientGetSupportOptionsResponses];
+export type ClientListSupportTicketsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page number to return.
+         */
+        page?: ClientListSupportTicketsPageQueryParameter;
+        /**
+         * Results to return per page. The maximum is 100.
+         */
+        per_page?: ClientListSupportTicketsPerPageQueryParameter;
+    };
+    url: '/api/client/support/tickets';
+};
+export type ClientListSupportTicketsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientListSupportTicketsError = ClientListSupportTicketsErrors[keyof ClientListSupportTicketsErrors];
+export type ClientListSupportTicketsResponses = {
+    /**
+     * Tickets returned.
+     */
+    200: ClientListSupportTicketsResponseBody;
+};
+export type ClientListSupportTicketsResponse = ClientListSupportTicketsResponses[keyof ClientListSupportTicketsResponses];
+export type ClientOpenASupportTicketData = {
+    body: ClientOpenASupportTicketRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/support/tickets';
+};
+export type ClientOpenASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientOpenASupportTicketError = ClientOpenASupportTicketErrors[keyof ClientOpenASupportTicketErrors];
+export type ClientOpenASupportTicketResponses = {
+    /**
+     * Ticket opened.
+     */
+    201: ClientOpenASupportTicketResponseBody;
+};
+export type ClientOpenASupportTicketResponse = ClientOpenASupportTicketResponses[keyof ClientOpenASupportTicketResponses];
+export type ClientGetASupportTicketData = {
+    body?: never;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: ClientGetASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/client/support/tickets/{ticket}';
+};
+export type ClientGetASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetASupportTicketError = ClientGetASupportTicketErrors[keyof ClientGetASupportTicketErrors];
+export type ClientGetASupportTicketResponses = {
+    /**
+     * Ticket returned.
+     */
+    200: ClientGetASupportTicketResponseBody;
+};
+export type ClientGetASupportTicketResponse = ClientGetASupportTicketResponses[keyof ClientGetASupportTicketResponses];
+export type ClientReplyToASupportTicketData = {
+    body: ClientReplyToASupportTicketRequest;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: ClientReplyToASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/client/support/tickets/{ticket}/messages';
+};
+export type ClientReplyToASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The ticket was closed too long ago to reopen.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientReplyToASupportTicketError = ClientReplyToASupportTicketErrors[keyof ClientReplyToASupportTicketErrors];
+export type ClientReplyToASupportTicketResponses = {
+    /**
+     * Reply added.
+     */
+    201: ClientReplyToASupportTicketResponseBody;
+};
+export type ClientReplyToASupportTicketResponse = ClientReplyToASupportTicketResponses[keyof ClientReplyToASupportTicketResponses];
+export type ClientCloseASupportTicketData = {
+    body?: never;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: ClientCloseASupportTicketTicketPathParameter;
+    };
+    query?: never;
+    url: '/api/client/support/tickets/{ticket}/close';
+};
+export type ClientCloseASupportTicketErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientCloseASupportTicketError = ClientCloseASupportTicketErrors[keyof ClientCloseASupportTicketErrors];
+export type ClientCloseASupportTicketResponses = {
+    /**
+     * Ticket closed.
+     */
+    200: ClientCloseASupportTicketResponseBody;
+};
+export type ClientCloseASupportTicketResponse = ClientCloseASupportTicketResponses[keyof ClientCloseASupportTicketResponses];
+export type ClientGetASupportAttachmentData = {
+    body?: never;
+    path: {
+        /**
+         * The support ticket ID.
+         */
+        ticket: ClientGetASupportAttachmentTicketPathParameter;
+        /**
+         * The support attachment ID.
+         */
+        attachment: ClientGetASupportAttachmentAttachmentPathParameter;
+    };
+    query?: never;
+    url: '/api/client/support/tickets/{ticket}/attachments/{attachment}';
+};
+export type ClientGetASupportAttachmentErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetASupportAttachmentError = ClientGetASupportAttachmentErrors[keyof ClientGetASupportAttachmentErrors];
+export type ClientGetASupportAttachmentResponses = {
+    /**
+     * Image returned.
+     */
+    200: ClientGetASupportAttachmentResponseBody;
+};
+export type ClientGetASupportAttachmentResponse = ClientGetASupportAttachmentResponses[keyof ClientGetASupportAttachmentResponses];
 export type ClientGetTheStoreCatalogData = {
     body?: never;
     path?: never;

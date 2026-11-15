@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useMemo, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import { useMatchRoute } from '@tanstack/react-router';
 import { useAssistantStatus } from '@/api/assistant';
 import { selectServerPermissions, useServerQuery } from '@/api/server/queries';
@@ -13,6 +13,7 @@ import {
     type ScreenParent,
 } from '@/extensions/registry';
 import { ScreenBadge, ScreenGate } from '@/extensions/screenNavigation';
+import SupportNavBadge from '@/components/admin/support/SupportNavBadge';
 import { hasPermission } from '@/plugins/usePermissions';
 import { getAreaNav, type AreaNavEntry, type NavFeature } from '@/router/nav';
 import { useServerRouteId } from '@/router/params';
@@ -166,10 +167,19 @@ export function resourceNavigation(
 const itemScreen = (item: NavItem) =>
     item.extensionId === undefined ? undefined : findExtensionScreen(item.extensionId, item.id);
 
+/** Live badges of core items, by the path they lead to. */
+const coreBadges = new Map<string, ComponentType>([['/panel/support', SupportNavBadge]]);
+
 export function navItemBadge(item: NavItem): ReactNode {
     const screen = itemScreen(item);
 
-    return screen ? <ScreenBadge screen={screen} badge={screen.nav?.badge} /> : null;
+    if (screen) {
+        return <ScreenBadge screen={screen} badge={screen.nav?.badge} />;
+    }
+
+    const CoreBadge = 'to' in item.destination ? coreBadges.get(item.destination.to) : undefined;
+
+    return CoreBadge ? <CoreBadge /> : null;
 }
 
 /** Whether an item is active: on its path, or below it unless it is exact. */

@@ -19,6 +19,8 @@ import { currentUserQueryOptions } from '@/api/account/queries';
 import { accountServersQueryOptions } from '@/api/account/servers/queries';
 import { accountSshKeysQueryOptions } from '@/api/account/ssh-keys/queries';
 import { walletQueryOptions } from '@/api/account/wallet/queries';
+import { supportTicketQueryOptions, supportTicketsQueryOptions } from '@/api/support/queries';
+import { adminSupportTicketQueryOptions } from '@/api/admin/support/queries';
 import {
     adminUserListQueryParams,
     adminUserWithServersQueryOptions,
@@ -88,7 +90,7 @@ import AuthenticatedLayout from '@/router/layouts/AuthenticatedLayout';
 import RootLayout from '@/router/layouts/RootLayout';
 import RootNotFound from '@/router/RootNotFound';
 import { RouteAccessDenied } from '@/router/RouteError';
-import { eggIdParam, idParam, scheduleIdParam } from '@/router/params';
+import { eggIdParam, idParam, scheduleIdParam, ticketIdParam } from '@/router/params';
 import { parseRedirectSearch } from '@/router/redirect';
 import { componentRoute, layoutRoute, pageRoute, requireServerPermission } from '@/router/viewRoutes';
 import { preloadView } from '@/views/View';
@@ -348,6 +350,25 @@ const accountChildren = [
             await context.queryClient.ensureQueryData({ ...walletQueryOptions(), revalidateIfStale: true });
         },
         component: componentRoute(() => import('@/components/account/wallet/WalletContainer')),
+    }),
+    // Phase 6 Task K: the player's support tickets.
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'support',
+        staticData: { nav: { label: 'Support', icon: 'life-buoy' } },
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(supportTicketsQueryOptions(1));
+        },
+        component: componentRoute(() => import('@/components/account/support/SupportContainer')),
+    }),
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'support/$ticketId',
+        params: ticketIdParam,
+        loader: ({ context, params }) => {
+            void context.queryClient.prefetchQuery(supportTicketQueryOptions(params.ticketId));
+        },
+        component: componentRoute(() => import('@/components/account/support/SupportTicketContainer')),
     }),
 ];
 
@@ -981,6 +1002,30 @@ const panelChildren = [
             await context.queryClient.ensureQueryData({ ...adminAnnouncementsQueryOptions(), revalidateIfStale: true });
         },
         component: componentRoute(() => import('@/components/admin/announcements/AnnouncementsContainer')),
+    }),
+    // Phase 6 Task K: the support queue. The tab paths render SupportAdminContainer, which picks
+    // the tab from the path (see components/admin/support/supportTabs.ts).
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'support',
+        staticData: { nav: { label: 'Support', icon: 'life-buoy' } },
+        component: componentRoute(() => import('@/components/admin/support/SupportAdminContainer')),
+    }),
+    ...(['canned-replies', 'categories'] as const).map((tab) =>
+        createRoute({
+            getParentRoute: () => panelRoute,
+            path: `support/${tab}`,
+            component: componentRoute(() => import('@/components/admin/support/SupportAdminContainer')),
+        })
+    ),
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'support/$ticketId',
+        params: ticketIdParam,
+        loader: ({ context, params }) => {
+            void context.queryClient.prefetchQuery(adminSupportTicketQueryOptions(params.ticketId));
+        },
+        component: componentRoute(() => import('@/components/admin/support/AdminSupportTicketContainer')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,

@@ -45,6 +45,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\StorePurchaseController;
 use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
+use Pterodactyl\Http\Controllers\Api\Client\Support\SupportTicketController;
 use Pterodactyl\Http\Controllers\Api\Client\TokenPurchaseController;
 use Pterodactyl\Http\Controllers\Api\Client\TwoFactorController;
 use Pterodactyl\Http\Controllers\Api\Client\WalletController;
@@ -75,6 +76,18 @@ Route::get('/assistant', AssistantController::class)->name('api:client.assistant
 
 Route::get('/notices', [NoticeController::class, 'index'])->name('api:client.notices');
 Route::post('/notices/{notice}/read', [NoticeController::class, 'read'])->whereNumber('notice')->name('api:client.notices.read');
+
+// Support tickets (phase 6 Task K). Tickets are looked up among the user's own, so another
+// user's ticket is not found.
+Route::prefix('/support')->name('api:client.support')->group(function (): void {
+    Route::get('/options', [SupportTicketController::class, 'options'])->name('.options');
+    Route::get('/tickets', [SupportTicketController::class, 'index'])->name('.tickets');
+    Route::post('/tickets', [SupportTicketController::class, 'store'])->middleware('throttle:support.ticket')->name('.tickets.store');
+    Route::get('/tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('.tickets.view');
+    Route::post('/tickets/{ticket}/messages', [SupportTicketController::class, 'reply'])->whereNumber('ticket')->middleware('throttle:support.reply')->name('.tickets.reply');
+    Route::post('/tickets/{ticket}/close', [SupportTicketController::class, 'close'])->whereNumber('ticket')->name('.tickets.close');
+    Route::get('/tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'attachment'])->whereNumber(['ticket', 'attachment'])->name('.tickets.attachment');
+});
 
 // The store: catalog, quotes and buying a server.
 Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');

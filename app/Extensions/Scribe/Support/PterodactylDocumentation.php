@@ -115,6 +115,11 @@ class PterodactylDocumentation
         'friendRequest' => ['integer', 'The ID of the friend request.', 2],
         'template' => ['integer', 'The ID of the permission template.', 1],
         'permissionTemplate_id' => ['integer', 'The ID of the global permission template.', 1],
+        // Phase 6: support tickets.
+        'ticket' => ['integer', 'The support ticket ID.', 12],
+        'attachment' => ['integer', 'The support attachment ID.', 3],
+        'canned_reply' => ['integer', 'The canned reply ID.', 1],
+        'support_category' => ['integer', 'The support category ID.', 1],
     ];
 
     private const array FIELD_DESCRIPTIONS = [

@@ -26,6 +26,11 @@ export const scheduleIdParam = {
     stringify: ({ scheduleId }: { scheduleId: number }) => ({ scheduleId: String(scheduleId) }),
 };
 
+export const ticketIdParam = {
+    parse: ({ ticketId }: { ticketId: string }) => ({ ticketId: parseRouteId(ticketId) }),
+    stringify: ({ ticketId }: { ticketId: number }) => ({ ticketId: String(ticketId) }),
+};
+
 export const routeParamStrings = (
     params: Readonly<Record<string, string | number | undefined>>
 ): Record<string, string> =>

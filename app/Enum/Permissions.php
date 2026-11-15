@@ -102,6 +102,10 @@ enum Permissions: string
     case AdminShopRead = 'admin:shop.read';
     case AdminShopUpdate = 'admin:shop.update';
 
+    // Phase 6 Task K: support tickets. Reading the queue, and replying, notes, assignment, canned replies and categories.
+    case AdminSupportRead = 'admin:support.read';
+    case AdminSupportReply = 'admin:support.reply';
+
     // Server subuser permissions, granted per-server and checked via ServerPolicy.
     case WebsocketConnect = 'websocket.connect';
 
