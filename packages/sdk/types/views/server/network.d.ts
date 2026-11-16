@@ -11,10 +11,23 @@ export interface ServerAllocationItem {
     /** The allocation the server binds to; it cannot be removed. */
     readonly primary: boolean;
 }
+/** The server's name in its node's shared Minecraft entrance: players join `<hostname>.<domain>`. */
+export interface ServerMinecraftHostnameModel {
+    readonly hostname: string;
+    readonly domain: string;
+    /** The full address players use; null while the entrance has none yet. */
+    readonly address: string | null;
+    /** The user may change the name (the rename permission). */
+    readonly canEdit: boolean;
+    /** Core has already shown a toast for a rejection; the promise rejects with it. */
+    readonly rename: (hostname: string) => Promise<void>;
+}
 export interface ServerAllocationsModel {
     readonly allocations: readonly ServerAllocationItem[];
-    /** The playit.gg address players connect to (such as `xyz.joinmc.link`), when the server has a live tunnel. */
+    /** The public address players connect to (a playit.gg tunnel, the game gateway or the shared Minecraft entrance). */
     readonly playitAddress: string | null;
+    /** Set when the server is joined through its node's shared Minecraft entrance. */
+    readonly minecraftHostname?: ServerMinecraftHostnameModel | null;
     /** The server is on a playit.gg node and has no tunnel yet, so players have no public address to use. */
     readonly addressPending?: boolean;
     /** The list has not loaded yet. */

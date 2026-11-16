@@ -168,6 +168,7 @@ return [
         ],
         'settings' => [
             'rename' => 'Renamed the server from :old to :new',
+            'minecraft-hostname' => 'Changed the Minecraft address name from :old to :new',
             'description' => 'Changed the server description from :old to :new',
         ],
         'startup' => [
@@ -295,6 +296,8 @@ return [
             'playit-old-tunnels' => 'Removed :removed old playit.gg tunnels of the :name node',
             'playit-old-tunnels-dismiss' => 'Dismissed the old playit.gg tunnels of the :name node',
             'gateway' => 'Updated the game gateway of the :name node (:state)',
+            'minecraft-entrance' => 'Updated the shared Minecraft entrance of the :name node (:state)',
+            'minecraft-entrance-proxy-protocol' => 'Set up PROXY protocol on :count servers of the :name node',
             'tags' => 'Updated the egg tags for a node',
             'tags_one' => 'Set the node tags to :tags.0',
             'tags_other' => 'Set :count tags on the node',

@@ -728,6 +728,7 @@ export type AdminServerTunnelAttributes = {
     hold_reason: string | null;
     retry_after: string | null;
     replaced_by_gateway: boolean;
+    replaced_by_entrance: boolean;
     created_at: string;
     updated_at: string;
 };
@@ -1713,9 +1714,9 @@ export type ClientServerAttributes = {
      */
     playit_address: string | null;
     /**
-     * Where `playit_address` comes from: `gateway` (the game gateway VPS) or `playit` (a playit.gg tunnel); null when there is no public address.
+     * Where `playit_address` comes from: `entrance` (the shared Minecraft entrance of the node, `<name>.<domain>`), `gateway` (the game gateway VPS) or `playit` (a playit.gg tunnel); null when there is no public address.
      */
-    address_source: 'gateway' | 'playit' | null;
+    address_source: 'entrance' | 'gateway' | 'playit' | null;
     /**
      * True when the server is on a node with a playit.gg agent or the game gateway but has no public address yet (no live tunnel, or a port the gateway does not forward): players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
      */
@@ -3172,6 +3173,36 @@ export type AdminCheckNodeGameGatewayPortsRequest = {
      * Ports to check instead of the stored ones, such as ones not saved yet.
      */
     ports?: string;
+};
+export type AdminUpdateNodeMinecraftEntranceRequest = {
+    /**
+     * Whether the entrance is on.
+     */
+    enabled: boolean;
+    /**
+     * The base domain the server names go under; required while enabled.
+     */
+    domain?: string;
+    /**
+     * playit or gateway; required while enabled.
+     */
+    mode?: 'playit' | 'gateway';
+    /**
+     * Behind the gateway: the public port (default 25565).
+     */
+    entrance_port?: number;
+    /**
+     * Behind playit: the local port the proxy listens on (default 25500).
+     */
+    proxy_port?: number;
+    /**
+     * Forward players' real IPs to servers that can read PROXY protocol (Paper, Purpur, Folia).
+     */
+    proxy_protocol?: boolean;
+    /**
+     * The per-server SRV records exist: show addresses without the playit port.
+     */
+    srv?: boolean;
 };
 export type AdminCreateTunnelRequest = {
     /**
@@ -5581,6 +5612,12 @@ export type ClientUpdateScheduleTaskRequest = {
      */
     continue_on_failure?: boolean;
 };
+export type ClientUpdateServerMinecraftHostnameRequest = {
+    /**
+     * The new name, such as survival.
+     */
+    hostname: string;
+};
 export type ClientUpdateAllocationNotesRequest = {
     /**
      * Notes for this resource. Must not be greater than 256 characters.
@@ -7898,6 +7935,250 @@ export type AdminCheckNodeGameGatewayPortsResponseBody = {
         primary: boolean;
     }>;
 };
+export type AdminGetNodeMinecraftEntranceResponseBody = {
+    /**
+     * Whether the entrance is turned on.
+     */
+    enabled: boolean;
+    /**
+     * Whether it is in use: on, with a domain and a usable way in (the gateway, or a playit agent).
+     */
+    active: boolean;
+    /**
+     * The base domain, such as play.example.com.
+     */
+    domain: string | null;
+    /**
+     * How players reach the entrance.
+     */
+    mode: 'playit' | 'gateway' | null;
+    /**
+     * The public port behind the gateway (25565 lets players leave it out); the proxy listens on it too.
+     */
+    entrance_port: number;
+    /**
+     * The local port the proxy listens on behind playit.
+     */
+    proxy_port: number;
+    /**
+     * The port the proxy listens on now.
+     */
+    listen_port: number;
+    /**
+     * The port players reach the entrance on; null while the playit tunnel has no address.
+     */
+    public_port: number | null;
+    /**
+     * Whether the proxy forwards players' real IPs (PROXY protocol) to servers that can read it.
+     */
+    proxy_protocol: boolean;
+    /**
+     * Whether the SRV records exist, so addresses are shown without the playit port.
+     */
+    srv: boolean;
+    /**
+     * The address of the playit tunnel to the proxy.
+     */
+    tunnel_address: string | null;
+    /**
+     * Why the playit tunnel could not be made or read.
+     */
+    tunnel_error: string | null;
+    /**
+     * When mc-router.sh on the node last fetched its routes.
+     */
+    synced_at: string | null;
+    /**
+     * Servers routed now (Minecraft Java, installed and not suspended).
+     */
+    servers: number;
+    /**
+     * The address of one routed server.
+     */
+    example_address: string | null;
+    /**
+     * Behind the gateway: whether it forwards the entrance port.
+     */
+    gateway_forwards_entrance: boolean | null;
+    /**
+     * The DNS records to create for the domain.
+     */
+    dns: Array<{
+        type: string;
+        name: string;
+        value: string;
+        note: string;
+    }>;
+    /**
+     * The node script the commands download.
+     */
+    script: {
+        /**
+         * Where the panel serves mc-router.sh.
+         */
+        url: string;
+        /**
+         * The SHA-256 of mc-router.sh.
+         */
+        sha256: string | null;
+    };
+    /**
+     * The mc-router.sh commands, run with sudo on the node.
+     */
+    commands: {
+        /**
+         * Downloads mc-router.sh and checks it.
+         */
+        download: string;
+        /**
+         * Installs Gate and the route sync timer.
+         */
+        install: string;
+        /**
+         * Shows the proxy, the last sync and the routes.
+         */
+        status: string;
+        /**
+         * Removes the proxy from the node.
+         */
+        remove: string;
+    };
+};
+export type AdminUpdateNodeMinecraftEntranceResponseBody = {
+    /**
+     * Whether the entrance is turned on.
+     */
+    enabled: boolean;
+    /**
+     * Whether it is in use.
+     */
+    active: boolean;
+    /**
+     * The base domain.
+     */
+    domain: string | null;
+    /**
+     * How players reach the entrance.
+     */
+    mode: 'playit' | 'gateway' | null;
+    /**
+     * The public port behind the gateway.
+     */
+    entrance_port: number;
+    /**
+     * The local proxy port behind playit.
+     */
+    proxy_port: number;
+    /**
+     * The port the proxy listens on now.
+     */
+    listen_port: number;
+    /**
+     * The port players reach the entrance on.
+     */
+    public_port: number | null;
+    /**
+     * Whether players' real IPs are forwarded.
+     */
+    proxy_protocol: boolean;
+    /**
+     * Whether the SRV records exist.
+     */
+    srv: boolean;
+    /**
+     * The address of the playit tunnel.
+     */
+    tunnel_address: string | null;
+    /**
+     * Why the playit tunnel failed.
+     */
+    tunnel_error: string | null;
+    /**
+     * When the node last fetched its routes.
+     */
+    synced_at: string | null;
+    /**
+     * Servers routed now.
+     */
+    servers: number;
+    /**
+     * The address of one routed server.
+     */
+    example_address: string | null;
+    /**
+     * Behind the gateway: whether it forwards the entrance port.
+     */
+    gateway_forwards_entrance: boolean | null;
+    /**
+     * The DNS records to create.
+     */
+    dns: Array<{
+        type: string;
+        name: string;
+        value: string;
+        note: string;
+    }>;
+    /**
+     * The node script.
+     */
+    script: {
+        /**
+         * Where the panel serves mc-router.sh.
+         */
+        url: string;
+        /**
+         * The SHA-256 of mc-router.sh.
+         */
+        sha256: string | null;
+    };
+    /**
+     * The mc-router.sh commands.
+     */
+    commands: {
+        /**
+         * Downloads mc-router.sh.
+         */
+        download: string;
+        /**
+         * Installs Gate and the sync timer.
+         */
+        install: string;
+        /**
+         * Shows the proxy status.
+         */
+        status: string;
+        /**
+         * Removes the proxy.
+         */
+        remove: string;
+    };
+};
+export type AdminApplyMinecraftEntranceProxyProtocolResponseBody = {
+    /**
+     * Servers that now get real player IPs.
+     */
+    applied: number;
+    /**
+     * Servers changed that must restart first; apply again afterwards.
+     */
+    restart: number;
+    /**
+     * Servers whose software cannot read PROXY protocol.
+     */
+    unsupported: number;
+    /**
+     * Servers Wings could not change.
+     */
+    failed: number;
+    /**
+     * Each routed server with its result.
+     */
+    servers: Array<{
+        server_id: number;
+        server_name: string;
+        result: 'applied' | 'restart' | 'unsupported' | 'failed';
+    }>;
+};
 export type AdminGetNodePlayitGgSwitchResponseBody = {
     /**
      * The playit mode of the node: `read_only`, `self_managed` or null.
@@ -9672,6 +9953,42 @@ export type ClientListServerActivityFilterOptionsResponseBody = {
     };
 };
 export type ClientGetFileContentsResponseBody = string;
+export type ClientGetServerMinecraftHostnameResponseBody = {
+    /**
+     * Whether the server is joined through the node's shared Minecraft entrance.
+     */
+    routed: boolean;
+    /**
+     * The name in front of the domain.
+     */
+    hostname: string | null;
+    /**
+     * The base domain of the entrance.
+     */
+    domain: string | null;
+    /**
+     * The address players join with.
+     */
+    address: string | null;
+};
+export type ClientUpdateServerMinecraftHostnameResponseBody = {
+    /**
+     * Always true.
+     */
+    routed: boolean;
+    /**
+     * The name in front of the domain.
+     */
+    hostname: string | null;
+    /**
+     * The base domain of the entrance.
+     */
+    domain: string | null;
+    /**
+     * The address players join with.
+     */
+    address: string | null;
+};
 export type ClientListAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
@@ -11207,6 +11524,8 @@ export type AdminGetNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminTestNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminGetNodeGameGatewayNodeIdPathParameter = number;
 export type AdminCheckNodeGameGatewayPortsNodeIdPathParameter = number;
+export type AdminGetNodeMinecraftEntranceNodeIdPathParameter = number;
+export type AdminApplyMinecraftEntranceProxyProtocolNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgSwitchNodeIdPathParameter = number;
 export type AdminCheckNodePlayitGgSwitchStatusNodeIdPathParameter = number;
 export type AdminCheckNodePlayitGgClaimNodeIdPathParameter = number;
@@ -12122,6 +12441,7 @@ export type ClientUpdateScheduleTaskServerUuidPathParameter = string;
 export type ClientUpdateScheduleTaskScheduleIdPathParameter = number;
 export type ClientUpdateScheduleTaskTaskIdPathParameter = number;
 export type ClientListServerAllocationsServerUuidPathParameter = string;
+export type ClientGetServerMinecraftHostnameServerUuidPathParameter = string;
 export type ClientUpdateAllocationNotesServerUuidPathParameter = string;
 export type ClientUpdateAllocationNotesAllocationIdPathParameter = number;
 export type ClientSetPrimaryAllocationServerUuidPathParameter = string;
@@ -16308,6 +16628,109 @@ export type AdminCheckNodeGameGatewayPortsResponses = {
     200: AdminCheckNodeGameGatewayPortsResponseBody;
 };
 export type AdminCheckNodeGameGatewayPortsResponse = AdminCheckNodeGameGatewayPortsResponses[keyof AdminCheckNodeGameGatewayPortsResponses];
+export type AdminGetNodeMinecraftEntranceData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodeMinecraftEntranceNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/minecraft-entrance';
+};
+export type AdminGetNodeMinecraftEntranceErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetNodeMinecraftEntranceError = AdminGetNodeMinecraftEntranceErrors[keyof AdminGetNodeMinecraftEntranceErrors];
+export type AdminGetNodeMinecraftEntranceResponses = {
+    /**
+     * Minecraft entrance returned.
+     */
+    200: AdminGetNodeMinecraftEntranceResponseBody;
+};
+export type AdminGetNodeMinecraftEntranceResponse = AdminGetNodeMinecraftEntranceResponses[keyof AdminGetNodeMinecraftEntranceResponses];
+export type AdminUpdateNodeMinecraftEntranceData = {
+    body: AdminUpdateNodeMinecraftEntranceRequest;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodeMinecraftEntranceNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/minecraft-entrance';
+};
+export type AdminUpdateNodeMinecraftEntranceErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateNodeMinecraftEntranceError = AdminUpdateNodeMinecraftEntranceErrors[keyof AdminUpdateNodeMinecraftEntranceErrors];
+export type AdminUpdateNodeMinecraftEntranceResponses = {
+    /**
+     * Minecraft entrance saved.
+     */
+    200: AdminUpdateNodeMinecraftEntranceResponseBody;
+};
+export type AdminUpdateNodeMinecraftEntranceResponse = AdminUpdateNodeMinecraftEntranceResponses[keyof AdminUpdateNodeMinecraftEntranceResponses];
+export type AdminApplyMinecraftEntranceProxyProtocolData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminApplyMinecraftEntranceProxyProtocolNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/minecraft-entrance/proxy-protocol';
+};
+export type AdminApplyMinecraftEntranceProxyProtocolErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminApplyMinecraftEntranceProxyProtocolError = AdminApplyMinecraftEntranceProxyProtocolErrors[keyof AdminApplyMinecraftEntranceProxyProtocolErrors];
+export type AdminApplyMinecraftEntranceProxyProtocolResponses = {
+    /**
+     * PROXY protocol applied.
+     */
+    200: AdminApplyMinecraftEntranceProxyProtocolResponseBody;
+};
+export type AdminApplyMinecraftEntranceProxyProtocolResponse = AdminApplyMinecraftEntranceProxyProtocolResponses[keyof AdminApplyMinecraftEntranceProxyProtocolResponses];
 export type AdminGetNodePlayitGgSwitchData = {
     body?: never;
     path: {
@@ -26708,6 +27131,76 @@ export type ClientCreateServerAllocationResponses = {
     200: ClientAllocationResource;
 };
 export type ClientCreateServerAllocationResponse = ClientCreateServerAllocationResponses[keyof ClientCreateServerAllocationResponses];
+export type ClientGetServerMinecraftHostnameData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerMinecraftHostnameServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/network/minecraft-hostname';
+};
+export type ClientGetServerMinecraftHostnameErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientGetServerMinecraftHostnameError = ClientGetServerMinecraftHostnameErrors[keyof ClientGetServerMinecraftHostnameErrors];
+export type ClientGetServerMinecraftHostnameResponses = {
+    /**
+     * Hostname returned.
+     */
+    200: ClientGetServerMinecraftHostnameResponseBody;
+};
+export type ClientGetServerMinecraftHostnameResponse = ClientGetServerMinecraftHostnameResponses[keyof ClientGetServerMinecraftHostnameResponses];
+export type ClientUpdateServerMinecraftHostnameData = {
+    body: ClientUpdateServerMinecraftHostnameRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetServerMinecraftHostnameServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/network/minecraft-hostname';
+};
+export type ClientUpdateServerMinecraftHostnameErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientUpdateServerMinecraftHostnameError = ClientUpdateServerMinecraftHostnameErrors[keyof ClientUpdateServerMinecraftHostnameErrors];
+export type ClientUpdateServerMinecraftHostnameResponses = {
+    /**
+     * Hostname saved.
+     */
+    200: ClientUpdateServerMinecraftHostnameResponseBody;
+};
+export type ClientUpdateServerMinecraftHostnameResponse = ClientUpdateServerMinecraftHostnameResponses[keyof ClientUpdateServerMinecraftHostnameResponses];
 export type ClientDeleteServerAllocationData = {
     body?: never;
     path: {

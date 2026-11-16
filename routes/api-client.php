@@ -29,6 +29,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\FileController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileUploadController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\LogController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\Minecraft\MinecraftVersionController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\MinecraftHostnameController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\NetworkAllocationController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\ModpackController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\PluginController;
@@ -262,6 +263,8 @@ Route::group([
 
     Route::group(['prefix' => '/network'], function (): void {
         Route::get('/allocations', [NetworkAllocationController::class, 'index']);
+        Route::get('/minecraft-hostname', [MinecraftHostnameController::class, 'show']);
+        Route::put('/minecraft-hostname', [MinecraftHostnameController::class, 'update']);
         Route::middleware([ResourceLimit::Allocation->middleware()])
             ->post('/allocations', [NetworkAllocationController::class, 'store']);
         Route::post('/allocations/{allocation}', [NetworkAllocationController::class, 'update']);

@@ -19,6 +19,7 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Entrance\MinecraftEntrance;
 use Pterodactyl\Services\Games\ExtraPortPlanner;
 use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Servers\ServerAddress;
@@ -55,6 +56,9 @@ class TunnelService
 
     /** Why a server on a node in game gateway mode gets no playit.gg tunnel. */
     public const string GATEWAY = 'This node uses the game gateway: players join through the gateway VPS, so its servers get no playit.gg tunnels.';
+
+    /** Why a Minecraft server joined through its node's shared entrance gets no main tunnel. */
+    public const string ENTRANCE = "This server is joined through its node's shared Minecraft entrance (<name>.<domain>), so it gets no playit.gg tunnel of its own for the game port.";
 
     /** How long the scheduler waits before retrying a tunnel that hit the account's limit. */
     public const int TUNNEL_LIMIT_BACKOFF_HOURS = 6;
@@ -120,7 +124,8 @@ class TunnelService
             return null;
         }
 
-        $main = $this->provision($server);
+        // A server routed by the node's shared Minecraft entrance only gets its extra ports.
+        $main = MinecraftEntrance::isRouted($server) ? null : $this->provision($server);
         $planned = $this->plannedExtras($server, $game);
 
         foreach ($planned as $key => $extra) {
@@ -199,12 +204,14 @@ class TunnelService
                 continue;
             }
 
+            $server->setRelation('node', $node);
+            $routed = MinecraftEntrance::isRouted($server);
             $keys = $server->tunnels->map(fn (ServerTunnel $tunnel): string => $tunnel->port_key)->all();
-            if ($extrasOnly && ! in_array(ServerTunnel::MAIN, $keys, true)) {
+            if ($extrasOnly && ! $routed && ! in_array(ServerTunnel::MAIN, $keys, true)) {
                 continue;
             }
 
-            $wanted = [ServerTunnel::MAIN, ...array_keys($this->plannedExtras($server, $game))];
+            $wanted = [...($routed ? [] : [ServerTunnel::MAIN]), ...array_keys($this->plannedExtras($server, $game))];
             if (array_diff($wanted, $keys) === []) {
                 continue;
             }
@@ -312,8 +319,9 @@ class TunnelService
      */
     public function recreate(ServerTunnel $tunnel, bool $deleteImported = false): ServerTunnel
     {
-        if ($tunnel->server()->with('node')->first()?->node->hasGateway() === true) {
-            // Left alone while the node is in gateway mode; turning the gateway off resumes playit.
+        $owner = $tunnel->server()->with(['node', 'egg'])->first();
+        if ($owner?->node->hasGateway() === true || ($owner instanceof Server && $tunnel->isMain() && MinecraftEntrance::isRouted($owner))) {
+            // Left alone while the node uses the gateway or the shared entrance; turning it off resumes playit.
             return $tunnel;
         }
 
@@ -380,6 +388,10 @@ class TunnelService
             return $tunnel->wasRecentlyCreated ? $this->fail($tunnel, self::GATEWAY) : $tunnel;
         }
 
+        if ($tunnel->isMain() && MinecraftEntrance::isRouted($server)) {
+            return $tunnel->wasRecentlyCreated ? $this->fail($tunnel, self::ENTRANCE) : $tunnel;
+        }
+
         $tunnel->fill(['hold_reason' => null, 'retry_after' => null]);
 
         if (! $server->node->hasPlayitAgent()) {
@@ -436,8 +448,9 @@ class TunnelService
         }
 
         $node = $server->node;
-        if ($node->hasGateway()) {
-            // Nothing is created, synced or retried on playit while the node uses the gateway.
+        if ($node->hasGateway() || ($tunnel->isMain() && MinecraftEntrance::isRouted($server))) {
+            // Nothing is created, synced or retried on playit while the node uses the gateway, or
+            // for the game port of a server joined through the shared Minecraft entrance.
             return;
         }
 

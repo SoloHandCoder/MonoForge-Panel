@@ -14,6 +14,7 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Entrance\EntranceTunnelService;
 use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Tunnels\TunnelImportService;
 use Pterodactyl\Services\Tunnels\TunnelService;
@@ -22,7 +23,7 @@ use Pterodactyl\Services\Tunnels\TunnelService;
 #[Signature('p:tunnels:sync {--limit=50 : The most tunnels to handle in one run.}')]
 class SyncTunnelsCommand extends Command
 {
-    public function handle(TunnelService $tunnels, TunnelImportService $importer): int
+    public function handle(TunnelService $tunnels, TunnelImportService $importer, EntranceTunnelService $entrances): int
     {
         // First link the tunnels made by hand in the playit dashboard (one agent read per node),
         // so a server whose tunnel exists now is not tried again below.
@@ -82,6 +83,12 @@ class SyncTunnelsCommand extends Command
             if ($tunnels->sync($tunnel)->status === TunnelStatus::Active) {
                 $active++;
             }
+        }
+
+        // The one playit tunnel of each node whose shared Minecraft entrance goes through playit
+        // (and the removal of one that is no longer needed).
+        foreach (Node::query()->where('mc_entrance_enabled', true)->orWhereNotNull('mc_entrance_tunnel_id')->get() as $node) {
+            $entrances->ensure($node);
         }
 
         $this->components->info(sprintf('Linked %d playit.gg tunnel(s) from the dashboard. Queued %d new tunnel(s). Checked %d tunnel(s); %d now active; %d parked as not a game.', $linked['imported'], $created, $pending->count() - $held, $active, $held));

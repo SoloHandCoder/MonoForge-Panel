@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Remote\ActivityProcessingController;
 use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupRemoteUploadController;
 use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupStatusController;
+use Pterodactyl\Http\Controllers\Api\Remote\MinecraftRoutesController;
 use Pterodactyl\Http\Controllers\Api\Remote\PlayitAgentSwitchController;
 use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerDetailsController;
 use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerInstallController;
@@ -39,3 +40,6 @@ Route::middleware('throttle:30,1')->group(function (): void {
     Route::post('/playit/agent-switch', [PlayitAgentSwitchController::class, 'report']);
     Route::post('/playit/agent-status', [PlayitAgentSwitchController::class, 'status']);
 });
+
+// The node's Minecraft router (mc-router.sh): Gate's routes for the shared Minecraft entrance.
+Route::get('/minecraft-routes', MinecraftRoutesController::class)->middleware('throttle:20,1');

@@ -10,6 +10,7 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Entrance\MinecraftEntrance;
 use Pterodactyl\Services\Games\ExtraPortPlanner;
 use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Tunnels\TunnelProfile;
@@ -19,6 +20,9 @@ use Pterodactyl\Services\Tunnels\TunnelProfile;
  * address (the server pages, the dashboard, the purchase result, the public page, discovery and
  * the assistant) comes from here, through {@see \Pterodactyl\Services\Tunnels\TunnelService}.
  *
+ * - On a node with the shared Minecraft entrance, a Minecraft Java server is `<name>.<domain>`
+ *   ({@see MinecraftEntrance}), the port left out when the entrance is on 25565 or SRV records
+ *   carry it. Its extra ports (voice chat and the like) keep their own addresses below.
  * - On a node in game gateway mode: `<gateway host>:<allocation port>` when the gateway forwards
  *   the port (a Minecraft Java server on 25565 leaves the port out), otherwise nothing. playit
  *   tunnels of such a node are never shown.
@@ -31,6 +35,8 @@ class ServerAddress
     public const string SOURCE_GATEWAY = 'gateway';
 
     public const string SOURCE_PLAYIT = 'playit';
+
+    public const string SOURCE_ENTRANCE = 'entrance';
 
     /** The port Minecraft Java clients use when an address has none. */
     public const int MINECRAFT_DEFAULT_PORT = 25565;
@@ -47,6 +53,10 @@ class ServerAddress
     public function main(Server $server): ?string
     {
         $node = $this->node($server);
+        if (MinecraftEntrance::isRouted($server)) {
+            return MinecraftEntrance::address($server);
+        }
+
         if ($node->hasGateway()) {
             $allocation = $server->relationLoaded('allocation') ? $server->getRelation('allocation') : $server->allocation()->first();
             if (! $allocation instanceof Allocation || ! $node->gatewayForwards((int) $allocation->port)) {
@@ -118,6 +128,10 @@ class ServerAddress
             return null;
         }
 
+        if (MinecraftEntrance::isRouted($server)) {
+            return self::SOURCE_ENTRANCE;
+        }
+
         return $this->node($server)->hasGateway() ? self::SOURCE_GATEWAY : self::SOURCE_PLAYIT;
     }
 
@@ -130,7 +144,7 @@ class ServerAddress
     {
         $node = $this->node($server);
 
-        return $this->main($server) === null && ($node->hasGateway() || $node->hasPlayitAgent());
+        return $this->main($server) === null && ($node->hasGateway() || $node->hasPlayitAgent() || $node->hasMinecraftEntrance());
     }
 
     private function node(Server $server): Node

@@ -6,6 +6,7 @@ namespace Pterodactyl\Models;
 
 use Database\Factories\ServerFactory;
 use Illuminate\Database\Eloquent\Attributes\Guarded;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -33,6 +34,7 @@ use UnexpectedValueException;
  */
 #[Attributes\Identifiable('serv')]
 #[Guarded(['id', self::CREATED_AT, self::UPDATED_AT, 'deleted_at', 'installed_at'])]
+#[Hidden(['mc_hostname', 'mc_proxy_protocol_written_at', 'mc_proxy_protocol_at'])]
 class Server extends Model implements Identifiable
 {
     /** @use HasFactory<ServerFactory> */
@@ -88,6 +90,8 @@ class Server extends Model implements Identifiable
             'backup_limit' => 'integer',
             'deleted_at' => 'datetime',
             'installed_at' => 'datetime',
+            'mc_proxy_protocol_written_at' => 'immutable_datetime',
+            'mc_proxy_protocol_at' => 'immutable_datetime',
         ];
     }
 

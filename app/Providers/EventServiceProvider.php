@@ -7,6 +7,7 @@ namespace Pterodactyl\Providers;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Pterodactyl\Events\Server\Installed as ServerInstalledEvent;
 use Pterodactyl\Listeners\AuthenticationListener;
+use Pterodactyl\Listeners\EntranceListener;
 use Pterodactyl\Listeners\RevocationListener;
 use Pterodactyl\Listeners\SubscriptionEndingListener;
 use Pterodactyl\Listeners\TunnelListener;
@@ -38,6 +39,7 @@ class EventServiceProvider extends ServiceProvider
         RevocationListener::class,
         SubscriptionEndingListener::class,
         TunnelListener::class,
+        EntranceListener::class,
         TwoFactorListener::class,
     ];
 

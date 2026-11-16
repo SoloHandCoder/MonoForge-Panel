@@ -42,6 +42,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Nodes\ConfigurationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeleteAllocationBlockController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeployTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\GatewayController;
+use Pterodactyl\Http\Controllers\Api\Admin\Nodes\MinecraftEntranceController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\NodeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitSwitchController;
@@ -373,6 +374,9 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/gateway', [GatewayController::class, 'show'])->name('.gateway');
     Route::put('/gateway', [GatewayController::class, 'update'])->name('.gateway.update');
     Route::post('/gateway/check', [GatewayController::class, 'check'])->name('.gateway.check');
+    Route::get('/minecraft-entrance', [MinecraftEntranceController::class, 'show'])->name('.minecraft-entrance');
+    Route::put('/minecraft-entrance', [MinecraftEntranceController::class, 'update'])->name('.minecraft-entrance.update');
+    Route::post('/minecraft-entrance/proxy-protocol', [MinecraftEntranceController::class, 'applyProxyProtocol'])->name('.minecraft-entrance.proxy-protocol');
     // "Set up automatic tunnels" changes the node's agent key (and its state shows the claim URL):
     // a browser session only.
     Route::middleware(RequireSessionAuthentication::class)->group(function (): void {

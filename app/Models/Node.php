@@ -36,7 +36,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'playit_previous_agent_id', 'playit_previous_secret', 'playit_previous_mode', 'playit_switched_at', 'gateway_enabled', 'gateway_host', 'gateway_ports', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'playit_previous_agent_id', 'playit_previous_secret', 'playit_previous_mode', 'playit_switched_at', 'gateway_enabled', 'gateway_host', 'gateway_ports', 'mc_entrance_enabled', 'mc_entrance_domain', 'mc_entrance_mode', 'mc_entrance_port', 'mc_entrance_proxy_port', 'mc_entrance_proxy_protocol', 'mc_entrance_srv', 'mc_entrance_tunnel_id', 'mc_entrance_address', 'mc_entrance_error', 'mc_entrance_synced_at', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -65,6 +65,12 @@ class Node extends Model implements Identifiable
     /** Utilization above this percentage renders red; between the two, yellow. */
     public const int THRESHOLD_PERCENTAGE_MEDIUM = 90;
 
+    /** `mc_entrance_mode`: the panel keeps one playit.gg tunnel to the node's Minecraft proxy. */
+    public const string ENTRANCE_PLAYIT = 'playit';
+
+    /** `mc_entrance_mode`: the game gateway VPS forwards the entrance port to the proxy. */
+    public const string ENTRANCE_GATEWAY = 'gateway';
+
     protected $attributes = [
         'public' => true,
         'behind_proxy' => false,
@@ -79,6 +85,11 @@ class Node extends Model implements Identifiable
         'shop_limit_disk_mb' => 0,
         'shop_limit_cpu_percent' => 0,
         'gateway_enabled' => false,
+        'mc_entrance_enabled' => false,
+        'mc_entrance_port' => 25565,
+        'mc_entrance_proxy_port' => 25500,
+        'mc_entrance_proxy_protocol' => false,
+        'mc_entrance_srv' => false,
     ];
 
     /**
@@ -108,6 +119,12 @@ class Node extends Model implements Identifiable
             'playit_previous_secret' => 'encrypted',
             'playit_switched_at' => 'immutable_datetime',
             'gateway_enabled' => 'boolean',
+            'mc_entrance_enabled' => 'boolean',
+            'mc_entrance_port' => 'integer',
+            'mc_entrance_proxy_port' => 'integer',
+            'mc_entrance_proxy_protocol' => 'boolean',
+            'mc_entrance_srv' => 'boolean',
+            'mc_entrance_synced_at' => 'immutable_datetime',
         ];
     }
 
@@ -171,6 +188,24 @@ class Node extends Model implements Identifiable
     public function gatewayForwards(int $port): bool
     {
         return $this->hasGateway() && GatewayPorts::contains($this->gatewayRanges(), $port);
+    }
+
+    /**
+     * Whether Minecraft Java servers on this node share one entrance and are joined by host
+     * name (`<name>.<domain>`) through the Gate proxy, instead of one address each. The way in
+     * must be usable: the game gateway, or a playit agent the panel can create tunnels with.
+     */
+    public function hasMinecraftEntrance(): bool
+    {
+        if ($this->mc_entrance_enabled !== true || ! is_string($this->mc_entrance_domain) || $this->mc_entrance_domain === '') {
+            return false;
+        }
+
+        return match ($this->mc_entrance_mode) {
+            self::ENTRANCE_GATEWAY => $this->hasGateway(),
+            self::ENTRANCE_PLAYIT => ! $this->hasGateway() && $this->hasPlayitAgent(),
+            default => false,
+        };
     }
 
     public function getConnectionAddress(): string

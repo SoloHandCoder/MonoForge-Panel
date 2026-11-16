@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Network } from 'lucide-react';
 import {
     actionsColumn,
@@ -14,6 +14,7 @@ import {
     EmptyHeader,
     EmptyMedia,
     EmptyTitle,
+    Input,
     InputSpinner,
     ListToolbar,
     NewButton,
@@ -25,7 +26,12 @@ import {
     useDebouncedCallback,
     type TableColumn,
 } from '@/sdk';
-import type { ServerAllocationItem, ServerAllocationsModel, ViewProps } from '@/sdk/theme';
+import type {
+    ServerAllocationItem,
+    ServerAllocationsModel,
+    ServerMinecraftHostnameModel,
+    ViewProps,
+} from '@/sdk/theme';
 import { usePending } from '../usePending';
 
 interface CellProps {
@@ -129,6 +135,69 @@ function allocationColumns(model: ServerAllocationsModel): TableColumn<ServerAll
     ];
 }
 
+/** A DNS label of 3 to 40 lowercase letters, digits and single inner hyphens (checked again by the panel). */
+const HOSTNAME = /^[a-z0-9](?:[a-z0-9]|-(?!-)){1,38}[a-z0-9]$/;
+
+/** The server's name in its node's shared Minecraft entrance, which the owner may change. */
+function MinecraftHostname({ hostname }: { hostname: ServerMinecraftHostnameModel }) {
+    const [value, setValue] = useState(hostname.hostname);
+    const [saving, track] = usePending();
+    const name = value.trim().toLowerCase();
+    const valid = HOSTNAME.test(name);
+
+    return (
+        <div className='mb-4 rounded-lg border border-border bg-card p-4 text-sm'>
+            <p className='text-muted-foreground'>
+                Players join this server as{' '}
+                <span className='font-mono text-foreground'>
+                    {hostname.address ?? `${hostname.hostname}.${hostname.domain}`}
+                </span>
+                {hostname.address ? '' : ' (address pending)'}, through the shared entrance of its node.
+            </p>
+            {hostname.canEdit && (
+                <form
+                    className='mt-3 flex flex-wrap items-end gap-2'
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (valid && name !== hostname.hostname) {
+                            track(hostname.rename(name));
+                        }
+                    }}
+                >
+                    <label className='flex min-w-0 flex-1 flex-col gap-1'>
+                        <span className='text-xs font-medium text-muted-foreground'>Name</span>
+                        <span className='flex min-w-0 items-center gap-1'>
+                            <Input
+                                value={value}
+                                maxLength={40}
+                                aria-label='Name in the address'
+                                aria-invalid={!valid}
+                                className='min-w-0 flex-1 font-mono sm:max-w-56'
+                                onChange={(event) => setValue(event.currentTarget.value)}
+                            />
+                            <span className='truncate font-mono text-muted-foreground'>.{hostname.domain}</span>
+                        </span>
+                    </label>
+                    <Button
+                        type='submit'
+                        size='small'
+                        disabled={!valid || name === hostname.hostname}
+                        isLoading={saving}
+                    >
+                        Change
+                    </Button>
+                    {!valid && (
+                        <p className='w-full text-xs text-destructive'>
+                            3 to 40 lowercase letters, digits and single hyphens, starting and ending with a letter or
+                            digit.
+                        </p>
+                    )}
+                </form>
+            )}
+        </div>
+    );
+}
+
 export default function Allocations({ model, className }: ViewProps<'server.allocations'>) {
     const [creating, track] = usePending();
     const columns = useMemo(() => allocationColumns(model), [model]);
@@ -168,6 +237,9 @@ export default function Allocations({ model, className }: ViewProps<'server.allo
                         Players connect here; the ports below are the node&apos;s own.
                     </span>
                 </div>
+            )}
+            {model.minecraftHostname && (
+                <MinecraftHostname key={model.minecraftHostname.hostname} hostname={model.minecraftHostname} />
             )}
             {model.canManage && (
                 <ListToolbar

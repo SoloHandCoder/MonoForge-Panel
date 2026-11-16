@@ -4,7 +4,7 @@ import type { Server } from '@/api/server/types';
 type ServerAttributes = Server['attributes'] & {
     readonly playit_address?: string | null;
     readonly address_pending?: boolean;
-    readonly address_source?: 'gateway' | 'playit' | null;
+    readonly address_source?: 'entrance' | 'gateway' | 'playit' | null;
 };
 
 /**
@@ -16,9 +16,13 @@ export function playitAddress(attributes: ServerAttributes): string | null {
     return attributes.playit_address || null;
 }
 
-/** Whether the public address is a playit.gg tunnel (not the game gateway). */
+/** Whether the public address is a playit.gg tunnel of its own (not the game gateway or the shared entrance). */
 export function isPlayitAddress(attributes: ServerAttributes): boolean {
-    return playitAddress(attributes) !== null && attributes.address_source !== 'gateway';
+    return (
+        playitAddress(attributes) !== null &&
+        attributes.address_source !== 'gateway' &&
+        attributes.address_source !== 'entrance'
+    );
 }
 
 /**

@@ -25,6 +25,7 @@ use Pterodactyl\Http\Resources\Api\ApiResourceCollection;
 use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Entrance\MinecraftEntrance;
 use Pterodactyl\Services\Tunnels\TunnelImportService;
 use Pterodactyl\Services\Tunnels\TunnelService;
 
@@ -53,6 +54,7 @@ class TunnelController extends AdminApiController
             'hold_reason' => null,
             'retry_after' => null,
             'replaced_by_gateway' => false,
+            'replaced_by_entrance' => false,
             'created_at' => '2026-11-16T10:00:00+00:00',
             'updated_at' => '2026-11-16T10:00:20+00:00',
         ],
@@ -164,7 +166,7 @@ class TunnelController extends AdminApiController
     public function store(StoreTunnelRequest $request, TunnelService $tunnels): JsonResponse
     {
         $server = Server::query()->with('node')->findOrFail($request->integer('server_id'));
-        $this->refuseOnGateway($server);
+        $this->refuseOnGateway($server, true);
         $tunnel = $tunnels->provision($server);
 
         return ServerTunnelResource::make($this->checkNow($tunnels, $tunnel))->respond(Response::HTTP_CREATED);
@@ -178,7 +180,7 @@ class TunnelController extends AdminApiController
     public function retry(UpdateTunnelRequest $request, ServerTunnel $tunnel, TunnelService $tunnels): ServerTunnelResource
     {
         $tunnel->load('server.node');
-        $this->refuseOnGateway($tunnel->server);
+        $this->refuseOnGateway($tunnel->server, $tunnel->isMain());
         if ($tunnel->status === TunnelStatus::Deleted && $tunnel->server instanceof Server) {
             $tunnel = $tunnels->provision($tunnel->server);
         }
@@ -193,7 +195,7 @@ class TunnelController extends AdminApiController
     #[ScribeResponse(self::TUNNEL_EXAMPLE, description: 'Tunnel recreated or queued.')]
     public function recreate(UpdateTunnelRequest $request, ServerTunnel $tunnel, TunnelService $tunnels): ServerTunnelResource
     {
-        $this->refuseOnGateway($tunnel->load('server.node')->server);
+        $this->refuseOnGateway($tunnel->load('server.node')->server, $tunnel->isMain());
 
         // The administrator asked for it, so an imported tunnel is deleted on playit too.
         return ServerTunnelResource::make($this->checkNow($tunnels, $tunnels->recreate($tunnel, deleteImported: true)));
@@ -224,13 +226,15 @@ class TunnelController extends AdminApiController
 
     /**
      * A server on a node in game gateway mode gets no playit tunnel: players join through the
-     * gateway VPS. Turning the gateway off on the node makes these work again.
+     * gateway VPS. Neither does the game port of a Minecraft server joined through the node's
+     * shared entrance. Turning those off on the node makes these work again.
      *
      * @throws ValidationException
      */
-    private function refuseOnGateway(?Server $server): void
+    private function refuseOnGateway(?Server $server, bool $main): void
     {
         throw_if($server?->node->hasGateway() === true, ValidationException::withMessages(['server_id' => TunnelService::GATEWAY]));
+        throw_if($main && $server instanceof Server && MinecraftEntrance::isRouted($server), ValidationException::withMessages(['server_id' => TunnelService::ENTRANCE]));
     }
 
     /** The administrator is waiting, so move the tunnel on now instead of on the queue. */
