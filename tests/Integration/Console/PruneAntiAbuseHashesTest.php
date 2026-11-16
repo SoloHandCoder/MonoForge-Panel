@@ -6,13 +6,14 @@ namespace Pterodactyl\Tests\Pest\Integration\Console\PruneAntiAbuseHashesTest;
 
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Pterodactyl\Console\Commands\Billing\PruneAntiAbuseHashesCommand;
 use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Models\User;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 
-uses(IntegrationTestCase::class);
+uses(IntegrationTestCase::class, DatabaseTransactions::class);
 
 test('network and linked-account hashes are cleared after 12 months, the rows stay', function (): void {
     $old = User::factory()->create(['created_at' => now()->subMonths(13)]);
