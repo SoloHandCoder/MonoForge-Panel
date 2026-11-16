@@ -55,6 +55,7 @@ class PterodactylDocumentation
     private const array URL_PARAMETERS = [
         'provider' => ['string', 'The login provider: discord or google.', 'discord'],
         'allocation' => ['integer', 'The allocation ID.', 1],
+        'article' => ['string', 'The slug of the help article, the part of its address after /help/.', 'joining-your-server'],
         'backup' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
         'backup_uuid' => ['string', 'The backup UUID.', 'b6b9acf9-19b1-4bb1-8c75-4abac802c6cf'],
         'coupon' => ['integer', 'The ID of the coupon.', 1],
