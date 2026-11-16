@@ -141,9 +141,16 @@ class SupportTicketService
         return $ticket;
     }
 
-    /** Remembers the newest public message the person has seen on the ticket. */
+    /**
+     * Remembers the newest public message the person has seen on the ticket, and reads their panel
+     * notice about it: opening or answering the ticket covers it, as answering a friend request does.
+     */
     public function markRead(SupportTicket $ticket, User $user): void
     {
+        $user->notices()->unread()
+            ->whereIn('kind', [SupportNotifier::userKind($ticket->id), SupportNotifier::staffKind($ticket->id)])
+            ->update(['read_at' => CarbonImmutable::now()]);
+
         if ($ticket->last_message_id === null) {
             return;
         }
