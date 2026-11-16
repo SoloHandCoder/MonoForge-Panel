@@ -6,6 +6,7 @@ import {
     READ_ONLY_KEY_MESSAGE,
     type NodePlayitSettings,
 } from '@/api/admin/tunnels/queries';
+import NodePlayitAutoSetup from '@/components/admin/nodes/NodePlayitAutoSetup';
 import { Alert } from '@/components/elements/alert';
 import Button from '@/components/elements/Button';
 import Spinner from '@/components/elements/Spinner';
@@ -105,5 +106,12 @@ function PlayitForm({ nodeId, settings }: { nodeId: number; settings: NodePlayit
 export default function NodePlayitSettings({ nodeId }: { nodeId: number }) {
     const { data } = useAdminNodePlayit(nodeId);
 
-    return data ? <PlayitForm key={nodeId} nodeId={nodeId} settings={data} /> : <Spinner size='small' centered />;
+    return data ? (
+        <>
+            <PlayitForm key={nodeId} nodeId={nodeId} settings={data} />
+            <NodePlayitAutoSetup nodeId={nodeId} />
+        </>
+    ) : (
+        <Spinner size='small' centered />
+    );
 }
