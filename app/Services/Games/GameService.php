@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Games;
 
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Pterodactyl\Exceptions\DisplayException;
@@ -19,8 +19,6 @@ use Pterodactyl\Models\Game;
 final readonly class GameService
 {
     public const int MAX_EXTRA_PORTS = 5;
-
-    public function __construct(private ConnectionInterface $db) {}
 
     /**
      * @return array<string, list<mixed>>
@@ -70,7 +68,7 @@ final readonly class GameService
     {
         throw_if($game->built_in, DisplayException::class, 'Built-in games cannot be deleted.');
 
-        $this->db->transaction(function () use ($game): void {
+        DB::transaction(function () use ($game): void {
             Egg::query()->where('game_id', $game->id)->update(['game_id' => null]);
             $game->delete();
         });
@@ -101,7 +99,7 @@ final readonly class GameService
             $game->extra_ports = $this->extraPorts($input['extra_ports']);
         }
 
-        $this->db->transaction(function () use ($game, $input): void {
+        DB::transaction(function () use ($game, $input): void {
             $game->save();
 
             if (is_array($input['egg_ids'] ?? null)) {

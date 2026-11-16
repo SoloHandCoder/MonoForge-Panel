@@ -40,6 +40,7 @@ use Pterodactyl\Http\Resources\Api\Client\FriendListResource;
 use Pterodactyl\Http\Resources\Api\Client\UserResource as ClientUserResource;
 use Pterodactyl\Http\Resources\Api\Concerns\FormatsActivityLogs;
 use Pterodactyl\Services\Extensions\ExtensionRepository;
+use Pterodactyl\Services\Games\GameEggBackfiller;
 use Pterodactyl\Services\Tags\TagBackfiller;
 use ReflectionClass;
 use ReflectionMethod;
@@ -75,8 +76,8 @@ foreach ([
     'Pterodactyl\Console' => ['Pterodactyl\Console\Commands\Migration'],
     'Pterodactyl\Http' => [],
     // Deliberate seams: the tags migration hands the backfiller the connection it
-    // runs on, and the extension repository resolves during provider boot.
-    'Pterodactyl\Services' => [TagBackfiller::class, ExtensionRepository::class, 'Pterodactyl\Services\Migration'],
+    // runs on (so does the games one), and the extension repository resolves during provider boot.
+    'Pterodactyl\Services' => [TagBackfiller::class, GameEggBackfiller::class, ExtensionRepository::class, 'Pterodactyl\Services\Migration'],
 ] as $namespace => $seams) {
     arch("{$namespace} uses facades for framework services")
         ->expect($namespace)
