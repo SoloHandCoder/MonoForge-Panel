@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Pterodactyl\Models\ActivityLog;
@@ -201,9 +203,9 @@ class ReferralService
         Referral::query()
             ->where('status', Referral::STATUS_HELD)
             ->where('payout_after', '<=', now())
-            ->where(fn ($query) => $query->whereNull('flagged_at')->orWhereNotNull('reviewed_at'))
+            ->where(fn (Builder $query): Builder => $query->whereNull('flagged_at')->orWhereNotNull('reviewed_at'))
             ->orderBy('id')
-            ->chunkById(100, function ($referrals) use (&$paid): void {
+            ->chunkById(100, function (Collection $referrals) use (&$paid): void {
                 foreach ($referrals as $referral) {
                     try {
                         $paid += $this->payout($referral) === Referral::STATUS_PAID ? 1 : 0;

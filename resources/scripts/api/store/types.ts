@@ -109,11 +109,21 @@ export interface RawStoreQuote {
     resources: Partial<Record<StoreAddonResource, number>>;
 }
 
+export interface RawStoreQuoteCoupon {
+    code: string;
+    valid: boolean;
+    message: string | null;
+    type: 'percent' | 'fixed' | null;
+    discount_tokens: number;
+    first_period_tokens: number;
+}
+
 export interface RawStoreQuoteResponse {
     node_id: number;
     can_provision: boolean;
     balance?: number | null;
     quote: RawStoreQuote;
+    coupon?: RawStoreQuoteCoupon | null;
 }
 
 export interface StoreEgg {
@@ -212,6 +222,16 @@ export interface StoreCatalog {
 
 export type StoreResources = Record<StoreAddonResource, number>;
 
+/** A coupon checked against the quote: what it takes off the first period, or why it cannot be used. */
+export interface StoreQuoteCoupon {
+    code: string;
+    valid: boolean;
+    message: string | null;
+    discount: number;
+    /** What the first period costs with the coupon; renewals cost `totalPerPeriod`. */
+    firstPeriod: number;
+}
+
 export interface StoreQuote {
     totalPerPeriod: number;
     periodDays: number;
@@ -220,6 +240,7 @@ export interface StoreQuote {
     resources: Partial<StoreResources>;
     canProvision: boolean;
     balance: number | null;
+    coupon: StoreQuoteCoupon | null;
 }
 
 export interface StoreSelection {
@@ -230,6 +251,8 @@ export interface StoreSelection {
     nodeId: number | null;
     /** Add-on key → units; zero units are left out. */
     addons: Record<string, number>;
+    /** A discount coupon for the first period. */
+    coupon?: string | null;
 }
 
 export type PurchaseResult = ClientStorePurchaseAttributes;
@@ -342,5 +365,14 @@ export function mapQuote(raw: RawStoreQuoteResponse): StoreQuote {
         resources: raw.quote.resources,
         canProvision: raw.can_provision,
         balance: raw.balance ?? null,
+        coupon: raw.coupon
+            ? {
+                  code: raw.coupon.code,
+                  valid: raw.coupon.valid,
+                  message: raw.coupon.message,
+                  discount: raw.coupon.discount_tokens,
+                  firstPeriod: raw.coupon.first_period_tokens,
+              }
+            : null,
     };
 }

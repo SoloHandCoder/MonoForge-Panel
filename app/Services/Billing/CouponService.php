@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -176,9 +177,9 @@ class CouponService
     {
         return TokenTransaction::query()
             ->where('user_id', $user->id)
-            ->where(fn ($query) => $query
+            ->where(fn (Builder $query): Builder => $query
                 ->where('type', TokenTransaction::TYPE_PURCHASE)
-                ->orWhere(fn ($query) => $query
+                ->orWhere(fn (Builder $query): Builder => $query
                     ->where('type', TokenTransaction::TYPE_SERVER_CHARGE)
                     ->where('reference_type', StorePurchaseService::REFERENCE_TYPE)
                     ->whereNotExists(fn (QueryBuilder $refunds) => $refunds

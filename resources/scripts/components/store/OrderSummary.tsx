@@ -6,6 +6,7 @@ import { Dialog } from '@/components/elements/dialog';
 import Icon from '@/components/elements/Icon';
 import Spinner from '@/components/elements/Spinner';
 import PurchaseAgreement from '@/components/legal/PurchaseAgreement';
+import CouponField, { type CouponControl } from '@/components/store/CouponField';
 import { CapacityNotice } from '@/components/store/StoreNotices';
 import { everyDays, planResources, tokens } from '@/components/store/storeFormat';
 import type { CheckoutError } from '@/components/store/useCheckout';
@@ -13,7 +14,10 @@ import { cn } from '@/lib/cn';
 import { PanelLink } from '@/sdk/navigation';
 
 export interface OrderPrice {
+    /** The price of every period. */
     total: number;
+    /** What is charged now (the first period after a coupon); null while the coupon is being checked. */
+    firstPeriod?: number | null;
     days: number;
     lines: { label: string; tokens: number }[] | null;
     resources: StoreResources;
@@ -47,10 +51,24 @@ function WalletLink() {
     );
 }
 
+/** What is charged now: the first period after the coupon, else the price of a period. */
+export const chargedNow = (price: OrderPrice): number => price.firstPeriod ?? price.total;
+
 function Total({ price }: { price: OrderPrice }) {
+    const now = chargedNow(price);
+    const discounted = now !== price.total;
+
     return (
         <div className='mt-5 border-t border-border pt-4'>
-            <p className='text-xs text-muted-foreground'>Total {everyDays(price.days)}</p>
+            {discounted && (
+                <p className='mb-3 flex items-baseline justify-between gap-3 text-sm'>
+                    <span className='text-muted-foreground'>First period</span>
+                    <span className='font-header text-xl font-bold text-foreground tabular-nums'>{tokens(now)}</span>
+                </p>
+            )}
+            <p className='text-xs text-muted-foreground'>
+                {discounted ? 'Then' : 'Total'} {everyDays(price.days)}
+            </p>
             <p className='mt-0.5 flex items-baseline gap-2' aria-live='polite'>
                 <span
                     className={cn(
@@ -67,7 +85,7 @@ function Total({ price }: { price: OrderPrice }) {
                 <p className='mt-2 flex items-center gap-1.5 text-sm text-muted-foreground'>
                     <Icon icon={Coins} className='size-3.5' aria-hidden />
                     Balance {tokens(price.balance)}
-                    {!price.short && <span>· {tokens(price.balance - price.total)} after</span>}
+                    {!price.short && <span>· {tokens(price.balance - now)} after</span>}
                 </p>
             )}
         </div>
@@ -80,12 +98,16 @@ export default function OrderSummary({
     error,
     canBuy,
     onBuy,
+    coupon,
 }: {
     price: OrderPrice;
     error: CheckoutError | null;
     canBuy: boolean;
     onBuy: () => void;
+    coupon?: CouponControl;
 }) {
+    const now = chargedNow(price);
+
     return (
         <aside
             className='animate-rise rounded-2xl border border-border bg-card p-5 sm:p-6 lg:sticky lg:top-6'
@@ -103,11 +125,12 @@ export default function OrderSummary({
                     ))}
                 </dl>
             )}
+            {coupon && <CouponField coupon={coupon} />}
             <Total price={price} />
             {price.soldOut && <CapacityNotice className='mt-4' />}
             {price.short && !price.soldOut && price.balance !== null && (
                 <p role='alert' className='mt-4 text-sm text-destructive'>
-                    You need {tokens(price.total - price.balance)} more. <WalletLink />
+                    You need {tokens(now - price.balance)} more. <WalletLink />
                 </p>
             )}
             {error && (
@@ -116,7 +139,7 @@ export default function OrderSummary({
                 </Alert>
             )}
             <Button size='large' className='mt-5 w-full justify-center' disabled={!canBuy} onClick={onBuy}>
-                Buy for {tokens(price.total)}
+                Buy for {tokens(now)}
             </Button>
             <p className='mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground'>
                 <Icon icon={ShieldCheck} className='size-3.5' aria-hidden />
@@ -142,12 +165,14 @@ export function ConfirmPurchaseDialog({
     onClose: () => void;
     onConfirm: () => void;
 }) {
+    const now = chargedNow(price);
+
     return (
         <Dialog
             open={open}
             onClose={onClose}
             title='Confirm your purchase'
-            description={`${tokens(price.total)} now, then ${tokens(price.total)} ${everyDays(price.days)} from your balance until you cancel.`}
+            description={`${tokens(now)} now, then ${tokens(price.total)} ${everyDays(price.days)} from your balance until you cancel.`}
         >
             <div className='grid gap-4 text-sm'>
                 <div className='rounded-xl border border-border bg-(--sunken) p-4'>
@@ -158,8 +183,18 @@ export function ConfirmPurchaseDialog({
                     </p>
                     <ResourceList resources={price.resources} className='mt-1.5 gap-1 text-foreground' />
                 </div>
+                {now !== price.total && (
+                    <p className='flex items-baseline justify-between gap-3'>
+                        <span className='text-muted-foreground'>You pay now (with the coupon)</span>
+                        <span className='font-header text-xl font-bold text-foreground tabular-nums'>
+                            {tokens(now)}
+                        </span>
+                    </p>
+                )}
                 <p className='flex items-baseline justify-between gap-3'>
-                    <span className='text-muted-foreground'>You pay {everyDays(price.days)}</span>
+                    <span className='text-muted-foreground'>
+                        {now === price.total ? 'You pay' : 'Then you pay'} {everyDays(price.days)}
+                    </span>
                     <span className='font-header text-xl font-bold text-foreground tabular-nums'>
                         {tokens(price.total)}
                     </span>
@@ -170,7 +205,7 @@ export function ConfirmPurchaseDialog({
                 <Button.Text isSecondary onClick={onClose}>
                     Back
                 </Button.Text>
-                <Button onClick={onConfirm}>Pay {tokens(price.total)}</Button>
+                <Button onClick={onConfirm}>Pay {tokens(now)}</Button>
             </Dialog.Footer>
         </Dialog>
     );

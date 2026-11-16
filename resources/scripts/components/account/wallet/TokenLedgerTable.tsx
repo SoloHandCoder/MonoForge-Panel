@@ -46,6 +46,8 @@ const tones = {
     ai_usage: 'neutral',
     admin_adjust: 'info',
     correction: 'info',
+    coupon: 'success',
+    referral: 'success',
 } as const satisfies Record<TokenTransaction['type'], UiTone>;
 
 const columns: TableColumn<Row>[] = [

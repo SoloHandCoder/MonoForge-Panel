@@ -38,7 +38,7 @@ class CouponController extends AdminApiController
         'valid_from' => '2026-11-16T00:00:00+00:00',
         'valid_until' => '2026-12-31T23:59:59+00:00',
         'plan_ids' => [3],
-        'category_ids' => [],
+        'category_ids' => [1],
         'new_customers_only' => true,
         'enabled' => true,
         'created_at' => '2026-11-16T12:00:00+00:00',

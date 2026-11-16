@@ -17,6 +17,7 @@ import { friendsQueryOptions } from '@/api/account/friends/queries';
 import { permissionTemplatesQueryOptions } from '@/api/account/permission-templates/queries';
 import { currentUserQueryOptions } from '@/api/account/queries';
 import { accountServersQueryOptions } from '@/api/account/servers/queries';
+import { referralsQueryOptions } from '@/api/account/referrals';
 import { accountSshKeysQueryOptions } from '@/api/account/ssh-keys/queries';
 import { walletQueryOptions } from '@/api/account/wallet/queries';
 import { supportTicketQueryOptions, supportTicketsQueryOptions } from '@/api/support/queries';
@@ -350,6 +351,16 @@ const accountChildren = [
             await context.queryClient.ensureQueryData({ ...walletQueryOptions(), revalidateIfStale: true });
         },
         component: componentRoute(() => import('@/components/account/wallet/WalletContainer')),
+    }),
+    // Phase 7 Task C: the user's referral link and rewards.
+    createRoute({
+        getParentRoute: () => accountRoute,
+        path: 'referrals',
+        staticData: { nav: { label: 'Referrals', icon: 'gift' } },
+        loader: async ({ context }) => {
+            await context.queryClient.ensureQueryData({ ...referralsQueryOptions(), revalidateIfStale: true });
+        },
+        component: componentRoute(() => import('@/components/account/referrals/ReferralsContainer')),
     }),
     // Phase 6 Task K: the player's support tickets.
     createRoute({
@@ -1295,7 +1306,19 @@ const panelChildren = [
         },
         component: componentRoute(() => import('@/components/admin/shop/ShopContainer')),
     }),
-    ...(['periods', 'multipliers', 'addons', 'limits', 'nodes', 'token-packs', 'tunnels'] as const).map((tab) =>
+    ...(
+        [
+            'periods',
+            'multipliers',
+            'addons',
+            'limits',
+            'nodes',
+            'token-packs',
+            'tunnels',
+            'coupons',
+            'referrals',
+        ] as const
+    ).map((tab) =>
         createRoute({
             getParentRoute: () => panelRoute,
             path: `shop/${tab}`,

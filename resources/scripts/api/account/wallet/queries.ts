@@ -13,7 +13,9 @@ export type TokenTransactionType =
     | 'addon_charge'
     | 'ai_usage'
     | 'admin_adjust'
-    | 'correction';
+    | 'correction'
+    | 'coupon'
+    | 'referral';
 
 /** One row of a user's token ledger. */
 export type TokenTransaction = ClientTokenTransactionAttributes;
@@ -32,6 +34,8 @@ export const tokenTransactionLabels = {
     ai_usage: 'AI usage',
     admin_adjust: 'Adjustment',
     correction: 'Correction',
+    coupon: 'Coupon',
+    referral: 'Referral',
 } satisfies Record<TokenTransactionType, string>;
 
 /** Whole tokens with thousands separators, e.g. "1,500". */

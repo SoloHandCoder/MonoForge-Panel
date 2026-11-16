@@ -927,7 +927,7 @@ export type AdminTokenTransactionAttributes = {
      * The token balance right after this change.
      */
     balance_after: number;
-    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction';
+    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction' | 'coupon' | 'referral';
     reference_type: string | null;
     reference_id: string | null;
     description: string;
@@ -1990,6 +1990,9 @@ export type ClientStorePurchaseAttributes = {
         uuid: string;
         name: string;
     };
+    /**
+     * What the first period cost, after the coupon. Renewals cost the full price.
+     */
     tokens_charged: number;
     period_days: number;
     replayed: boolean;
@@ -1997,6 +2000,14 @@ export type ClientStorePurchaseAttributes = {
      * The playit.gg address of the server once its tunnel is ready; null until then.
      */
     address: string | null;
+    /**
+     * Tokens the coupon took off the first period; 0 without one.
+     */
+    discount_tokens: number;
+    /**
+     * The coupon code used, or null.
+     */
+    coupon: string | null;
 };
 
 export type ClientStorePurchaseResource = {
@@ -2028,7 +2039,7 @@ export type ClientTokenTransactionAttributes = {
      * The token balance right after this change.
      */
     balance_after: number;
-    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction';
+    type: 'purchase' | 'refund' | 'chargeback' | 'server_charge' | 'addon_charge' | 'ai_usage' | 'admin_adjust' | 'correction' | 'coupon' | 'referral';
     reference_type: string | null;
     reference_id: string | null;
     description: string;
@@ -2739,6 +2750,115 @@ export type AdminUpdateTokenPackRequest = {
      * The sort. Must be at least -100000. Must not be greater than 100000.
      */
     sort?: number;
+};
+
+export type AdminCreateCouponRequest = {
+    /**
+     * The code. Must match the regex /^[A-Z0-9_-]{3,32}$/.
+     */
+    code: string;
+    /**
+     * The type.
+     */
+    type: 'percent' | 'fixed' | 'tokens';
+    /**
+     * The value. Must be at least 1. Must not be greater than 1000000000000.
+     */
+    value: number;
+    /**
+     * A description for this resource. Must not be greater than 191 characters.
+     */
+    description?: string | null;
+    /**
+     * The max redemptions. Must be at least 1. Must not be greater than 1000000000.
+     */
+    max_redemptions?: number | null;
+    /**
+     * The valid from. Must be a valid date.
+     */
+    valid_from?: string | null;
+    /**
+     * The valid until. Must be a valid date.
+     */
+    valid_until?: string | null;
+    /**
+     * Must match an existing stored value.
+     */
+    plan_ids?: Array<number>;
+    /**
+     * Must match an existing stored value.
+     */
+    category_ids?: Array<number>;
+    /**
+     * The new customers only.
+     */
+    new_customers_only?: boolean;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+
+export type AdminUpdateCouponRequest = {
+    /**
+     * The code. Must match the regex /^[A-Z0-9_-]{3,32}$/.
+     */
+    code: string;
+    /**
+     * The type.
+     */
+    type: 'percent' | 'fixed' | 'tokens';
+    /**
+     * The value. Must be at least 1. Must not be greater than 1000000000000.
+     */
+    value: number;
+    /**
+     * A description for this resource. Must not be greater than 191 characters.
+     */
+    description?: string | null;
+    /**
+     * The max redemptions. Must be at least 1. Must not be greater than 1000000000.
+     */
+    max_redemptions?: number | null;
+    /**
+     * The valid from. Must be a valid date.
+     */
+    valid_from?: string | null;
+    /**
+     * The valid until. Must be a valid date.
+     */
+    valid_until?: string | null;
+    /**
+     * Must match an existing stored value.
+     */
+    plan_ids?: Array<number>;
+    /**
+     * Must match an existing stored value.
+     */
+    category_ids?: Array<number>;
+    /**
+     * The new customers only.
+     */
+    new_customers_only?: boolean;
+    /**
+     * The enabled.
+     */
+    enabled?: boolean;
+};
+
+export type AdminUpdateReferralSettingsRequest = {
+    /**
+     * The enabled.
+     */
+    enabled: boolean;
+    /**
+     * The reward tokens. Must be at least 1. Must not be greater than 1000000.
+     */
+    reward_tokens: number;
+    /**
+     * The monthly cap. Must be at least 0. Must not be greater than 1000.
+     */
+    monthly_cap: number;
 };
 
 export type AdminStartAnAdminAssistantConversationRequest = {
@@ -4890,6 +5010,10 @@ export type ClientQuoteAServerRequest = {
     addons?: {
         [key: string]: number;
     };
+    /**
+     * The coupon. Must not be greater than 32 characters.
+     */
+    coupon?: string | null;
 };
 
 export type ClientPurchaseServerRequest = {
@@ -4931,6 +5055,10 @@ export type ClientPurchaseServerRequest = {
      * The expected total. Must be at least 0.
      */
     expected_total?: number | null;
+    /**
+     * The coupon. Must not be greater than 32 characters.
+     */
+    coupon?: string | null;
     /**
      * The idempotency key. Must match the regex /^[A-Za-z0-9_-]+$/. Must be at least 16 characters. Must not be greater than 100 characters.
      */
@@ -5008,6 +5136,13 @@ export type ClientUpdateAccountPasswordRequest = {
      * Confirmation matching the new password.
      */
     password_confirmation: string;
+};
+
+export type ClientRedeemCouponRequest = {
+    /**
+     * The code. Must not be greater than 32 characters.
+     */
+    code: string;
 };
 
 export type ClientCreateAccountApiKeyRequest = {
@@ -6382,6 +6517,194 @@ export type AdminUpdateTokenPackResponseBody = {
     bonus_tokens?: number;
     visible?: boolean;
     sort?: number;
+};
+
+export type AdminListCouponsResponseBody = {
+    data?: Array<{
+        id?: number;
+        code?: string;
+        type?: string;
+        value?: number;
+        description?: string;
+        max_redemptions?: number;
+        redemptions_count?: number;
+        valid_from?: string;
+        valid_until?: string;
+        plan_ids?: Array<number>;
+        category_ids?: Array<number>;
+        new_customers_only?: boolean;
+        enabled?: boolean;
+        created_at?: string;
+    }>;
+    meta?: {
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+    };
+};
+
+export type AdminCreateCouponResponseBody = {
+    id?: number;
+    code?: string;
+    type?: string;
+    value?: number;
+    description?: string;
+    max_redemptions?: number;
+    redemptions_count?: number;
+    valid_from?: string;
+    valid_until?: string;
+    plan_ids?: Array<number>;
+    category_ids?: Array<number>;
+    new_customers_only?: boolean;
+    enabled?: boolean;
+    created_at?: string;
+};
+
+export type AdminListCouponRedemptionsResponseBody = {
+    data?: Array<{
+        id?: number;
+        coupon?: {
+            id?: number;
+            code?: string;
+            type?: string;
+        };
+        user?: {
+            id?: number;
+            username?: string;
+            email?: string;
+        };
+        tokens?: number;
+        server?: {
+            id?: number;
+            uuid?: string;
+            name?: string;
+        };
+        created_at?: string;
+    }>;
+    meta?: {
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+    };
+};
+
+export type AdminUpdateCouponResponseBody = {
+    id?: number;
+    code?: string;
+    type?: string;
+    value?: number;
+    description?: string;
+    max_redemptions?: number;
+    redemptions_count?: number;
+    valid_from?: string;
+    valid_until?: string;
+    plan_ids?: Array<number>;
+    category_ids?: Array<number>;
+    new_customers_only?: boolean;
+    enabled?: boolean;
+    created_at?: string;
+};
+
+export type AdminListReferralsResponseBody = {
+    data?: Array<{
+        id?: number;
+        referrer?: {
+            id?: number;
+            username?: string;
+            email?: string;
+        };
+        referred?: {
+            id?: number;
+            username?: string;
+            email?: string;
+        };
+        status?: string;
+        flagged?: boolean;
+        flag_reason?: string;
+        awaiting_review?: boolean;
+        reviewed_by?: string | null;
+        reviewed_at?: string | null;
+        tebex_transaction_id?: string;
+        reward_tokens?: string | null;
+        qualified_at?: string;
+        payout_after?: string;
+        paid_at?: string | null;
+        reversed_at?: string | null;
+        created_at?: string;
+    }>;
+    meta?: {
+        current_page?: number;
+        last_page?: number;
+        total?: number;
+    };
+};
+
+export type AdminGetReferralSettingsResponseBody = {
+    enabled?: boolean;
+    reward_tokens?: number;
+    monthly_cap?: number;
+    hold_days?: number;
+};
+
+export type AdminUpdateReferralSettingsResponseBody = {
+    enabled?: boolean;
+    reward_tokens?: number;
+    monthly_cap?: number;
+    hold_days?: number;
+};
+
+export type AdminApproveReferralResponseBody = {
+    id?: number;
+    referrer?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    referred?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    status?: string;
+    flagged?: boolean;
+    flag_reason?: string;
+    awaiting_review?: boolean;
+    reviewed_by?: string | null;
+    reviewed_at?: string | null;
+    tebex_transaction_id?: string;
+    reward_tokens?: string | null;
+    qualified_at?: string;
+    payout_after?: string;
+    paid_at?: string | null;
+    reversed_at?: string | null;
+    created_at?: string;
+};
+
+export type AdminRejectReferralResponseBody = {
+    id?: number;
+    referrer?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    referred?: {
+        id?: number;
+        username?: string;
+        email?: string;
+    };
+    status?: string;
+    flagged?: boolean;
+    flag_reason?: string;
+    awaiting_review?: boolean;
+    reviewed_by?: string | null;
+    reviewed_at?: string | null;
+    tebex_transaction_id?: string;
+    reward_tokens?: string | null;
+    qualified_at?: string;
+    payout_after?: string;
+    paid_at?: string | null;
+    reversed_at?: string | null;
+    created_at?: string;
 };
 
 export type AdminListAdminAssistantConversationsResponseBody = {
@@ -7971,6 +8294,35 @@ export type ClientQuoteAServerResponseBody = {
             allocations?: number;
         };
     };
+    /**
+     * The coupon that was sent, checked but not redeemed; null without one.
+     */
+    coupon: {
+        /**
+         * The coupon code, upper case.
+         */
+        code: string;
+        /**
+         * Whether the coupon can be used on this order.
+         */
+        valid: boolean;
+        /**
+         * Why the coupon cannot be used; null when it can.
+         */
+        message: string | null;
+        /**
+         * percent or fixed; null when the coupon cannot be used.
+         */
+        type: 'percent' | 'fixed';
+        /**
+         * Tokens taken off the first period.
+         */
+        discount_tokens: number;
+        /**
+         * What the first period costs with the coupon: the expected_total to send with the purchase.
+         */
+        first_period_tokens: number;
+    } | null;
 };
 
 export type ClientListTokenPacksResponseBody = {
@@ -8041,6 +8393,48 @@ export type ClientGetTokenPurchaseResponseBody = {
          */
         created_at: string;
     };
+};
+
+export type ClientRedeemCouponResponseBody = {
+    code?: string;
+    /**
+     * The tokens added to the wallet.
+     */
+    tokens: number;
+    /**
+     * The token balance afterwards.
+     */
+    balance: number;
+};
+
+export type ClientGetReferralsResponseBody = {
+    enabled?: boolean;
+    /**
+     * The referral code; null while the programme is off.
+     */
+    code: string | null;
+    /**
+     * The referral link path on the panel; null while the programme is off.
+     */
+    path: string | null;
+    reward_tokens?: number;
+    hold_days?: number;
+    stats?: {
+        signed_up?: number;
+        pending?: number;
+        paid?: number;
+        tokens_earned?: number;
+    };
+    referrals?: Array<{
+        id?: number;
+        username?: string;
+        status?: string;
+        under_review?: boolean;
+        reward_tokens?: string | null;
+        payout_after?: string;
+        paid_at?: string | null;
+        created_at?: string;
+    }>;
 };
 
 export type ClientSendFriendRequestResponseBody = {
@@ -9163,6 +9557,47 @@ export type AdminApproveAndCreditATebexPaymentPaymentIdPathParameter = number;
 export type AdminUpdateTokenPackTokenPackIdPathParameter = number;
 
 export type AdminUpdateTokenPackTokenPackPathParameter = number;
+
+/**
+ * Part of the code to look for.
+ */
+export type AdminListCouponsSearchQueryParameter = string;
+
+/**
+ * Page number to return.
+ */
+export type AdminListCouponsPageQueryParameter = number;
+
+/**
+ * Only the redemptions of this coupon.
+ */
+export type AdminListCouponRedemptionsCouponIdQueryParameter = number;
+
+/**
+ * Page number to return.
+ */
+export type AdminListCouponRedemptionsPageQueryParameter = number;
+
+export type AdminUpdateCouponCouponIdPathParameter = number;
+
+/**
+ * Only referrals with this status.
+ */
+export type AdminListReferralsStatusQueryParameter = 'registered' | 'held' | 'paid' | 'reversed' | 'rejected' | 'capped';
+
+/**
+ * Only flagged referrals.
+ */
+export type AdminListReferralsFlaggedQueryParameter = boolean;
+
+/**
+ * Page number to return.
+ */
+export type AdminListReferralsPageQueryParameter = number;
+
+export type AdminApproveReferralReferralIdPathParameter = number;
+
+export type AdminRejectReferralReferralIdPathParameter = number;
 
 export type AdminGetAnAdminAssistantConversationConversationUuidPathParameter = string;
 
@@ -12837,6 +13272,379 @@ export type AdminUpdateTokenPackResponses = {
 };
 
 export type AdminUpdateTokenPackResponse = AdminUpdateTokenPackResponses[keyof AdminUpdateTokenPackResponses];
+
+export type AdminListCouponsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Part of the code to look for.
+         */
+        search?: AdminListCouponsSearchQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListCouponsPageQueryParameter;
+    };
+    url: '/api/admin/shop/coupons';
+};
+
+export type AdminListCouponsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminListCouponsError = AdminListCouponsErrors[keyof AdminListCouponsErrors];
+
+export type AdminListCouponsResponses = {
+    /**
+     * Coupons returned.
+     */
+    200: AdminListCouponsResponseBody;
+};
+
+export type AdminListCouponsResponse = AdminListCouponsResponses[keyof AdminListCouponsResponses];
+
+export type AdminCreateCouponData = {
+    body: AdminCreateCouponRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/coupons';
+};
+
+export type AdminCreateCouponErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminCreateCouponError = AdminCreateCouponErrors[keyof AdminCreateCouponErrors];
+
+export type AdminCreateCouponResponses = {
+    /**
+     * Coupon created.
+     */
+    201: AdminCreateCouponResponseBody;
+};
+
+export type AdminCreateCouponResponse = AdminCreateCouponResponses[keyof AdminCreateCouponResponses];
+
+export type AdminListCouponRedemptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only the redemptions of this coupon.
+         */
+        coupon_id?: AdminListCouponRedemptionsCouponIdQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListCouponRedemptionsPageQueryParameter;
+    };
+    url: '/api/admin/shop/coupons/redemptions';
+};
+
+export type AdminListCouponRedemptionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminListCouponRedemptionsError = AdminListCouponRedemptionsErrors[keyof AdminListCouponRedemptionsErrors];
+
+export type AdminListCouponRedemptionsResponses = {
+    /**
+     * Redemptions returned.
+     */
+    200: AdminListCouponRedemptionsResponseBody;
+};
+
+export type AdminListCouponRedemptionsResponse = AdminListCouponRedemptionsResponses[keyof AdminListCouponRedemptionsResponses];
+
+export type AdminDeleteCouponData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the coupon.
+         */
+        coupon_id: AdminUpdateCouponCouponIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/coupons/{coupon_id}';
+};
+
+export type AdminDeleteCouponErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The coupon was used.
+     */
+    409: ErrorEnvelope;
+};
+
+export type AdminDeleteCouponError = AdminDeleteCouponErrors[keyof AdminDeleteCouponErrors];
+
+export type AdminDeleteCouponResponses = {
+    /**
+     * Coupon deleted.
+     */
+    204: void;
+};
+
+export type AdminDeleteCouponResponse = AdminDeleteCouponResponses[keyof AdminDeleteCouponResponses];
+
+export type AdminUpdateCouponData = {
+    body: AdminUpdateCouponRequest;
+    path: {
+        /**
+         * The ID of the coupon.
+         */
+        coupon_id: AdminUpdateCouponCouponIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/coupons/{coupon_id}';
+};
+
+export type AdminUpdateCouponErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateCouponError = AdminUpdateCouponErrors[keyof AdminUpdateCouponErrors];
+
+export type AdminUpdateCouponResponses = {
+    /**
+     * Coupon updated.
+     */
+    200: AdminUpdateCouponResponseBody;
+};
+
+export type AdminUpdateCouponResponse = AdminUpdateCouponResponses[keyof AdminUpdateCouponResponses];
+
+export type AdminListReferralsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only referrals with this status.
+         */
+        status?: AdminListReferralsStatusQueryParameter;
+        /**
+         * Only flagged referrals.
+         */
+        flagged?: AdminListReferralsFlaggedQueryParameter;
+        /**
+         * Page number to return.
+         */
+        page?: AdminListReferralsPageQueryParameter;
+    };
+    url: '/api/admin/shop/referrals';
+};
+
+export type AdminListReferralsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminListReferralsError = AdminListReferralsErrors[keyof AdminListReferralsErrors];
+
+export type AdminListReferralsResponses = {
+    /**
+     * Referrals returned.
+     */
+    200: AdminListReferralsResponseBody;
+};
+
+export type AdminListReferralsResponse = AdminListReferralsResponses[keyof AdminListReferralsResponses];
+
+export type AdminGetReferralSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/referrals/settings';
+};
+
+export type AdminGetReferralSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type AdminGetReferralSettingsError = AdminGetReferralSettingsErrors[keyof AdminGetReferralSettingsErrors];
+
+export type AdminGetReferralSettingsResponses = {
+    /**
+     * Settings returned.
+     */
+    200: AdminGetReferralSettingsResponseBody;
+};
+
+export type AdminGetReferralSettingsResponse = AdminGetReferralSettingsResponses[keyof AdminGetReferralSettingsResponses];
+
+export type AdminUpdateReferralSettingsData = {
+    body: AdminUpdateReferralSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/referrals/settings';
+};
+
+export type AdminUpdateReferralSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminUpdateReferralSettingsError = AdminUpdateReferralSettingsErrors[keyof AdminUpdateReferralSettingsErrors];
+
+export type AdminUpdateReferralSettingsResponses = {
+    /**
+     * Settings saved.
+     */
+    200: AdminUpdateReferralSettingsResponseBody;
+};
+
+export type AdminUpdateReferralSettingsResponse = AdminUpdateReferralSettingsResponses[keyof AdminUpdateReferralSettingsResponses];
+
+export type AdminApproveReferralData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the referral.
+         */
+        referral_id: AdminApproveReferralReferralIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/referrals/{referral_id}/approve';
+};
+
+export type AdminApproveReferralErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type AdminApproveReferralError = AdminApproveReferralErrors[keyof AdminApproveReferralErrors];
+
+export type AdminApproveReferralResponses = {
+    /**
+     * Referral approved.
+     */
+    200: AdminApproveReferralResponseBody;
+};
+
+export type AdminApproveReferralResponse = AdminApproveReferralResponses[keyof AdminApproveReferralResponses];
+
+export type AdminRejectReferralData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the referral.
+         */
+        referral_id: AdminRejectReferralReferralIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/shop/referrals/{referral_id}/reject';
+};
+
+export type AdminRejectReferralErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type AdminRejectReferralError = AdminRejectReferralErrors[keyof AdminRejectReferralErrors];
+
+export type AdminRejectReferralResponses = {
+    /**
+     * Referral rejected.
+     */
+    200: AdminRejectReferralResponseBody;
+};
+
+export type AdminRejectReferralResponse = AdminRejectReferralResponses[keyof AdminRejectReferralResponses];
 
 export type AdminListAdminAssistantConversationsData = {
     body?: never;
@@ -23109,6 +23917,68 @@ export type ClientGetTokenPurchaseResponses = {
 };
 
 export type ClientGetTokenPurchaseResponse = ClientGetTokenPurchaseResponses[keyof ClientGetTokenPurchaseResponses];
+
+export type ClientRedeemCouponData = {
+    body: ClientRedeemCouponRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/wallet/coupons';
+};
+
+export type ClientRedeemCouponErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The coupon cannot be redeemed.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientRedeemCouponError = ClientRedeemCouponErrors[keyof ClientRedeemCouponErrors];
+
+export type ClientRedeemCouponResponses = {
+    /**
+     * Coupon redeemed.
+     */
+    200: ClientRedeemCouponResponseBody;
+};
+
+export type ClientRedeemCouponResponse = ClientRedeemCouponResponses[keyof ClientRedeemCouponResponses];
+
+export type ClientGetReferralsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/client/account/referrals';
+};
+
+export type ClientGetReferralsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+
+export type ClientGetReferralsError = ClientGetReferralsErrors[keyof ClientGetReferralsErrors];
+
+export type ClientGetReferralsResponses = {
+    /**
+     * Referrals returned.
+     */
+    200: ClientGetReferralsResponseBody;
+};
+
+export type ClientGetReferralsResponse = ClientGetReferralsResponses[keyof ClientGetReferralsResponses];
 
 export type ClientListAccountApiKeysData = {
     body?: never;
