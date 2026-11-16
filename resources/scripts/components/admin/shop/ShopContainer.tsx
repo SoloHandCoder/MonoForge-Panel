@@ -9,6 +9,7 @@ import PeriodsTab from '@/components/admin/shop/periods/PeriodsTab';
 import PlansTab from '@/components/admin/shop/plans/PlansTab';
 import { shopTabFromPath, shopTabs, type ShopTab } from '@/components/admin/shop/shopTabs';
 import TebexShopTab from '@/components/admin/shop/TebexShopTab';
+import TrialsTab from '@/components/admin/shop/trials/TrialsTab';
 import TunnelsTab from '@/components/admin/shop/tunnels/TunnelsTab';
 
 const tabContent = {
@@ -18,6 +19,7 @@ const tabContent = {
     addons: () => <AddonsTab />,
     limits: () => <LimitsTab />,
     nodes: () => <NodesTab />,
+    trials: () => <TrialsTab />,
     'token-packs': () => <TebexShopTab />,
     tunnels: () => <TunnelsTab />,
 } satisfies Record<ShopTab, () => React.ReactNode>;

@@ -23,7 +23,7 @@ export interface OrderPrice {
     soldOut: boolean;
 }
 
-function ResourceList({ resources, className }: { resources: StoreResources; className?: string }) {
+export function ResourceList({ resources, className }: { resources: StoreResources; className?: string }) {
     return (
         <ul className={cn('grid gap-1.5 text-sm', className)}>
             {planResources(resources).map((line) => (

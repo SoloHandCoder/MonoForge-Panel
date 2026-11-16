@@ -135,7 +135,7 @@ function estimateFor(catalog: StoreCatalog, plan: StorePlan, choices: CheckoutCh
 }
 
 /** Whether the catalog already says the plan, or the picked location or node, is sold out. */
-function soldOutInCatalog(
+export function soldOutInCatalog(
     plan: StorePlan,
     locations: StoreLocation[],
     { locationId, nodeId }: CheckoutChoices

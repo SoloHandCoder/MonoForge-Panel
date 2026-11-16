@@ -1,10 +1,21 @@
 import type { CSSProperties } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Archive, ArrowRight, Cpu, Database, HardDrive, MemoryStick, Network, type LucideIcon } from 'lucide-react';
+import {
+    Archive,
+    ArrowRight,
+    Cpu,
+    Database,
+    Gift,
+    HardDrive,
+    MemoryStick,
+    Network,
+    type LucideIcon,
+} from 'lucide-react';
 import type { StoreLocation, StorePlan } from '@/api/store/types';
 import Badge from '@/components/elements/Badge';
 import Icon from '@/components/elements/Icon';
 import { cpu, fromPerMonth, megabytes } from '@/components/store/storeFormat';
+import { tryFreeLabel, type PlanTrial } from '@/components/store/useTrial';
 import { cn } from '@/lib/cn';
 
 /** The dashboard's server card language: a soft lift and a violet glow on hover or focus. */
@@ -64,12 +75,15 @@ export default function PlanCard({
     index,
     cheapest,
     discount,
+    trial = null,
 }: {
     plan: StorePlan;
     locations: StoreLocation[];
     index: number;
     cheapest: boolean;
     discount: number;
+    /** The plan's free trial, shown as "Try free" when this player may start it. */
+    trial?: PlanTrial | null;
 }) {
     const price = fromPerMonth(plan, locations);
 
@@ -114,6 +128,18 @@ export default function PlanCard({
                     >{`${plan.allocations} extra ${plan.allocations === 1 ? 'port' : 'ports'}`}</Spec>
                 )}
             </ul>
+            {trial?.eligible && (
+                <Link
+                    to='/store/$planId'
+                    params={{ planId: String(plan.id) }}
+                    hash='trial'
+                    className='relative z-10 mt-5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-3.5 py-2 text-sm font-medium text-foreground no-underline transition-colors duration-150 hover:bg-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+                >
+                    <Icon icon={Gift} className='size-4 text-(--accent-soft)' aria-hidden />
+                    {tryFreeLabel(trial.hours)}
+                    <span className='sr-only'> ({plan.name})</span>
+                </Link>
+            )}
             <div className='mt-auto flex items-center justify-between gap-3 pt-6'>
                 <EggAvatars plan={plan} />
                 <Link

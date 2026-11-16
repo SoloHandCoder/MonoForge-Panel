@@ -1,4 +1,4 @@
-import type { ClientStorePurchaseAttributes } from '@/api/generated';
+import type { ClientStorePurchaseAttributes, ClientStoreTrialAttributes } from '@/api/generated';
 
 /*
  * The store as the checkout uses it. `GET /api/client/store/catalog` and `POST /api/client/store/quote`
@@ -89,6 +89,16 @@ export interface RawStoreAddon {
     max_units: number;
 }
 
+/** Free trial servers as the catalog offers them to the signed-in player. */
+export interface RawStoreTrialOffer {
+    enabled: boolean;
+    hours: number;
+    plan_ids: number[];
+    eligible: boolean;
+    /** Why this player cannot start a trial; null when they can. */
+    reason: string | null;
+}
+
 export interface RawStoreCatalog {
     enabled: boolean;
     subdomains_enabled: boolean;
@@ -97,6 +107,7 @@ export interface RawStoreCatalog {
     categories: RawStoreCategory[];
     periods: RawStorePeriod[];
     addons: RawStoreAddon[];
+    trial?: RawStoreTrialOffer;
 }
 
 export interface RawStoreQuote {
@@ -208,6 +219,17 @@ export interface StoreCatalog {
     subdomainBase: string | null;
     /** The player's token balance. */
     balance: number | null;
+    trial: StoreTrialOffer;
+}
+
+export interface StoreTrialOffer {
+    /** Whether the store offers free trials at all. */
+    enabled: boolean;
+    hours: number;
+    planIds: number[];
+    /** Whether this player may start one. */
+    eligible: boolean;
+    reason: string | null;
 }
 
 export type StoreResources = Record<StoreAddonResource, number>;
@@ -233,6 +255,15 @@ export interface StoreSelection {
 }
 
 export type PurchaseResult = ClientStorePurchaseAttributes;
+
+export type TrialResult = ClientStoreTrialAttributes;
+
+const noTrial: StoreTrialOffer = { enabled: false, hours: 0, planIds: [], eligible: false, reason: null };
+
+export const mapTrialOffer = (raw: RawStoreTrialOffer | undefined): StoreTrialOffer =>
+    raw
+        ? { enabled: raw.enabled, hours: raw.hours, planIds: raw.plan_ids, eligible: raw.eligible, reason: raw.reason }
+        : noTrial;
 
 /** Decimal columns may arrive as strings. */
 const multiplierOf = (value: number | string | null | undefined): number => Number(value ?? 1) || 1;
@@ -330,6 +361,7 @@ export function mapCatalog(raw: RawStoreCatalog): StoreCatalog {
         subdomainsEnabled: raw.subdomains_enabled,
         subdomainBase: raw.subdomain_base ?? null,
         balance: raw.balance ?? null,
+        trial: mapTrialOffer(raw.trial),
     };
 }
 

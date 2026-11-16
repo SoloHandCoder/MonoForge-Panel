@@ -9,6 +9,7 @@ import { ServerError } from '@/components/elements/ScreenBlock';
 import PlanCard from '@/components/store/PlanCard';
 import { CapacityNotice } from '@/components/store/StoreNotices';
 import { bestDiscount, sortPlans, tokens } from '@/components/store/storeFormat';
+import { trialFor } from '@/components/store/useTrial';
 import { cn } from '@/lib/cn';
 import { PanelLink } from '@/sdk/navigation';
 
@@ -113,6 +114,7 @@ function StorePlans({ catalog }: { catalog: StoreCatalog }) {
                         index={index}
                         cheapest={index === 0 && plans.length > 1}
                         discount={discount}
+                        trial={trialFor(catalog, plan)}
                     />
                 ))}
             </div>

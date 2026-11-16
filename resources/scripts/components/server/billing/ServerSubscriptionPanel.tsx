@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import {
+    keepTrialInput,
     renewServerSubscriptionInput,
     sleepDuration,
     timeUntil,
     updateAutoSleepInput,
     updateServerSubscriptionInput,
+    useKeepTrialServer,
     useRenewServerSubscription,
     useServerSubscription,
     useUpdateServerSubscription,
@@ -34,6 +37,89 @@ function RenewButton({ subscription }: { subscription: ServerSubscription }) {
         >
             {subscription.status === 'suspended' ? 'Renew and unsuspend' : 'Renew now'}
         </Button>
+    );
+}
+
+type TrialOption = NonNullable<ServerSubscription['trial']>['options'][number];
+
+/** The billing period picker and "Keep this server" of a free trial. */
+function KeepTrialControls({ subscription, ended }: { subscription: ServerSubscription; ended: boolean }) {
+    const keep = useKeepTrialServer();
+    const options: TrialOption[] = subscription.trial?.options ?? [];
+    const [periodId, setPeriodId] = useState<number | null>(options[0]?.period_id ?? null);
+    const picked = options.find((option) => option.period_id === periodId) ?? options[0];
+
+    if (!picked) {
+        return <p className='mt-3 text-sm'>Contact support to keep this server: its plan is not sold any more.</p>;
+    }
+
+    return (
+        <div className='mt-3 flex flex-col gap-3'>
+            {options.length > 1 && (
+                <fieldset className='flex flex-wrap gap-2'>
+                    <legend className='sr-only'>Billing period</legend>
+                    {options.map((option) => (
+                        <label
+                            key={option.period_id}
+                            className='inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-card-foreground has-checked:border-primary has-focus-visible:outline-2 has-focus-visible:outline-ring'
+                        >
+                            <input
+                                type='radio'
+                                name={`keep-${subscription.server_identifier}`}
+                                value={option.period_id}
+                                checked={option.period_id === picked.period_id}
+                                onChange={() => setPeriodId(option.period_id)}
+                                className='accent-(--accent-soft)'
+                            />
+                            {option.name} · {option.price_tokens} tokens
+                        </label>
+                    ))}
+                </fieldset>
+            )}
+            <div className='flex flex-wrap items-center gap-2'>
+                <Button
+                    color={ended ? 'red' : 'primary'}
+                    isLoading={keep.isPending}
+                    disabled={keep.isPending}
+                    onClick={() =>
+                        keep.mutate(
+                            keepTrialInput(subscription.server_identifier, picked.period_id, picked.price_tokens)
+                        )
+                    }
+                >
+                    Keep this server · {picked.price_tokens} tokens / {picked.days} days
+                </Button>
+                <PanelLink
+                    destination={{ to: '/account/wallet' }}
+                    className='text-sm font-medium underline underline-offset-2'
+                >
+                    Top up
+                </PanelLink>
+            </div>
+        </div>
+    );
+}
+
+/** A free trial: the countdown to its end (or, once it ended, to the deletion) and "Keep this server". */
+function TrialBanner({ subscription, now }: { subscription: ServerSubscription; now: number }) {
+    const ended = subscription.status === 'suspended';
+    const until = ended ? subscription.delete_at : subscription.next_renewal_at;
+    const left = until === null ? '0m' : timeUntil(until, now);
+    let title = `Free trial — ends in ${left}`;
+
+    if (ended) {
+        title = left === '0m' ? 'Trial ended — deleting now' : `Trial ended — deletes in ${left}`;
+    }
+
+    return (
+        <Alert type={ended ? 'danger' : 'info'} title={title}>
+            <p>
+                {ended
+                    ? `The free trial is over and the server is suspended${until === null ? '' : `; it is deleted on ${formatDate(until, dateFormat)}`}. Keep it to get it back with everything on it.`
+                    : `This server is free until ${formatDate(subscription.next_renewal_at, dateFormat)}. Keep it by paying for a billing period; otherwise it is suspended when the trial ends.`}
+            </p>
+            <KeepTrialControls subscription={subscription} ended={ended} />
+        </Alert>
     );
 }
 
@@ -152,6 +238,15 @@ export default function ServerSubscriptionPanel({ identifier, summary }: { ident
 
     if (!subscription || subscription.status === 'cancelled') {
         return null;
+    }
+
+    // A free trial shows its countdown and "Keep this server" on every page of the server.
+    if (subscription.is_trial) {
+        return (
+            <div className='mb-4'>
+                <TrialBanner subscription={subscription} now={now} />
+            </div>
+        );
     }
 
     if (subscription.status === 'suspended') {

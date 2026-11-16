@@ -9,10 +9,12 @@ import {
 
 const now = Date.parse('2026-11-20T12:00:00Z');
 
-const subscription = (status: string, deleteAt: string | null): ServerSubscription => ({
+const subscription = (status: string, deleteAt: string | null, isTrial = false): ServerSubscription => ({
     server_identifier: 'a1b2c3d4',
     server_name: 'Survival',
     status,
+    is_trial: isTrial,
+    trial: isTrial ? { ends_at: '2026-11-20T12:00:00Z', options: [] } : null,
     price_tokens: 500,
     period_days: 30,
     addons: [],
@@ -50,6 +52,16 @@ describe('billing countdown', () => {
             'Suspended — deletes in 6d 23h. Top up and renew'
         );
         expect(billingNotice(subscription('suspended', '2026-11-20T11:00:00Z'), now)).toBe('Suspended — deleting now');
+    });
+
+    it('says an ended free trial is deleted unless kept, and stays quiet while the trial runs', () => {
+        expect(billingNotice(subscription('trial', null, true), now)).toBeNull();
+        expect(billingNotice(subscription('suspended', '2026-11-27T11:00:00Z', true), now)).toBe(
+            'Trial ended — deletes in 6d 23h. Keep this server'
+        );
+        expect(billingNotice(subscription('suspended', '2026-11-20T11:00:00Z', true), now)).toBe(
+            'Trial ended — deleting now'
+        );
     });
 });
 
