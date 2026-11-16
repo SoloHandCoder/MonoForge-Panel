@@ -14,7 +14,7 @@ use Pterodactyl\Models\Node;
 use Pterodactyl\Services\Tunnels\TunnelImportService;
 use Pterodactyl\Services\Tunnels\TunnelService;
 
-#[Description('Links tunnels made in the playit.gg dashboard to their servers, retries failed tunnels and checks pending ones for their address.')]
+#[Description('Links tunnels made in the playit.gg dashboard to their servers, creates missing tunnels on self-managed agents, retries failed tunnels and checks pending ones for their address.')]
 #[Signature('p:tunnels:sync {--limit=50 : The most tunnels to handle in one run.}')]
 class SyncTunnelsCommand extends Command
 {
@@ -25,6 +25,13 @@ class SyncTunnelsCommand extends Command
         $linked = $importer->import();
         foreach ($linked['errors'] as $error) {
             $this->components->warn(sprintf('%s: %s', $error['node_name'], $error['message']));
+        }
+
+        // Nodes on the self-managed agent the panel set up can create tunnels: give servers that
+        // never had one (such as those from before the switch) a tunnel too.
+        $created = 0;
+        foreach (Node::query()->where('playit_mode', Node::PLAYIT_SELF_MANAGED)->get() as $node) {
+            $created += $tunnels->provisionMissing($node);
         }
 
         $pending = ServerTunnel::query()
@@ -45,7 +52,7 @@ class SyncTunnelsCommand extends Command
             }
         }
 
-        $this->components->info(sprintf('Linked %d playit.gg tunnel(s) from the dashboard. Checked %d tunnel(s); %d now active.', $linked['imported'], $pending->count(), $active));
+        $this->components->info(sprintf('Linked %d playit.gg tunnel(s) from the dashboard. Queued %d new tunnel(s). Checked %d tunnel(s); %d now active.', $linked['imported'], $created, $pending->count(), $active));
 
         return self::SUCCESS;
     }

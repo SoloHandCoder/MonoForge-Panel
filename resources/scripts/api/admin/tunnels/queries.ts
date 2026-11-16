@@ -254,3 +254,181 @@ export const useTestAdminNodePlayit = (nodeId: number) =>
                 : toast.error('playit.gg connection failed', { description: result.message }),
         onError: (error) => notifyHttpError(error, 'Unable to test the playit.gg agent'),
     });
+
+// "Set up automatic tunnels" (phase 7 Task A): the node moves to a self-managed playit.gg agent.
+
+export type PlayitClaimStatus =
+    | 'waiting_for_visit'
+    | 'waiting_for_user'
+    | 'accepted'
+    | 'rejected'
+    | 'expired'
+    | 'ready'
+    | 'switched';
+
+export interface PlayitOldTunnel {
+    id: number;
+    playit_tunnel_id: string;
+    name: string | null;
+    address: string | null;
+    local_port: number | null;
+    server_id: number | null;
+    server_name: string | null;
+}
+
+/** Where the switch stands. Never contains the agent secret or the switch token. */
+export interface PlayitSwitchState {
+    mode: 'read_only' | 'self_managed' | null;
+    self_managed: boolean;
+    switched_at: string | null;
+    can_undo: boolean;
+    claim: {
+        status: PlayitClaimStatus;
+        /** Only while the claim waits on playit.gg. */
+        claim_url: string | null;
+        expires_at: string | null;
+        agent_id: string | null;
+        /** Set while a switch token was created and not used yet. */
+        token_expires_at: string | null;
+        fetched_at: string | null;
+        report: 'switched' | 'rolled_back' | null;
+        reported_at: string | null;
+        last_error: string | null;
+    } | null;
+    old_tunnels: PlayitOldTunnel[];
+    old_tunnels_removed: number;
+    script: { url: string; sha256: string | null };
+}
+
+export interface PlayitSwitchToken {
+    token: string;
+    expires_at: string;
+}
+
+export interface PlayitOldTunnelRemoval {
+    removed: number;
+    remaining: number;
+    /** playit only lets the old key read: delete the rest in the playit dashboard. */
+    manual: boolean;
+    message: string;
+}
+
+const playitSwitchKey = (nodeId: number) => ['admin', 'nodes', nodeId, 'playit', 'switch'] as const;
+
+const isWaiting = (state: PlayitSwitchState | undefined): boolean =>
+    state?.claim?.status === 'waiting_for_visit' ||
+    state?.claim?.status === 'waiting_for_user' ||
+    state?.claim?.status === 'accepted';
+
+/** True while the node's script may be running: a token was made, or the secret was fetched and nothing reported yet. */
+const awaitingScript = (state: PlayitSwitchState | undefined): boolean =>
+    state?.claim?.status === 'ready' &&
+    !state.self_managed &&
+    (state.claim.token_expires_at !== null || (state.claim.fetched_at !== null && state.claim.report === null));
+
+export const playitSwitchWaits = { isWaiting, awaitingScript };
+
+export const adminPlayitSwitchQueryOptions = (nodeId: number) =>
+    queryOptions({
+        queryKey: playitSwitchKey(nodeId),
+        queryFn: async ({ signal }): Promise<PlayitSwitchState> =>
+            (await http.get<PlayitSwitchState>(`/api/admin/nodes/${nodeId}/playit/switch`, { signal })).data,
+    });
+
+/** The switch state; refreshed every 5 s while the node's script may be reporting. */
+export const usePlayitSwitch = (nodeId: number) =>
+    useQuery({
+        ...adminPlayitSwitchQueryOptions(nodeId),
+        refetchInterval: (query) => (awaitingScript(query.state.data) ? 5_000 : false),
+    });
+
+/** Polls playit.gg (through the panel) every 3 s while the claim waits to be accepted. */
+export const usePlayitClaimPolling = (nodeId: number, state: PlayitSwitchState | undefined) => {
+    const queryClient = useQueryClient();
+
+    return useQuery({
+        queryKey: [...playitSwitchKey(nodeId), 'check'],
+        queryFn: async (): Promise<PlayitSwitchState> => {
+            const next = (await http.post<PlayitSwitchState>(`/api/admin/nodes/${nodeId}/playit/switch/check`)).data;
+
+            queryClient.setQueryData(playitSwitchKey(nodeId), next);
+
+            return next;
+        },
+        enabled: isWaiting(state),
+        refetchInterval: 3_000,
+        refetchOnWindowFocus: false,
+        retry: false,
+    });
+};
+
+const usePlayitSwitchAction = (nodeId: number, path: string, done: string | null, failed: string) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () => (await http.post<PlayitSwitchState>(`/api/admin/nodes/${nodeId}/${path}`)).data,
+        onSuccess: async (state) => {
+            queryClient.setQueryData(playitSwitchKey(nodeId), state);
+            await queryClient.invalidateQueries({ queryKey: nodePlayitKey(nodeId) });
+            await queryClient.invalidateQueries({ queryKey: tunnelsKey });
+            if (done !== null) {
+                toast.success(done);
+            }
+        },
+        onError: (error) => notifyHttpError(error, failed),
+    });
+};
+
+export const useStartPlayitClaim = (nodeId: number) =>
+    usePlayitSwitchAction(nodeId, 'playit/switch', null, 'Unable to start the playit.gg claim');
+
+export const useFinishPlayitSwitch = (nodeId: number) =>
+    usePlayitSwitchAction(
+        nodeId,
+        'playit/switch/finish',
+        'The panel now uses the new agent',
+        'Unable to finish the switch'
+    );
+
+export const useUndoPlayitSwitch = (nodeId: number) =>
+    usePlayitSwitchAction(nodeId, 'playit/switch/undo', 'The previous agent is back', 'Unable to undo the switch');
+
+export const useDismissOldTunnels = (nodeId: number) =>
+    usePlayitSwitchAction(
+        nodeId,
+        'playit/old-tunnels/dismiss',
+        'Old tunnels dismissed',
+        'Unable to dismiss the old tunnels'
+    );
+
+/** A one-time token for the node's switch script, shown once. */
+export const useCreatePlayitSwitchToken = (nodeId: number) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () =>
+            (await http.post<PlayitSwitchToken>(`/api/admin/nodes/${nodeId}/playit/switch/token`)).data,
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: playitSwitchKey(nodeId) });
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to create the switch token'),
+    });
+};
+
+export const useRemoveOldTunnels = (nodeId: number) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () =>
+            (await http.post<PlayitOldTunnelRemoval>(`/api/admin/nodes/${nodeId}/playit/old-tunnels/remove`)).data,
+        onSuccess: async (result) => {
+            await queryClient.invalidateQueries({ queryKey: playitSwitchKey(nodeId) });
+            if (result.manual && result.remaining > 0) {
+                toast.warning('Some old tunnels are left', { description: result.message });
+            } else {
+                toast.success('Old tunnels removed', { description: result.message });
+            }
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to remove the old tunnels'),
+    });
+};

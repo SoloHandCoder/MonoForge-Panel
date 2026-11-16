@@ -6841,6 +6841,418 @@ export type AdminTestNodePlayitGgAgentResponseBody = {
     message?: string;
     tunnel_count?: number;
 };
+export type AdminGetNodePlayitGgSwitchResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
+export type AdminStartNodePlayitGgClaimResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
+export type AdminCheckNodePlayitGgClaimResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
+export type AdminCreateNodePlayitGgSwitchTokenResponseBody = {
+    token?: string;
+    expires_at?: string;
+};
+export type AdminFinishNodePlayitGgSwitchResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
+export type AdminUndoNodePlayitGgSwitchResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
+export type AdminRemoveOldNodePlayitGgTunnelsResponseBody = {
+    removed?: number;
+    remaining?: number;
+    manual?: boolean;
+    message?: string;
+};
+export type AdminDismissOldNodePlayitGgTunnelsResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+};
 export type AdminImportExistingTunnelsResponseBody = {
     imported?: number;
     skipped?: number;
@@ -9113,6 +9525,13 @@ export type AdminCreateNodeDeployTokenNodeIdPathParameter = number;
 export type AdminGetNodeUtilizationNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminTestNodePlayitGgAgentNodeIdPathParameter = number;
+export type AdminGetNodePlayitGgSwitchNodeIdPathParameter = number;
+export type AdminCheckNodePlayitGgClaimNodeIdPathParameter = number;
+export type AdminCreateNodePlayitGgSwitchTokenNodeIdPathParameter = number;
+export type AdminFinishNodePlayitGgSwitchNodeIdPathParameter = number;
+export type AdminUndoNodePlayitGgSwitchNodeIdPathParameter = number;
+export type AdminRemoveOldNodePlayitGgTunnelsNodeIdPathParameter = number;
+export type AdminDismissOldNodePlayitGgTunnelsNodeIdPathParameter = number;
 /**
  * Only tunnels with this status.
  */
@@ -13946,6 +14365,270 @@ export type AdminTestNodePlayitGgAgentResponses = {
     200: AdminTestNodePlayitGgAgentResponseBody;
 };
 export type AdminTestNodePlayitGgAgentResponse = AdminTestNodePlayitGgAgentResponses[keyof AdminTestNodePlayitGgAgentResponses];
+export type AdminGetNodePlayitGgSwitchData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodePlayitGgSwitchNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch';
+};
+export type AdminGetNodePlayitGgSwitchErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetNodePlayitGgSwitchError = AdminGetNodePlayitGgSwitchErrors[keyof AdminGetNodePlayitGgSwitchErrors];
+export type AdminGetNodePlayitGgSwitchResponses = {
+    /**
+     * Switch state returned.
+     */
+    200: AdminGetNodePlayitGgSwitchResponseBody;
+};
+export type AdminGetNodePlayitGgSwitchResponse = AdminGetNodePlayitGgSwitchResponses[keyof AdminGetNodePlayitGgSwitchResponses];
+export type AdminStartNodePlayitGgClaimData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodePlayitGgSwitchNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch';
+};
+export type AdminStartNodePlayitGgClaimErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminStartNodePlayitGgClaimError = AdminStartNodePlayitGgClaimErrors[keyof AdminStartNodePlayitGgClaimErrors];
+export type AdminStartNodePlayitGgClaimResponses = {
+    /**
+     * Claim started.
+     */
+    200: AdminStartNodePlayitGgClaimResponseBody;
+};
+export type AdminStartNodePlayitGgClaimResponse = AdminStartNodePlayitGgClaimResponses[keyof AdminStartNodePlayitGgClaimResponses];
+export type AdminCheckNodePlayitGgClaimData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminCheckNodePlayitGgClaimNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch/check';
+};
+export type AdminCheckNodePlayitGgClaimErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminCheckNodePlayitGgClaimError = AdminCheckNodePlayitGgClaimErrors[keyof AdminCheckNodePlayitGgClaimErrors];
+export type AdminCheckNodePlayitGgClaimResponses = {
+    /**
+     * Claim checked.
+     */
+    200: AdminCheckNodePlayitGgClaimResponseBody;
+};
+export type AdminCheckNodePlayitGgClaimResponse = AdminCheckNodePlayitGgClaimResponses[keyof AdminCheckNodePlayitGgClaimResponses];
+export type AdminCreateNodePlayitGgSwitchTokenData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminCreateNodePlayitGgSwitchTokenNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch/token';
+};
+export type AdminCreateNodePlayitGgSwitchTokenErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminCreateNodePlayitGgSwitchTokenError = AdminCreateNodePlayitGgSwitchTokenErrors[keyof AdminCreateNodePlayitGgSwitchTokenErrors];
+export type AdminCreateNodePlayitGgSwitchTokenResponses = {
+    /**
+     * Token created.
+     */
+    200: AdminCreateNodePlayitGgSwitchTokenResponseBody;
+};
+export type AdminCreateNodePlayitGgSwitchTokenResponse = AdminCreateNodePlayitGgSwitchTokenResponses[keyof AdminCreateNodePlayitGgSwitchTokenResponses];
+export type AdminFinishNodePlayitGgSwitchData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminFinishNodePlayitGgSwitchNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch/finish';
+};
+export type AdminFinishNodePlayitGgSwitchErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminFinishNodePlayitGgSwitchError = AdminFinishNodePlayitGgSwitchErrors[keyof AdminFinishNodePlayitGgSwitchErrors];
+export type AdminFinishNodePlayitGgSwitchResponses = {
+    /**
+     * Switch finished.
+     */
+    200: AdminFinishNodePlayitGgSwitchResponseBody;
+};
+export type AdminFinishNodePlayitGgSwitchResponse = AdminFinishNodePlayitGgSwitchResponses[keyof AdminFinishNodePlayitGgSwitchResponses];
+export type AdminUndoNodePlayitGgSwitchData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminUndoNodePlayitGgSwitchNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch/undo';
+};
+export type AdminUndoNodePlayitGgSwitchErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminUndoNodePlayitGgSwitchError = AdminUndoNodePlayitGgSwitchErrors[keyof AdminUndoNodePlayitGgSwitchErrors];
+export type AdminUndoNodePlayitGgSwitchResponses = {
+    /**
+     * Switch undone.
+     */
+    200: AdminUndoNodePlayitGgSwitchResponseBody;
+};
+export type AdminUndoNodePlayitGgSwitchResponse = AdminUndoNodePlayitGgSwitchResponses[keyof AdminUndoNodePlayitGgSwitchResponses];
+export type AdminRemoveOldNodePlayitGgTunnelsData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminRemoveOldNodePlayitGgTunnelsNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/old-tunnels/remove';
+};
+export type AdminRemoveOldNodePlayitGgTunnelsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminRemoveOldNodePlayitGgTunnelsError = AdminRemoveOldNodePlayitGgTunnelsErrors[keyof AdminRemoveOldNodePlayitGgTunnelsErrors];
+export type AdminRemoveOldNodePlayitGgTunnelsResponses = {
+    /**
+     * Old tunnels removed.
+     */
+    200: AdminRemoveOldNodePlayitGgTunnelsResponseBody;
+};
+export type AdminRemoveOldNodePlayitGgTunnelsResponse = AdminRemoveOldNodePlayitGgTunnelsResponses[keyof AdminRemoveOldNodePlayitGgTunnelsResponses];
+export type AdminDismissOldNodePlayitGgTunnelsData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminDismissOldNodePlayitGgTunnelsNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/old-tunnels/dismiss';
+};
+export type AdminDismissOldNodePlayitGgTunnelsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDismissOldNodePlayitGgTunnelsError = AdminDismissOldNodePlayitGgTunnelsErrors[keyof AdminDismissOldNodePlayitGgTunnelsErrors];
+export type AdminDismissOldNodePlayitGgTunnelsResponses = {
+    /**
+     * Old tunnels dismissed.
+     */
+    200: AdminDismissOldNodePlayitGgTunnelsResponseBody;
+};
+export type AdminDismissOldNodePlayitGgTunnelsResponse = AdminDismissOldNodePlayitGgTunnelsResponses[keyof AdminDismissOldNodePlayitGgTunnelsResponses];
 export type AdminListTunnelsData = {
     body?: never;
     path?: never;
