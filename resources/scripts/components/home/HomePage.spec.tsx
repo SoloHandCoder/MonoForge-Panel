@@ -224,6 +224,8 @@ describe('public homepage', () => {
         expect(footer.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/legal/terms');
         expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/legal/privacy');
         expect(footer.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', DISCORD_INVITE_URL);
+        expect(footer.getByRole('link', { name: 'Help center' })).toHaveAttribute('href', '/help');
+        expect(screen.getByRole('link', { name: 'help center' })).toHaveAttribute('href', '/help');
     });
 
     it('keeps the decorative backdrop out of the accessibility tree', () => {

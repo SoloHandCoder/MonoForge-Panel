@@ -65,6 +65,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\TransferProgressController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\AdvancedController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\GeneralController;
+use Pterodactyl\Http\Controllers\Api\Admin\Settings\HelpController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LegalController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\LoginProvidersController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\MailController;
@@ -101,6 +102,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Users\TokenController as UserTokenCon
 use Pterodactyl\Http\Controllers\Api\Admin\Users\UserController;
 use Pterodactyl\Http\Controllers\Api\Admin\VersionController;
 use Pterodactyl\Http\Middleware\Api\Admin\RequireSessionAuthentication;
+use Pterodactyl\Services\Help\HelpArticles;
 
 // Admin API (/api/admin), gated on the global root administrator flag.
 
@@ -108,6 +110,9 @@ Route::get('/languages', LanguagesController::class)->name('api.admin.languages'
 
 Route::get('/activity', ActivityController::class)->name('api.admin.activity');
 Route::get('/activity/filters', ActivityFilterController::class)->name('api.admin.activity.filters');
+
+// The guides for running the panel, under Admin > Help (root administrators only).
+Route::get('/help', [HelpController::class, 'guides'])->name('api.admin.help');
 
 /*
 |--------------------------------------------------------------------------
@@ -705,6 +710,15 @@ Route::prefix('/settings')->name('api.admin.settings')->group(function (): void 
     Route::put('/legal/{document}', [LegalController::class, 'update'])
         ->whereIn('document', LegalDocument::values())
         ->name('.legal.update');
+
+    // The help center articles (Admin > Settings > Help).
+    Route::get('/help', [HelpController::class, 'index'])->name('.help');
+    Route::put('/help/{article}', [HelpController::class, 'update'])
+        ->where('article', HelpArticles::SLUG_PATTERN)
+        ->name('.help.update');
+    Route::delete('/help/{article}', [HelpController::class, 'destroy'])
+        ->where('article', HelpArticles::SLUG_PATTERN)
+        ->name('.help.reset');
 
     // Phase 6: one-click plugins (the CurseForge API key).
     Route::get('/plugins', [PluginSettingsController::class, 'index'])->name('.plugins');

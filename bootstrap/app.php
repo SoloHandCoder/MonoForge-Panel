@@ -23,6 +23,7 @@ use Pterodactyl\Console\Scheduler;
 use Pterodactyl\Exceptions\ApiErrorResponse;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Http\Controllers\Base\PublicHelpController;
 use Pterodactyl\Http\Controllers\Base\PublicNoticeController;
 use Pterodactyl\Http\Controllers\Base\PublicServerPageController;
 use Pterodactyl\Http\Controllers\Base\PublicStatusController;
@@ -84,6 +85,11 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
         Route::middleware('throttle:60,1')
             ->get('/api/public/status', PublicStatusController::class)
             ->name('api.public.status');
+
+        // The help center's articles: no session, not cached so an admin's change shows at once.
+        Route::middleware('throttle:60,1')
+            ->get('/api/public/help', PublicHelpController::class)
+            ->name('api.public.help');
 
         // The public homepage's plans: no session or cookies, cached for a minute.
         Route::middleware('throttle:60,1')

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
+use Pterodactyl\Http\Controllers\Base\HelpPageController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
 use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
@@ -13,6 +14,7 @@ use Pterodactyl\Http\Controllers\Base\ReferralLinkController;
 use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
+use Pterodactyl\Services\Help\HelpArticles;
 use Pterodactyl\Services\ServerPages\ServerPageBanners;
 use Pterodactyl\Services\ServerPages\ServerPageSlug;
 
@@ -41,6 +43,16 @@ Route::get('/legal/{document}', LegalPageController::class)
 Route::get('/status', [IndexController::class, 'index'])
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->name('status');
+
+// The help center and its articles: public and indexable; the server adds each page's title and
+// description, the SPA renders the articles.
+Route::get('/help', [HelpPageController::class, 'index'])
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('help');
+Route::get('/help/{article}', [HelpPageController::class, 'show'])
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->where('article', HelpArticles::SLUG_PATTERN)
+    ->name('help.article');
 
 // A referral link: remembers the code for 30 days and sends the visitor on to sign up.
 Route::get('/r/{code}', ReferralLinkController::class)

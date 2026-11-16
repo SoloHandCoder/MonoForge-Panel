@@ -53,7 +53,7 @@ class ExtensionManifest
      */
     public const array RESERVED_ROOT_PREFIXES = [
         'account', 'admin', 'api', 'assets', 'auth', 'daemon', 'extension-files', 'extensions',
-        'favicons', 'legal', 'locales', 'panel', 'r', 's', 'sanctum', 'scripts', 'server', 'servers', 'status', 'storage', 'store',
+        'favicons', 'help', 'legal', 'locales', 'panel', 'r', 's', 'sanctum', 'scripts', 'server', 'servers', 'status', 'storage', 'store',
         'themes', 'up',
     ];
 

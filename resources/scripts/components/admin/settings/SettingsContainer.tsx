@@ -4,6 +4,7 @@ import AdminContentBlock from '@/components/admin/AdminContentBlock';
 import Spinner from '@/components/elements/Spinner';
 import AdvancedSettingsForm from '@/components/admin/settings/AdvancedSettingsForm';
 import GeneralSettingsForm from '@/components/admin/settings/GeneralSettingsForm';
+import HelpSettings from '@/components/admin/settings/HelpSettingsForm';
 import LegalSettings from '@/components/admin/settings/LegalSettingsForm';
 import LoginProvidersForm from '@/components/admin/settings/LoginProvidersForm';
 import MailSettingsForm from '@/components/admin/settings/MailSettingsForm';
@@ -24,6 +25,7 @@ type Tab =
     | 'login-providers'
     | 'registration'
     | 'legal'
+    | 'help'
     | 'status'
     | 'plugins'
     | 'templates';
@@ -38,6 +40,7 @@ const tabs: { key: Tab; label: string }[] = [
     { key: 'login-providers', label: 'Login providers' },
     { key: 'registration', label: 'Registration' },
     { key: 'legal', label: 'Legal' },
+    { key: 'help', label: 'Help' },
     { key: 'status', label: 'Status page' },
     { key: 'plugins', label: 'Plugins' },
     { key: 'templates', label: 'Templates' },
@@ -50,6 +53,7 @@ const tabPaths = {
     'login-providers': '/panel/settings/login-providers',
     registration: '/panel/settings/registration',
     legal: '/panel/settings/legal',
+    help: '/panel/settings/help',
     status: '/panel/settings/status',
     plugins: '/panel/settings/plugins',
     templates: '/panel/settings/templates',
@@ -76,6 +80,10 @@ const tabFromPath = (pathname: string): Tab | undefined => {
         return 'legal';
     }
 
+    if (pathname.endsWith('/settings/help')) {
+        return 'help';
+    }
+
     if (pathname.endsWith('/status')) {
         return 'status';
     }
@@ -98,6 +106,7 @@ const parseTab = (tab: string | undefined): Tab =>
     tab === 'login-providers' ||
     tab === 'registration' ||
     tab === 'legal' ||
+    tab === 'help' ||
     tab === 'status' ||
     tab === 'plugins' ||
     tab === 'templates'
@@ -118,6 +127,7 @@ function SettingsTabPanel({ tab, settings }: { tab: Tab; settings: AdminSettings
             {tab === 'login-providers' && <LoginProvidersForm />}
             {tab === 'registration' && <RegistrationSettings />}
             {tab === 'legal' && <LegalSettings />}
+            {tab === 'help' && <HelpSettings />}
             {tab === 'status' && <StatusPageSettings />}
             {tab === 'plugins' && <PluginSettingsForm />}
             {tab === 'templates' && <PermissionTemplateSettings />}

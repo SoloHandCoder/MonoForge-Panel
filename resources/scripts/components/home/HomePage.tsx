@@ -462,6 +462,13 @@ function Faq() {
                         <p className='mt-3 text-sm text-muted-foreground'>{item.answer}</p>
                     </details>
                 ))}
+                <p className='mt-2 text-center text-sm text-muted-foreground'>
+                    More questions? The{' '}
+                    <a href='/help' className='font-medium text-(--accent-soft) underline-offset-2 hover:underline'>
+                        help center
+                    </a>{' '}
+                    has a guide for every part of the panel.
+                </p>
             </div>
         </Section>
     );
@@ -519,6 +526,9 @@ function Footer() {
                     &copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> MonoForge
                 </p>
                 <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-2'>
+                    <a href='/help' className='text-muted-foreground no-underline hover:text-foreground'>
+                        Help center
+                    </a>
                     <LegalLinks className='text-sm' />
                     <a {...discordLink} className='font-medium text-(--accent-soft) no-underline hover:text-foreground'>
                         Discord

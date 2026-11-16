@@ -3971,6 +3971,32 @@ export type AdminUpdateLegalDocumentRequest = {
      */
     reaccept: boolean;
 };
+export type AdminUpdateHelpArticleRequest = {
+    /**
+     * The title. Required for an added article.
+     */
+    title?: string | null;
+    /**
+     * The category the article is listed under.
+     */
+    category?: string | null;
+    /**
+     * One sentence about the article, shown in the list and as its search description.
+     */
+    summary?: string | null;
+    /**
+     * The article as markdown. Required for an added article.
+     */
+    content?: string | null;
+    /**
+     * Where the article goes: lower comes first. Blank keeps the shipped place, or puts an added article last.
+     */
+    order?: number | null;
+    /**
+     * Whether the article is shown.
+     */
+    enabled: boolean;
+};
 export type AdminUpdatePluginSettingsRequest = {
     /**
      * A new CurseForge API key, or blank to keep the stored one.
@@ -5533,6 +5559,18 @@ export type AdminListActivityFilterOptionsResponseBody = {
             email?: string;
         }>;
     };
+};
+export type AdminListAdminGuidesResponseBody = {
+    /**
+     * The guides in help center order, each with its markdown.
+     */
+    data: Array<{
+        slug?: string;
+        title?: string;
+        category?: string;
+        summary?: string;
+        content?: string;
+    }>;
 };
 export type AdminGetTheSupportSummaryResponseBody = {
     /**
@@ -8234,6 +8272,37 @@ export type AdminUpdateLegalDocumentResponseBody = {
     version?: number;
     updated_at?: string;
 };
+export type AdminListHelpArticlesResponseBody = {
+    /**
+     * The articles in help center order.
+     */
+    data: Array<{
+        slug?: string;
+        title?: string;
+        category?: string;
+        summary?: string;
+        content?: string;
+        order?: number;
+        audience?: string;
+        enabled?: boolean;
+        shipped?: boolean;
+        overridden?: boolean;
+        public_url?: string;
+    }>;
+};
+export type AdminUpdateHelpArticleResponseBody = {
+    slug?: string;
+    title?: string;
+    category?: string;
+    summary?: string;
+    content?: string;
+    order?: number;
+    audience?: string;
+    enabled?: boolean;
+    shipped?: boolean;
+    overridden?: boolean;
+    public_url?: string;
+};
 export type AdminGetPluginSettingsResponseBody = {
     curseforge_key_set?: boolean;
     set_in_env?: boolean;
@@ -9753,6 +9822,18 @@ export type ClientListInstalledPluginsResponseBody = {
         scanning: boolean;
     };
 };
+export type ApiListPublicHelpArticlesResponseBody = {
+    /**
+     * The articles in help center order: by category, then by their place in it.
+     */
+    articles: Array<{
+        slug?: string;
+        title?: string;
+        category?: string;
+        summary?: string;
+        content?: string;
+    }>;
+};
 export type ApiListThePublicStorePlansResponseBody = {
     /**
      * Whether the store is open. When it is closed the lists are empty.
@@ -10541,6 +10622,7 @@ export type AdminListTagsIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes'
 export type AdminGetTagIncludeQueryParameter = 'eggs' | 'nodes' | 'eggs,nodes';
 export type AdminGetTagTagIdPathParameter = number;
 export type AdminUpdateLegalDocumentDocumentPathParameter = string;
+export type AdminUpdateHelpArticleArticlePathParameter = string;
 export type AdminUpdateGlobalPermissionTemplatePermissionTemplateIdPathParameter = number;
 /**
  * Page number to retrieve.
@@ -11339,6 +11421,30 @@ export type AdminListActivityFilterOptionsResponses = {
     200: AdminListActivityFilterOptionsResponseBody;
 };
 export type AdminListActivityFilterOptionsResponse = AdminListActivityFilterOptionsResponses[keyof AdminListActivityFilterOptionsResponses];
+export type AdminListAdminGuidesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/help';
+};
+export type AdminListAdminGuidesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListAdminGuidesError = AdminListAdminGuidesErrors[keyof AdminListAdminGuidesErrors];
+export type AdminListAdminGuidesResponses = {
+    /**
+     * Admin guides returned.
+     */
+    200: AdminListAdminGuidesResponseBody;
+};
+export type AdminListAdminGuidesResponse = AdminListAdminGuidesResponses[keyof AdminListAdminGuidesResponses];
 export type AdminListAnnouncementsData = {
     body?: never;
     path?: never;
@@ -19143,6 +19249,100 @@ export type AdminUpdateLegalDocumentResponses = {
     200: AdminUpdateLegalDocumentResponseBody;
 };
 export type AdminUpdateLegalDocumentResponse = AdminUpdateLegalDocumentResponses[keyof AdminUpdateLegalDocumentResponses];
+export type AdminListHelpArticlesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/settings/help';
+};
+export type AdminListHelpArticlesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListHelpArticlesError = AdminListHelpArticlesErrors[keyof AdminListHelpArticlesErrors];
+export type AdminListHelpArticlesResponses = {
+    /**
+     * Help articles returned.
+     */
+    200: AdminListHelpArticlesResponseBody;
+};
+export type AdminListHelpArticlesResponse = AdminListHelpArticlesResponses[keyof AdminListHelpArticlesResponses];
+export type AdminResetHelpArticleData = {
+    body?: never;
+    path: {
+        /**
+         * The slug of the help article, the part of its address after /help/.
+         */
+        article: AdminUpdateHelpArticleArticlePathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/help/{article}';
+};
+export type AdminResetHelpArticleErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminResetHelpArticleError = AdminResetHelpArticleErrors[keyof AdminResetHelpArticleErrors];
+export type AdminResetHelpArticleResponses = {
+    /**
+     * Help article reset.
+     */
+    204: void;
+};
+export type AdminResetHelpArticleResponse = AdminResetHelpArticleResponses[keyof AdminResetHelpArticleResponses];
+export type AdminUpdateHelpArticleData = {
+    body: AdminUpdateHelpArticleRequest;
+    path: {
+        /**
+         * The slug of the help article, the part of its address after /help/.
+         */
+        article: AdminUpdateHelpArticleArticlePathParameter;
+    };
+    query?: never;
+    url: '/api/admin/settings/help/{article}';
+};
+export type AdminUpdateHelpArticleErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateHelpArticleError = AdminUpdateHelpArticleErrors[keyof AdminUpdateHelpArticleErrors];
+export type AdminUpdateHelpArticleResponses = {
+    /**
+     * Help article updated.
+     */
+    200: AdminUpdateHelpArticleResponseBody;
+};
+export type AdminUpdateHelpArticleResponse = AdminUpdateHelpArticleResponses[keyof AdminUpdateHelpArticleResponses];
 export type AdminGetPluginSettingsData = {
     body?: never;
     path?: never;
@@ -27046,6 +27246,26 @@ export type AuthGetCsrfCookieResponses = {
     204: void;
 };
 export type AuthGetCsrfCookieResponse = AuthGetCsrfCookieResponses[keyof AuthGetCsrfCookieResponses];
+export type ApiListPublicHelpArticlesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/public/help';
+};
+export type ApiListPublicHelpArticlesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+};
+export type ApiListPublicHelpArticlesError = ApiListPublicHelpArticlesErrors[keyof ApiListPublicHelpArticlesErrors];
+export type ApiListPublicHelpArticlesResponses = {
+    /**
+     * Articles returned.
+     */
+    200: ApiListPublicHelpArticlesResponseBody;
+};
+export type ApiListPublicHelpArticlesResponse = ApiListPublicHelpArticlesResponses[keyof ApiListPublicHelpArticlesResponses];
 export type ApiListThePublicStorePlansData = {
     body?: never;
     path?: never;
