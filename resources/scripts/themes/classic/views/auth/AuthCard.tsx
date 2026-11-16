@@ -31,6 +31,10 @@ export default function AuthCard({ title, submit, className, children }: Props) 
                 <a {...discordLinkProps} className='no-underline hover:text-foreground'>
                     Join our Discord
                 </a>
+                <span aria-hidden> · </span>
+                <a href='/help' className='no-underline hover:text-foreground'>
+                    Help
+                </a>
             </p>
             <nav aria-label='Legal' className='mt-1 text-center text-muted-foreground text-xs'>
                 {LEGAL_LINKS.map((link, index) => (
