@@ -65,7 +65,7 @@ describe('free trials in the store', () => {
             eligible: false,
             reason: 'Used.',
         });
-        expect(tryFreeLabel(48)).toBe('Try free for 48 h');
+        expect(tryFreeLabel(48)).toBe('Try free for 48\u00a0h');
     });
 });
 

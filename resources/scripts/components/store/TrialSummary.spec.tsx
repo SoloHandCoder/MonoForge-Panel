@@ -45,7 +45,7 @@ it('starts the free trial and says nothing is charged', async () => {
     expect(screen.getByText('Free')).toBeVisible();
     expect(screen.getByText('For 48 hours')).toBeVisible();
     expect(screen.getByText('captcha widget')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Try free for 48 h' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try free for 48\u00a0h' }));
 
     expect(onStart).toHaveBeenCalledOnce();
 });
@@ -59,5 +59,5 @@ it('cannot start while sold out, and shows why a start failed', async () => {
 
     expect(screen.getByText(CAPACITY_MESSAGE)).toBeVisible();
     expect(screen.getByText('You have already used your free trial.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Try free for 48 h' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Try free for 48\u00a0h' })).toBeDisabled();
 });

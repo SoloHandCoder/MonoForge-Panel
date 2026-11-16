@@ -175,7 +175,7 @@ function ChoiceSteps({
     const steps = locations.length > 0 ? 2 : 1;
 
     return (
-        <div className='grid gap-4'>
+        <div className='grid grid-cols-1 gap-4'>
             <EggStep eggs={plan.eggs} eggId={choices.eggId} onChange={picks.setEggId} />
             {locations.length > 0 && (
                 <LocationStep
@@ -355,7 +355,7 @@ function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan })
         <>
             <CheckoutHeader plan={plan} />
             {trial && <ModeSwitch trial={trial} mode={active ? 'trial' : 'buy'} onChange={setMode} />}
-            <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start'>
+            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start'>
                 <ChoiceSteps
                     catalog={catalog}
                     plan={plan}

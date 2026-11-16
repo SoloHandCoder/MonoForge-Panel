@@ -67,7 +67,7 @@ function Actions({ onClose, primary = 'wallet' }: { onClose: () => void; primary
                 size: 'large',
                 color: primary === 'store' ? 'primary' : 'grey',
                 isSecondary: primary !== 'store',
-                className: 'flex-1 justify-center gap-2 no-underline',
+                className: 'inline-flex flex-1 items-center justify-center gap-2 no-underline',
             })}
         >
             <Icon icon={ShoppingBag} className='size-4' aria-hidden />
@@ -297,7 +297,7 @@ function Overlay({ children, onClose }: { children: ReactNode; onClose: () => vo
                         onClose();
                     }
                 }}
-                className='fixed inset-0 z-50 grid animate-fade-in place-items-center overflow-y-auto bg-background/95 px-4 py-10 outline-none backdrop-blur-md'
+                className='fixed inset-0 z-50 grid animate-fade-in place-items-center overflow-x-hidden overflow-y-auto bg-background/95 px-4 py-10 outline-none backdrop-blur-md'
             >
                 <div
                     aria-hidden

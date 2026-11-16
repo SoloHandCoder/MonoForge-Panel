@@ -116,11 +116,11 @@ export default function OrderSummary({
             <h2 className='font-header text-base font-semibold text-foreground'>Your order</h2>
             <ResourceList resources={price.resources} className='mt-4 text-muted-foreground' />
             {price.lines && (
-                <dl className='mt-5 grid gap-1.5 border-t border-border pt-4 text-sm'>
+                <dl className='mt-5 grid grid-cols-1 gap-1.5 border-t border-border pt-4 text-sm'>
                     {price.lines.map((line) => (
                         <div key={line.label} className='flex justify-between gap-3'>
-                            <dt className='truncate text-muted-foreground'>{line.label}</dt>
-                            <dd className='text-foreground tabular-nums'>{tokens(line.tokens)}</dd>
+                            <dt className='min-w-0 truncate text-muted-foreground'>{line.label}</dt>
+                            <dd className='shrink-0 text-foreground tabular-nums'>{tokens(line.tokens)}</dd>
                         </div>
                     ))}
                 </dl>

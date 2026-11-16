@@ -318,9 +318,9 @@ function FormContent({
                 return (
                     <Form form={form}>
                         <SpinnerOverlay visible={submitting || model.saving} />
-                        <div className='flex justify-between'>
-                            <h2 className='text-2xl'>{title}</h2>
-                            <div>
+                        <div className='flex items-start justify-between gap-4'>
+                            <h2 className='min-w-0 text-2xl break-words'>{title}</h2>
+                            <div className='shrink-0'>
                                 <SubmitButton form={form} model={model} />
                             </div>
                         </div>
