@@ -26,6 +26,7 @@ import Icon from '@/components/elements/Icon';
 import Portal from '@/components/elements/Portal';
 import { Orb } from '@/components/store/PurchaseOverlay';
 import { cn } from '@/lib/cn';
+import { lockPageScroll } from '@/lib/scrollLock';
 
 type Tone = 'calm' | 'danger' | 'warning';
 
@@ -274,14 +275,9 @@ function Overlay({ children, onClose }: { children: ReactNode; onClose: () => vo
     const rootRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const { overflow } = document.body.style;
-
-        document.body.style.overflow = 'hidden';
         rootRef.current?.focus();
 
-        return () => {
-            document.body.style.overflow = overflow;
-        };
+        return lockPageScroll();
     }, []);
 
     return (

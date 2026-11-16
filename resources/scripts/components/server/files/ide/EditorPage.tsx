@@ -17,6 +17,7 @@ import Spinner from '@/components/elements/Spinner';
 import { fileListDestination } from '@/components/server/files/breadcrumbs';
 import { bytesToString } from '@/lib/formatters';
 import { cn } from '@/lib/cn';
+import { usePageScrollLock } from '@/lib/scrollLock';
 import { UNSAVED_CHANGES_MESSAGE, useNavigationBlocker } from '@/plugins/useNavigationBlocker';
 import { usePermissions } from '@/plugins/usePermissions';
 import { parseEditorSearch, type EditorSearch } from '@/router/search';
@@ -289,15 +290,7 @@ function useEditorWindow(tab: EditorTab | null, serverName: string) {
         setPageTitle(`${tab ? `${tab.name} | ` : ''}${serverName} | Editor`);
     }, [tab, serverName]);
 
-    useEffect(() => {
-        const { overflow } = document.body.style;
-
-        document.body.style.overflow = 'hidden';
-
-        return () => {
-            document.body.style.overflow = overflow;
-        };
-    }, []);
+    usePageScrollLock();
 }
 
 interface PendingClose {

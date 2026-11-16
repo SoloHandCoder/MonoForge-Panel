@@ -1,2 +1,8 @@
 @import '../../../packages/sdk/panel.css';
 @source '../**/*.{ts,tsx}';
+
+/* The page scroll lock of full-screen overlays (resources/scripts/lib/scrollLock.ts). */
+html[data-scroll-lock],
+html[data-scroll-lock] body {
+    overflow: hidden;
+}

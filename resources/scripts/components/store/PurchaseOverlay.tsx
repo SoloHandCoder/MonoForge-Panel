@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Check, LayoutDashboard, Server, SquareTerminal, type LucideIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import type { PurchaseResult } from '@/api/store/types';
 import { buttonClassName } from '@/components/elements/Button';
 import Icon from '@/components/elements/Icon';
 import Portal from '@/components/elements/Portal';
 import { everyDays, tokens } from '@/components/store/storeFormat';
 import { cn } from '@/lib/cn';
+import { lockPageScroll } from '@/lib/scrollLock';
 
 export const PURCHASE_STEPS = [
     'Reserving your resources',
@@ -104,6 +106,14 @@ function Done({ result, trialHours }: { result: PurchaseResult; trialHours: numb
 
     useEffect(() => goRef.current?.focus(), []);
 
+    // The playit address is made after the server: tell the player it can take a moment.
+    useEffect(() => {
+        toast.info('Your server address may take a moment', {
+            id: `server-address-${result.server.identifier}`,
+            description: 'It appears on the server page once the server is installed, usually within a few minutes.',
+        });
+    }, [result.server.identifier]);
+
     return (
         <div className='flex animate-rise flex-col items-center text-center'>
             <div className='relative grid size-28 place-items-center' aria-hidden>
@@ -181,14 +191,9 @@ export default function PurchaseOverlay({
     }
 
     useEffect(() => {
-        const { overflow } = document.body.style;
-
-        document.body.style.overflow = 'hidden';
         rootRef.current?.focus();
 
-        return () => {
-            document.body.style.overflow = overflow;
-        };
+        return lockPageScroll();
     }, []);
 
     return (

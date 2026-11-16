@@ -4,6 +4,7 @@ import { buildRouteTree } from '@/router/routeTree';
 import RouteError from '@/router/RouteError';
 import Spinner from '@/components/elements/Spinner';
 import { NotFound } from '@/components/elements/ScreenBlock';
+import { releaseStaleScrollLock } from '@/lib/scrollLock';
 
 export const router = createRouter({
     routeTree: buildRouteTree(),
@@ -17,6 +18,12 @@ export const router = createRouter({
     defaultPendingComponent: () => <Spinner centered />,
     defaultNotFoundComponent: () => <NotFound />,
     defaultErrorComponent: RouteError,
+});
+
+// A dialog or overlay that went away mid-navigation must never leave the next page unscrollable.
+// Runs after the 150 ms view transition, once the new page's own dialogs have mounted.
+router.subscribe('onResolved', () => {
+    window.setTimeout(releaseStaleScrollLock, 400);
 });
 
 declare module '@tanstack/react-router' {
