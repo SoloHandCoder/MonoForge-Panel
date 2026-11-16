@@ -7,9 +7,16 @@ import { Dialog } from '@/components/elements/dialog';
 import Icon from '@/components/elements/Icon';
 import { formatLegalDate } from '@/components/legal/formatLegalDate';
 
-/** Pages the prompt stays away from: sign-in, the documents themselves and where admins edit them. */
+/**
+ * Pages the prompt stays away from: sign-in, the documents themselves, the help center (so a player
+ * can still read it while terms are pending) and where admins edit the documents.
+ */
 export const isLegalGateExempt = (pathname: string): boolean =>
-    pathname.startsWith('/auth') || pathname.startsWith('/legal/') || pathname.startsWith('/panel/settings/legal');
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/legal/') ||
+    pathname === '/help' ||
+    pathname.startsWith('/help/') ||
+    pathname.startsWith('/panel/settings/legal');
 
 const NAMES = {
     terms: 'Terms of Service',

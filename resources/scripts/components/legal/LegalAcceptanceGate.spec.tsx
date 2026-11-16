@@ -79,12 +79,18 @@ describe('updated terms prompt', () => {
         expect(state.accept).not.toHaveBeenCalled();
     });
 
-    it('stays away when nothing changed, and on the sign-in, legal and Admin Legal settings pages', () => {
+    it('stays away when nothing changed, and on the sign-in, legal, help center and Admin Legal settings pages', () => {
         render(<LegalAcceptanceGate pathname='/' />);
         expect(screen.queryByRole('dialog')).toBeNull();
 
         state.pending = ['privacy'];
-        for (const pathname of ['/panel/settings/legal', '/legal/privacy', '/auth/login']) {
+        for (const pathname of [
+            '/panel/settings/legal',
+            '/legal/privacy',
+            '/auth/login',
+            '/help',
+            '/help/the-console',
+        ]) {
             cleanup();
             render(<LegalAcceptanceGate pathname={pathname} />);
 
@@ -93,5 +99,7 @@ describe('updated terms prompt', () => {
 
         expect(isLegalGateExempt('/panel/settings')).toBe(false);
         expect(isLegalGateExempt('/account')).toBe(false);
+        // Only the help center itself, not a page that merely starts with the same letters.
+        expect(isLegalGateExempt('/helpdesk')).toBe(false);
     });
 });
