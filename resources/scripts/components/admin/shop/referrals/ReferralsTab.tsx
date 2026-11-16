@@ -155,8 +155,8 @@ function SettingsForm({ settings }: { settings: ReferralSettings }) {
                         </form.AppField>
                     </div>
                     <p className='text-xs text-muted-foreground'>
-                        The first purchase is held for the hold period. A refund, chargeback or dispute before
-                        then cancels the referral; one after the payout takes both rewards back. Sign-ups from the
+                        The first purchase is held for the hold period. A refund, chargeback or dispute before then
+                        cancels the referral; one after the payout takes both rewards back. Sign-ups from the
                         referrer&apos;s own network are flagged below and wait for your approval.
                     </p>
                 </div>

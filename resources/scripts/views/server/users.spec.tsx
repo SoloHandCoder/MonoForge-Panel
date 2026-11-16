@@ -146,7 +146,9 @@ describe('server.subusers', () => {
         await renderInServer(<View name='server.subusers' />, {}, '/server/a1b2c3d4/users', (client) =>
             client.setQueryData(serverSubscriptionsQueryOptions().queryKey, {
                 object: 'list',
-                data: [{ object: 'server_subscription', attributes: { server_identifier: 'a1b2c3d4', is_trial: true } }],
+                data: [
+                    { object: 'server_subscription', attributes: { server_identifier: 'a1b2c3d4', is_trial: true } },
+                ],
             } as never)
         );
 

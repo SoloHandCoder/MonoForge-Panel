@@ -202,12 +202,7 @@ function SelfManaged({ nodeId, state }: { nodeId: number; state: PlayitSwitchSta
             )}
             <OldTunnels nodeId={nodeId} state={state} />
             <div className='mt-4 flex flex-wrap justify-end gap-3'>
-                <Button
-                    type='button'
-                    isSecondary
-                    isLoading={reconcile.isPending}
-                    onClick={() => reconcile.mutate()}
-                >
+                <Button type='button' isSecondary isLoading={reconcile.isPending} onClick={() => reconcile.mutate()}>
                     Check status
                 </Button>
                 {state.can_undo && (
