@@ -50,7 +50,8 @@ const articles: HelpArticle[] = [
         title: 'The console',
         category: 'Your server',
         summary: 'Commands and power buttons.',
-        content: '# The console\n\nPress **Tab** to complete commands.\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(2))',
+        content:
+            '# The console\n\nPress **Tab** to complete commands.\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(2))',
     },
 ];
 
@@ -60,7 +61,10 @@ describe('the help center', () => {
 
         const started = within(screen.getByRole('region', { name: 'Getting started' }));
 
-        expect(started.getByRole('link', { name: /Joining your server/ })).toHaveAttribute('href', '/help/joining-your-server');
+        expect(started.getByRole('link', { name: /Joining your server/ })).toHaveAttribute(
+            'href',
+            '/help/joining-your-server'
+        );
         expect(started.getByText('Find your address.')).toBeVisible();
         expect(screen.getByRole('region', { name: 'Your server' })).toHaveTextContent('The console');
     });

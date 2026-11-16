@@ -3,7 +3,13 @@ import type { HelpArticle } from '@/api/help';
 import { helpCategories, toHelpArticles } from '@/api/help';
 import { MAX_QUERY, normalize, plainText, queryTerms, searchHelp } from './helpSearch';
 
-const article = (slug: string, title: string, content: string, summary = '', category = 'Getting started'): HelpArticle => ({
+const article = (
+    slug: string,
+    title: string,
+    content: string,
+    summary = '',
+    category = 'Getting started'
+): HelpArticle => ({
     slug,
     title,
     category,
@@ -12,17 +18,33 @@ const article = (slug: string, title: string, content: string, summary = '', cat
 });
 
 const articles: HelpArticle[] = [
-    article('joining', 'Joining your server', '# Joining\n\nEvery server gets a **playit.gg** address. "Address pending" means the tunnel is not ready.'),
-    article('backups', 'Backups and schedules', '# Backups\n\nLock a backup to keep it. Schedules can restart the server.', 'Make and restore backups.', 'Your server'),
-    article('wallet', 'Tokens and the Wallet', '# Tokens\n\nTokens never expire. Buy packs through [Tebex](https://tebex.io).', '', 'Tokens and billing'),
+    article(
+        'joining',
+        'Joining your server',
+        '# Joining\n\nEvery server gets a **playit.gg** address. "Address pending" means the tunnel is not ready.'
+    ),
+    article(
+        'backups',
+        'Backups and schedules',
+        '# Backups\n\nLock a backup to keep it. Schedules can restart the server.',
+        'Make and restore backups.',
+        'Your server'
+    ),
+    article(
+        'wallet',
+        'Tokens and the Wallet',
+        '# Tokens\n\nTokens never expire. Buy packs through [Tebex](https://tebex.io).',
+        '',
+        'Tokens and billing'
+    ),
     article('cafe', 'Café rules', '# Café\n\nCoffee is served.', '', 'More help'),
 ];
 
 describe('plainText', () => {
     it('drops markdown markers and keeps link labels', () => {
-        expect(plainText('# Title\n\n- **Bold** and *em* with `code`\n> quote\n1. [Tebex](https://tebex.io) item')).toBe(
-            'Title Bold and em with code quote Tebex item'
-        );
+        expect(
+            plainText('# Title\n\n- **Bold** and *em* with `code`\n> quote\n1. [Tebex](https://tebex.io) item')
+        ).toBe('Title Bold and em with code quote Tebex item');
     });
 });
 
@@ -75,7 +97,9 @@ describe('searchHelp', () => {
     it('treats markup in an article as plain text', () => {
         const hostile = article('x', 'Rules', '<script>alert(1)</script> <img src=x onerror=alert(2)>');
 
-        expect(searchHelp([hostile], 'script')[0]?.snippet).toBe('<script>alert(1)</script> <img src=x onerror=alert(2)>');
+        expect(searchHelp([hostile], 'script')[0]?.snippet).toBe(
+            '<script>alert(1)</script> <img src=x onerror=alert(2)>'
+        );
     });
 });
 
