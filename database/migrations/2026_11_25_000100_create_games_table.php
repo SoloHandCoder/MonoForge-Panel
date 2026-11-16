@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Pterodactyl\Services\Games\GameDetector;
+use Pterodactyl\Services\Games\GameEggBackfiller;
 
 return new class extends Migration
 {
@@ -59,21 +60,7 @@ return new class extends Migration
         ]);
 
         // Pre-fill the built-in games with the eggs the panel already detected as them.
-        $games = DB::table('games')->pluck('id', 'slug');
-        $tags = DB::table('taggables')
-            ->join('tags', 'tags.id', '=', 'taggables.tag_id')
-            ->where('taggables.taggable_type', 'egg')
-            ->get(['taggables.taggable_id', 'tags.slug'])
-            ->groupBy('taggable_id');
-
-        foreach (DB::table('eggs')->orderBy('id')->get(['id', 'name']) as $egg) {
-            $slugs = $tags->get($egg->id, collect())->pluck('slug')->map(fn (mixed $slug): string => (string) $slug)->values()->all();
-            $game = GameDetector::detect((string) $egg->name, $slugs);
-
-            if ($game !== null && $games->has($game)) {
-                DB::table('eggs')->where('id', $egg->id)->update(['game_id' => $games->get($game)]);
-            }
-        }
+        (new GameEggBackfiller(DB::connection()))->backfill();
     }
 
     public function down(): void

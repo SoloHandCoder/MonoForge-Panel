@@ -113,7 +113,11 @@ class Game extends Model
     protected static function booted(): void
     {
         // GameResolver remembers the built-in games for the request; a change must show at once.
-        static::saved(fn (): mixed => Once::flush());
-        static::deleted(fn (): mixed => Once::flush());
+        $forget = function (): void {
+            Once::flush();
+        };
+
+        static::saved($forget);
+        static::deleted($forget);
     }
 }
