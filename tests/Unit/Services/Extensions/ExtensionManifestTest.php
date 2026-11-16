@@ -465,6 +465,7 @@ test('rejects malformed, reserved and core root path prefixes', function (mixed 
     'extension prefix' => [['root' => ['extensions']], '"/extensions" is reserved'],
     'registered core route' => [['root' => ['health-probe']], '"/health-probe" is reserved'],
     'public directory' => [['root' => ['favicons']], '"/favicons" is reserved'],
+    'help center' => [['root' => ['help']], '"/help" is reserved'],
 ]);
 
 test('root path prefixes of other extensions are left to the enable-time comparison', function (): void {
