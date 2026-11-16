@@ -229,6 +229,14 @@ const serverPageRoute = createRoute({
     component: componentRoute(() => import('@/components/serverPage/PublicServerPage')),
 });
 
+// The server discovery page: the listed public server pages, readable without signing in; the
+// server adds its title and description for search engines.
+const serverDiscoveryRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'servers',
+    component: componentRoute(() => import('@/components/serverPage/ServerDiscoveryPage')),
+});
+
 const authenticatedRoute = createRoute({
     getParentRoute: () => rootRoute,
     id: 'authenticated',
@@ -1669,6 +1677,7 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
         helpRoute,
         helpArticleRoute,
         serverPageRoute,
+        serverDiscoveryRoute,
         authenticatedRoute.addChildren([
             dashboardRoute,
             storeRoute,

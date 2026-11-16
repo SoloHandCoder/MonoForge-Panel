@@ -42,6 +42,8 @@ Allow: /locales/
 Allow: /api/public/
 # Public server pages; an owner can still ask for theirs not to be listed (noindex).
 Allow: /s/
+# The server discovery page that lists them.
+Allow: /servers$
 # The help center, the status page and the legal pages.
 Allow: /help$
 Allow: /help/
@@ -107,6 +109,7 @@ TXT;
             $entries[] = ['loc' => $root.'/status', 'lastmod' => null];
         }
 
+        $entries[] = ['loc' => $root.'/servers', 'lastmod' => null];
         $entries[] = ['loc' => $root.'/help', 'lastmod' => null];
         foreach ($this->help->published('public') as $article) {
             $entries[] = ['loc' => $root.'/help/'.$article['slug'], 'lastmod' => null];

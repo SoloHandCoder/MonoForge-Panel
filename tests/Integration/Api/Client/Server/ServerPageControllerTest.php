@@ -74,6 +74,19 @@ test('a server without a page returns the defaults', function (): void {
             'votes' => 0,
             'has_address' => false,
             'allow_wake' => false,
+            'discoverable' => true,
+            'hidden_from_discovery' => false,
+            'tagline' => '',
+            'background_style' => 'solid',
+            'background_from' => null,
+            'background_to' => null,
+            'button_style' => 'rounded',
+            'show_players' => true,
+            'show_votes' => true,
+            'show_address' => true,
+            'show_description' => true,
+            'discord_url' => null,
+            'website_url' => null,
         ]);
 });
 
@@ -310,4 +323,117 @@ test('without gd a jpeg carrying exif is refused, and other images are only chec
 
     expect(fn (): string => $banners->store(UploadedFile::fake()->createWithContent('photo.jpg', $exif)))->toThrow(ValidationException::class);
     expect($banners->store(UploadedFile::fake()->createWithContent('plain.jpg', $jpeg)))->toMatch('/\A[a-f0-9]{40}\.jpg\z/');
+});
+
+test('the owner saves the look, the sections, the links and the discovery listing', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput([
+        'discoverable' => false,
+        'tagline' => "  Islands,\n events\u{0007} and no pay to win  ",
+        'background_style' => 'gradient',
+        'background_from' => '#241A44',
+        'background_to' => '#3B1F6B',
+        'button_style' => 'square',
+        'show_players' => false,
+        'show_votes' => false,
+        'show_address' => false,
+        'show_description' => false,
+        'discord_url' => 'https://discord.gg/skyblock',
+        'website_url' => 'https://skyblock.example.com/about',
+    ]))
+        ->assertOk()
+        ->assertJsonPath('discoverable', false)
+        ->assertJsonPath('tagline', 'Islands, events and no pay to win')
+        ->assertJsonPath('background_style', 'gradient')
+        ->assertJsonPath('background_from', '#241a44')
+        ->assertJsonPath('background_to', '#3b1f6b')
+        ->assertJsonPath('button_style', 'square')
+        ->assertJsonPath('show_players', false)
+        ->assertJsonPath('show_votes', false)
+        ->assertJsonPath('show_address', false)
+        ->assertJsonPath('show_description', false)
+        ->assertJsonPath('discord_url', 'https://discord.gg/skyblock')
+        ->assertJsonPath('website_url', 'https://skyblock.example.com/about');
+
+    // Left out, every one of them keeps its value; an empty link or tagline clears it.
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['tagline' => '', 'website_url' => '']))
+        ->assertOk()
+        ->assertJsonPath('discoverable', false)
+        ->assertJsonPath('button_style', 'square')
+        ->assertJsonPath('background_to', '#3b1f6b')
+        ->assertJsonPath('discord_url', 'https://discord.gg/skyblock')
+        ->assertJsonPath('tagline', '')
+        ->assertJsonPath('website_url', null);
+});
+
+test('a new page is listed on the discovery page unless the owner opts out', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput())->assertOk()->assertJsonPath('discoverable', true);
+    expect(ServerPage::query()->where('server_id', $server->id)->value('discoverable'))->toBeTruthy();
+});
+
+test('the look is validated: colours, choices and the tagline', function (array $input, string $field): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput($input))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.meta.source_field', $field);
+})->with([
+    'a named background' => [['background_from' => 'red'], 'background_from'],
+    'a background with css' => [['background_from' => '#000000;color:red'], 'background_from'],
+    'a short gradient colour' => [['background_style' => 'gradient', 'background_to' => '#abc'], 'background_to'],
+    'an unknown background style' => [['background_style' => 'video'], 'background_style'],
+    'an unknown button style' => [['button_style' => 'pill'], 'button_style'],
+    'a long tagline' => [['tagline' => str_repeat('a', 81)], 'tagline'],
+    'a gradient without its second colour' => [['background_style' => 'gradient', 'background_to' => null], 'background_to'],
+    // No text colour reads on both black and white.
+    'an unreadable gradient' => [['background_style' => 'gradient', 'background_from' => '#000000', 'background_to' => '#ffffff'], 'background_to'],
+    'a section that is not a boolean' => [['show_players' => 'sometimes'], 'show_players'],
+]);
+
+test('a gradient whose colours are both dark or both light is accepted', function (string $from, string $to): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['background_style' => 'gradient', 'background_from' => $from, 'background_to' => $to]))
+        ->assertOk();
+})->with([
+    'dark' => ['#0e0d15', '#5b21b6'],
+    'light' => ['#fef3c7', '#bae6fd'],
+]);
+
+test('the social links must be https, and the discord one an invite on discord', function (string $field, string $url, bool $valid): void {
+    [$user, $server] = $this->generateTestAccount();
+
+    $response = $this->actingAs($user)->putJson(pageUrl($server), pageInput([$field => $url]));
+
+    if ($valid) {
+        $response->assertOk()->assertJsonPath($field, $url);
+    } else {
+        $response->assertUnprocessable()->assertJsonPath('errors.0.meta.source_field', $field);
+    }
+})->with([
+    'a discord.gg invite' => ['discord_url', 'https://discord.gg/abc123', true],
+    'a discord.com invite' => ['discord_url', 'https://discord.com/invite/abc123', true],
+    'plain http' => ['discord_url', 'http://discord.gg/abc123', false],
+    'another site' => ['discord_url', 'https://discord.gg.evil.example/abc123', false],
+    'a look-alike host' => ['discord_url', 'https://discordapp.example.com/invite/abc', false],
+    'a discord page that is not an invite' => ['discord_url', 'https://discord.com/channels/1/2', false],
+    'javascript' => ['discord_url', 'javascript:alert(1)', false],
+    'a website' => ['website_url', 'https://skyblock.example.com', true],
+    'a website over http' => ['website_url', 'http://skyblock.example.com', false],
+    'a website with credentials' => ['website_url', 'https://user:pass@example.com', false],
+    'a website with a port' => ['website_url', 'https://example.com:8443', false],
+    'a website with a quote' => ['website_url', 'https://example.com/"onmouseover=x', false],
+    'a data address' => ['website_url', 'data:text/html,hi', false],
+]);
+
+test('the owner cannot undo an administrator hiding the page from discovery', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    ServerPage::query()->forceCreate(['server_id' => $server->id, 'slug' => 'skyblock', 'published' => true, 'hidden_from_discovery' => true]);
+
+    $this->actingAs($user)->putJson(pageUrl($server), pageInput(['discoverable' => true, 'hidden_from_discovery' => false]))
+        ->assertOk()
+        ->assertJsonPath('hidden_from_discovery', true);
 });

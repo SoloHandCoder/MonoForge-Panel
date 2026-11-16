@@ -54,6 +54,7 @@ test('the sitemap lists the public pages from the configured address', function 
     expect($locations)->toContain('https://panel.example.test/')
         ->toContain('https://panel.example.test/status')
         ->toContain('https://panel.example.test/help')
+        ->toContain('https://panel.example.test/servers')
         ->toContain('https://panel.example.test/legal/terms')
         ->toContain('https://panel.example.test/legal/privacy')
         ->toContain('https://panel.example.test/legal/refunds');
@@ -148,6 +149,7 @@ test('robots.txt is written with the sitemap of the configured address', functio
             ->toContain('Allow: /legal/')
             ->toContain('Allow: /help/')
             ->toContain('Allow: /s/')
+            ->toContain('Allow: /servers$')
             ->toContain('Disallow: /')
             ->not->toContain('Allow: /auth')
             ->not->toContain('Allow: /admin');

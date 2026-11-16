@@ -6,9 +6,11 @@ namespace Pterodactyl\Http\Controllers\Base;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
+use Knuckles\Scribe\Attributes\QueryParam;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Knuckles\Scribe\Attributes\Unauthenticated;
@@ -19,6 +21,7 @@ use Pterodactyl\Http\Middleware\VerifyCaptcha;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
+use Pterodactyl\Services\ServerPages\ServerDiscovery;
 use Pterodactyl\Services\ServerPages\ServerPageVisitor;
 use Pterodactyl\Services\ServerPages\ServerPageVotes;
 use Pterodactyl\Services\ServerPages\ServerPageWake;
@@ -34,7 +37,7 @@ use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
  * session; a visitor is known only by keyed hashes of their address and visitor cookie.
  */
 #[Group('Public', 'Endpoints that need no account, used by the public homepage.')]
-#[Subgroup('Server pages', 'The shareable public pages of servers at /s/{slug}.')]
+#[Subgroup('Server pages', 'The shareable public pages of servers at /s/{slug}, and the server discovery page at /servers.')]
 class PublicServerPageController extends Controller
 {
     private const array STATUS_SCHEMA = [
@@ -64,9 +67,154 @@ class PublicServerPageController extends Controller
         ],
     ];
 
+    private const array THEME_SCHEMA = [
+        'type' => 'object',
+        'description' => "The page's look. The text colours are picked by the panel so every combination stays readable (WCAG AA).",
+        'required' => ['accent', 'accent_text', 'background', 'text', 'button_style'],
+        'properties' => [
+            'accent' => ['type' => 'string', 'description' => 'The accent colour as #rrggbb.', 'example' => '#8b5cf6'],
+            'accent_text' => ['type' => 'string', 'description' => 'The text colour on the accent: #ffffff or #000000.', 'example' => '#ffffff'],
+            'background' => [
+                'type' => 'object',
+                'required' => ['style', 'from', 'to', 'image_url'],
+                'properties' => [
+                    'style' => ['type' => 'string', 'enum' => ['solid', 'gradient', 'image'], 'description' => 'A solid colour, a gradient between two colours, or the banner image.', 'example' => 'gradient'],
+                    'from' => ['type' => 'string', 'description' => 'The background colour (the start of a gradient) as #rrggbb.', 'example' => '#241a44'],
+                    'to' => ['type' => 'string', 'nullable' => true, 'description' => 'The end of a gradient as #rrggbb, or null.', 'example' => '#8b5cf6'],
+                    'image_url' => ['type' => 'string', 'nullable' => true, 'description' => 'The banner image path when the style is image, or null.', 'example' => null],
+                ],
+            ],
+            'text' => ['type' => 'string', 'description' => 'The text colour on the background: #ffffff or #000000 (always #ffffff over an image, which gets a dark scrim).', 'example' => '#ffffff'],
+            'button_style' => ['type' => 'string', 'enum' => ['rounded', 'square'], 'description' => 'The shape of the buttons.', 'example' => 'rounded'],
+        ],
+    ];
+
+    private const array SECTIONS_SCHEMA = [
+        'type' => 'object',
+        'description' => 'Which parts of the page the owner shows. A hidden section is also left out of the data.',
+        'required' => ['players', 'votes', 'address', 'description'],
+        'properties' => [
+            'players' => ['type' => 'boolean', 'example' => true],
+            'votes' => ['type' => 'boolean', 'example' => true],
+            'address' => ['type' => 'boolean', 'example' => true],
+            'description' => ['type' => 'boolean', 'example' => true],
+        ],
+    ];
+
+    private const array LINKS_SCHEMA = [
+        'type' => 'object',
+        'description' => 'The social links, each an https address or null. Shown with rel="nofollow ugc noopener noreferrer".',
+        'required' => ['discord', 'website'],
+        'properties' => [
+            'discord' => ['type' => 'string', 'nullable' => true, 'description' => 'A Discord invite on discord.gg or discord.com.', 'example' => 'https://discord.gg/skyblock'],
+            'website' => ['type' => 'string', 'nullable' => true, 'description' => 'The server website.', 'example' => 'https://skyblock.example.com'],
+        ],
+    ];
+
+    private const array GAME_SCHEMA = [
+        'type' => 'object',
+        'nullable' => true,
+        'description' => 'The game in Admin > Games, or null when the panel does not know it.',
+        'required' => ['slug', 'name', 'color'],
+        'properties' => [
+            'slug' => ['type' => 'string', 'example' => 'minecraft'],
+            'name' => ['type' => 'string', 'example' => 'Minecraft'],
+            'color' => ['type' => 'string', 'description' => 'The game colour as #rrggbb.', 'example' => '#62B47A'],
+        ],
+    ];
+
+    private const array THEME_EXAMPLE = [
+        'accent' => '#8b5cf6',
+        'accent_text' => '#ffffff',
+        'background' => ['style' => 'gradient', 'from' => '#241a44', 'to' => '#8b5cf6', 'image_url' => null],
+        'text' => '#ffffff',
+        'button_style' => 'rounded',
+    ];
+
+    private const array SECTIONS_EXAMPLE = ['players' => true, 'votes' => true, 'address' => true, 'description' => true];
+
+    private const array DISCOVERY_EXAMPLE = [
+        'data' => [[
+            'slug' => 'skyblock',
+            'url' => '/s/skyblock',
+            'name' => 'Skyblock Island',
+            'tagline' => 'Islands, events and no pay to win',
+            'description' => 'A friendly skyblock server. Weekly events, no pay to win.',
+            'game' => ['slug' => 'minecraft', 'name' => 'Minecraft', 'color' => '#62B47A'],
+            'status' => 'online',
+            'players' => ['online' => 3, 'max' => 20],
+            'votes' => 42,
+            'address' => 'skyblock.joinmc.link',
+            'theme' => self::THEME_EXAMPLE,
+            'sections' => self::SECTIONS_EXAMPLE,
+            'created_at' => '2026-11-10T18:30:00+00:00',
+        ]],
+        'meta' => ['page' => 1, 'per_page' => 24, 'has_more' => false],
+        'games' => [['slug' => 'minecraft', 'name' => 'Minecraft', 'color' => '#62B47A'], ['slug' => 'terraria', 'name' => 'Terraria', 'color' => '#4C9A2A']],
+    ];
+
+    private const array DISCOVERY_ENTRIES_SCHEMA = [
+        'type' => 'array',
+        'items' => [
+            'type' => 'object',
+            'required' => ['slug', 'url', 'name', 'tagline', 'description', 'game', 'status', 'players', 'votes', 'address', 'theme', 'sections', 'created_at'],
+            'properties' => [
+                'slug' => ['type' => 'string', 'description' => 'The part of the page address after /s/.', 'example' => 'skyblock'],
+                'url' => ['type' => 'string', 'description' => 'The path of the public page.', 'example' => '/s/skyblock'],
+                'name' => ['type' => 'string', 'description' => 'The server name, at most 64 characters.', 'example' => 'Skyblock Island'],
+                'tagline' => ['type' => 'string', 'description' => 'The tagline, plain text up to 80 characters; empty for none.', 'example' => 'Islands, events and no pay to win'],
+                'description' => ['type' => 'string', 'description' => 'The start of the description as plain text, up to 160 characters; empty for none or when hidden.', 'example' => 'A friendly skyblock server.'],
+                'game' => self::GAME_SCHEMA,
+                'status' => self::STATUS_SCHEMA,
+                'players' => self::PLAYERS_SCHEMA,
+                'votes' => ['type' => 'integer', 'example' => 42],
+                'address' => ['type' => 'string', 'nullable' => true, 'description' => 'The playit address to join with, or null.', 'example' => 'skyblock.joinmc.link'],
+                'theme' => self::THEME_SCHEMA,
+                'sections' => self::SECTIONS_SCHEMA,
+                'created_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When the page was made.', 'example' => '2026-11-10T18:30:00+00:00'],
+            ],
+        ],
+    ];
+
+    private const array DISCOVERY_META_SCHEMA = [
+        'type' => 'object',
+        'required' => ['page', 'per_page', 'has_more'],
+        'properties' => [
+            'page' => ['type' => 'integer', 'example' => 1],
+            'per_page' => ['type' => 'integer', 'example' => 24],
+            'has_more' => ['type' => 'boolean', 'description' => 'Whether another page follows.', 'example' => false],
+        ],
+    ];
+
+    private const array GAMES_SCHEMA = [
+        'type' => 'array',
+        'description' => 'The games of Admin > Games, to filter by.',
+        'items' => [
+            'type' => 'object',
+            'required' => ['slug', 'name', 'color'],
+            'properties' => [
+                'slug' => ['type' => 'string', 'example' => 'minecraft'],
+                'name' => ['type' => 'string', 'example' => 'Minecraft'],
+                'color' => ['type' => 'string', 'example' => '#62B47A'],
+            ],
+        ],
+    ];
+
+    private const array VALIDATION_ERROR = [
+        'errors' => [
+            [
+                'code' => 'ValidationException',
+                'status' => '422',
+                'detail' => 'The selected sort is invalid.',
+                'meta' => ['source_field' => 'sort', 'rule' => 'in'],
+            ],
+        ],
+    ];
+
     private const array PAGE_EXAMPLE = [
         'slug' => 'skyblock',
         'name' => 'Skyblock Island',
+        'tagline' => 'Islands, events and no pay to win',
         'description' => "A friendly **skyblock** server.\n\n- Weekly events\n- No pay to win",
         'banner' => ['color' => '#8b5cf6', 'image_url' => '/s/skyblock/banner/3f786850e387550fdab836ed7e6dc881de23001b.png'],
         'game' => 'Minecraft',
@@ -78,6 +226,9 @@ class PublicServerPageController extends Controller
         'join_url' => null,
         'votes' => 42,
         'can_wake' => false,
+        'theme' => self::THEME_EXAMPLE,
+        'sections' => self::SECTIONS_EXAMPLE,
+        'links' => ['discord' => 'https://discord.gg/skyblock', 'website' => null],
     ];
 
     private const array NOT_FOUND_ERROR = [
@@ -139,11 +290,46 @@ class PublicServerPageController extends Controller
     public function __construct(private readonly PublicServerPages $pages) {}
 
     #[Unauthenticated]
+    #[Endpoint('List discoverable server pages', 'Returns the server discovery page: the published pages whose owner lists them and an administrator has not hidden, of servers that are installed and not suspended, 24 a page. The status and players are the ones each page last showed (refreshed every few minutes, never asked of the game per request), and the only address is the playit tunnel address. Cached for 30 seconds.')]
+    #[QueryParam('game', 'string', 'Only servers of this game, by its slug in Admin > Games.', required: false, example: 'minecraft')]
+    #[QueryParam('search', 'string', 'Only servers whose name contains this, at most 64 characters.', required: false, example: 'sky')]
+    #[QueryParam('sort', 'string', 'players (most players online first, the default), votes (most votes first) or newest.', required: false, example: 'players', enum: ServerDiscovery::SORTS)]
+    #[QueryParam('page', 'integer', 'The page of results, from 1.', required: false, example: 1)]
+    #[QueryParam('per_page', 'integer', 'Results per page, 1 to 24 (the default).', required: false, example: 24)]
+    #[ResponseField('data', 'object[]', 'The listed server pages.', schema: self::DISCOVERY_ENTRIES_SCHEMA)]
+    #[ResponseField('meta', 'object', 'The page of results.', schema: self::DISCOVERY_META_SCHEMA)]
+    #[ResponseField('games', 'object[]', 'The games to filter by.', schema: self::GAMES_SCHEMA)]
+    #[ScribeResponse(self::DISCOVERY_EXAMPLE, description: 'Server pages listed.')]
+    #[ScribeResponse(self::VALIDATION_ERROR, status: 422, description: 'A filter is not valid.')]
+    public function index(Request $request, ServerDiscovery $discovery): JsonResponse
+    {
+        $request->validate([
+            'game' => ['sometimes', 'nullable', 'string', 'regex:/\A[a-z0-9][a-z0-9-]{0,63}\z/'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:'.ServerDiscovery::SEARCH_MAX],
+            'sort' => ['sometimes', 'nullable', 'string', Rule::in(ServerDiscovery::SORTS)],
+            'page' => ['sometimes', 'nullable', 'integer', 'between:1,'.ServerDiscovery::MAX_PAGE],
+            'per_page' => ['sometimes', 'nullable', 'integer', 'between:1,'.ServerDiscovery::PER_PAGE],
+        ]);
+
+        $game = $request->string('game')->toString();
+        $sort = $request->string('sort')->toString();
+
+        return new JsonResponse($discovery->list(
+            $game === '' ? null : $game,
+            $request->string('search')->toString(),
+            $sort === '' ? 'players' : $sort,
+            $request->integer('page', 1),
+            $request->integer('per_page', ServerDiscovery::PER_PAGE),
+        ), headers: ['Cache-Control' => 'public, max-age='.ServerDiscovery::CACHE_SECONDS]);
+    }
+
+    #[Unauthenticated]
     #[Endpoint('Get a public server page', "Returns what the public page of a server shows: its name, description, banner, game, version, online status and players, join address and votes. Only published pages of servers that are not suspended are found. The only address ever returned is the server's playit tunnel address; without one it is null. Cached for 30 seconds.")]
     #[UrlParam('slug', 'string', 'The part of the page address after /s/.', example: 'skyblock')]
     #[ResponseField('slug', 'string', 'The part of the page address after /s/.')]
     #[ResponseField('name', 'string', 'The server name.')]
-    #[ResponseField('description', 'string', 'The description in markdown, to be shown with a safe renderer; empty for none.')]
+    #[ResponseField('tagline', 'string', 'One line of plain text under the name, at most 80 characters; empty for none.')]
+    #[ResponseField('description', 'string', 'The description in markdown, to be shown with a safe renderer; empty for none or when the owner hides it.')]
     #[ResponseField('banner', 'object', 'The banner colour and image.', schema: self::BANNER_SCHEMA)]
     #[ResponseField('game', 'string', 'The game, such as Minecraft, or null when it is not one the panel knows.', nullable: true)]
     #[ResponseField('software', 'string', 'The server type, such as Paper.', nullable: true)]
@@ -154,6 +340,9 @@ class PublicServerPageController extends Controller
     #[ResponseField('join_url', 'string', 'A link that adds the server in the game (Minecraft Bedrock), or null.', nullable: true)]
     #[ResponseField('votes', 'integer', 'The total votes.')]
     #[ResponseField('can_wake', 'boolean', 'Whether a visitor may wake the server now: it is sleeping and its owner allows it.')]
+    #[ResponseField('theme', 'object', "The page's colours and button shape.", schema: self::THEME_SCHEMA)]
+    #[ResponseField('sections', 'object', 'Which parts of the page are shown.', schema: self::SECTIONS_SCHEMA)]
+    #[ResponseField('links', 'object', 'The Discord invite and website.', schema: self::LINKS_SCHEMA)]
     #[ScribeResponse(self::PAGE_EXAMPLE, description: 'Page returned.')]
     #[ScribeResponse(self::NOT_FOUND_ERROR, status: 404, description: 'No published page has that address.')]
     public function show(string $slug): JsonResponse

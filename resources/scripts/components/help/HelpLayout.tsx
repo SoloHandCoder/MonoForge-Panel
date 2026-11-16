@@ -19,12 +19,20 @@ export default function HelpLayout({ children, wide = false }: { children: React
                         <img src='/favicons/favicon.svg' alt='' className='size-8' />
                         MonoForge
                     </a>
-                    <Link
-                        to='/help'
-                        className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground'
-                    >
-                        Help center
-                    </Link>
+                    <nav aria-label='Public pages' className='flex flex-wrap items-center gap-2'>
+                        <Link
+                            to='/servers'
+                            className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground'
+                        >
+                            Discover servers
+                        </Link>
+                        <Link
+                            to='/help'
+                            className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:text-foreground'
+                        >
+                            Help center
+                        </Link>
+                    </nav>
                 </header>
                 <Main>{children}</Main>
                 <p className='text-center text-xs text-muted-foreground'>

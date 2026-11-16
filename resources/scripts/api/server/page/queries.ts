@@ -17,6 +17,8 @@ export type ServerPageInput = ClientUpdateServerPublicPageRequest;
 export const SLUG_MIN = 3;
 export const SLUG_MAX = 32;
 export const DESCRIPTION_MAX = 2000;
+export const TAGLINE_MAX = 80;
+export const LINK_MAX = 255;
 export const BANNER_MAX_BYTES = 1024 * 1024;
 export const BANNER_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
@@ -31,6 +33,46 @@ export const slugProblem = (slug: string): string | null => {
     return slugPattern.test(slug)
         ? null
         : 'Use lowercase letters, numbers and single hyphens, starting and ending with a letter or number.';
+};
+
+const DISCORD_HOSTS = new Set(['discord.gg', 'discord.com', 'www.discord.com']);
+
+const httpsUrl = (value: string): URL | null => {
+    if (value.length > LINK_MAX || /[\s<>"'\\]/.test(value)) {
+        return null;
+    }
+
+    try {
+        const url = new URL(value);
+
+        return url.protocol === 'https:' && !url.username && !url.password && !url.port && url.hostname.includes('.')
+            ? url
+            : null;
+    } catch {
+        return null;
+    }
+};
+
+/** The first problem with a social link, checked before it is sent; the panel checks it again. */
+export const linkProblem = (kind: 'discord' | 'website', value: string): string | null => {
+    if (value.trim() === '') {
+        return null;
+    }
+
+    const url = httpsUrl(value.trim());
+
+    if (kind === 'website') {
+        return url ? null : 'Use an https address, such as https://example.com.';
+    }
+
+    const invite =
+        url &&
+        DISCORD_HOSTS.has(url.hostname) &&
+        (url.hostname === 'discord.gg'
+            ? /^\/[A-Za-z0-9-]{2,32}\/?$/.test(url.pathname)
+            : /^\/invite\/[A-Za-z0-9-]{2,32}\/?$/.test(url.pathname));
+
+    return invite ? null : 'Use a Discord invite link, such as https://discord.gg/abc123.';
 };
 
 /** A suggested slug from the server name: "My Skyblock!" becomes "my-skyblock". */

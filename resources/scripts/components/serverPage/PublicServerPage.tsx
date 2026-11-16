@@ -1,7 +1,7 @@
 /* oxlint-disable rules/design-tokens -- the page backdrop, card radius and owner-chosen banner colour are the public pages' fixed look */
 import { useParams } from '@tanstack/react-router';
 import { isAxiosError } from 'axios';
-import { Check, Copy, Gamepad2, Heart, Moon, Power, Users } from 'lucide-react';
+import { Check, Copy, ExternalLink, Gamepad2, Globe, Heart, MessageCircle, Moon, Power, Users } from 'lucide-react';
 import { type CSSProperties, useEffect, useState } from 'react';
 import {
     publicServerPageInput,
@@ -10,7 +10,6 @@ import {
     useVoteForServer,
     useWakeServer,
     type PublicServerPage as PublicPage,
-    type PublicServerStatus,
 } from '@/api/public/serverPage';
 import Icon from '@/components/elements/Icon';
 import Spinner from '@/components/elements/Spinner';
@@ -18,30 +17,14 @@ import copyToClipboard from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
 import Markdown from '@/lib/markdown';
+import { accentButtonStyle, accentVars, themeStyle } from '@/lib/serverPageTheme';
+import { statusStyles } from '@/components/serverPage/status';
 import { useCaptcha } from '@/views/auth/captcha';
 import { Main } from '@/views/a11y';
 import { setPageTitle } from '@/views/pageTitle';
 
-const statusStyles = {
-    online: { label: 'Online', dot: 'bg-success', text: 'text-success', ping: true },
-    starting: { label: 'Starting', dot: 'bg-warning', text: 'text-warning', ping: true },
-    sleeping: { label: 'Sleeping', dot: 'bg-primary', text: 'text-primary', ping: false },
-    offline: { label: 'Offline', dot: 'bg-destructive', text: 'text-destructive', ping: false },
-    unknown: { label: 'Status unknown', dot: 'bg-muted-foreground', text: 'text-muted-foreground', ping: false },
-} satisfies Record<PublicServerStatus, { label: string; dot: string; text: string; ping: boolean }>;
-
-const HEX = /^#[0-9a-f]{6}$/i;
-const BANNER_PATH = /^\/s\/[a-z0-9-]+\/banner\/[a-f0-9]{40}\.(?:png|jpg|webp)$/;
-
-/** The banner: the owner's image, else a gradient from their colour, else the brand violet. */
-export const bannerStyle = (banner: PublicPage['banner']): CSSProperties => {
-    const color = banner.color && HEX.test(banner.color) ? banner.color : '#8b5cf6';
-    const gradient = `linear-gradient(135deg, ${color} 0%, color-mix(in oklab, ${color} 45%, #0e0d15) 100%)`;
-    // Only the panel's own banner paths go into the style, so nothing else can reach the CSS.
-    const image = banner.image_url && BANNER_PATH.test(banner.image_url) ? `url("${banner.image_url}")` : null;
-
-    return { backgroundColor: color, backgroundImage: image ?? gradient };
-};
+/** Only https links reach the page; the panel checked them when they were saved and again when sent. */
+const safeLink = (url: string | null): string | null => (url && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null);
 
 function StatusPill({ page }: { page: PublicPage }) {
     const style = statusStyles[page.status];
@@ -54,7 +37,10 @@ function StatusPill({ page }: { page: PublicPage }) {
             <span className='relative flex size-2.5'>
                 {style.ping && (
                     <span
-                        className={cn('absolute inline-flex size-full animate-ping rounded-full opacity-60', style.dot)}
+                        className={cn(
+                            'absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping',
+                            style.dot
+                        )}
                     />
                 )}
                 <span className={cn('relative inline-flex size-2.5 rounded-full', style.dot)} />
@@ -111,7 +97,8 @@ function JoinCard({ page }: { page: PublicPage }) {
                     <button
                         type='button'
                         onClick={async () => setCopied(await copyToClipboard(address))}
-                        className='inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-none'
+                        style={accentButtonStyle}
+                        className='inline-flex flex-1 items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-none'
                     >
                         <Icon icon={copied ? Check : Copy} aria-hidden className='size-4' />
                         {copied ? 'Copied' : 'Copy address'}
@@ -119,7 +106,8 @@ function JoinCard({ page }: { page: PublicPage }) {
                     {page.join_url && (
                         <a
                             href={page.join_url}
-                            className='inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground no-underline transition-colors hover:bg-muted sm:flex-none'
+                            style={{ borderRadius: 'var(--page-radius)' }}
+                            className='inline-flex flex-1 items-center justify-center gap-2 border border-border px-4 py-2.5 text-sm font-semibold text-foreground no-underline transition-colors hover:bg-muted sm:flex-none'
                         >
                             <Icon icon={Gamepad2} aria-hidden className='size-4' />
                             Add in game
@@ -166,7 +154,8 @@ function VoteCard({ page, slug }: { page: PublicPage; slug: string }) {
                 type='button'
                 disabled={vote.isPending || result !== undefined}
                 onClick={() => vote.mutate({ ...publicServerPageInput(slug), body: { vote: true } })}
-                className='inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+                style={{ borderRadius: 'var(--page-radius)' }}
+                className='inline-flex items-center justify-center gap-2 border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
             >
                 <Icon
                     icon={Heart}
@@ -233,7 +222,8 @@ function WakeCard({ slug, onWoken }: { slug: string; onWoken: () => void }) {
                 type='button'
                 disabled={wake.isPending || wake.data?.woken === true}
                 onClick={() => void start()}
-                className='inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+                style={accentButtonStyle}
+                className='inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60'
             >
                 <Icon icon={Power} aria-hidden className='size-4' />
                 {wake.isPending ? 'Waking…' : 'Wake server'}
@@ -243,22 +233,65 @@ function WakeCard({ slug, onWoken }: { slug: string; onWoken: () => void }) {
     );
 }
 
-/** Everything a published page shows, below the site header. */
+function Links({ page }: { page: PublicPage }) {
+    const discord = safeLink(page.links.discord);
+    const website = safeLink(page.links.website);
+
+    if (!discord && !website) {
+        return null;
+    }
+
+    const linkClass =
+        'inline-flex items-center gap-2 border border-border bg-card/80 px-3 py-1.5 text-sm font-medium text-foreground no-underline transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+
+    return (
+        <div className='flex flex-wrap gap-2'>
+            {discord && (
+                <a
+                    href={discord}
+                    target='_blank'
+                    rel='nofollow ugc noopener noreferrer'
+                    style={{ borderRadius: 'var(--page-radius)' }}
+                    className={linkClass}
+                >
+                    <Icon icon={MessageCircle} aria-hidden className='size-4' />
+                    Discord
+                    <Icon icon={ExternalLink} aria-hidden className='size-3.5 text-muted-foreground' />
+                </a>
+            )}
+            {website && (
+                <a
+                    href={website}
+                    target='_blank'
+                    rel='nofollow ugc noopener noreferrer'
+                    style={{ borderRadius: 'var(--page-radius)' }}
+                    className={linkClass}
+                >
+                    <Icon icon={Globe} aria-hidden className='size-4' />
+                    Website
+                    <Icon icon={ExternalLink} aria-hidden className='size-3.5 text-muted-foreground' />
+                </a>
+            )}
+        </div>
+    );
+}
+
+/** Everything a published page shows, below the site header, in the owner's colours. */
 export function PublicServerView({ page, slug, onWoken }: { page: PublicPage; slug: string; onWoken: () => void }) {
     const details = [page.game, page.software, page.version].filter((value): value is string => !!value);
 
     return (
-        <div className='flex flex-col gap-5'>
-            <section className='animate-rise overflow-hidden rounded-[18px] border border-border bg-card shadow-lg'>
+        <div className='flex flex-col gap-5' style={accentVars(page.theme)}>
+            <section className='overflow-hidden rounded-[18px] border border-border bg-card shadow-lg motion-safe:animate-rise'>
                 <div
                     data-testid='server-banner'
-                    className='relative h-36 bg-cover bg-center sm:h-48'
-                    style={bannerStyle(page.banner)}
+                    className='flex min-h-40 flex-col justify-end gap-1 bg-cover bg-center px-5 pt-12 pb-5 sm:min-h-52 sm:px-6'
+                    style={themeStyle(page.theme)}
                 >
-                    <div className='absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card to-transparent' />
+                    <h1 className='text-2xl font-bold break-words sm:text-3xl'>{page.name}</h1>
+                    {page.tagline !== '' && <p className='text-base break-words opacity-90'>{page.tagline}</p>}
                 </div>
-                <div className='-mt-8 flex flex-col gap-3 px-5 pb-5 sm:px-6 sm:pb-6'>
-                    <h1 className='relative text-2xl font-bold break-words text-foreground sm:text-3xl'>{page.name}</h1>
+                <div className='flex flex-col gap-3 px-5 py-4 sm:px-6'>
                     <div className='flex flex-wrap items-center gap-2'>
                         <StatusPill page={page} />
                         {details.map((detail) => (
@@ -270,28 +303,33 @@ export function PublicServerView({ page, slug, onWoken }: { page: PublicPage; sl
                             </span>
                         ))}
                     </div>
+                    <Links page={page} />
                 </div>
             </section>
 
             {page.can_wake && <WakeCard slug={slug} onWoken={onWoken} />}
 
-            <div className='animate-rise' style={{ '--rise-delay': '60ms' } as CSSProperties}>
-                <JoinCard page={page} />
-            </div>
+            {page.sections.address && (
+                <div className='motion-safe:animate-rise' style={{ '--rise-delay': '60ms' } as CSSProperties}>
+                    <JoinCard page={page} />
+                </div>
+            )}
 
-            {page.description.trim() !== '' && (
+            {page.sections.description && page.description.trim() !== '' && (
                 <section
                     aria-label='About this server'
-                    className='animate-rise rounded-[18px] border border-border bg-card p-5 sm:p-6'
+                    className='rounded-[18px] border border-border bg-card p-5 motion-safe:animate-rise sm:p-6'
                     style={{ '--rise-delay': '120ms' } as CSSProperties}
                 >
                     <Markdown source={page.description} className='break-words' />
                 </section>
             )}
 
-            <div className='animate-rise' style={{ '--rise-delay': '180ms' } as CSSProperties}>
-                <VoteCard page={page} slug={slug} />
-            </div>
+            {page.sections.votes && (
+                <div className='motion-safe:animate-rise' style={{ '--rise-delay': '180ms' } as CSSProperties}>
+                    <VoteCard page={page} slug={slug} />
+                </div>
+            )}
         </div>
     );
 }
@@ -368,12 +406,20 @@ export default function PublicServerPage() {
                         <img src='/favicons/favicon.svg' alt='' className='size-8' />
                         MonoForge
                     </a>
-                    <a
-                        href='/'
-                        className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline hover:text-foreground'
-                    >
-                        Get your own server
-                    </a>
+                    <nav aria-label='Public pages' className='flex flex-wrap items-center gap-2'>
+                        <a
+                            href='/servers'
+                            className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline hover:text-foreground'
+                        >
+                            More servers
+                        </a>
+                        <a
+                            href='/'
+                            className='rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm text-muted-foreground no-underline hover:text-foreground'
+                        >
+                            Get your own server
+                        </a>
+                    </nav>
                 </header>
                 <Main>
                     <PageBody key={slug} slug={slug} />

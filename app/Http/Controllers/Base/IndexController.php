@@ -11,6 +11,7 @@ use Illuminate\View\View;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
+use Pterodactyl\Services\ServerPages\ServerPageText;
 use Pterodactyl\Services\Status\StatusPageSettings;
 
 class IndexController extends Controller
@@ -55,7 +56,10 @@ class IndexController extends Controller
 
         $root = mb_rtrim(config()->string('app.url'), '/');
         $name = $page->server->name;
-        $summary = $this->plainText($page->description ?? '');
+        // A description the owner hides stays out of link previews too; the tagline stands in.
+        $summary = $page->show_description ? $this->plainText($page->description ?? '') : '';
+        $summary = $summary !== '' ? $summary : ServerPageText::line($page->tagline, ServerPageText::TAGLINE_MAX);
+
         $banner = $page->bannerUrl();
 
         return response()->view('templates/base.core', ['seo' => [

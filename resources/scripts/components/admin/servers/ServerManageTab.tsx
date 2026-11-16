@@ -13,6 +13,7 @@ import { useAdminNodes } from '@/api/admin/nodes/queries';
 import { useServerDetail } from '@/components/admin/servers/useServerDetail';
 import TransferServerModal from '@/components/admin/servers/TransferServerModal';
 import ServerSubscriptionCard from '@/components/admin/servers/ServerSubscriptionCard';
+import ServerPageDiscoveryCard from '@/components/admin/servers/ServerPageDiscoveryCard';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
 import Button from '@/components/elements/Button';
 import { Dialog } from '@/components/elements/dialog';
@@ -265,6 +266,7 @@ function ServerManageContent({ server }: Props) {
                     </Dialog.Trigger>
                 }
             />
+            <ServerPageDiscoveryCard serverId={attributes.id} />
         </div>
     );
 }

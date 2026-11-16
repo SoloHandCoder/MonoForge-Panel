@@ -96,6 +96,11 @@ $app = Application::configure(basePath: $_ENV['APP_BASE_PATH'] ?? dirname(__DIR_
             ->get('/api/public/store/plans', PublicStorePlansController::class)
             ->name('api.public.store.plans');
 
+        // The server discovery page at /servers: no session, one query a page, cached for 30 seconds.
+        Route::middleware('throttle:60,1')
+            ->get('/api/public/servers', [PublicServerPageController::class, 'index'])
+            ->name('api.public.servers.index');
+
         // The shareable public server pages at /s/{slug}: no session, cached for 30 seconds. Votes
         // and the wake button set or read only the visitor cookie, kept as a keyed hash.
         Route::middleware('throttle:60,1')

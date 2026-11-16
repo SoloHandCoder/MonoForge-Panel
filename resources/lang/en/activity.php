@@ -320,6 +320,8 @@ return [
             'subscription-extend' => 'Extended the subscription of :name by :days days',
             'subscription-cancel' => 'Cancelled the subscription of :name',
             'toggle-install' => 'Toggled the install status of :name',
+            'page-discovery-hide' => 'Hid the public page /s/:slug of :name from the server discovery page',
+            'page-discovery-show' => 'Listed the public page /s/:slug of :name on the server discovery page again',
             'transfer' => 'Started transferring :name to node :node_id',
             'mount' => 'Added the :name mount to a server',
             'unmount' => 'Removed the :name mount from a server',

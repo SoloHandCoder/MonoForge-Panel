@@ -15,6 +15,7 @@ use Pterodactyl\Console\Commands\Billing\PruneAntiAbuseHashesCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
+use Pterodactyl\Console\Commands\MonoForge\RefreshServerDiscoveryCommand;
 use Pterodactyl\Console\Commands\MonoForge\RobotsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
@@ -82,6 +83,9 @@ final class Scheduler
 
         // Public server page votes only matter while they block the next one (24 hours).
         $schedule->command(PruneCommand::class, ['--model' => [ServerPageVote::class, ServerPageSlugHold::class]])->daily()->withoutOverlapping()->onOneServer();
+        // The status the server discovery page shows for listed pages nobody opened lately, a few
+        // pages a run so the game servers and the host are never asked all at once.
+        $schedule->command(RefreshServerDiscoveryCommand::class)->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
         // The AI crash doctor: compare the servers' states each minute (cached Wings readings, one
         // pool per node) and record crashes; crashes go after 30 days.
         $schedule->command(DetectCrashesCommand::class)->everyMinute()->withoutOverlapping(5)->onOneServer();
