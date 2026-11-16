@@ -105,6 +105,36 @@ test('a staff reply answers the ticket and notifies the player in the panel and 
     $this->actingAs($player)->getJson('/api/client/support/tickets')->assertJsonPath('data.0.unread', true);
 });
 
+test('opening or answering a ticket reads its panel notices', function (): void {
+    $admin = $this->getAdminUser();
+    $player = User::factory()->create();
+    $ticket = openTicket($player);
+    $staffNotice = fn () => UserNotice::query()->where('user_id', $admin->id)->where('kind', "support.staff.{$ticket->id}");
+
+    expect($staffNotice()->whereNull('read_at')->exists())->toBeTrue();
+
+    // Opening the ticket reads the administrator's notice; other notices stay unread.
+    $other = $admin->notices()->create(['level' => 'info', 'title' => 'Other', 'body' => 'Unrelated.', 'kind' => 'support.staff.999']);
+    $this->getJson("/api/admin/support/tickets/{$ticket->id}")->assertOk();
+
+    expect($staffNotice()->whereNull('read_at')->exists())->toBeFalse()
+        ->and($other->refresh()->read_at)->toBeNull();
+
+    // The player's reply brings it back; answering reads it again.
+    resolve(SupportTicketService::class)->replyAsUser($ticket->refresh(), $player, 'Still broken.', []);
+    expect($staffNotice()->whereNull('read_at')->exists())->toBeTrue();
+
+    $this->actingAs($admin)->postJson("/api/admin/support/tickets/{$ticket->id}/messages", ['body' => 'Looking now.'])->assertCreated();
+    expect($staffNotice()->whereNull('read_at')->exists())->toBeFalse();
+
+    // The player's notice about that reply is read once they open the ticket.
+    $playerNotice = fn () => UserNotice::query()->where('user_id', $player->id)->where('kind', "support.reply.{$ticket->id}")->whereNull('read_at');
+    expect($playerNotice()->exists())->toBeTrue();
+
+    $this->actingAs($player)->getJson("/api/client/support/tickets/{$ticket->id}")->assertOk();
+    expect($playerNotice()->exists())->toBeFalse();
+});
+
 test('an internal note changes nothing the player sees', function (): void {
     $player = User::factory()->create();
     $ticket = openTicket($player);

@@ -163,7 +163,11 @@ export default function SettingsContainer() {
                     </span>
                 </Alert>
             )}
-            <div className='flex border-b border-border mb-6'>
+            <div
+                className='mb-6 flex overflow-x-auto border-b border-border'
+                role='tablist'
+                aria-label='Settings sections'
+            >
                 {tabs.map((item) => (
                     <SettingsTabButton
                         key={item.key}

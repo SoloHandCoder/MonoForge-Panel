@@ -4,7 +4,7 @@ import { rememberCheckout } from '@/api/account/wallet/purchases';
 import { httpErrorToHuman } from '@/api/http';
 import { isTebexCheckoutUrl, useTokenPackCheckout, useTokenPacks, type TokenPack } from '@/api/store/tokenPacks';
 import Button from '@/components/elements/Button';
-import Card from '@/components/elements/Card';
+import Icon from '@/components/elements/Icon';
 import Spinner from '@/components/elements/Spinner';
 import PurchaseAgreement from '@/components/legal/PurchaseAgreement';
 
@@ -31,9 +31,9 @@ function PackCard({ pack, busy, onBuy }: { pack: TokenPack; busy: boolean; onBuy
 }
 
 /**
- * The token packs on sale, each with a Buy button that opens the Tebex checkout. Rendered on the
- * Wallet page; it renders nothing while no Tebex store is connected. The return from Tebex is
- * shown by `TokenPurchaseReturn`.
+ * The token packs on sale, each with a Buy button that opens the Tebex checkout. Rendered inside the
+ * Wallet page's "Buy tokens" box, so it says so when nothing is on sale instead of leaving the box
+ * empty. The return from Tebex is shown by `TokenPurchaseReturn`.
  */
 export default function TokenPacks() {
     const { data, error, isLoading } = useTokenPacks();
@@ -72,17 +72,22 @@ export default function TokenPacks() {
     }
 
     if (!data?.enabled || data.data.length === 0) {
-        return null;
+        return (
+            <p className='flex items-center gap-2 text-sm text-muted-foreground'>
+                <Icon icon={Coins} className='size-4 shrink-0' aria-hidden />
+                No token packs are on sale right now. You can still redeem a coupon.
+            </p>
+        );
     }
 
     return (
-        <Card title='Buy tokens' icon={Coins}>
+        <div>
             {redirectError && (
                 <p role='alert' className='mb-4 text-sm text-destructive'>
                     The store returned an unexpected checkout link, so it was not opened. Please try again.
                 </p>
             )}
-            <ul className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+            <ul className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
                 {data.data.map((pack) => (
                     <PackCard key={pack.id} pack={pack} busy={buying === pack.id} onBuy={() => void buy(pack)} />
                 ))}
@@ -91,7 +96,7 @@ export default function TokenPacks() {
                 Payments are handled by Tebex, our payment partner. Tokens are added once the payment is confirmed.
             </p>
             <PurchaseAgreement className='mt-1' />
-        </Card>
+        </div>
     );
 }
 

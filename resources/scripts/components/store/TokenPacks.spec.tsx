@@ -68,12 +68,21 @@ describe('token packs', () => {
         expect(window.sessionStorage.getItem('monoforge:tebex-checkout')).toBeNull();
     });
 
-    it('renders nothing while no Tebex store is connected', () => {
+    it('says nothing is on sale while no Tebex store is connected, so the Buy tokens box is not empty', () => {
         state.packs = { enabled: false, data: [] };
 
-        const { container } = render(<TokenPacks />);
+        render(<TokenPacks />);
 
-        expect(container).toBeEmptyDOMElement();
+        expect(screen.getByText(/No token packs are on sale right now/)).toBeVisible();
+        expect(screen.queryByRole('button')).toBeNull();
+    });
+
+    it('says the same when the store is connected but every pack is hidden', () => {
+        state.packs = { enabled: true, data: [] };
+
+        render(<TokenPacks />);
+
+        expect(screen.getByText(/No token packs are on sale right now/)).toBeVisible();
     });
 
     it('accepts only https links on tebex.io', () => {

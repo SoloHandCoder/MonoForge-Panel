@@ -5,7 +5,7 @@ const fading = { fetching: { true: 'opacity-55' } };
 export const table = {
     root: '@container overflow-hidden rounded-sm border border-border bg-card',
     empty: { base: 'flex transition-opacity', variants: fading },
-    scroller: 'overflow-x-auto scrollbar-thin scrollbar-thumb-(--scrollbar-thumb)',
+    scroller: 'relative overflow-x-auto scrollbar-thin scrollbar-thumb-(--scrollbar-thumb)',
     table: 'w-full border-collapse text-left text-sm',
     head: 'border-b border-border bg-muted/70',
     headerRow: '',

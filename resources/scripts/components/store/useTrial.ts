@@ -41,8 +41,8 @@ export function useCheckoutTrial(catalog: StoreCatalog, plan: StorePlan, hash: s
     return { trial, active, setMode };
 }
 
-/** "Try free for 48 h". */
-export const tryFreeLabel = (hours: number): string => `Try free for ${hours} h`;
+/** "Try free for 48 h", with a no-break space so a narrow button never leaves the "h" alone on a line. */
+export const tryFreeLabel = (hours: number): string => `Try free for ${hours}\u00a0h`;
 
 export interface TrialDetails {
     planId: number;

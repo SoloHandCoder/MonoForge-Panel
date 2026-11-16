@@ -31,6 +31,18 @@ class SupportNotifier
         return '/panel/support/'.$ticketId;
     }
 
+    /** The kind of the player's notice about a staff reply on the ticket. */
+    public static function userKind(int $ticketId): string
+    {
+        return 'support.reply.'.$ticketId;
+    }
+
+    /** The kind of a staff member's notice about a new ticket or a player's reply. */
+    public static function staffKind(int $ticketId): string
+    {
+        return 'support.staff.'.$ticketId;
+    }
+
     public function ticketCreated(SupportTicket $ticket): void
     {
         $this->notifyStaff($ticket, 'New support ticket', "{$ticket->user->username} opened #{$ticket->id}: {$this->subject($ticket)}");
@@ -50,7 +62,7 @@ class SupportNotifier
             'info',
             'Support replied to your ticket',
             "There is a new reply on #{$ticket->id}: {$this->subject($ticket)}",
-            "support.reply.{$ticket->id}",
+            self::userKind($ticket->id),
             'Open ticket',
             self::userPath($ticket->id),
         ));
@@ -77,7 +89,7 @@ class SupportNotifier
                 'info',
                 $title,
                 $body,
-                "support.staff.{$ticket->id}",
+                self::staffKind($ticket->id),
                 'Open ticket',
                 self::staffPath($ticket->id),
             ));

@@ -66,7 +66,7 @@ export default function UsageTab() {
             {data ? (
                 <div
                     className={cn(
-                        'overflow-x-auto rounded-xl border border-border bg-card transition-opacity duration-150',
+                        'relative overflow-x-auto rounded-xl border border-border bg-card transition-opacity duration-150',
                         isFetching && 'opacity-60'
                     )}
                 >

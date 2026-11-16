@@ -356,7 +356,7 @@ function RedemptionsList({ coupon }: { coupon: AdminCoupon | null }) {
     }
 
     return (
-        <div className='overflow-x-auto'>
+        <div className='relative overflow-x-auto'>
             <table className='w-full min-w-[32rem] text-left text-sm'>
                 <thead>
                     <tr className='text-xs text-muted-foreground'>

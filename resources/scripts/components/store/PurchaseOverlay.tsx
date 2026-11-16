@@ -151,7 +151,7 @@ function Done({ result, trialHours }: { result: PurchaseResult; trialHours: numb
                     params={{ id: result.server.identifier }}
                     className={buttonClassName({
                         size: 'large',
-                        className: 'flex-1 justify-center gap-2 no-underline',
+                        className: 'inline-flex flex-1 items-center justify-center gap-2 no-underline',
                     })}
                 >
                     <Icon icon={SquareTerminal} className='size-4' aria-hidden />
@@ -163,7 +163,7 @@ function Done({ result, trialHours }: { result: PurchaseResult; trialHours: numb
                         size: 'large',
                         color: 'grey',
                         isSecondary: true,
-                        className: 'flex-1 justify-center gap-2 no-underline',
+                        className: 'inline-flex flex-1 items-center justify-center gap-2 no-underline',
                     })}
                 >
                     <Icon icon={LayoutDashboard} className='size-4' aria-hidden />
@@ -204,7 +204,7 @@ export default function PurchaseOverlay({
                 aria-modal='true'
                 aria-label={label}
                 tabIndex={-1}
-                className='fixed inset-0 z-50 grid animate-fade-in place-items-center overflow-y-auto bg-background/95 px-4 py-10 outline-none backdrop-blur-md'
+                className='fixed inset-0 z-50 grid animate-fade-in place-items-center overflow-x-hidden overflow-y-auto bg-background/95 px-4 py-10 outline-none backdrop-blur-md'
             >
                 <div
                     aria-hidden

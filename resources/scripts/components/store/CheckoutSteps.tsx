@@ -126,7 +126,7 @@ export function EggStep({
     return (
         <Step number={1} title='Choose your game' description='The server comes set up for it.'>
             {eggs.length === 0 && <p className='text-sm text-muted-foreground'>This plan has no games to pick yet.</p>}
-            <div className='grid gap-2 sm:grid-cols-2' role='radiogroup' aria-label='Game'>
+            <div className='grid grid-cols-1 gap-2 sm:grid-cols-2' role='radiogroup' aria-label='Game'>
                 {eggs.map((egg) => (
                     <Choice key={egg.id} name='egg' checked={egg.id === eggId} onSelect={() => onChange(egg.id)}>
                         <EggBadge egg={egg} className='size-9 rounded-lg' />
@@ -212,7 +212,7 @@ export function LocationStep({
 
     return (
         <Step number={2} title='Pick a location' description='Some locations cost a little more.'>
-            <div className='grid gap-2 sm:grid-cols-2' role='radiogroup' aria-label='Location'>
+            <div className='grid grid-cols-1 gap-2 sm:grid-cols-2' role='radiogroup' aria-label='Location'>
                 {locations.map((each) => (
                     <Choice
                         key={each.id}
@@ -256,7 +256,7 @@ export function PeriodStep({
     return (
         <Step number={number} title='Billing period' description='Tokens are taken automatically each period.'>
             {periods.length === 0 && <p className='text-sm text-muted-foreground'>No billing periods right now.</p>}
-            <div className='grid gap-2 sm:grid-cols-3' role='radiogroup' aria-label='Billing period'>
+            <div className='grid grid-cols-1 gap-2 sm:grid-cols-3' role='radiogroup' aria-label='Billing period'>
                 {periods.map((period) => {
                     const note = periodNote(period);
 
@@ -274,7 +274,7 @@ export function PeriodStep({
                             {note && (
                                 <span
                                     className={cn(
-                                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
                                         period.priceModifierPercent < 0
                                             ? 'bg-(--status-online-bg) text-(--status-online-fg)'
                                             : 'bg-(--status-busy-bg) text-(--status-busy-fg)'
@@ -427,7 +427,7 @@ export function AddonsStep({
 }) {
     return (
         <Step number={number} title='Add-ons' description='Optional extras, billed with the server.'>
-            <div className='grid gap-2'>
+            <div className='grid grid-cols-1 gap-2'>
                 {addons.map((addon) => (
                     <AddonStepper
                         key={addon.key}

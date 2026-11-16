@@ -200,6 +200,7 @@ const packColumns = [
             <div className='min-w-0'>
                 <p className='truncate font-medium text-foreground'>{row.original.name}</p>
                 <p className='truncate text-xs text-muted-foreground'>Tebex package {row.original.tebex_package_id}</p>
+                {!row.original.visible && <p className='text-xs text-muted-foreground sm:hidden'>Hidden</p>}
             </div>
         ),
         meta: { headerClassName: 'w-auto', cellClassName: 'w-auto' },
@@ -215,7 +216,7 @@ const packColumns = [
                 )}
             </span>
         ),
-        meta: { headerClassName: 'w-32', cellClassName: 'w-32' },
+        meta: { headerClassName: 'w-24 sm:w-32', cellClassName: 'w-24 sm:w-32' },
     },
     {
         id: 'visible',
@@ -225,7 +226,7 @@ const packColumns = [
                 {row.original.visible ? 'On sale' : 'Hidden'}
             </Badge>
         ),
-        meta: { headerClassName: 'w-28', cellClassName: 'w-28' },
+        meta: { headerClassName: 'hidden w-28 sm:table-cell', cellClassName: 'hidden w-28 sm:table-cell' },
     },
     actionsColumn<AdminTokenPack>(2, (pack) => <PackActionsCell pack={pack} />),
 ] satisfies ColumnDef<AdminTokenPack>[];
@@ -392,7 +393,7 @@ function PaymentsBody({ page, flagged, onPage }: { page: number; flagged: boolea
     }
 
     return (
-        <div className='overflow-x-auto'>
+        <div className='relative overflow-x-auto'>
             <table className='w-full min-w-[36rem] text-left'>
                 <thead>
                     <tr className='text-xs text-muted-foreground'>

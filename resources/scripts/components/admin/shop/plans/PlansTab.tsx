@@ -230,7 +230,7 @@ export default function PlansTab() {
     };
 
     return (
-        <div className='grid gap-4'>
+        <div className='grid grid-cols-1 gap-4'>
             <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <p className='text-sm text-muted-foreground'>
                     Plans are listed cheapest first in the store. Use the arrows to order the categories.
