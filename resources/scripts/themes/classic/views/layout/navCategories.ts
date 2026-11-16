@@ -52,6 +52,7 @@ export const ADMIN_NAV: NavCategoryScheme = {
         // The token shop and its billing pages, before their routes declare a group of their own.
         shop: 'billing',
         billing: 'billing',
+        revenue: 'billing',
         store: 'billing',
         orders: 'billing',
         products: 'billing',

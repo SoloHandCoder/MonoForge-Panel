@@ -60,6 +60,7 @@ import { adminActivityFacetsQueryOptions, adminActivityLogsQueryOptions } from '
 import { adminAnnouncementsQueryOptions } from '@/api/admin/announcements/queries';
 import { adminShopCategoriesQueryOptions, adminShopPlansQueryOptions } from '@/api/admin/shop/queries';
 import { adminVersionQueryOptions } from '@/api/admin/version/queries';
+import { adminRevenueQueryOptions } from '@/api/admin/billing/queries';
 import { adminLiveUsageQueryOptions, adminStorageUsageQueryOptions } from '@/api/admin/insights/queries';
 import {
     adminLocationListQueryParams,
@@ -1317,6 +1318,17 @@ const panelChildren = [
         path: 'shop/plans/$id',
         params: idParam,
         component: componentRoute(() => import('@/components/admin/shop/plans/PlanEditor')),
+    }),
+    // Phase 7 Task R: the revenue dashboard, filed under Billing beside the shop.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'revenue',
+        staticData: { nav: { label: 'Revenue', icon: 'chart-column', group: 'billing' } },
+        // Prefetch without waiting: the page shows its own spinner.
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminRevenueQueryOptions());
+        },
+        component: componentRoute(() => import('@/components/admin/billing/RevenueContainer')),
     }),
     // Phase 4: the AI assistant. Every sub-tab path renders AssistantAdminContainer, which picks the tab
     // from the path (see components/admin/assistant/assistantTabs.ts).
