@@ -92,7 +92,15 @@ export function useTrialFlow() {
 
             const { server, replayed, address } = response.attributes;
 
-            setResult({ server, replayed, address, tokens_charged: 0, period_days: 0, discount_tokens: 0, coupon: null });
+            setResult({
+                server,
+                replayed,
+                address,
+                tokens_charged: 0,
+                period_days: 0,
+                discount_tokens: 0,
+                coupon: null,
+            });
         } catch (cause) {
             await wait(MIN_FAILURE_MS - (Date.now() - started));
             if (isAxiosError(cause) && cause.response) {
