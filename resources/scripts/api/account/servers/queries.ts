@@ -100,6 +100,19 @@ export const isServerStatsEntry = (
 ): entry is ClientStatsResource => entry !== undefined && entry.object !== 'error';
 
 /**
+ * Whether the last batch could not read the server's usage from Wings (an `error` entry, such as a
+ * node that does not answer). A card with no reading yet shows that instead of loading forever.
+ * Only the batch writes it; reading it never sends a request.
+ */
+export const serverResourceUsageUnreachableQueryOptions = (uuid: string) =>
+    queryOptions({
+        queryKey: ['account', 'servers', uuid, 'resources-unreachable'] as const,
+        queryFn: () => false,
+        enabled: false,
+        staleTime: Infinity,
+    });
+
+/**
  * One request for the usage of up to 50 servers, polled every 30 seconds and paused in a hidden tab.
  * Each server's reading is also written to its own resources query, so a card, its row and the
  * server page read the same cache entry.
@@ -122,6 +135,11 @@ export const serverResourceUsageBatchQueryOptions = (queryClient: QueryClient, u
                         entry
                     );
                 }
+
+                queryClient.setQueryData(
+                    serverResourceUsageUnreachableQueryOptions(uuid).queryKey,
+                    entry?.object === 'error'
+                );
             }
 
             return data;

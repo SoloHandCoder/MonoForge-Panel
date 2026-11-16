@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useCurrentUser } from '@/api/account/queries';
 import { billingNotice, useServerSubscription } from '@/api/billing/subscriptions';
 import {
     serverResourceUsageBatchFilters,
     serverResourceUsageQueryOptions,
+    serverResourceUsageUnreachableQueryOptions,
     useAccountServers,
     useServerResourceUsage,
     useServerResourceUsageBatch,
@@ -146,7 +147,11 @@ const useDashboardModel = () => pageStatus(useServerListQuery().query);
 const tracksResources = ({ attributes }: Server): boolean =>
     attributes.status !== 'suspended' && !attributes.is_node_under_maintenance && attributes.uuid.length > 0;
 
-function resolveState(server: Server, stats: ClientStatsAttributes | undefined): ServerCardState {
+/**
+ * `unreachable`: the last poll could not read the usage from Wings. Without a reading the card then
+ * says the server cannot be reached instead of loading forever.
+ */
+function resolveState(server: Server, stats: ClientStatsAttributes | undefined, unreachable = false): ServerCardState {
     const { attributes } = server;
 
     if (stats?.is_suspended || attributes.status === 'suspended') {
@@ -181,7 +186,11 @@ function resolveState(server: Server, stats: ClientStatsAttributes | undefined):
         return { kind: 'unavailable', reason: 'restoring-backup' };
     }
 
-    return attributes.status ? { kind: 'unavailable', reason: 'unavailable' } : { kind: 'loading' };
+    if (attributes.status) {
+        return { kind: 'unavailable', reason: 'unavailable' };
+    }
+
+    return unreachable ? { kind: 'unavailable', reason: 'connection-error' } : { kind: 'loading' };
 }
 
 function cardPermissions(server: Server, rootAdmin = false): ServerCardPermissions {
@@ -242,7 +251,8 @@ function cardModel(
     server: Server,
     stats: ClientStatsAttributes | undefined,
     power: PowerSender,
-    rootAdmin: boolean
+    rootAdmin: boolean,
+    unreachable = false
 ): ServerCardModel {
     const { identifier, uuid, name, description } = server.attributes;
     const send = (signal: ServerPowerSignal) => () => power.send(uuid, signal);
@@ -254,7 +264,7 @@ function cardModel(
         description,
         address: primaryAddress(server),
         addressPending: addressPending(server.attributes),
-        state: resolveState(server, stats),
+        state: resolveState(server, stats, unreachable),
         permissions: cardPermissions(server, rootAdmin),
         actions: { start: send('start'), stop: send('stop'), restart: send('restart') },
         sending: power.sending === uuid,
@@ -263,6 +273,8 @@ function cardModel(
 
 const usageOf = (results: { data?: { attributes: ClientStatsAttributes } }[]) =>
     results.map((result) => result.data?.attributes);
+
+const unreachableOf = (results: { data?: boolean }[]) => results.map((result) => result.data === true);
 
 const countPower = (items: readonly ServerListItem[], power: ServerRunState): number =>
     items.filter(({ state }) => state.kind === 'ready' && state.power === power).length;
@@ -287,6 +299,12 @@ function useServerListModel(): ServerListModel {
         ),
         combine: usageOf,
     });
+    const unreachable = useQueries({
+        queries: (servers?.data ?? []).map((server) =>
+            serverResourceUsageUnreachableQueryOptions(server.attributes.uuid)
+        ),
+        combine: unreachableOf,
+    });
     const type = scope === 'others' ? 'admin' : undefined;
 
     useEffect(() => {
@@ -298,7 +316,7 @@ function useServerListModel(): ServerListModel {
     return useMemo(() => {
         const pagination = servers?.meta.pagination;
         const items = (servers?.data ?? []).map((server, index) =>
-            Object.assign(cardModel(server, usage[index], power, rootAdmin), { server })
+            Object.assign(cardModel(server, usage[index], power, rootAdmin, unreachable[index]), { server })
         );
 
         return {
@@ -339,11 +357,15 @@ function useServerListModel(): ServerListModel {
                     }),
             },
         };
-    }, [servers, usage, power, scope, rootAdmin, username, type, navigate]);
+    }, [servers, usage, unreachable, power, scope, rootAdmin, username, type, navigate]);
 }
 
 function useServerCardModel({ server }: { readonly server: Server }): ServerCardModel {
-    const stats = useServerResourceUsage(server.attributes.uuid, tracksResources(server)).data?.attributes;
+    const usage = useServerResourceUsage(server.attributes.uuid, tracksResources(server));
+    const stats = usage.data?.attributes;
+    // A batch reports Wings errors through its flag; a card polling on its own through its error.
+    const unreachable =
+        useQuery(serverResourceUsageUnreachableQueryOptions(server.attributes.uuid)).data === true || usage.isError;
     const power = usePowerSender();
     const rootAdmin = useCurrentUser().rootAdmin;
     const subscription = useServerSubscription(server.attributes.identifier);
@@ -351,8 +373,8 @@ function useServerCardModel({ server }: { readonly server: Server }): ServerCard
     const notice = billingNotice(subscription, now);
 
     return useMemo(
-        () => ({ ...cardModel(server, stats, power, rootAdmin), billingNotice: notice }),
-        [server, stats, power, rootAdmin, notice]
+        () => ({ ...cardModel(server, stats, power, rootAdmin, unreachable), billingNotice: notice }),
+        [server, stats, power, rootAdmin, unreachable, notice]
     );
 }
 

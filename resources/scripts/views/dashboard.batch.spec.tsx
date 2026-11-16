@@ -173,3 +173,40 @@ it('refetches the batch every 30 seconds and never in a hidden tab', () => {
     expect(options.refetchInterval).toBe(30_000);
     expect(options.refetchIntervalInBackground).toBe(false);
 });
+
+it('shows a card Wings cannot reach as unavailable instead of loading forever', async () => {
+    const [reachable, unreachable] = servers(2);
+
+    sdk.clientListServerResources.mockImplementation(async () => ({
+        data: {
+            object: 'server_resources',
+            data: {
+                [reachable!.attributes.uuid]: stats(),
+                [unreachable!.attributes.uuid]: {
+                    object: 'error',
+                    attributes: { code: 'daemon_error', status: 504, detail: 'The node could not be reached.' },
+                },
+            },
+        },
+    }));
+
+    await renderList([reachable!, unreachable!]);
+
+    await waitFor(() => expect(pills()).toEqual(['online', 'offline']));
+    expect(screen.getByText('Unavailable')).toBeVisible();
+    expect(screen.queryByText('Loading')).toBeNull();
+    expect(screen.getByText('Connection Error')).toBeVisible();
+});
+
+it('marks a card polling on its own unavailable once its resources request fails', async () => {
+    const [server] = servers(1);
+
+    sdk.clientGetServerResources.mockRejectedValue(new Error('504'));
+    host = createExtensionTestHost({ path: '/' });
+    await act(async () => {
+        render(<View name='dashboard.serverCard' server={server!} />, { wrapper: host!.Wrapper });
+    });
+
+    await waitFor(() => expect(screen.getByText('Unavailable')).toBeVisible());
+    expect(screen.queryByText('Loading')).toBeNull();
+});
