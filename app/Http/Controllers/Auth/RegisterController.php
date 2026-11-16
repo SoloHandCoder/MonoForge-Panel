@@ -14,9 +14,9 @@ use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Http\Requests\Auth\RegisterRequest;
-use Pterodactyl\Services\Billing\TrialFingerprint;
 use Pterodactyl\Services\Billing\ReferralService;
 use Pterodactyl\Services\Billing\ReferralSettings;
+use Pterodactyl\Services\Billing\TrialFingerprint;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Throwable;
 
