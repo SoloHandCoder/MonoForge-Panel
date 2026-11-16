@@ -1705,6 +1705,19 @@ export type ClientServerSubscriptionAttributes = {
     server_identifier: string;
     server_name: string;
     status: string;
+    is_trial: boolean;
+    /**
+     * A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.
+     */
+    trial: {
+        ends_at: string;
+        options: Array<{
+            period_id: number;
+            name: string;
+            days: number;
+            price_tokens: number;
+        }>;
+    } | null;
     price_tokens: number;
     period_days: number;
     addons: Array<{
@@ -1809,6 +1822,27 @@ export type ClientStorePurchaseAttributes = {
 export type ClientStorePurchaseResource = {
     object: string;
     attributes: ClientStorePurchaseAttributes;
+};
+export type ClientStoreTrialAttributes = {
+    server: {
+        identifier: string;
+        uuid: string;
+        name: string;
+    };
+    hours: number;
+    /**
+     * When the trial ends (ISO 8601).
+     */
+    ends_at: string | null;
+    replayed: boolean;
+    /**
+     * The playit.gg address of the server once its tunnel is ready; null until then.
+     */
+    address: string | null;
+};
+export type ClientStoreTrialResource = {
+    object: string;
+    attributes: ClientStoreTrialAttributes;
 };
 export type ClientSystemPermissionsResponse = {
     object: string;
@@ -2338,6 +2372,28 @@ export type AdminUpdatePriceMultiplierRequest = {
      * The label. Must not be greater than 191 characters.
      */
     label?: string | null;
+};
+export type AdminUpdateFreeTrialSettingsRequest = {
+    /**
+     * The enabled.
+     */
+    enabled: boolean;
+    /**
+     * Must match an existing stored value.
+     */
+    plan_ids?: Array<number>;
+    /**
+     * The hours.
+     */
+    hours: 24 | 48 | 72;
+    /**
+     * The max concurrent. Must be at least 0. Must not be greater than 10000.
+     */
+    max_concurrent: number;
+    /**
+     * The require verified.
+     */
+    require_verified: boolean;
 };
 export type AdminUpdateShopNodeRequest = {
     /**
@@ -4618,6 +4674,36 @@ export type ClientPurchaseServerRequest = {
      */
     idempotency_key: string;
 };
+export type ClientStartFreeTrialRequest = {
+    /**
+     * The plan id. Must be at least 1.
+     */
+    plan_id: number;
+    /**
+     * The egg ID. Must be at least 1.
+     */
+    egg_id: number;
+    /**
+     * The location ID. Must be at least 1.
+     */
+    location_id?: number | null;
+    /**
+     * The node ID. Must be at least 1.
+     */
+    node_id?: number | null;
+    /**
+     * The display name. Must match the regex /^[^<>]+$/u. Must be at least 1 character. Must not be greater than 60 characters.
+     */
+    name: string;
+    /**
+     * The idempotency key. Must match the regex /^[A-Za-z0-9_-]+$/. Must be at least 16 characters. Must not be greater than 100 characters.
+     */
+    idempotency_key: string;
+    /**
+     * The captcha token (Turnstile action trial), required when the panel uses a captcha.
+     */
+    'g-recaptcha-response'?: string;
+};
 export type ClientBuyTokenPackRequest = {
     /**
      * The token pack to buy.
@@ -4633,6 +4719,16 @@ export type ClientUpdateServerSubscriptionRequest = {
      * Let the server sleep while nobody plays. Required without auto_renew.
      */
     auto_sleep?: boolean;
+};
+export type ClientKeepTrialServerRequest = {
+    /**
+     * The billing period to pay for.
+     */
+    period_id: number;
+    /**
+     * The price the player confirmed; a different current price is refused.
+     */
+    expected_total?: number;
 };
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
@@ -5785,6 +5881,66 @@ export type AdminUpdatePriceMultiplierResponseBody = {
     scope_id?: number;
     multiplier?: number;
     label?: string;
+};
+export type AdminGetFreeTrialsResponseBody = {
+    settings?: {
+        enabled?: boolean;
+        plan_ids?: Array<number>;
+        hours?: number;
+        max_concurrent?: number;
+        require_verified?: boolean;
+    };
+    stats?: {
+        started?: number;
+        running?: number;
+        converted?: number;
+        lapsed?: number;
+        /**
+         * Percent of the trials that are over (kept, ended or deleted) that were kept.
+         */
+        conversion_rate: number;
+    };
+    /**
+     * The most recent trials, newest first; state is running, expired (ended, suspended until it is deleted), converted or deleted.
+     */
+    trials: Array<{
+        id?: number;
+        state?: string;
+        /**
+         * The player; null once the account was deleted.
+         */
+        user: {
+            id?: number;
+            username?: string;
+        } | null;
+        /**
+         * The trial server; null once it was deleted.
+         */
+        server: {
+            id?: number;
+            identifier?: string;
+            name?: string;
+        } | null;
+        /**
+         * The plan; null once it was deleted.
+         */
+        plan: {
+            id?: number;
+            name?: string;
+        } | null;
+        hours?: number;
+        started_at?: string;
+        ends_at?: string;
+        converted_at?: string | null;
+        expired_at?: string | null;
+    }>;
+};
+export type AdminUpdateFreeTrialSettingsResponseBody = {
+    enabled?: boolean;
+    plan_ids?: Array<number>;
+    hours?: number;
+    max_concurrent?: number;
+    require_verified?: boolean;
 };
 export type AdminListShopNodesResponseBody = {
     data?: Array<{
@@ -7410,6 +7566,19 @@ export type ClientGetTheStoreCatalogResponseBody = {
      * The token balance of the requesting user.
      */
     balance: number;
+    /**
+     * Free trial servers: whether the store offers them, their length in hours, the plans that can be tried, and whether this user may start one (with the reason when not).
+     */
+    trial: {
+        enabled?: boolean;
+        hours?: number;
+        plan_ids?: Array<number>;
+        eligible?: boolean;
+        /**
+         * Why this user cannot start a free trial; null when they can.
+         */
+        reason: string | null;
+    };
     categories?: Array<{
         id?: number;
         name?: string;
@@ -9432,6 +9601,7 @@ export type ClientGetASupportAttachmentTicketPathParameter = number;
 export type ClientGetASupportAttachmentAttachmentPathParameter = number;
 export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
 export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
+export type ClientKeepTrialServerServerUuidPathParameter = string;
 /**
  * Page number to retrieve.
  */
@@ -11123,6 +11293,58 @@ export type AdminUpdatePriceMultiplierResponses = {
     200: AdminUpdatePriceMultiplierResponseBody;
 };
 export type AdminUpdatePriceMultiplierResponse = AdminUpdatePriceMultiplierResponses[keyof AdminUpdatePriceMultiplierResponses];
+export type AdminGetFreeTrialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/trials';
+};
+export type AdminGetFreeTrialsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetFreeTrialsError = AdminGetFreeTrialsErrors[keyof AdminGetFreeTrialsErrors];
+export type AdminGetFreeTrialsResponses = {
+    /**
+     * Trials returned.
+     */
+    200: AdminGetFreeTrialsResponseBody;
+};
+export type AdminGetFreeTrialsResponse = AdminGetFreeTrialsResponses[keyof AdminGetFreeTrialsResponses];
+export type AdminUpdateFreeTrialSettingsData = {
+    body: AdminUpdateFreeTrialSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/trials';
+};
+export type AdminUpdateFreeTrialSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateFreeTrialSettingsError = AdminUpdateFreeTrialSettingsErrors[keyof AdminUpdateFreeTrialSettingsErrors];
+export type AdminUpdateFreeTrialSettingsResponses = {
+    /**
+     * Trial settings updated.
+     */
+    200: AdminUpdateFreeTrialSettingsResponseBody;
+};
+export type AdminUpdateFreeTrialSettingsResponse = AdminUpdateFreeTrialSettingsResponses[keyof AdminUpdateFreeTrialSettingsResponses];
 export type AdminListShopNodesData = {
     body?: never;
     path?: never;
@@ -20035,6 +20257,42 @@ export type ClientPurchaseServerResponses = {
     201: ClientStorePurchaseResource;
 };
 export type ClientPurchaseServerResponse = ClientPurchaseServerResponses[keyof ClientPurchaseServerResponses];
+export type ClientStartFreeTrialData = {
+    body: ClientStartFreeTrialRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/trial';
+};
+export type ClientStartFreeTrialErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The player cannot start a free trial.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The store is at its capacity limits, busy, or the user has to accept the updated Terms of Service first.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientStartFreeTrialError = ClientStartFreeTrialErrors[keyof ClientStartFreeTrialErrors];
+export type ClientStartFreeTrialResponses = {
+    /**
+     * The idempotency key already started this trial.
+     */
+    200: ClientStoreTrialResource;
+    /**
+     * Trial server created and installing.
+     */
+    201: ClientStoreTrialResource;
+};
+export type ClientStartFreeTrialResponse = ClientStartFreeTrialResponses[keyof ClientStartFreeTrialResponses];
 export type ClientListTokenPacksData = {
     body?: never;
     path?: never;
@@ -20189,6 +20447,47 @@ export type ClientRenewServerSubscriptionResponses = {
     200: ClientServerSubscriptionResource;
 };
 export type ClientRenewServerSubscriptionResponse = ClientRenewServerSubscriptionResponses[keyof ClientRenewServerSubscriptionResponses];
+export type ClientKeepTrialServerData = {
+    body: ClientKeepTrialServerRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientKeepTrialServerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}/keep';
+};
+export type ClientKeepTrialServerErrors = {
+    /**
+     * The balance is too low, the period is not offered, the price changed or the server is not a trial.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientKeepTrialServerError = ClientKeepTrialServerErrors[keyof ClientKeepTrialServerErrors];
+export type ClientKeepTrialServerResponses = {
+    /**
+     * The server is kept and paid for one period.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientKeepTrialServerResponse = ClientKeepTrialServerResponses[keyof ClientKeepTrialServerResponses];
 export type ClientGetAccountData = {
     body?: never;
     path?: never;

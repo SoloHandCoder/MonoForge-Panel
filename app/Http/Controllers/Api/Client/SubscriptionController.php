@@ -9,6 +9,7 @@ use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
+use Knuckles\Scribe\Attributes\ResponseField;
 use Knuckles\Scribe\Attributes\Subgroup;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Facades\Activity;
@@ -37,7 +38,11 @@ class SubscriptionController extends ClientApiController
             'server_name' => 'Survival',
             'status' => 'active',
             'is_trial' => false,
-            'trial' => null,
+            // Only set for a free trial (is_trial); null for every paid subscription.
+            'trial' => [
+                'ends_at' => '2026-11-18T12:00:00+00:00',
+                'options' => [['period_id' => 1, 'name' => 'Monthly', 'days' => 30, 'price_tokens' => 500]],
+            ],
             'price_tokens' => 500,
             'period_days' => 30,
             'addons' => [['key' => 'backup', 'units' => 1]],
@@ -66,6 +71,7 @@ class SubscriptionController extends ClientApiController
      */
     #[Endpoint('List server subscriptions', 'Returns the billing of every shop server the authenticated user pays for, including the deletion countdown of suspended ones.')]
     #[ScribeResponse(['object' => 'list', 'data' => [self::SUBSCRIPTION_EXAMPLE]], description: 'Subscriptions returned.')]
+    #[ResponseField('attributes.trial', description: 'A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.', nullable: true)]
     public function index(ClientApiRequest $request): ApiResourceCollection
     {
         $subscriptions = ServerSubscription::query()
@@ -85,6 +91,7 @@ class SubscriptionController extends ClientApiController
     #[BodyParam('auto_renew', 'boolean', 'Renew automatically from the token balance. Required without auto_sleep.', required: false, example: true)]
     #[BodyParam('auto_sleep', 'boolean', 'Let the server sleep while nobody plays. Required without auto_renew.', required: false, example: true)]
     #[ScribeResponse(self::SUBSCRIPTION_EXAMPLE, description: 'Subscription updated.')]
+    #[ResponseField('attributes.trial', description: 'A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.', nullable: true)]
     public function update(UpdateSubscriptionRequest $request, ServerSleep $sleep, Server $server): ServerSubscriptionResource
     {
         $subscription = $this->subscriptionOf($request->user(), $server);
@@ -124,6 +131,7 @@ class SubscriptionController extends ClientApiController
      */
     #[Endpoint('Renew server subscription', 'Pays a suspended server from the token balance, which unsuspends it, or pays the next period of an active one ahead of time (one period at most).')]
     #[ScribeResponse(self::SUBSCRIPTION_EXAMPLE, description: 'Subscription renewed.')]
+    #[ResponseField('attributes.trial', description: 'A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.', nullable: true)]
     #[ScribeResponse(['errors' => [['code' => 'SubscriptionRenewalException', 'status' => '400', 'detail' => 'You need 500 tokens to renew this server. Top up your wallet and try again.']]], status: 400, description: 'The balance is too low, or the next period is already paid.')]
     public function renew(ClientApiRequest $request, SubscriptionService $subscriptions, Server $server): ServerSubscriptionResource
     {
@@ -148,6 +156,7 @@ class SubscriptionController extends ClientApiController
     #[BodyParam('period_id', 'integer', 'The billing period to pay for.', required: true, example: 1)]
     #[BodyParam('expected_total', 'integer', 'The price the player confirmed; a different current price is refused.', required: false, example: 500)]
     #[ScribeResponse(self::SUBSCRIPTION_EXAMPLE, description: 'The server is kept and paid for one period.')]
+    #[ResponseField('attributes.trial', description: 'A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.', nullable: true)]
     #[ScribeResponse(['errors' => [['code' => 'SubscriptionRenewalException', 'status' => '400', 'detail' => 'You need 500 tokens to keep this server. Top up your wallet and try again.']]], status: 400, description: 'The balance is too low, the period is not offered, the price changed or the server is not a trial.')]
     public function keep(KeepTrialRequest $request, TrialService $trials, SubscriptionService $subscriptions, Server $server): ServerSubscriptionResource
     {

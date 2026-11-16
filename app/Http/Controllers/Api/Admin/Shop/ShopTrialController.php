@@ -54,7 +54,10 @@ class ShopTrialController extends AdminApiController
 
     #[Endpoint('Get free trials', 'Returns the free trial settings, the trial numbers with the conversion rate (trials kept / trials that are over), and the most recent 200 trials.')]
     #[ResponseField('stats.conversion_rate', 'number', 'Percent of the trials that are over (kept, ended or deleted) that were kept.')]
-    #[ResponseField('trials', 'object[]', 'The most recent trials; state is running, expired (ended, suspended until it is deleted), converted or deleted. A user or plan that was deleted since is null.')]
+    #[ResponseField('trials', description: 'The most recent trials, newest first; state is running, expired (ended, suspended until it is deleted), converted or deleted.')]
+    #[ResponseField('user', 'object', 'The player; null once the account was deleted.', nullable: true)]
+    #[ResponseField('server', 'object', 'The trial server; null once it was deleted.', nullable: true)]
+    #[ResponseField('plan', 'object', 'The plan; null once it was deleted.', nullable: true)]
     #[ScribeResponse(self::INDEX_EXAMPLE, description: 'Trials returned.')]
     public function index(GetShopRequest $request): JsonResponse
     {
