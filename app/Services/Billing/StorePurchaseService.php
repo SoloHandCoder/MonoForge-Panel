@@ -425,7 +425,6 @@ class StorePurchaseService
         $server = null;
         try {
             $server = $this->createServer($user, $order->name, sprintf('%s, bought in the store.', $plan->name), $plan, $egg, $image, $node, $quote, $reference);
-            $server = $this->createServer($user, $order, $plan, $egg, $image, $node, $quote, $reference);
             // The subscription renews at the full price: a coupon only lowers the first period.
             $this->subscriptions->start($server, $user, $plan, $period, $quote, $addons);
         } catch (Throwable $throwable) {
