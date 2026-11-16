@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import { removeListItems, upsertListItem } from '@/api/queryData';
 import {
+    clientCreateScheduleFromPresetMutation,
     clientCreateScheduleTaskMutation,
     clientCreateServerScheduleMutation,
     clientDeleteScheduleTaskMutation,
@@ -10,12 +11,14 @@ import {
     clientExecuteServerScheduleMutation,
     clientGetServerScheduleOptions,
     clientGetServerScheduleQueryKey,
+    clientListSchedulePresetsOptions,
     clientListServerSchedulesOptions,
     clientListServerSchedulesQueryKey,
     clientUpdateScheduleTaskMutation,
     clientUpdateServerScheduleMutation,
 } from '@/api/generated/@tanstack/react-query.gen';
 import type {
+    ClientCreateScheduleFromPresetData,
     ClientCreateScheduleTaskData,
     ClientCreateServerScheduleData,
     ClientDeleteScheduleTaskData,
@@ -24,6 +27,7 @@ import type {
     ClientGetServerScheduleData,
     ClientListServerSchedulesData,
     ClientListServerSchedulesResponse,
+    ClientSchedulePresetsAttributes,
     ClientScheduleTaskResource,
     ClientServerScheduleResource,
     ClientUpdateScheduleTaskData,
@@ -34,6 +38,8 @@ import { notifyHttpError } from '@/plugins/notifications';
 
 export type Schedule = ClientServerScheduleResource;
 export type Task = ClientScheduleTaskResource;
+export type SchedulePresets = ClientSchedulePresetsAttributes;
+export type SchedulePresetBody = ClientCreateScheduleFromPresetData['body'];
 
 export type ScheduleValues = {
     id?: number;
@@ -54,6 +60,8 @@ export type TaskValues = {
     payload: string;
     timeOffset: string | number;
     continueOnFailure: boolean;
+    /** A backup task keeps only its newest this many backups; ignored by other actions. */
+    keepBackups?: number | null;
 };
 
 const serverSchedulesInput = (uuid: string): Options<ClientListServerSchedulesData> => ({
@@ -82,6 +90,8 @@ const taskBody = (task: TaskValues): ClientCreateScheduleTaskData['body'] => ({
     payload: task.payload,
     continue_on_failure: task.continueOnFailure,
     time_offset: Number(task.timeOffset),
+    // Only a backup task keeps a number of backups; the panel ignores it for the others.
+    keep_backups: task.action === 'backup' ? (task.keepBackups ?? null) : null,
 });
 
 export const createServerScheduleInput = (
@@ -325,5 +335,35 @@ export const useDeleteServerScheduleTask = (schedule: Schedule) => {
             toast.success('Task deleted');
         },
         onError: (error) => notifyHttpError(error, 'Unable to delete task'),
+    });
+};
+
+/** The Quick setup presets the viewer can set up on the server, and the panel's timezone. */
+export const schedulePresetsQueryOptions = (uuid: string) =>
+    clientListSchedulePresetsOptions({ path: { server_uuid: uuid } });
+
+export const useSchedulePresets = (uuid: string) =>
+    useQuery({
+        ...schedulePresetsQueryOptions(uuid),
+        select: (resource): SchedulePresets => resource.attributes,
+        enabled: uuid.length > 0,
+    });
+
+export const createScheduleFromPresetInput = (
+    uuid: string,
+    body: SchedulePresetBody
+): Options<ClientCreateScheduleFromPresetData> => ({ path: { server_uuid: uuid }, body });
+
+/** Sets up a preset; its schedule joins the list like any other. */
+export const useCreateScheduleFromPreset = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        ...clientCreateScheduleFromPresetMutation(),
+        onSuccess: async (schedule, { path }) => {
+            await cacheServerSchedule(queryClient, path.server_uuid, schedule);
+            toast.success('Schedule set up');
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to set up the schedule'),
     });
 };

@@ -1,5 +1,15 @@
 import { useMemo } from 'react';
-import { ArrowDownCircle, Clock, Code, FileArchive, ListTodo, ToggleRight, type LucideIcon } from 'lucide-react';
+import {
+    ArrowDownCircle,
+    BrushCleaning,
+    Clock,
+    Code,
+    FileArchive,
+    ListTodo,
+    ToggleRight,
+    UserX,
+    type LucideIcon,
+} from 'lucide-react';
 import {
     actionsColumn,
     Badge,
@@ -32,8 +42,29 @@ const actionDetails = (action: string): [string, LucideIcon] => {
             return ['Send Power Action', ToggleRight];
         case 'backup':
             return ['Create Backup', FileArchive];
+        case 'restart_if_empty':
+            return ['Restart When Empty', UserX];
+        case 'delete_logs':
+            return ['Delete Old Logs', BrushCleaning];
         default:
             return ['Unknown Action', Code];
+    }
+};
+
+/** What the task does, in a line: its payload, or what a payload of hours or days means. */
+const taskSummary = (task: ScheduleTask): string => {
+    switch (task.action) {
+        case 'restart_if_empty':
+            return `After ${task.payload} hour(s) with nobody online`;
+        case 'delete_logs':
+            return `Logs in logs/ older than ${task.payload} day(s)`;
+        case 'backup':
+            return [task.payload, task.keepBackups === null ? '' : `Keeps the newest ${task.keepBackups}`]
+                .filter(Boolean)
+                .join('\n');
+        case 'command':
+        case 'power':
+            return task.payload;
     }
 };
 
@@ -45,9 +76,9 @@ function TaskIdentity({ task }: { task: ScheduleTask }) {
             <Icon icon={icon} className='mt-0.5 hidden text-muted-foreground md:block' />
             <div className='min-w-0'>
                 <p className='font-medium'>{title}</p>
-                {task.payload ? (
+                {taskSummary(task) ? (
                     <code className='mt-1 block max-w-xl whitespace-pre-wrap break-all text-xs text-muted-foreground'>
-                        {task.payload}
+                        {taskSummary(task)}
                     </code>
                 ) : null}
             </div>

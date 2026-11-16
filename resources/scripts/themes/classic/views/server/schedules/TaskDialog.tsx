@@ -97,12 +97,49 @@ function TaskForm({ form: config, task, onSubmit, onClose }: Omit<Props, 'open'>
                                 </form.AppField>
                             )}
                             {action === 'backup' && (
+                                <div className='space-y-6'>
+                                    <form.AppField name='payload' validators={payloadValidators}>
+                                        {(field) => (
+                                            <field.TextAreaField
+                                                label='Ignored Files'
+                                                rows={6}
+                                                description='Optional. Include the files and folders to be excluded in this backup. By default, the contents of your .pteroignore file will be used. If you have reached your backup limit, the oldest backup will be rotated.'
+                                            />
+                                        )}
+                                    </form.AppField>
+                                    <form.AppField
+                                        name='keepBackups'
+                                        validators={{ onChange: ({ value }) => config.validateKeepBackups(value) }}
+                                    >
+                                        {(field) => (
+                                            <field.NumberField
+                                                label='Keep only the newest'
+                                                min={1}
+                                                max={config.maxKeepBackups ?? undefined}
+                                                description='Optional. Once this task has made this many backups, it deletes its oldest unlocked one. Leave it empty to keep backups until the server limit.'
+                                            />
+                                        )}
+                                    </form.AppField>
+                                </div>
+                            )}
+                            {action === 'restart_if_empty' && (
                                 <form.AppField name='payload' validators={payloadValidators}>
                                     {(field) => (
-                                        <field.TextAreaField
-                                            label='Ignored Files'
-                                            rows={6}
-                                            description='Optional. Include the files and folders to be excluded in this backup. By default, the contents of your .pteroignore file will be used. If you have reached your backup limit, the oldest backup will be rotated.'
+                                        <field.TextField
+                                            label='Hours with nobody online'
+                                            inputMode='numeric'
+                                            description='Restarts the server once its game has reported nobody online for this many hours (Minecraft Java for now). Run the schedule every 15 minutes.'
+                                        />
+                                    )}
+                                </form.AppField>
+                            )}
+                            {action === 'delete_logs' && (
+                                <form.AppField name='payload' validators={payloadValidators}>
+                                    {(field) => (
+                                        <field.TextField
+                                            label='Delete logs older than (days)'
+                                            inputMode='numeric'
+                                            description='Deletes .log and .log.gz files in logs/ older than this. latest.log is kept.'
                                         />
                                     )}
                                 </form.AppField>

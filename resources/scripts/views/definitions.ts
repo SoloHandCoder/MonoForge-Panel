@@ -157,6 +157,7 @@ defineView('server.databases', { context: 'server', ...databases });
 
 defineView('page.server.schedules', { ...viewPage('page.server.schedules'), ...schedules });
 defineView('server.schedules', { context: 'server', ...schedules });
+defineView('server.schedules.quickSetup', { context: 'server', ...schedules });
 defineView('page.server.schedules.detail', { ...viewPage('page.server.schedules.detail'), ...schedules });
 defineView('server.schedule', { context: 'server', ...schedules });
 defineView('server.schedule.tasks', { context: 'server', ...schedules });

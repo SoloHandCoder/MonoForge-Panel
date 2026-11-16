@@ -57,6 +57,7 @@ export const classicViews: ThemeViews = {
     'server.conflict': lazyView(() => import('./server/ServerConflict')),
     'page.server.schedules': lazyView(schedules, 'SchedulesPage'),
     'server.schedules': lazyView(schedules, 'ScheduleList'),
+    'server.schedules.quickSetup': lazyView(schedules, 'ScheduleQuickSetup'),
     'page.server.schedules.detail': lazyView(schedules, 'ScheduleDetailPage'),
     'server.schedule': lazyView(schedules, 'ScheduleDetails'),
     'server.schedule.tasks': lazyView(schedules, 'ScheduleTasks'),

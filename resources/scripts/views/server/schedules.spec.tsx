@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as Router from '@tanstack/react-router';
 import http from '@/api/http';
 import {
+    schedulePresetsQueryOptions,
     serverScheduleQueryOptions,
     serverSchedulesQueryOptions,
     type Schedule,
+    type SchedulePresets,
     type Task,
 } from '@/api/server/schedules/queries';
 import { createExtensionTestHost, createTestServer, type ExtensionTestHost } from '@/sdk/testing';
@@ -32,6 +34,7 @@ const task = (id: number, sequence: number, action: Task['attributes']['action']
         sequence_id: sequence,
         action,
         payload,
+        keep_backups: null,
         time_offset: sequence > 1 ? 30 : 0,
         is_queued: false,
         continue_on_failure: false,
@@ -45,6 +48,7 @@ const schedule = (id: number, name: string, options: Partial<Schedule['attribute
     attributes: {
         id,
         name,
+        preset: null,
         cron: { minute: '0', hour: '4', day_of_month: '*', month: '*', day_of_week: '*' },
         is_active: true,
         is_processing: false,
@@ -70,7 +74,10 @@ beforeEach(() => {
         requests.push({ method: config.method ?? 'get', url: config.url ?? '', body });
 
         return {
-            data: config.method === 'post' && config.url?.endsWith('/schedules') ? schedule(9, 'Created') : '',
+            data:
+                config.method === 'post' && /\/schedules(\/presets)?$/.test(config.url ?? '')
+                    ? schedule(9, 'Created')
+                    : '',
             status: 200,
             statusText: 'OK',
             headers: {},
@@ -239,15 +246,23 @@ describe('the task form', () => {
         sequence: 2,
         action: 'power',
         payload: 'stop',
+        keepBackups: null,
         timeOffset: 60,
         continueOnFailure: true,
     } as const;
 
     it('starts from the task, or a command for a new one', () => {
-        expect(form.values()).toEqual({ action: 'command', payload: '', timeOffset: 0, continueOnFailure: false });
+        expect(form.values()).toEqual({
+            action: 'command',
+            payload: '',
+            keepBackups: null,
+            timeOffset: 0,
+            continueOnFailure: false,
+        });
         expect(form.values(restart)).toEqual({
             action: 'power',
             payload: 'stop',
+            keepBackups: null,
             timeOffset: 60,
             continueOnFailure: true,
         });
@@ -257,6 +272,25 @@ describe('the task form', () => {
         expect(form.payloadFor('power')).toBe('start');
         expect(form.payloadFor('backup', restart)).toBe('');
         expect(form.payloadFor('power', restart)).toBe('stop');
+        expect(form.payloadFor('restart_if_empty')).toBe('2');
+        expect(form.payloadFor('delete_logs')).toBe('7');
+    });
+
+    it('takes whole hours and days for restart when empty and log cleanup tasks', () => {
+        expect(form.validatePayload('restart_if_empty', '2')).toBeUndefined();
+        expect(form.validatePayload('restart_if_empty', '73')).toBe('Enter the hours to wait, from 1 to 72.');
+        expect(form.validatePayload('restart_if_empty', '1.5')).toBe('Enter the hours to wait, from 1 to 72.');
+        expect(form.validatePayload('delete_logs', '0')).toBe('Enter the days of logs to keep, from 1 to 365.');
+        expect(form.validatePayload('delete_logs', '30')).toBeUndefined();
+    });
+
+    it('keeps at most the server limit of backups', () => {
+        const limited = scheduleTaskForm(3);
+
+        expect(limited.validateKeepBackups(null)).toBeUndefined();
+        expect(limited.validateKeepBackups(3)).toBeUndefined();
+        expect(limited.validateKeepBackups(4)).toBe('This server keeps at most 3 backups.');
+        expect(limited.validateKeepBackups(0)).toBe('Keep at least 1 backup, or leave it empty.');
     });
 
     it('validates the payload, the offset and the backup limit', () => {
@@ -266,5 +300,142 @@ describe('the task form', () => {
         expect(form.validateTimeOffset(null)).toBe('A time offset must be provided.');
         expect(form.validate({ ...form.values(), action: 'backup' })).toContain('backup limit is set to 0');
         expect(scheduleTaskForm(2).validate({ ...form.values(), action: 'backup' })).toBeNull();
+    });
+});
+
+describe('server.schedules.quickSetup', () => {
+    const presets = (options: Partial<SchedulePresets> = {}) =>
+        ({
+            object: 'schedule_presets',
+            attributes: {
+                timezone: 'Europe/Berlin',
+                is_minecraft: true,
+                backup_limit: 3,
+                can_send_commands: true,
+                presets: [
+                    { key: 'daily_restart', available: true, reason: null },
+                    { key: 'backup_rotation', available: true, reason: null },
+                    { key: 'restart_when_empty', available: true, reason: null },
+                    { key: 'weekly_cleanup', available: false, reason: 'You need the file.delete permission.' },
+                ],
+                ...options,
+            },
+        }) satisfies { object: string; attributes: SchedulePresets };
+    const seed =
+        (schedules: Schedule[] = [], options: Partial<SchedulePresets> = {}) =>
+        ({ queryClient }: ExtensionTestHost) => {
+            queryClient.setQueryData(schedulePresetsQueryOptions(uuid).queryKey, presets(options));
+            queryClient.setQueryData(serverSchedulesQueryOptions(uuid).queryKey, { object: 'list', data: schedules });
+        };
+
+    it('offers each preset, says why one is unavailable and shows the timezone', async () => {
+        await renderInServer(<View name='server.schedules.quickSetup' />, seed());
+
+        expect(screen.getByRole('heading', { name: 'Quick setup' })).toBeVisible();
+        expect(screen.getByText(/Times are in Europe\/Berlin/)).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Set up Daily restart' })).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Set up Backup rotation' })).toBeVisible();
+        expect(screen.queryByRole('button', { name: 'Set up Weekly cleanup' })).not.toBeInTheDocument();
+        expect(screen.getByText('You need the file.delete permission.')).toBeVisible();
+    });
+
+    it('sets up a daily restart from its dialog', async () => {
+        await renderInServer(<View name='server.schedules.quickSetup' />, seed());
+
+        fireEvent.click(screen.getByRole('button', { name: 'Set up Daily restart' }));
+        const dialog = await screen.findByRole('dialog');
+
+        expect(within(dialog).getByText(/Europe\/Berlin/)).toBeVisible();
+        // Minecraft warns with say, so the command is not asked for.
+        expect(within(dialog).queryByLabelText('Warning command')).not.toBeInTheDocument();
+        fireEvent.change(within(dialog).getByLabelText('Restart at'), { target: { value: '05:30' } });
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Set up daily restart' }));
+        });
+
+        expect(requests).toContainEqual({
+            method: 'post',
+            url: `/api/client/servers/${uuid}/schedules/presets`,
+            body: { preset: 'daily_restart', hour: 5, minute: 30, warning_minutes: 5 },
+        });
+    });
+
+    it('shows active presets with a link and disables one in a click', async () => {
+        const active = schedule(4, 'Daily restart at 04:00 (Europe/Berlin)', { preset: 'daily_restart' });
+
+        await renderInServer(<View name='server.schedules.quickSetup' />, seed([active]));
+
+        expect(screen.getByText('Active')).toBeVisible();
+        expect(screen.getByRole('link', { name: 'Daily restart at 04:00 (Europe/Berlin)' })).toHaveAttribute(
+            'href',
+            '/server/a1b2c3d4/schedules/4'
+        );
+        expect(screen.queryByRole('button', { name: 'Set up Daily restart' })).not.toBeInTheDocument();
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Disable Daily restart at 04:00 (Europe/Berlin)' }));
+        });
+
+        expect(requests).toContainEqual({
+            method: 'post',
+            url: `/api/client/servers/${uuid}/schedules/4`,
+            body: expect.objectContaining({ name: 'Daily restart at 04:00 (Europe/Berlin)', is_active: false }),
+        });
+    });
+
+    it('renders nothing for a viewer who cannot set up or disable presets', async () => {
+        await renderInServer(
+            <ViewFixtureProvider fixtures={{ 'server.schedules.quickSetup': 'readOnly' }}>
+                <View name='server.schedules.quickSetup' />
+            </ViewFixtureProvider>,
+            () => {}
+        );
+
+        expect(screen.queryByRole('heading', { name: 'Quick setup' })).not.toBeInTheDocument();
+    });
+});
+
+describe('server.schedules.quickSetup on another game', () => {
+    it('asks for the broadcast command and sends it with the daily restart', async () => {
+        await renderInServer(<View name='server.schedules.quickSetup' />, ({ queryClient }) => {
+            queryClient.setQueryData(schedulePresetsQueryOptions(uuid).queryKey, {
+                object: 'schedule_presets',
+                attributes: {
+                    timezone: 'UTC',
+                    is_minecraft: false,
+                    backup_limit: 0,
+                    can_send_commands: true,
+                    presets: [
+                        { key: 'daily_restart' as const, available: true, reason: null },
+                        {
+                            key: 'backup_rotation' as const,
+                            available: false,
+                            reason: 'This server cannot keep backups.',
+                        },
+                        { key: 'restart_when_empty' as const, available: false, reason: 'Not this game.' },
+                        {
+                            key: 'weekly_cleanup' as const,
+                            available: false,
+                            reason: 'Weekly cleanup is for Minecraft servers.',
+                        },
+                    ],
+                },
+            });
+            queryClient.setQueryData(serverSchedulesQueryOptions(uuid).queryKey, { object: 'list', data: [] });
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Set up Daily restart' }));
+        const dialog = await screen.findByRole('dialog');
+
+        fireEvent.change(within(dialog).getByLabelText('Warning command'), { target: { value: 'broadcast' } });
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Set up daily restart' }));
+        });
+
+        expect(requests).toContainEqual({
+            method: 'post',
+            url: `/api/client/servers/${uuid}/schedules/presets`,
+            body: { preset: 'daily_restart', hour: 4, minute: 0, warning_minutes: 5, warning_command: 'broadcast' },
+        });
+        expect(screen.getByText('This server cannot keep backups.')).toBeVisible();
     });
 });

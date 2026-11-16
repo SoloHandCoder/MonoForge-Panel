@@ -1586,6 +1586,7 @@ the view's layers; a page's **engine slots** are rendered around it by the engin
 | `server.schedule` | server | `ScheduleModel` |  |  | active, processing, inactive, readOnly |
 | `server.schedule.tasks` | server | `ScheduleTasksModel` |  |  | tasks, empty, readOnly, noBackups |
 | `server.schedules` | server | `ScheduleListModel` |  |  | schedules, empty, readOnly, loading |
+| `server.schedules.quickSetup` | server | `ScheduleQuickSetupModel` |  |  | presets, active, otherGame, readOnly |
 | `server.sftp` | server | `ServerSftpModel` |  |  | default, ipv6, denied |
 | `server.startup.command` | server | `StartupCommandModel` |  |  | default |
 | `server.startup.image` | server | `StartupImageModel` |  |  | selectable, single, custom, pending |
