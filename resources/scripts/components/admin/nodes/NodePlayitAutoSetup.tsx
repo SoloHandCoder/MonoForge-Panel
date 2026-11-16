@@ -25,16 +25,19 @@ import { formatDate } from '@/lib/dates';
 
 const when = (iso: string | null): string => (iso ? formatDate(iso, 'MMM D, HH:mm') : '');
 
-/** The commands to run on the node; the token is pasted into the script's hidden prompt, never into a command. */
+/**
+ * The commands to run on the node; the token is pasted into the script's hidden prompt, never into a command.
+ * The script talks to the panel named in the node's Wings config ("remote"), which is this panel, so no
+ * `--panel` is printed: one copied from somewhere else could send the daemon token to another host.
+ */
 export function switchCommands(script: PlayitSwitchState['script']): string {
-    const panel = new URL(script.url).origin;
     const lines = [`curl -fsSL -o playit-switch-agent.sh ${script.url}`];
 
     if (script.sha256) {
         lines.push(`echo "${script.sha256}  playit-switch-agent.sh" | sha256sum -c -`);
     }
 
-    lines.push(`sudo bash playit-switch-agent.sh --panel ${panel}`);
+    lines.push('sudo bash playit-switch-agent.sh');
 
     return lines.join('\n');
 }

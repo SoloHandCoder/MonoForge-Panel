@@ -161,12 +161,12 @@ describe('NodePlayitAutoSetup', () => {
 });
 
 describe('switchCommands', () => {
-    it('downloads the script, checks its hash and runs it against the panel', () => {
+    it('downloads the script, checks its hash and runs it against the Wings remote, without --panel', () => {
         expect(switchCommands(base.script)).toBe(
             [
                 'curl -fsSL -o playit-switch-agent.sh https://panel.example.com/scripts/playit-switch-agent.sh',
                 `echo "${SHA}  playit-switch-agent.sh" | sha256sum -c -`,
-                'sudo bash playit-switch-agent.sh --panel https://panel.example.com',
+                'sudo bash playit-switch-agent.sh',
             ].join('\n')
         );
     });

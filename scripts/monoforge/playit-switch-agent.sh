@@ -2,13 +2,15 @@
 # MonoForge Panel: switch this node's playit.gg agent to the self-managed agent the panel set up
 # ("Set up automatic tunnels" on the node's playit card), so the panel can create tunnels itself.
 #
-#   sudo bash playit-switch-agent.sh --panel https://panel.example.com
+#   sudo bash playit-switch-agent.sh
 #       Finds the playit agent of this host (never one inside a game server container), shows the
 #       systemd unit or process, the secret file and its owner, and asks you to type "yes".
 #       It then asks for the one-time token shown in the panel (hidden prompt), fetches the new
-#       agent secret from the panel once, backs up the secret file, writes the new secret, restarts
-#       playit through systemd (or tells you how to restart it yourself) and tells the panel.
-#       If anything fails after the file changed, the old file is put back automatically.
+#       agent secret from the panel in the Wings config ("remote") once, backs up the secret
+#       file, writes the new secret, restarts playit through systemd (or tells you how to restart
+#       it yourself) and tells the panel. If anything fails after the file changed, the old file
+#       is put back automatically. Run it inside tmux or screen, so a dropped SSH session cannot
+#       stop it halfway.
 #
 #   sudo bash playit-switch-agent.sh --rollback [BACKUP_DIR]
 #       Puts back the secret file from a backup (the latest one by default), restarts playit and,
@@ -17,18 +19,21 @@
 # Options:
 #   --unit NAME           the systemd unit that runs playit (skips the detection)
 #   --secret-path PATH    the playit secret file (skips the detection of the file)
-#   --panel URL           the panel URL (default: "remote" from the Wings config)
+#   --panel URL           another panel URL than "remote" in the Wings config (asks first)
 #   --wings-config PATH   the Wings config with the node's daemon token
 #                         (default: /etc/pterodactyl/config.yml)
 #   --manual-secret       paste the agent secret into a hidden prompt instead of fetching it
 #                         (the panel is not told; finish the switch in the panel by hand)
+#   --allow-http          allow an http:// panel URL (never for playit.gg)
 #   --dry-run             only show what was detected and what would happen; change nothing
 #
 # Detection: --unit or --secret-path win. Otherwise a systemd unit whose ExecStart is a playit or
 # playitd binary. Otherwise a running playit process of this host (same mount and pid namespace
-# as pid 1), owned by root or the "playit" user. The script refuses when more than one matches,
-# when the secret file is in the Wings data directory, /var/lib/docker or /home/container, and
-# when the file or a parent directory is a symlink or owned by anyone but root or "playit".
+# and root as pid 1), owned by root or the "playit" user. The script refuses when more than one
+# matches. The secret file must be a .toml file in /etc/playit, /var/lib/playit or the agent
+# user's ~/.config/playit_gg, with a secret_key line; never in the Wings data directory,
+# /var/lib/docker or /home/container; and no part of its path may be a symlink, be owned by
+# anyone but root or "playit", or be writable by group or others.
 # A playit process outside systemd is never started by this script: it prints how to restart it.
 #
 # The secret is never printed, logged, passed on a command line or written anywhere but the
@@ -38,6 +43,7 @@ set +x
 umask 077
 ulimit -c 0 2>/dev/null || true
 
+SCRIPT_NAME=playit-switch-agent.sh
 BACKUP_ROOT=/var/backups/monoforge-playit
 BACKUP_KEEP_DAYS=30
 WINGS_CONFIG=/etc/pterodactyl/config.yml
@@ -56,7 +62,11 @@ say() { printf '%s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-usage() { sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() {
+    local self=${BASH_SOURCE[0]:-}
+    if [ -f "$self" ]; then sed -n '2,40p' "$self" | sed 's/^# \{0,1\}//'; else say "Usage: sudo bash $SCRIPT_NAME [--rollback [DIR]] [--dry-run] [--unit NAME] [--secret-path PATH]"; fi
+    exit "${1:-0}"
+}
 
 # Asks for a typed "yes"; anything else is a no. There is no way to skip it.
 confirm_yes() {
@@ -73,6 +83,17 @@ read_hidden() {
     read -r -s -p "$prompt " __value </dev/tty || true
     printf '\n' >/dev/tty
     printf -v "$2" '%s' "$__value"
+}
+
+# Whether a value is a one-time switch token (48 lowercase hex characters, nothing else).
+valid_token() {
+    [[ "$1" =~ ^[0-9a-f]{48}$ ]]
+}
+
+# Whether a value looks like a playit agent secret (hex only).
+valid_secret() {
+    # ERE repeat counts stop at 255, so the length is checked on its own.
+    [[ "$1" =~ ^[0-9a-fA-F]+$ ]] && [ ${#1} -ge 16 ] && [ ${#1} -le 512 ]
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -111,7 +132,7 @@ wings_data_dirs() {
     local dir
     for dir in "$(yaml_nested system root_directory "$WINGS_CONFIG")" "$(yaml_nested system data "$WINGS_CONFIG")" \
         /var/lib/pterodactyl /var/lib/docker /home/container; do
-        [ -n "$dir" ] && printf '%s\n' "${dir%/}"
+        if [ -n "$dir" ]; then printf '%s\n' "${dir%/}"; fi
     done
 }
 
@@ -142,6 +163,30 @@ path_forbidden() {
     return 1
 }
 
+# The home directory of a user, or empty.
+home_of() {
+    getent passwd "$1" 2>/dev/null | cut -d: -f6
+}
+
+# Whether a secret path is one playit uses: a .toml file directly in /etc/playit,
+# /var/lib/playit or the agent user's ~/.config/playit_gg. `$2` is the agent user.
+secret_path_allowed() {
+    local path=$1 user=${2:-root} dir name home
+    [[ "$path" == /* ]] || return 1
+    path=$(realpath -m -s -- "$path")
+    case "/$path/" in */../* | */./*) return 1 ;; esac
+    dir=$(dirname -- "$path")
+    name=$(basename -- "$path")
+    [[ "$name" =~ ^[A-Za-z0-9._-]+\.toml$ ]] || return 1
+    [ "$dir" = /etc/playit ] && return 0
+    [ "$dir" = /var/lib/playit ] && return 0
+    home=$(home_of "$user")
+    if [ -n "$home" ] && [ "$home" != / ]; then
+        [ "$dir" = "$(realpath -m -s -- "$home")/.config/playit_gg" ] && return 0
+    fi
+    return 1
+}
+
 # Whether a uid may own the agent and its files: root or the playit user, never the Wings uid.
 uid_allowed() {
     local uid=$1 playit_uid wings
@@ -163,18 +208,34 @@ is_playit_binary() {
     [[ "$name" =~ ^playit(d)?([-_.].*)?$ ]]
 }
 
-# Whether a process runs in the host's mount and pid namespaces (not in a container).
+# Whether a process runs in the host's mount and pid namespaces with the host's root (not in a
+# container). Anything that cannot be read counts as a mismatch.
 in_host_namespaces() {
-    local pid=$1 ns
+    local pid=$1 ns mine host root
     for ns in mnt pid; do
-        [ "$(readlink "/proc/$pid/ns/$ns" 2>/dev/null)" = "$(readlink /proc/1/ns/$ns 2>/dev/null)" ] || return 1
+        mine=$(readlink "/proc/$pid/ns/$ns" 2>/dev/null || true)
+        host=$(readlink "/proc/1/ns/$ns" 2>/dev/null || true)
+        [ -n "$mine" ] && [ -n "$host" ] && [ "$mine" = "$host" ] || return 1
     done
+    root=$(readlink "/proc/$pid/root" 2>/dev/null || true)
+    [ "$root" = / ]
 }
 
-# Whether a secret file is unsafe to write as root: it, or one of its directories, is a symlink
-# or is owned by anyone but root or the playit user. Prints the reason and returns 0 when unsafe.
+# The start time of a process (field 22 of /proc/<pid>/stat, after the command name), or empty.
+proc_start_time() {
+    local stat
+    stat=$(cat "/proc/$1/stat" 2>/dev/null || true)
+    [ -n "$stat" ] || return 0
+    stat=${stat##*) }
+    # Fields after ") " start at field 3 (state); the start time is field 22, the 20th here.
+    printf '%s' "$stat" | awk '{ print $20 }'
+}
+
+# Whether a secret file is unsafe to write: it, or one of its directories, is a symlink, is owned
+# by anyone but root or the playit user, or is a directory writable by group or others (the
+# sticky /tmp included). Prints the reason and returns 0 when unsafe.
 path_unsafe() {
-    local path=$1 part uid
+    local path=$1 part uid mode
     # Normalised without following symlinks, so each one on the way is seen.
     path=$(realpath -m -s -- "$path")
     part=$path
@@ -183,11 +244,51 @@ path_unsafe() {
         if [ -e "$part" ]; then
             uid=$(stat -c %u -- "$part")
             uid_allowed "$uid" || { printf '%s is owned by uid %s, not root or %s' "$part" "$uid" "$PLAYIT_USER"; return 0; }
+            if [ -d "$part" ]; then
+                mode=$(stat -c %a -- "$part")
+                if (( (8#$mode & 8#022) != 0 )); then printf '%s is writable by group or others (mode %s)' "$part" "$mode"; return 0; fi
+            fi
         fi
         [ "$part" = / ] && break
         part=$(dirname -- "$part")
     done
     return 1
+}
+
+# Who writes the secret file: the least privileged owner of the file and its directories. Any
+# part owned by the playit user means the write runs as that user, never as root through a
+# directory it controls.
+path_writer() {
+    local path part owner=""
+    path=$(realpath -m -s -- "$1")
+    part=$path
+    while :; do
+        if [ -e "$part" ] && [ "$(stat -c %u -- "$part")" != 0 ]; then
+            owner=$(stat -c %U -- "$part")
+        fi
+        [ "$part" = / ] && break
+        part=$(dirname -- "$part")
+    done
+    printf '%s' "${owner:-root}"
+}
+
+# The mode of the new secret file: 640 when the file's group is the playit group (so the agent
+# can read a root-owned file), otherwise 600. Never anything readable by others.
+secret_mode() {
+    local file=$1 group
+    if [ -f "$file" ]; then
+        group=$(stat -c %G -- "$file")
+        if [ "$group" = "$PLAYIT_USER" ] && [ "$(stat -c %U -- "$file")" != "$PLAYIT_USER" ]; then
+            printf '640'
+            return 0
+        fi
+    fi
+    printf '600'
+}
+
+# Whether a systemd unit name looks like one.
+valid_unit_name() {
+    [[ "$1" =~ ^[A-Za-z0-9:_.@-]+\.service$ ]]
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -228,6 +329,38 @@ parse_execstart() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# The secret file's content.
+# ---------------------------------------------------------------------------------------------
+
+# How many lines of a text set a key named exactly secret_key.
+secret_key_lines() {
+    local count=0 line
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^[[:space:]]*secret_key[[:space:]]*= ]]; then count=$((count + 1)); fi
+    done <<<"$1"
+    printf '%s' "$count"
+}
+
+# The new secret file from the old one ($1, possibly empty when there is none): only the line
+# that sets exactly `secret_key =` changes. Fails when the old file sets it more than once.
+build_secret_content() {
+    local old=$1 secret=$2 line out=""
+    if [ -z "$old" ]; then
+        printf 'secret_key = "%s"\n' "$secret"
+        return 0
+    fi
+    [ "$(secret_key_lines "$old")" = 1 ] || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^[[:space:]]*secret_key[[:space:]]*= ]]; then
+            out+="secret_key = \"$secret\""$'\n'
+        else
+            out+="$line"$'\n'
+        fi
+    done <<<"$old"
+    printf '%s' "$out"
+}
+
+# ---------------------------------------------------------------------------------------------
 # Detecting playit on this host.
 # ---------------------------------------------------------------------------------------------
 MODE=""          # systemd | manual
@@ -236,8 +369,10 @@ RUN_USER=root
 RUN_CWD=/
 SECRET_PATH=""
 PLAYIT_PID=""
+PLAYIT_START=""
 FILE_OWNER=root
 FILE_MODE=600
+WRITE_AS=root
 
 # The systemd services whose ExecStart is a playit binary, one per line.
 playit_units() {
@@ -247,7 +382,7 @@ playit_units() {
         [ -n "$unit" ] || continue
         exec=$(systemctl show -p ExecStart --value -- "$unit" 2>/dev/null || true)
         parse_execstart "$exec" || continue
-        is_playit_binary "${ARGV[0]}" && printf '%s\n' "$unit"
+        if is_playit_binary "${ARGV[0]}"; then printf '%s\n' "$unit"; fi
     done < <(systemctl list-units --type=service --all --no-legend --plain 2>/dev/null | awk '{print $1}')
 }
 
@@ -265,10 +400,12 @@ playit_processes() {
     done
 }
 
-use_unit() {
-    local exec
-    UNIT=$1
-    MODE=systemd
+# Checks a unit runs a playit binary and reads it into UNIT, RUN_USER, RUN_CWD and ARGV.
+read_unit() {
+    local exec unit=$1
+    [[ "$unit" == *.service ]] || unit=$unit.service
+    valid_unit_name "$unit" || die "$1 is not a systemd service name."
+    UNIT=$unit
     exec=$(systemctl show -p ExecStart --value -- "$UNIT" 2>/dev/null || true)
     parse_execstart "$exec" || die "Cannot read the ExecStart of $UNIT."
     is_playit_binary "${ARGV[0]}" || die "$UNIT does not run a playit binary (${ARGV[0]})."
@@ -276,6 +413,11 @@ use_unit() {
     RUN_USER=${RUN_USER:-root}
     RUN_CWD=$(systemctl show -p WorkingDirectory --value -- "$UNIT" 2>/dev/null || true)
     RUN_CWD=${RUN_CWD:-/}
+}
+
+use_unit() {
+    read_unit "$1"
+    MODE=systemd
     if arg_value --secret >/dev/null; then
         die "$UNIT runs playit with --secret on its command line; give it a --secret-path file first."
     fi
@@ -284,21 +426,41 @@ use_unit() {
 }
 
 use_process() {
-    local home
-    PLAYIT_PID=$1
+    local pid=$1 home
+    PLAYIT_START=$(proc_start_time "$pid")
+    [ -n "$PLAYIT_START" ] || die "playit (pid $pid) went away."
+    cmdline_of "$pid"
+    RUN_USER=$(stat -c %U "/proc/$pid")
+    RUN_CWD=$(readlink "/proc/$pid/cwd" || printf '/')
+    # The same process as before it was read, still on the host and owned by an allowed user.
+    [ "$(proc_start_time "$pid")" = "$PLAYIT_START" ] || die "playit (pid $pid) changed while it was read. Run the script again."
+    in_host_namespaces "$pid" || die "playit (pid $pid) is not in the host's namespaces."
+    uid_allowed "$(stat -c %u "/proc/$pid")" || die "playit (pid $pid) is not owned by root or $PLAYIT_USER."
+    PLAYIT_PID=$pid
     MODE=manual
-    cmdline_of "$PLAYIT_PID"
-    RUN_USER=$(stat -c %U "/proc/$PLAYIT_PID")
-    RUN_CWD=$(readlink "/proc/$PLAYIT_PID/cwd" || printf '/')
     if arg_value --secret >/dev/null; then
-        die "playit (pid $PLAYIT_PID) runs with --secret on its command line; move the secret into a file (--secret_path) first."
+        die "playit (pid $pid) runs with --secret on its command line; move the secret into a file (--secret_path) first."
     fi
     SECRET_PATH=$(arg_value --secret_path --secret-path || true)
     if [ -z "$SECRET_PATH" ]; then
-        home=$(getent passwd "$RUN_USER" | cut -d: -f6)
+        home=$(home_of "$RUN_USER")
         SECRET_PATH=$home/.config/playit_gg/playit.toml
     fi
     case "$SECRET_PATH" in /*) ;; *) SECRET_PATH=$RUN_CWD/$SECRET_PATH ;; esac
+}
+
+# The checks every secret path passes, in a switch and on a restore.
+check_secret_path() {
+    local reason
+    [[ "$SECRET_PATH" == /* ]] || die "The secret path must be absolute: $SECRET_PATH"
+    SECRET_PATH=$(realpath -m -s -- "$SECRET_PATH")
+    path_forbidden "$SECRET_PATH" && die "Refusing $SECRET_PATH: it is inside game server data (the Wings data directory, /var/lib/docker or /home/container)."
+    secret_path_allowed "$SECRET_PATH" "$RUN_USER" || die "Refusing $SECRET_PATH: playit secrets live in /etc/playit, /var/lib/playit or ~$RUN_USER/.config/playit_gg, as a .toml file."
+    if reason=$(path_unsafe "$SECRET_PATH"); then
+        die "Refusing $SECRET_PATH: $reason."
+    fi
+    WRITE_AS=$(path_writer "$SECRET_PATH")
+    uid_allowed "$(id -u "$WRITE_AS")" || die "Refusing $SECRET_PATH: it would be written as $WRITE_AS."
 }
 
 detect() {
@@ -324,23 +486,18 @@ detect() {
     fi
 
     [ -z "$SECRET_PATH_OVERRIDE" ] || SECRET_PATH=$SECRET_PATH_OVERRIDE
-    case "$SECRET_PATH" in /*) ;; *) die "The secret path must be absolute: $SECRET_PATH" ;; esac
-    SECRET_PATH=$(realpath -m -s -- "$SECRET_PATH")
-
-    path_forbidden "$SECRET_PATH" && die "Refusing $SECRET_PATH: it is inside game server data (the Wings data directory, /var/lib/docker or /home/container)."
-    local reason
-    if reason=$(path_unsafe "$SECRET_PATH"); then
-        die "Refusing $SECRET_PATH: $reason."
-    fi
+    check_secret_path
 
     if [ -f "$SECRET_PATH" ]; then
         FILE_OWNER=$(stat -c %U -- "$SECRET_PATH")
-        FILE_MODE=$(stat -c %a -- "$SECRET_PATH")
+        local current
+        current=$(run_as "$WRITE_AS" cat -- "$SECRET_PATH") || die "Cannot read $SECRET_PATH as $WRITE_AS."
+        [ "$(secret_key_lines "$current")" = 1 ] || die "Refusing $SECRET_PATH: it has no single secret_key line, so it is not a playit secret file."
+        current=""
     else
-        FILE_OWNER=$(stat -c %U -- "$(dirname -- "$SECRET_PATH")" 2>/dev/null || printf 'root')
-        FILE_MODE=600
+        FILE_OWNER=$WRITE_AS
     fi
-    uid_allowed "$(id -u "$FILE_OWNER")" || die "Refusing $SECRET_PATH: owner $FILE_OWNER is not root or $PLAYIT_USER."
+    FILE_MODE=$(secret_mode "$SECRET_PATH")
     if [ "$MODE" = systemd ]; then
         uid_allowed "$(id -u "$RUN_USER" 2>/dev/null || printf x)" || die "$UNIT runs as $RUN_USER, not root or $PLAYIT_USER."
     fi
@@ -357,12 +514,13 @@ describe() {
             fi
             say "Restart:       by hand (this script never starts programs outside systemd)" ;;
     esac
-    say "Secret file:   $SECRET_PATH $([ -f "$SECRET_PATH" ] && printf '(exists, owner %s, mode %s)' "$FILE_OWNER" "$FILE_MODE" || printf '(missing; created for %s)' "$FILE_OWNER")"
+    say "Secret file:   $SECRET_PATH $([ -f "$SECRET_PATH" ] && printf '(exists, owner %s)' "$FILE_OWNER" || printf '(missing)')"
+    say "Written as:    $WRITE_AS, mode $FILE_MODE"
 }
 
 # ---------------------------------------------------------------------------------------------
-# Files: written as the file's owner (so a non-root owner can only affect their own files),
-# through a temp file in the same directory and an atomic rename.
+# Files: written as the least privileged owner on the path (so a non-root owner can only affect
+# their own files), through a temp file in the same directory and an atomic rename.
 # ---------------------------------------------------------------------------------------------
 run_as() {
     local user=$1
@@ -370,11 +528,11 @@ run_as() {
     if [ "$user" = root ]; then "$@"; else runuser -u "$user" -- "$@"; fi
 }
 
-# Writes stdin to DEST with MODE, as OWNER: mktemp (O_EXCL, 0600) in DEST's directory, then mv -T.
-install_as_owner() {
-    local owner=$1 dest=$2 mode=$3
+# Writes stdin to DEST with MODE, as USER: mktemp (O_EXCL, 0600) in DEST's directory, then mv -T.
+install_as() {
+    local user=$1 dest=$2 mode=$3
     # shellcheck disable=SC2016
-    run_as "$owner" bash -c 'set -euo pipefail; umask 077
+    run_as "$user" bash -c 'set -euo pipefail; umask 077
         dest=$1; mode=$2; dir=$(dirname -- "$dest")
         tmp=$(mktemp -- "$dir/.playit.toml.monoforge.XXXXXX")
         trap '\''rm -f -- "$tmp"'\'' EXIT
@@ -384,26 +542,21 @@ install_as_owner() {
         trap - EXIT' _ "$dest" "$mode"
 }
 
-# The new secret file: the old file with only its secret_key line changed, read as its owner.
-secret_content() {
-    local secret=$1 line
-    if [ -f "$SECRET_PATH" ] && run_as "$FILE_OWNER" grep -qE '^[[:space:]]*secret_key[[:space:]]*=' -- "$SECRET_PATH"; then
-        run_as "$FILE_OWNER" cat -- "$SECRET_PATH" | while IFS= read -r line || [ -n "$line" ]; do
-            case "$line" in
-                *secret_key*=*) printf 'secret_key = "%s"\n' "$secret" ;;
-                *) printf '%s\n' "$line" ;;
-            esac
-        done
-    else
-        printf 'secret_key = "%s"\n' "$secret"
-    fi
-}
-
 write_secret() {
-    local reason
+    local secret=$1 reason old="" content
     if reason=$(path_unsafe "$SECRET_PATH"); then die "Refusing $SECRET_PATH: $reason."; fi
-    run_as "$FILE_OWNER" mkdir -p -- "$(dirname -- "$SECRET_PATH")"
-    secret_content "$1" | install_as_owner "$FILE_OWNER" "$SECRET_PATH" "$FILE_MODE"
+    [ "$(path_writer "$SECRET_PATH")" = "$WRITE_AS" ] || die "The owners on $SECRET_PATH changed. Nothing written."
+    if [ -f "$SECRET_PATH" ]; then
+        old=$(run_as "$WRITE_AS" cat -- "$SECRET_PATH") || die "Cannot read $SECRET_PATH."
+    else
+        run_as "$WRITE_AS" mkdir -p -- "$(dirname -- "$SECRET_PATH")"
+    fi
+    # Built and checked in full before anything is installed.
+    content=$(build_secret_content "$old" "$secret") || die "$SECRET_PATH sets secret_key more than once. Nothing written."
+    old=""
+    [ "$(secret_key_lines "$content")" = 1 ] || die "The new secret file would not have exactly one secret_key line. Nothing written."
+    printf '%s\n' "$content" | install_as "$WRITE_AS" "$SECRET_PATH" "$FILE_MODE"
+    content=""
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -491,8 +644,10 @@ backup() {
         # A hard link to another user's file would carry that user's ownership: refuse it.
         [ "$(stat -c %U -- "$BACKUP_DIR/playit.toml")" = "$FILE_OWNER" ] || die "The secret file changed owner while it was backed up. Nothing changed."
         printf '1' >"$BACKUP_DIR/had_secret"
+        printf '%s' "$(stat -c %a -- "$SECRET_PATH")" >"$BACKUP_DIR/mode"
     else
         printf '0' >"$BACKUP_DIR/had_secret"
+        printf '600' >"$BACKUP_DIR/mode"
     fi
     {
         printf 'MODE\t%s\n' "$MODE"
@@ -500,16 +655,34 @@ backup() {
         printf 'RUN_USER\t%s\n' "$RUN_USER"
         printf 'SECRET_PATH\t%s\n' "$SECRET_PATH"
         printf 'FILE_OWNER\t%s\n' "$FILE_OWNER"
-        printf 'FILE_MODE\t%s\n' "$FILE_MODE"
     } >"$BACKUP_DIR/state.tsv"
     basename -- "$BACKUP_DIR" >"$BACKUP_ROOT/latest"
     say "Backed up the playit secret file to $BACKUP_DIR"
 }
 
-# Reads a backup's state (plain key/value lines; nothing is executed).
+# A backup directory to roll back to: a direct, root-only child of BACKUP_ROOT whose files are
+# plain files (no links) owned by root, or, for the copy of the secret file, by its owner.
+backup_dir_valid() {
+    local dir=$1 root file uid
+    [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
+    root=$(realpath -e -- "$BACKUP_ROOT" 2>/dev/null) || return 1
+    [ "$(dirname -- "$(realpath -e -- "$dir")")" = "$root" ] || return 1
+    [ "$(stat -c %u -- "$dir")" = 0 ] && [ "$(stat -c %a -- "$dir")" = 700 ] || return 1
+    for file in state.tsv had_secret mode; do
+        [ -f "$dir/$file" ] && [ ! -L "$dir/$file" ] && [ "$(stat -c %u -- "$dir/$file")" = 0 ] || return 1
+    done
+    if [ -e "$dir/playit.toml" ] || [ -L "$dir/playit.toml" ]; then
+        [ -f "$dir/playit.toml" ] && [ ! -L "$dir/playit.toml" ] || return 1
+        uid=$(stat -c %u -- "$dir/playit.toml")
+        uid_allowed "$uid" || return 1
+    fi
+    return 0
+}
+
+# Reads a backup's state (plain key/value lines; nothing is executed) and checks it like a switch.
 load_state() {
-    local dir=$1 key value
-    [ -f "$dir/state.tsv" ] || die "$dir is not a backup made by this script."
+    local dir=$1 key value mode
+    MODE="" UNIT="" RUN_USER=root SECRET_PATH="" FILE_OWNER=root
     while IFS=$'\t' read -r key value; do
         case "$key" in
             MODE) MODE=$value ;;
@@ -517,40 +690,58 @@ load_state() {
             RUN_USER) RUN_USER=$value ;;
             SECRET_PATH) SECRET_PATH=$value ;;
             FILE_OWNER) FILE_OWNER=$value ;;
-            FILE_MODE) [[ "$value" =~ ^[0-7]{3,4}$ ]] && FILE_MODE=$value ;;
         esac
     done <"$dir/state.tsv"
     [ "$MODE" = systemd ] || [ "$MODE" = manual ] || die "$dir has an unknown mode."
-    case "$SECRET_PATH" in /*) ;; *) die "$dir has no absolute secret path." ;; esac
+    id -u "$RUN_USER" >/dev/null 2>&1 || die "$dir names an unknown user."
+    if [ "$MODE" = systemd ]; then
+        local user=$RUN_USER
+        read_unit "$UNIT"
+        RUN_USER=$user
+    fi
+    check_secret_path
+    mode=$(cat "$dir/mode")
+    [[ "$mode" =~ ^[0-7]{3,4}$ ]] || die "$dir has a bad mode."
+    # Never more open than 640 (group) on a restore either.
+    FILE_MODE=$(printf '%o' $(( 8#$mode & 8#640 )))
 }
 
+# Puts the backed-up file back. Returns 1, with a warning, when it could not.
 restore_file() {
     local dir=$1 reason
-    path_forbidden "$SECRET_PATH" && die "Refusing $SECRET_PATH: it is inside game server data."
-    if reason=$(path_unsafe "$SECRET_PATH"); then die "Refusing $SECRET_PATH: $reason."; fi
-    uid_allowed "$(id -u "$FILE_OWNER")" || die "Refusing to restore as $FILE_OWNER."
+    if path_forbidden "$SECRET_PATH"; then warn "Refusing $SECRET_PATH: it is inside game server data."; return 1; fi
+    if reason=$(path_unsafe "$SECRET_PATH"); then warn "Refusing $SECRET_PATH: $reason."; return 1; fi
+    WRITE_AS=$(path_writer "$SECRET_PATH")
+    if ! uid_allowed "$(id -u "$WRITE_AS")"; then warn "Refusing to restore as $WRITE_AS."; return 1; fi
     if [ "$(cat "$dir/had_secret")" = 1 ]; then
-        [ -f "$dir/playit.toml" ] && [ ! -L "$dir/playit.toml" ] || die "$dir has no secret file."
-        install_as_owner "$FILE_OWNER" "$SECRET_PATH" "$FILE_MODE" <"$dir/playit.toml"
+        if [ ! -f "$dir/playit.toml" ] || [ -L "$dir/playit.toml" ]; then warn "$dir has no secret file."; return 1; fi
+        if ! install_as "$WRITE_AS" "$SECRET_PATH" "$FILE_MODE" <"$dir/playit.toml"; then warn "Could not write $SECRET_PATH."; return 1; fi
+        if ! cmp -s -- "$dir/playit.toml" "$SECRET_PATH"; then warn "$SECRET_PATH does not match the backup after the restore."; return 1; fi
     else
-        run_as "$FILE_OWNER" rm -f -- "$SECRET_PATH"
+        if ! run_as "$WRITE_AS" rm -f -- "$SECRET_PATH"; then warn "Could not remove $SECRET_PATH."; return 1; fi
     fi
+    return 0
 }
 
+# Restores the file and restarts playit. Returns 1 when the file was not restored (the panel
+# must not be told then); a playit that does not come back is only warned about.
 restore() {
     local dir=$1
-    restore_file "$dir"
+    if ! restore_file "$dir"; then
+        warn "Could not restore the old playit secret file from $dir. Nothing was rolled back; fix it by hand."
+        return 1
+    fi
     if restart_agent && agent_running; then
         say "Restored the old playit secret file from $dir and playit runs again."
     else
         warn "Restored the old playit secret file from $dir, but playit did not come back up. Check it by hand."
-        return 1
     fi
+    return 0
 }
 
 # ---------------------------------------------------------------------------------------------
 # Talking to the panel and to playit. Secrets go into curl through a config on a pipe, never on
-# the command line (where `ps` would show them).
+# the command line (where `ps` would show them); -q keeps any .curlrc out.
 # ---------------------------------------------------------------------------------------------
 TOKEN_ID=""
 DAEMON_TOKEN=""
@@ -558,16 +749,25 @@ SWITCH_TOKEN=""
 HTTP_BODY=""
 HTTP_CODE=""
 
+# Reads the daemon token and settles the panel URL: the Wings "remote", unless --panel names
+# another one, which has to be confirmed (the daemon token is sent to it).
 load_wings_config() {
+    local remote
     [ -r "$WINGS_CONFIG" ] || die "Cannot read the Wings config at $WINGS_CONFIG. Pass --wings-config PATH."
     TOKEN_ID=$(yaml_value token_id "$WINGS_CONFIG")
     DAEMON_TOKEN=$(yaml_value token "$WINGS_CONFIG")
     [ -n "$TOKEN_ID" ] && [ -n "$DAEMON_TOKEN" ] || die "The Wings config has no token_id/token."
-    if [ -z "$PANEL" ]; then
-        PANEL=$(yaml_value remote "$WINGS_CONFIG")
-    fi
+    remote=$(yaml_value remote "$WINGS_CONFIG")
+    remote=${remote%/}
     PANEL=${PANEL%/}
-    [ -n "$PANEL" ] || die "Pass --panel https://your-panel."
+    if [ -z "$PANEL" ]; then
+        PANEL=$remote
+    elif [ "$PANEL" != "$remote" ]; then
+        say "The Wings config says the panel is: ${remote:-(nothing)}"
+        say "You passed --panel:                 $PANEL"
+        confirm_yes "The node's daemon token will be sent to $PANEL." || die "Nothing changed."
+    fi
+    [ -n "$PANEL" ] || die "The Wings config has no remote; pass --panel https://your-panel."
     case "$PANEL" in
         https://*) ;;
         http://*) [ "$ALLOW_HTTP" -eq 1 ] || die "The panel URL must use https (or pass --allow-http)." ;;
@@ -586,8 +786,9 @@ json_number() {
 
 # panel_post PATH JSON_BODY -> HTTP_CODE, HTTP_BODY
 panel_post() {
-    local path=$1 body=$2 out
-    out=$(curl -sS --proto '=https,http' --max-time 30 -X POST \
+    local path=$1 body=$2 out proto='=https'
+    [ "$ALLOW_HTTP" -eq 1 ] && proto='=https,http'
+    out=$(curl -q -sS --proto "$proto" --max-time 30 -X POST \
         -H 'Accept: application/json' -H 'Content-Type: application/json' \
         -K <(printf 'header = "Authorization: Bearer %s.%s"\ndata = "%s"\n' "$TOKEN_ID" "$DAEMON_TOKEN" "${body//\"/\\\"}") \
         -w '\n%{http_code}' "$PANEL$path") || { HTTP_CODE=000; HTTP_BODY=""; return 0; }
@@ -595,8 +796,8 @@ panel_post() {
     HTTP_BODY=${out%$'\n'*}
 }
 
-# Tells the panel the node is back on the old agent. A no-op on the panel when it never switched,
-# so it is always sent on a rollback.
+# Tells the panel the node is back on the old agent. A no-op on the panel when it never switched.
+# Only called once the old file really is back.
 report_rolled_back() {
     [ -n "$SWITCH_TOKEN" ] || { say "Choose \"Check status\" (or \"Undo switch\") on the node's playit card."; return 0; }
     panel_post /api/remote/playit/agent-switch "{\"token\":\"$SWITCH_TOKEN\",\"outcome\":\"rolled_back\"}"
@@ -610,7 +811,7 @@ report_rolled_back() {
 # The agent id playit returns for a key, from the agent's run data, or empty.
 playit_agent_id() {
     local key=$1 out
-    out=$(curl -sS --proto '=https' --max-time 20 -X POST \
+    out=$(curl -q -sS --proto '=https' --max-time 20 -X POST \
         -H 'Accept: application/json' -H 'Content-Type: application/json' \
         -K <(printf 'header = "Authorization: Agent-Key %s"\n' "$key") \
         --data '{}' "$PLAYIT_API/v1/agents/rundata" 2>/dev/null) || return 0
@@ -652,6 +853,12 @@ done
 command -v curl >/dev/null 2>&1 || die "curl is required."
 command -v runuser >/dev/null 2>&1 || die "runuser (util-linux) is required."
 
+# A hang-up ends the run through the EXIT trap (which rolls back); a dead terminal cannot answer.
+trap 'exit 129' HUP
+if [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ] && [ "$DRY_RUN" -eq 0 ]; then
+    say "Tip: run this inside tmux or screen, so a dropped SSH connection cannot interrupt it."
+fi
+
 # ---------------------------------------------------------------------------------------------
 # Rollback mode.
 # ---------------------------------------------------------------------------------------------
@@ -659,24 +866,29 @@ if [ "$MODE_ROLLBACK" -eq 1 ]; then
     if [ -n "$ROLLBACK_DIR" ]; then
         dir=$ROLLBACK_DIR
     else
-        [ -f "$BACKUP_ROOT/latest" ] || die "No backup found. Pass --rollback DIR (backups are in $BACKUP_ROOT)."
-        dir=$BACKUP_ROOT/$(head -n 1 "$BACKUP_ROOT/latest")
+        [ -f "$BACKUP_ROOT/latest" ] && [ ! -L "$BACKUP_ROOT/latest" ] || die "No backup found. Pass --rollback DIR (backups are in $BACKUP_ROOT)."
+        name=$(head -n 1 "$BACKUP_ROOT/latest")
+        [[ "$name" =~ ^[0-9]{8}-[0-9]{6}\.[A-Za-z0-9]+$ ]] || die "$BACKUP_ROOT/latest does not name a backup."
+        dir=$BACKUP_ROOT/$name
     fi
-    [ -d "$dir" ] && [ ! -L "$dir" ] || die "No backup at $dir."
-    [ "$(stat -c %u -- "$dir")" = 0 ] || die "$dir is not owned by root."
+    backup_dir_valid "$dir" || die "$dir is not a backup made by this script (a root-only directory directly in $BACKUP_ROOT)."
+    dir=$(realpath -e -- "$dir")
     load_state "$dir"
     say "Rolling back to $dir"
-    say "Secret file:   $SECRET_PATH (owner $FILE_OWNER, mode $FILE_MODE)"
+    say "Secret file:   $SECRET_PATH (written as $WRITE_AS, mode $FILE_MODE)"
     [ "$MODE" = systemd ] && say "playit unit:   $UNIT"
     if [ "$DRY_RUN" -eq 1 ]; then
         say "Dry run: nothing changed."
         exit 0
     fi
     confirm_yes "Restore this backup and restart playit?" || die "Nothing changed."
-    restore "$dir" || true
+    restore "$dir" || die "The rollback did not finish; the panel was not told."
     if [ -r "$WINGS_CONFIG" ]; then
         read_hidden "Paste the switch token to tell the panel (or press Enter to skip):" SWITCH_TOKEN
-        if [ -n "$SWITCH_TOKEN" ]; then load_wings_config; fi
+        if [ -n "$SWITCH_TOKEN" ]; then
+            valid_token "$SWITCH_TOKEN" || die "That is not a switch token. Copy it from the node's playit card."
+            load_wings_config
+        fi
         report_rolled_back
     fi
     exit 0
@@ -689,9 +901,9 @@ detect
 describe
 if [ "$DRY_RUN" -eq 1 ]; then
     if [ "$MODE" = systemd ]; then
-        say "Would:         back up the secret file, write the new secret as $FILE_OWNER and run: systemctl restart $UNIT"
+        say "Would:         back up the secret file, write the new secret as $WRITE_AS and run: systemctl restart $UNIT"
     else
-        say "Would:         back up the secret file, write the new secret as $FILE_OWNER, then ask you to restart playit:"
+        say "Would:         back up the secret file, write the new secret as $WRITE_AS, then ask you to restart playit:"
         manual_restart_steps
     fi
     say "Dry run: nothing changed."
@@ -707,7 +919,7 @@ if [ "$MANUAL_SECRET" -eq 1 ]; then
 else
     load_wings_config
     read_hidden "Paste the one-time switch token from the panel (hidden):" SWITCH_TOKEN
-    printf '%s' "$SWITCH_TOKEN" | grep -qE '^[0-9a-f]{48}$' || die "That is not a switch token. Copy it from the node's playit card."
+    valid_token "$SWITCH_TOKEN" || die "That is not a switch token. Copy it from the node's playit card."
     say "Fetching the new agent secret from $PANEL ..."
     panel_post /api/remote/playit/agent-secret "{\"token\":\"$SWITCH_TOKEN\"}"
     case "$HTTP_CODE" in
@@ -721,11 +933,11 @@ else
     NEW_AGENT=$(json_field agent_id "$HTTP_BODY")
     HTTP_BODY=""
 fi
-printf '%s' "$NEW_SECRET" | grep -qE '^[0-9a-fA-F]{16,512}$' || die "The agent secret does not look like a playit key."
+valid_secret "$NEW_SECRET" || die "The agent secret does not look like a playit key."
 
 OLD_AGENT=""
 if [ -f "$SECRET_PATH" ]; then
-    old_secret=$(run_as "$FILE_OWNER" sed -n 's/^[[:space:]]*secret_key[[:space:]]*=[[:space:]]*["'"'"']\{0,1\}\([0-9a-fA-F]*\).*/\1/p' -- "$SECRET_PATH" | head -n 1)
+    old_secret=$(run_as "$WRITE_AS" sed -n 's/^[[:space:]]*secret_key[[:space:]]*=[[:space:]]*["'"'"']\{0,1\}\([0-9a-fA-F]*\).*/\1/p' -- "$SECRET_PATH" | head -n 1)
     [ -z "$old_secret" ] || OLD_AGENT=$(playit_agent_id "$old_secret")
     old_secret=""
 fi
@@ -749,10 +961,15 @@ ROLLBACK_NEEDED=1
 on_exit() {
     local status=$?
     NEW_SECRET=""
+    trap - HUP INT TERM
     if [ "${ROLLBACK_NEEDED:-0}" -eq 1 ] && [ -n "$BACKUP_DIR" ]; then
-        warn "The switch did not finish; putting the old playit secret file back."
-        restore "$BACKUP_DIR" || true
-        report_rolled_back
+        # Output is best-effort: the terminal may be gone.
+        warn "The switch did not finish; putting the old playit secret file back." 2>/dev/null || true
+        if restore "$BACKUP_DIR" 2>/dev/null; then
+            report_rolled_back 2>/dev/null || true
+        else
+            warn "The old secret file could not be put back; the panel was not told. Restore it with: sudo bash $SCRIPT_NAME --rollback $BACKUP_DIR" 2>/dev/null || true
+        fi
     fi
     exit "$status"
 }
@@ -799,6 +1016,6 @@ else
 fi
 
 ROLLBACK_NEEDED=0
-say "Done. Backup of the old secret file: $BACKUP_DIR (undo with: sudo bash $0 --rollback $BACKUP_DIR)"
+say "Done. Backup of the old secret file: $BACKUP_DIR (undo with: sudo bash $SCRIPT_NAME --rollback $BACKUP_DIR)"
 say "It holds the old agent key; backups older than $BACKUP_KEEP_DAYS days are removed on the next run."
 say "Delete the old agent in the playit.gg dashboard once you no longer need to roll back."
