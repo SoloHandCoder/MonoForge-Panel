@@ -50,11 +50,19 @@ function SettingsForm({ settings }: { settings: ReferralSettings }) {
             enabled: settings.enabled,
             reward: settings.reward_tokens as number | null,
             cap: settings.monthly_cap as number | null,
+            hold: settings.hold_days as number | null,
+            minimum: settings.min_purchase_tokens as number | null,
         },
         onSubmit: async ({ value }) => {
             try {
                 await save.mutateAsync({
-                    body: { enabled: value.enabled, reward_tokens: value.reward ?? 1, monthly_cap: value.cap ?? 0 },
+                    body: {
+                        enabled: value.enabled,
+                        reward_tokens: value.reward ?? 1,
+                        monthly_cap: value.cap ?? 0,
+                        hold_days: value.hold ?? 30,
+                        min_purchase_tokens: value.minimum ?? 0,
+                    },
                 });
             } catch {
                 // Error toast is handled by the mutation.
@@ -71,7 +79,7 @@ function SettingsForm({ settings }: { settings: ReferralSettings }) {
                         {(field) => (
                             <field.SwitchField
                                 label='Pay referral rewards'
-                                description='Every user gets a link. When someone signs up through it and their first Tebex token purchase stays paid for the hold period, both get the reward.'
+                                description='Every user gets a link. When someone signs up through it, has a linked Discord or Google account that never earned a reward, and their first Tebex token purchase stays paid for the hold period, both get the reward.'
                             />
                         )}
                     </form.AppField>
@@ -111,9 +119,43 @@ function SettingsForm({ settings }: { settings: ReferralSettings }) {
                                 />
                             )}
                         </form.AppField>
+                        <form.AppField
+                            name='hold'
+                            validators={{
+                                onChange: ({ value }) =>
+                                    value === null || value < 1 || value > 365 ? 'Between 1 and 365.' : undefined,
+                            }}
+                        >
+                            {(field) => (
+                                <field.NumberField
+                                    label='Hold period (days)'
+                                    description='How long the first purchase must stay paid. Disputes can come weeks later.'
+                                    min={1}
+                                    max={365}
+                                    disabled={!enabled}
+                                />
+                            )}
+                        </form.AppField>
+                        <form.AppField
+                            name='minimum'
+                            validators={{
+                                onChange: ({ value }) =>
+                                    value === null || value < 0 || value > 100_000_000 ? 'Use 0 or more.' : undefined,
+                            }}
+                        >
+                            {(field) => (
+                                <field.NumberField
+                                    label='Smallest first purchase (tokens)'
+                                    description={`0 is the smallest token pack (now ${settings.effective_min_purchase_tokens.toLocaleString('en-US')} tokens).`}
+                                    min={0}
+                                    max={100_000_000}
+                                    disabled={!enabled}
+                                />
+                            )}
+                        </form.AppField>
                     </div>
                     <p className='text-xs text-muted-foreground'>
-                        The first purchase is held for {settings.hold_days} days. A refund, chargeback or dispute before
+                        The first purchase is held for the hold period. A refund, chargeback or dispute before
                         then cancels the referral; one after the payout takes both rewards back. Sign-ups from the
                         referrer&apos;s own network are flagged below and wait for your approval.
                     </p>

@@ -19,6 +19,8 @@ export interface ShopTrialSettings {
     plan_ids: number[];
     hours: TrialHours;
     max_concurrent: number;
+    /** The most trials started per day panel-wide; 0 allows none. */
+    daily_cap: number;
     require_verified: boolean;
 }
 

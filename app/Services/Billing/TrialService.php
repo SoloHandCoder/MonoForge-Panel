@@ -6,7 +6,6 @@ namespace Pterodactyl\Services\Billing;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\Billing\InvalidQuoteException;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Models\Billing\ServerSubscription;
@@ -15,7 +14,6 @@ use Pterodactyl\Models\Billing\ShopTrial;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
-use Pterodactyl\Models\UserOAuthAccount;
 
 /**
  * Free trial servers: who may start one, the record of every trial (kept after the server is
@@ -57,7 +55,7 @@ class TrialService
             return 'Free trials are for new players, and your account already has a server from the store.';
         }
 
-        $identities = $this->identities($user);
+        $identities = TrialFingerprint::linkedIdentities($user);
         if (TrialSettings::requireVerified() && $identities === []) {
             return 'Link a Discord or Google account on your account page to start a free trial.';
         }
@@ -80,6 +78,10 @@ class TrialService
 
         if ($this->running() >= TrialSettings::maxConcurrent()) {
             return 'All free trial slots are taken right now. Please try again later.';
+        }
+
+        if ($this->startedToday() >= TrialSettings::dailyCap()) {
+            return "Today's free trials are all taken. Please try again tomorrow.";
         }
 
         return null;
@@ -107,6 +109,12 @@ class TrialService
         ];
     }
 
+    /** Free trials started since midnight in the panel's timezone (panel-wide). */
+    public function startedToday(): int
+    {
+        return ShopTrial::query()->where('created_at', '>=', CarbonImmutable::now()->startOfDay())->count();
+    }
+
     /** Free trials running now (panel-wide). */
     public function running(): int
     {
@@ -118,7 +126,7 @@ class TrialService
      */
     public function record(User $user, Server $server, int $planId, int $hours, ?string $ip): ShopTrial
     {
-        $identities = $this->identities($user);
+        $identities = TrialFingerprint::linkedIdentities($user);
 
         return ShopTrial::query()->create([
             'user_id' => $user->id,
@@ -226,24 +234,5 @@ class TrialService
         $hash = User::query()->whereKey($user->id)->value('signup_subnet_hash');
 
         return is_string($hash) && $hash !== '' ? $hash : null;
-    }
-
-    /**
-     * The hashes of the user's linked Discord and Google accounts, by column.
-     *
-     * @return array<'discord_hash'|'google_hash', string>
-     */
-    private function identities(User $user): array
-    {
-        $hashes = [];
-        foreach (UserOAuthAccount::query()->where('user_id', $user->id)->get() as $account) {
-            $column = match ($account->provider) {
-                OAuthProvider::Discord => 'discord_hash',
-                OAuthProvider::Google => 'google_hash',
-            };
-            $hashes[$column] = TrialFingerprint::identity($account->provider->value, $account->provider_user_id);
-        }
-
-        return $hashes;
     }
 }

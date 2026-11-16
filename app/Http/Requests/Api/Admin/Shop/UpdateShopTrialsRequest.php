@@ -27,12 +27,13 @@ class UpdateShopTrialsRequest extends AdminApiRequest
             'plan_ids.*' => ['integer', 'distinct', 'exists:shop_plans,id'],
             'hours' => ['required', 'integer', Rule::in(TrialSettings::HOURS)],
             'max_concurrent' => ['required', 'integer', 'min:0', 'max:'.TrialSettings::MAX_CONCURRENT],
+            'daily_cap' => ['sometimes', 'integer', 'min:0', 'max:'.TrialSettings::MAX_DAILY_CAP],
             'require_verified' => ['required', 'boolean'],
         ];
     }
 
     /**
-     * @return array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, require_verified: bool}
+     * @return array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, daily_cap: int, require_verified: bool}
      */
     public function settings(): array
     {
@@ -48,6 +49,7 @@ class UpdateShopTrialsRequest extends AdminApiRequest
             'plan_ids' => $planIds,
             'hours' => $this->integer('hours'),
             'max_concurrent' => $this->integer('max_concurrent'),
+            'daily_cap' => $this->has('daily_cap') ? $this->integer('daily_cap') : TrialSettings::dailyCap(),
             'require_verified' => $this->boolean('require_verified'),
         ];
     }

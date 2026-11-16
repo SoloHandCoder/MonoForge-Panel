@@ -81,6 +81,10 @@ export interface ReferralSettings {
     /** 0 is no cap. */
     monthly_cap: number;
     hold_days: number;
+    /** Tokens the first purchase must credit; 0 is the smallest visible token pack. */
+    min_purchase_tokens: number;
+    /** The minimum in force (the setting, or the smallest pack). */
+    effective_min_purchase_tokens: number;
 }
 
 export const couponTypeLabels = {

@@ -69,6 +69,7 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:shop:trials:plan_ids',
         'monoforge:shop:trials:hours',
         'monoforge:shop:trials:max_concurrent',
+        'monoforge:shop:trials:daily_cap',
         'monoforge:shop:trials:require_verified',
         // Phase 4 Task W: the AI assistant.
         'monoforge:ai:enabled',

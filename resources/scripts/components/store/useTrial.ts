@@ -100,6 +100,7 @@ export function useTrialFlow() {
                 period_days: 0,
                 discount_tokens: 0,
                 coupon: null,
+                warning: null,
             });
         } catch (cause) {
             await wait(MIN_FAILURE_MS - (Date.now() - started));

@@ -29,6 +29,12 @@ class ReferralLinkController extends Controller
             return $response;
         }
 
+        // The first link a visitor followed wins: another one never replaces a valid referral.
+        $existing = $request->cookies->get(ReferralSettings::COOKIE);
+        if (is_string($existing) && $referrals->referrerFor($existing) instanceof User) {
+            return $response;
+        }
+
         return $response->withCookie(cookie(
             ReferralSettings::COOKIE,
             mb_strtoupper($code),

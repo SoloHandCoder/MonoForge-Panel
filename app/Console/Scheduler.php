@@ -11,6 +11,7 @@ use Pterodactyl\Console\Commands\Assistant\DetectCrashesCommand;
 use Pterodactyl\Console\Commands\Billing\AutoSleepCommand;
 use Pterodactyl\Console\Commands\Billing\PayReferralsCommand;
 use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
+use Pterodactyl\Console\Commands\Billing\PruneAntiAbuseHashesCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
@@ -18,6 +19,7 @@ use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
 use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
 use Pterodactyl\Console\Commands\Support\PruneSupportAttachmentsCommand;
+use Pterodactyl\Console\Commands\Tunnels\PruneOldPlayitSecretsCommand;
 use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
@@ -62,11 +64,15 @@ final class Scheduler
         $schedule->command(PruneTebexPayloadsCommand::class)->daily()->withoutOverlapping()->onOneServer();
         // Referral rewards whose hold has passed: one indexed query an hour, usually nothing to pay.
         $schedule->command(PayReferralsCommand::class)->hourly()->withoutOverlapping(30)->onOneServer();
+        // The network and linked-account hashes against trial, coupon and referral abuse: 12 months.
+        $schedule->command(PruneAntiAbuseHashesCommand::class)->daily()->withoutOverlapping()->onOneServer();
         // Token checkouts no payment was ever linked to, after 30 days (abandoned baskets).
         $schedule->command(PruneCommand::class, ['--model' => [TebexCheckout::class]])->daily()->withoutOverlapping()->onOneServer();
 
         // Link tunnels made in the playit.gg dashboard, retry failed ones and pick up addresses for pending ones.
         $schedule->command(SyncTunnelsCommand::class)->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
+        // The old agent key of a node switched to a self-managed agent: 30 days after the switch.
+        $schedule->command(PruneOldPlayitSecretsCommand::class)->daily()->withoutOverlapping()->onOneServer();
 
         // The public status page: one cheap reachability check of the panel and each shown node
         // a minute, and the checks and their daily sums dropped after 90 days.

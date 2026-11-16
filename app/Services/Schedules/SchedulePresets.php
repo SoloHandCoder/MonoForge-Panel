@@ -79,7 +79,8 @@ final readonly class SchedulePresets
             SchedulePreset::DailyRestart => (int) (is_numeric($input['warning_minutes'] ?? null) ? $input['warning_minutes'] : 0) > 0
                 ? [Permissions::ControlRestart, Permissions::ControlConsole]
                 : [Permissions::ControlRestart],
-            SchedulePreset::BackupRotation => [Permissions::BackupCreate],
+            // Rotation deletes the oldest backups, so it needs the right to delete them too.
+            SchedulePreset::BackupRotation => [Permissions::BackupCreate, Permissions::BackupDelete],
             SchedulePreset::RestartWhenEmpty => [Permissions::ControlRestart],
             SchedulePreset::WeeklyCleanup => [Permissions::FileDelete],
         };

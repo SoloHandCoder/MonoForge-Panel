@@ -23,12 +23,14 @@ use Pterodactyl\Models\User;
  * @property string|null $purchase_reference the store purchase it discounted (its ledger reference)
  * @property int|null $server_id
  * @property string|null $network_hash
+ * @property string|null $discord_hash the linked Discord account of a free-tokens redemption, hashed
+ * @property string|null $google_hash the linked Google account of a free-tokens redemption, hashed
  * @property CarbonImmutable $created_at
  * @property Coupon $coupon
  * @property User|null $user
  * @property Server|null $server
  */
-#[Fillable(['coupon_id', 'user_id', 'tokens', 'purchase_reference', 'server_id', 'network_hash'])]
+#[Fillable(['coupon_id', 'user_id', 'tokens', 'purchase_reference', 'server_id', 'network_hash', 'discord_hash', 'google_hash'])]
 #[RouteKey('id')]
 #[Table(name: 'coupon_redemptions')]
 class CouponRedemption extends Model

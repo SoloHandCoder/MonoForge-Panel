@@ -24,11 +24,8 @@ afterEach(() => {
 const referral = (overrides: Partial<Referral> = {}): Referral => ({
     id: 1,
     username: 'al•••',
-    status: 'registered',
-    underReview: false,
+    status: 'pending',
     rewardTokens: null,
-    payoutAfter: null,
-    paidAt: null,
     createdAt: '2026-11-15T12:00:00+00:00',
     ...overrides,
 });
@@ -38,27 +35,21 @@ const overview: ReferralOverview = mapReferralOverview({
     code: 'K7Q2M9XA',
     path: '/r/K7Q2M9XA',
     reward_tokens: 200,
-    hold_days: 7,
+    hold_days: 30,
     stats: { signed_up: 2, pending: 1, paid: 1, tokens_earned: 200 },
     referrals: [
         {
             id: 2,
             username: 'sa•••',
             status: 'paid',
-            under_review: false,
             reward_tokens: 200,
-            payout_after: '2026-11-22T12:00:00+00:00',
-            paid_at: '2026-11-22T13:00:00+00:00',
             created_at: '2026-11-14T12:00:00+00:00',
         },
         {
             id: 1,
             username: 'al•••',
-            status: 'held',
-            under_review: true,
+            status: 'pending',
             reward_tokens: null,
-            payout_after: '2026-11-23T12:00:00+00:00',
-            paid_at: null,
             created_at: '2026-11-15T12:00:00+00:00',
         },
     ],
@@ -70,16 +61,11 @@ describe('referrals page', () => {
     });
 
     it('explains each referral in words', () => {
-        expect(referralNote(referral())).toMatch(/waiting for their first token purchase/);
-        expect(referralNote(referral({ status: 'held', payoutAfter: '2026-11-23T12:00:00+00:00' }))).toMatch(
-            /paid out on Nov 23, 2026/
-        );
-        expect(referralNote(referral({ status: 'held', underReview: true }))).toBe(
-            'Under review before it can be paid.'
-        );
-        expect(referralNote(referral({ status: 'paid', rewardTokens: 200 }))).toMatch(/You got 200 tokens/);
-        expect(referralNote(referral({ status: 'reversed' }))).toMatch(/refunded/);
-        expect(referralNote(referral({ status: 'capped' }))).toMatch(/monthly limit/);
+        expect(referralNote(referral())).toMatch(/^Pending/);
+        expect(referralNote(referral({ status: 'paid', rewardTokens: 200 }))).toBe('You got 200 tokens.');
+        expect(referralNote(referral({ status: 'not_eligible' }))).toBe('Not eligible for a reward.');
+        // No review details and no dates reach the referrer.
+        expect(referralNote(referral())).not.toMatch(/review|20\d\d/i);
     });
 
     it('shows the link, the stats and the referrals', () => {
@@ -89,7 +75,8 @@ describe('referrals page', () => {
         expect(screen.getByLabelText('Referral link')).toHaveValue(`${window.location.origin}/r/K7Q2M9XA`);
         expect(screen.getByRole('button', { name: 'Copy link' })).toBeVisible();
         expect(screen.getByText('Tokens earned').nextSibling).toHaveTextContent('200');
-        expect(screen.getByText('Under review')).toBeVisible();
+        expect(screen.queryByText(/under review/i)).toBeNull();
+        expect(screen.getAllByText('Pending')).toHaveLength(2);
         expect(screen.getAllByText('Paid')).toHaveLength(2);
     });
 

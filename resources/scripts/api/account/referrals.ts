@@ -1,17 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { clientGetReferralsOptions } from '@/api/generated/@tanstack/react-query.gen';
 
-export type ReferralStatus = 'registered' | 'held' | 'paid' | 'reversed' | 'rejected' | 'capped';
+/** What the referrer is told: no review details and no purchase or payout dates. */
+export type ReferralStatus = 'pending' | 'paid' | 'not_eligible';
 
 export interface Referral {
     id: number;
     /** The start of the referred username, masked. */
     username: string;
     status: ReferralStatus;
-    underReview: boolean;
     rewardTokens: number | null;
-    payoutAfter: string | null;
-    paidAt: string | null;
     createdAt: string;
 }
 
@@ -38,10 +36,7 @@ interface RawReferralOverview {
         id: number;
         username: string;
         status: ReferralStatus;
-        under_review: boolean;
         reward_tokens: number | null;
-        payout_after: string | null;
-        paid_at: string | null;
         created_at: string;
     }[];
 }
@@ -62,10 +57,7 @@ export const mapReferralOverview = (raw: RawReferralOverview): ReferralOverview 
         id: referral.id,
         username: referral.username,
         status: referral.status,
-        underReview: referral.under_review,
         rewardTokens: referral.reward_tokens,
-        payoutAfter: referral.payout_after,
-        paidAt: referral.paid_at,
         createdAt: referral.created_at,
     })),
 });
@@ -75,12 +67,9 @@ export const referralLink = (path: string, origin: string = globalThis.location.
     `${origin.replace(/\/+$/, '')}${path}`;
 
 export const referralStatusLabels = {
-    registered: 'Signed up',
-    held: 'Pending',
+    pending: 'Pending',
     paid: 'Paid',
-    reversed: 'Cancelled',
-    rejected: 'Not eligible',
-    capped: 'Over the monthly limit',
+    not_eligible: 'Not eligible',
 } satisfies Record<ReferralStatus, string>;
 
 export const referralsQueryOptions = () => clientGetReferralsOptions();

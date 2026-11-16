@@ -25,9 +25,18 @@ final readonly class RevenueRange
         return new self($today->subDays(max(1, $days) - 1), $today->endOfDay());
     }
 
+    /**
+     * A custom range of whole days. Times are dropped, so every request for the same days shares
+     * one cache entry, and a range longer than MAX_DAYS keeps its last MAX_DAYS days (the request
+     * refuses those anyway).
+     */
     public static function between(string $from, string $to): self
     {
-        return new self(CarbonImmutable::parse($from)->startOfDay(), CarbonImmutable::parse($to)->endOfDay());
+        $end = CarbonImmutable::parse(mb_substr(mb_trim($to), 0, 10))->endOfDay();
+        $start = CarbonImmutable::parse(mb_substr(mb_trim($from), 0, 10))->startOfDay();
+        $earliest = $end->startOfDay()->subDays(self::MAX_DAYS - 1);
+
+        return new self($start->lt($earliest) ? $earliest : $start, $end);
     }
 
     public function days(): int

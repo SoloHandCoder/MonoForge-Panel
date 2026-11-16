@@ -45,7 +45,8 @@ class GetRevenueRequest extends AdminApiRequest
                     return;
                 }
 
-                if (RevenueRange::between($from, $to)->days() > RevenueRange::MAX_DAYS) {
+                $days = (int) CarbonImmutable::parse($from)->startOfDay()->diffInDays(CarbonImmutable::parse($to)->startOfDay()) + 1;
+                if ($days > RevenueRange::MAX_DAYS) {
                     $validator->errors()->add('to', sprintf('A custom range can be at most %d days.', RevenueRange::MAX_DAYS));
                 }
             },

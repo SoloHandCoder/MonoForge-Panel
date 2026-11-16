@@ -393,6 +393,43 @@ export const useFinishPlayitSwitch = (nodeId: number) =>
 export const useUndoPlayitSwitch = (nodeId: number) =>
     usePlayitSwitchAction(nodeId, 'playit/switch/undo', 'The previous agent is back', 'Unable to undo the switch');
 
+/** What "Check status" found and fixed. */
+export interface PlayitReconcile {
+    action: 'none' | 'finished' | 'undone' | 'agent_corrected';
+    message: string;
+    agent_online: boolean | null;
+    tunnels: number;
+    created: number;
+    active: number;
+    waiting_for_agent: number;
+    last_error: string | null;
+}
+
+/** "Check status": brings the panel in line with the agent the node really runs. */
+export const useReconcilePlayitSwitch = (nodeId: number) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () =>
+            (
+                await http.post<PlayitSwitchState & { reconcile: PlayitReconcile }>(
+                    `/api/admin/nodes/${nodeId}/playit/switch/reconcile`
+                )
+            ).data,
+        onSuccess: async ({ reconcile, ...state }) => {
+            queryClient.setQueryData(playitSwitchKey(nodeId), state);
+            await queryClient.invalidateQueries({ queryKey: nodePlayitKey(nodeId) });
+            await queryClient.invalidateQueries({ queryKey: tunnelsKey });
+            if (reconcile.agent_online === false) {
+                toast.warning(reconcile.message);
+            } else {
+                toast.success(reconcile.message);
+            }
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to check the playit.gg status'),
+    });
+};
+
 export const useDismissOldTunnels = (nodeId: number) =>
     usePlayitSwitchAction(
         nodeId,

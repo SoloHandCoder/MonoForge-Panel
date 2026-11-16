@@ -607,6 +607,9 @@ test('the switch endpoints need a root administrator session', function (): void
     $this->withHeader('Accept', 'application/vnd.pterodactyl.v1+json')
         ->withHeader('Authorization', 'Bearer '.$key->identifier.decrypt($key->token));
     $this->postJson("/api/admin/nodes/{$node->id}/playit/switch")->assertForbidden();
+    // The state (with the claim URL while it waits) is session-only too.
+    $this->getJson("/api/admin/nodes/{$node->id}/playit/switch")->assertForbidden();
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/reconcile")->assertForbidden();
 
     expect(PlayitAgentClaim::query()->exists())->toBeFalse();
     Http::assertNothingSent();
@@ -620,4 +623,82 @@ test('the switch script is served without signing in', function (): void {
 
     expect($response->headers->get('Content-Type'))->toStartWith('text/x-shellscript')
         ->and(file_get_contents(PlayitAgentSwitchService::scriptFile()))->toContain('--rollback');
+});
+
+test('a claimed agent that is not self-managed is never used', function (): void {
+    Http::fake([
+        'api.playit.gg/claim/setup' => Http::response(claimAnswer(PlayitClient::CLAIM_ACCEPTED)),
+        'api.playit.gg/claim/exchange' => Http::response(exchangeOk()),
+        'api.playit.gg/v1/agents/rundata' => Http::response(runDataFor(OLD_AGENT)),
+    ]);
+    $node = attachOldAgent(freshNode());
+
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch")->assertOk();
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/check")
+        ->assertOk()
+        ->assertJsonPath('claim.status', 'rejected')
+        ->assertJsonPath('claim.agent_id', null)
+        ->assertJsonPath('claim.last_error', PlayitAgentSwitchService::NOT_SELF_MANAGED);
+
+    expect(PlayitAgentClaim::query()->sole()->secret)->toBeNull();
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/token")->assertStatus(400);
+});
+
+test('check status applies a switch report the panel never acted on, and says whether the agent is online', function (): void {
+    $node = freshNode();
+    serverOn($node, 25565);
+    attachOldAgent($node);
+    fakePlayit();
+
+    $token = readyClaim($node);
+    $this->flushHeaders();
+    remoteAs($node);
+    $this->postJson('/api/remote/playit/agent-secret', ['token' => $token])->assertOk();
+    // The report reached the panel, but the panel did not finish (as if its answer was lost first).
+    PlayitAgentClaim::query()->where('node_id', $node->id)->update(['report' => PlayitAgentClaim::REPORT_SWITCHED, 'reported_at' => now()]);
+    $this->flushHeaders();
+
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/reconcile")
+        ->assertOk()
+        ->assertJsonPath('reconcile.action', 'finished')
+        ->assertJsonPath('reconcile.agent_online', true)
+        ->assertJsonPath('self_managed', true);
+    expect($node->refresh()->playit_agent_id)->toBe(NEW_AGENT);
+    $this->assertActivityLogged('admin:node.playit-reconcile');
+
+    // Nothing more to fix the second time.
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/reconcile")->assertOk()->assertJsonPath('reconcile.action', 'none');
+});
+
+test('check status undoes a switch the node rolled back', function (): void {
+    $node = freshNode();
+    serverOn($node, 25565);
+    attachOldAgent($node);
+    fakePlayit();
+
+    $token = readyClaim($node);
+    $this->flushHeaders();
+    remoteAs($node);
+    $this->postJson('/api/remote/playit/agent-secret', ['token' => $token])->assertOk();
+    $this->postJson('/api/remote/playit/agent-switch', ['token' => $token, 'outcome' => 'switched'])->assertOk();
+    PlayitAgentClaim::query()->where('node_id', $node->id)->update(['report' => PlayitAgentClaim::REPORT_ROLLED_BACK]);
+    $this->flushHeaders();
+
+    $this->postJson("/api/admin/nodes/{$node->id}/playit/switch/reconcile")
+        ->assertOk()
+        ->assertJsonPath('reconcile.action', 'undone')
+        ->assertJsonPath('self_managed', false);
+    expect($node->refresh()->playit_agent_id)->toBe(OLD_AGENT);
+});
+
+test('the old agent key is dropped 30 days after the switch', function (): void {
+    $node = attachOldAgent(freshNode());
+    $node->forceFill(['playit_previous_secret' => OLD_SECRET, 'playit_previous_agent_id' => OLD_AGENT, 'playit_switched_at' => now()->subDays(29)])->save();
+
+    $this->artisan('p:tunnels:prune-old-secrets')->assertSuccessful();
+    expect($node->refresh()->playit_previous_secret)->toBe(OLD_SECRET);
+
+    $node->forceFill(['playit_switched_at' => now()->subDays(31)])->save();
+    $this->artisan('p:tunnels:prune-old-secrets')->assertSuccessful();
+    expect($node->refresh()->playit_previous_secret)->toBeNull();
 });

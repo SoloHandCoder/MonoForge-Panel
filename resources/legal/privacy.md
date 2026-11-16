@@ -28,6 +28,7 @@ This policy explains what personal data MonoForge collects, why, how long we kee
 
 - Account data, login connections and token history: as long as your account exists.
 - Activity logs: deleted automatically after the retention period set on the panel (90 days unless the operator changes it).
+- We keep one-way hashes of your network and linked login IDs for up to 12 months to prevent abuse of free trials, coupons and referrals.
 - Payment records: as long as accounting law requires (usually 10 years). The full notifications Tebex sends us are cut down to the transaction ID, type and date after **90 days**.
 - Server files, backups and console logs: until you delete them, or until the server is deleted (for example after an unpaid renewal and its grace period).
 - AI assistant conversations: until you delete them or your account is deleted.

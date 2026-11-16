@@ -78,6 +78,20 @@ class PlayitSwitchController extends AdminApiController
         ],
     ];
 
+    private const array RECONCILE_EXAMPLE = [
+        ...self::STATE_EXAMPLE,
+        'reconcile' => [
+            'action' => 'finished',
+            'message' => 'The node had reported the switch; the panel now uses the new agent.',
+            'agent_online' => true,
+            'tunnels' => 2,
+            'created' => 2,
+            'active' => 1,
+            'waiting_for_agent' => 0,
+            'last_error' => null,
+        ],
+    ];
+
     private const array TOKEN_EXAMPLE = [
         'token' => '3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d',
         'expires_at' => '2026-11-23T08:29:00+00:00',
@@ -145,6 +159,19 @@ class PlayitSwitchController extends AdminApiController
         Activity::event('admin:node.playit-switch')->subject($node)->property('name', $node->name)->log();
 
         return new JsonResponse($switches->state($node->refresh()));
+    }
+
+    #[Endpoint('Check node playit.gg switch status', "Brings the panel in line with the agent the node really runs: a report of the node's switch script the panel never acted on (a lost answer) is applied, so `switched` finishes the switch and `rolled_back` undoes it; the node's key is checked against playit.gg run data (a wrong agent id is corrected); missing tunnels are queued and one is tried. `reconcile.action` is `none`, `finished`, `undone` or `agent_corrected`; `reconcile.agent_online` says whether playit.gg accepts tunnels for the agent.")]
+    #[ScribeResponse(self::RECONCILE_EXAMPLE, description: 'Status checked.')]
+    #[ResponseField('reconcile.agent_online', 'boolean', "Whether playit.gg accepts tunnels for the node's agent; null without an agent.", nullable: true)]
+    #[ResponseField('reconcile.last_error', 'string', 'The last tunnel error.', nullable: true)]
+    public function reconcile(ManagePlayitSwitchRequest $request, Node $node, PlayitAgentSwitchService $switches): JsonResponse
+    {
+        $result = $switches->reconcile($node);
+
+        Activity::event('admin:node.playit-reconcile')->subject($node)->property(['name' => $node->name, 'action' => $result['action']])->log();
+
+        return new JsonResponse([...$switches->state($node->refresh()), 'reconcile' => $result]);
     }
 
     #[Endpoint('Undo node playit.gg switch', "Puts the node's previous playit.gg agent back after `playit-switch-agent.sh --rollback` on the node: the tunnels made on the self-managed agent are deleted on playit (best effort) and servers get their old tunnels and addresses back. Answers 400 when the node has no earlier agent.")]

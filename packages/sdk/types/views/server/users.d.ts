@@ -18,6 +18,11 @@ export interface SubuserListModel {
     readonly serverId: string;
     readonly subusers: readonly SubuserSummary[];
     readonly canCreate: boolean;
+    /**
+     * Why no user can be added although the viewer may create subusers (a free trial server, until
+     * it is kept), or null.
+     */
+    readonly createBlocked: string | null;
     readonly canUpdate: boolean;
     readonly canDelete: boolean;
     readonly deleting: boolean;

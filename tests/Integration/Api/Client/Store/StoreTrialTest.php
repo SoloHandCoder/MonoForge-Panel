@@ -16,6 +16,7 @@ use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\SubuserController;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Billing\ServerSubscription;
@@ -416,4 +417,30 @@ test('only the owner keeps a trial', function (): void {
     $server = Server::query()->where('owner_id', $this->user->id)->sole();
 
     $this->actingAs(trialPlayer('6006'))->postJson("/api/client/subscriptions/{$server->uuidShort}/keep", ['period_id' => $this->period->id])->assertNotFound();
+});
+
+test('at most the daily cap of trials is started per day', function (): void {
+    config(['monoforge.shop.trials.daily_cap' => 1]);
+    startTrial($this->user)->assertCreated();
+
+    startTrial(trialPlayer('6006'), [], '198.51.100.60')
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', "Today's free trials are all taken. Please try again tomorrow.");
+
+    // The next day the cap starts over.
+    CarbonImmutable::setTestNow('2026-11-21 00:05:00');
+    startTrial(trialPlayer('6007'), [], '192.0.2.60')->assertCreated();
+});
+
+test('a trial server cannot get subusers until it is kept', function (): void {
+    startTrial($this->user)->assertCreated();
+    $server = Server::query()->where('owner_id', $this->user->id)->sole();
+
+    $this->actingAs($this->user)->postJson("/api/client/servers/{$server->uuidShort}/users", ['email' => 'friend@example.com', 'permissions' => ['control.console']])
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', SubuserController::TRIAL_REFUSAL);
+
+    ServerSubscription::query()->where('server_id', $server->id)->update(['is_trial' => false]);
+    $this->actingAs($this->user)->postJson("/api/client/servers/{$server->uuidShort}/users", ['email' => 'friend@example.com', 'permissions' => ['control.console']])
+        ->assertJsonMissing(['detail' => SubuserController::TRIAL_REFUSAL]);
 });

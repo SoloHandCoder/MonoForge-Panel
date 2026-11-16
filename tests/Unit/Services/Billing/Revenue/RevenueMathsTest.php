@@ -46,3 +46,15 @@ test('ranges are whole days with both ends included', function (): void {
     expect(RevenueRange::between('2026-02-01', '2026-02-01')->days())->toBe(1)
         ->and(RevenueRange::between('2025-11-16', '2026-11-16')->days())->toBe(366);
 });
+
+test('custom ranges round to whole days, share a cache key and never pass the longest range', function (): void {
+    $range = RevenueRange::between('2026-11-01T13:45:00', '2026-11-03 08:00');
+
+    expect($range->from->toDateTimeString())->toBe('2026-11-01 00:00:00')
+        ->and($range->to->toDateTimeString())->toBe('2026-11-03 23:59:59')
+        ->and($range->cacheKey())->toBe(RevenueRange::between('2026-11-01', '2026-11-03')->cacheKey());
+
+    $long = RevenueRange::between('2020-01-01', '2026-11-16');
+    expect($long->days())->toBe(RevenueRange::MAX_DAYS)
+        ->and($long->to->toDateString())->toBe('2026-11-16');
+});

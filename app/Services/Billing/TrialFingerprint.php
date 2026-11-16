@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Pterodactyl\Enum\OAuthProvider;
+use Pterodactyl\Models\User;
+use Pterodactyl\Models\UserOAuthAccount;
+use RuntimeException;
+
 /**
  * Keyed hashes for the free trial anti-abuse checks: the /24 (IPv4) or /48 (IPv6) network of an
  * address and a linked Discord or Google id. They are HMACs with the app key, so a leaked table
  * cannot be turned back into addresses by hashing every network.
+ *
+ * Without an app key they would be plain hashes anyone can reverse, so they refuse to run.
  */
 final class TrialFingerprint
 {
@@ -44,8 +51,41 @@ final class TrialFingerprint
         return self::hash('oauth:'.$provider, $providerUserId);
     }
 
+    /**
+     * The hashes of the user's linked Discord and Google accounts, by column. Free trials,
+     * referral rewards and free-tokens coupons are limited to one per linked account.
+     *
+     * @return array<'discord_hash'|'google_hash', string>
+     */
+    public static function linkedIdentities(User $user): array
+    {
+        $hashes = [];
+        foreach (UserOAuthAccount::query()->where('user_id', $user->id)->get() as $account) {
+            $column = match ($account->provider) {
+                OAuthProvider::Discord => 'discord_hash',
+                OAuthProvider::Google => 'google_hash',
+            };
+            $hashes[$column] = self::identity($account->provider->value, $account->provider_user_id);
+        }
+
+        return $hashes;
+    }
+
+    /**
+     * The application key the anti-abuse hashes are keyed with.
+     *
+     * @throws RuntimeException when the panel has no app key
+     */
+    public static function key(): string
+    {
+        $key = config('app.key');
+        throw_unless(is_string($key) && $key !== '', RuntimeException::class, 'APP_KEY is not set, so the anti-abuse hashes cannot be keyed. Run "php artisan key:generate".');
+
+        return $key;
+    }
+
     private static function hash(string $purpose, string $value): string
     {
-        return hash_hmac('sha256', 'monoforge-trial:'.$purpose.':'.$value, config()->string('app.key'));
+        return hash_hmac('sha256', 'monoforge-trial:'.$purpose.':'.$value, self::key());
     }
 }

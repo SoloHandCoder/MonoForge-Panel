@@ -30,7 +30,9 @@ class ReferralController extends AdminApiController
         'enabled' => false,
         'reward_tokens' => 200,
         'monthly_cap' => 10,
-        'hold_days' => 7,
+        'hold_days' => 30,
+        'min_purchase_tokens' => 0,
+        'effective_min_purchase_tokens' => 500,
     ];
 
     private const array REFERRAL_EXAMPLE = [
@@ -46,7 +48,7 @@ class ReferralController extends AdminApiController
         'tebex_transaction_id' => 'tbx-26929122a56954-ef3212',
         'reward_tokens' => null,
         'qualified_at' => '2026-11-16T12:00:00+00:00',
-        'payout_after' => '2026-11-23T12:00:00+00:00',
+        'payout_after' => '2026-12-16T12:00:00+00:00',
         'paid_at' => null,
         'reversed_at' => null,
         'created_at' => '2026-11-15T12:00:00+00:00',
@@ -54,21 +56,32 @@ class ReferralController extends AdminApiController
 
     public function __construct(private readonly ReferralService $referrals) {}
 
-    #[Endpoint('Get referral settings', 'Returns whether the referral programme is on, the reward each side gets, the monthly cap per referrer (0 is none) and the hold period of the first purchase in days.')]
+    #[Endpoint('Get referral settings', 'Returns whether the referral programme is on, the reward each side gets, the monthly cap per referrer (0 is none), the hold period of the first purchase in days, and the tokens that purchase must credit (min_purchase_tokens as set, where 0 means the smallest visible token pack; effective_min_purchase_tokens is the number in force). A referral only qualifies when the referred user has a linked Discord or Google account that never earned a referral reward before.')]
     #[ScribeResponse(self::SETTINGS_EXAMPLE, description: 'Settings returned.')]
     public function settings(GetShopRequest $request): JsonResponse
     {
         return new JsonResponse(ReferralSettings::toArray());
     }
 
-    #[Endpoint('Update referral settings', 'Turns the referral programme on or off and sets the reward and the monthly cap. While it is off no sign-up is recorded as referred and no reward is paid (held rewards wait). Root administrators only.')]
+    #[Endpoint('Update referral settings', 'Turns the referral programme on or off and sets the reward, the monthly cap and, optionally, the hold period (1 to 365 days) and the tokens the first purchase must credit (0 is the smallest visible token pack). While it is off no sign-up is recorded as referred and no reward is paid (held rewards wait). Root administrators only.')]
     #[ScribeResponse(self::SETTINGS_EXAMPLE, description: 'Settings saved.')]
     public function updateSettings(UpdateReferralSettingsRequest $request): JsonResponse
     {
-        ReferralSettings::store($request->boolean('enabled'), $request->integer('reward_tokens'), $request->integer('monthly_cap'));
+        ReferralSettings::store(
+            $request->boolean('enabled'),
+            $request->integer('reward_tokens'),
+            $request->integer('monthly_cap'),
+            $request->has('hold_days') ? $request->integer('hold_days') : null,
+            $request->has('min_purchase_tokens') ? $request->integer('min_purchase_tokens') : null,
+        );
 
         Activity::event('admin:shop.referrals.update')
-            ->property(['enabled' => $request->boolean('enabled') ? 'yes' : 'no', 'reward' => $request->integer('reward_tokens'), 'cap' => $request->integer('monthly_cap')])
+            ->property([
+                'enabled' => $request->boolean('enabled') ? 'yes' : 'no',
+                'reward' => $request->integer('reward_tokens'),
+                'cap' => $request->integer('monthly_cap'),
+                'hold' => ReferralSettings::holdDays(),
+            ])
             ->log();
 
         return new JsonResponse(ReferralSettings::toArray());

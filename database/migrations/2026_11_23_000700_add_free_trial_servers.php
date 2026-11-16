@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -62,6 +63,10 @@ return new class extends Migration
         });
 
         Schema::dropIfExists('shop_trials');
+
+        // The narrowed enum has no `trial`: a trial nobody paid for becomes suspended (so the
+        // billing engine removes it after the grace period) instead of an invalid value.
+        DB::table('server_subscriptions')->where('status', 'trial')->update(['status' => 'suspended', 'delete_at' => now()->addDays(7)]);
 
         Schema::table('server_subscriptions', function (Blueprint $table): void {
             $table->dropColumn('is_trial');

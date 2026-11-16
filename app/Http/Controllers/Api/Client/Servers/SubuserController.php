@@ -23,20 +23,35 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Subusers\StoreSubuserRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Subusers\UpdateSubuserRequest;
 use Pterodactyl\Http\Resources\Api\ApiResourceCollection;
 use Pterodactyl\Http\Resources\Api\Client\SubuserResource;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Subuser;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Throwable;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
 #[Subgroup('Server Subusers', 'Create, view, update, and remove server subusers.')]
 class SubuserController extends ClientApiController
 {
+    /** Why a free trial server cannot get subusers: a trial is not handed on to another account. */
+    public const string TRIAL_REFUSAL = 'A free trial server cannot have subusers. Keep this server to add users.';
+
     private const array SUBUSER_EXISTS_ERROR = [
         'errors' => [
             [
                 'code' => 'ServerSubuserExistsException',
                 'status' => '400',
                 'detail' => 'A user with that email address is already assigned as a subuser for this server.',
+            ],
+        ],
+    ];
+
+    private const array TRIAL_ERROR = [
+        'errors' => [
+            [
+                'code' => 'AccessDeniedHttpException',
+                'status' => '403',
+                'detail' => self::TRIAL_REFUSAL,
             ],
         ],
     ];
@@ -74,8 +89,12 @@ class SubuserController extends ClientApiController
     #[BodyParam('friend', 'string', 'The UUID of a friend of the authenticated user to invite instead of an email.', required: false, example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[ResponseFromResource(SubuserResource::class, Subuser::class, description: 'Server subuser created.', resourceKey: 'server_subuser')]
     #[ScribeResponse(self::SUBUSER_EXISTS_ERROR, status: 400, description: 'The user is already assigned to the server or is the server owner.')]
+    #[ScribeResponse(self::TRIAL_ERROR, status: 403, description: 'The server is a free trial nobody has paid for yet.')]
     public function store(StoreSubuserRequest $request, CreatesSubusers $subusers, Server $server): SubuserResource
     {
+        $trial = ServerSubscription::query()->where('server_id', $server->id)->where('is_trial', true)->exists();
+        throw_if($trial, AccessDeniedHttpException::class, self::TRIAL_REFUSAL);
+
         $response = $subusers->create($server, $request->inviteeEmail(), $request->permissions());
 
         return SubuserResource::make($response);

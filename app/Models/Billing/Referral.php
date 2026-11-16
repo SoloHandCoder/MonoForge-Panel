@@ -31,6 +31,8 @@ use Pterodactyl\Models\User;
  * @property int $referred_id
  * @property string $status
  * @property string|null $network_hash
+ * @property string|null $discord_hash the referred user's linked Discord account when it qualified, hashed
+ * @property string|null $google_hash the referred user's linked Google account when it qualified, hashed
  * @property CarbonImmutable|null $flagged_at
  * @property string|null $flag_reason
  * @property int|null $reviewed_by

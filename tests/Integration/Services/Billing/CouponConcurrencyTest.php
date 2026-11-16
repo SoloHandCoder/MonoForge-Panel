@@ -6,10 +6,12 @@ namespace Pterodactyl\Tests\Pest\Integration\Services\Billing\CouponConcurrencyT
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Sleep;
+use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Models\Billing\Coupon;
 use Pterodactyl\Models\Billing\CouponRedemption;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
+use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use RuntimeException;
@@ -85,6 +87,15 @@ function race(Coupon $coupon, array $redeemers): array
     return [$allWaited, array_map(finishRedeem(...), $workers)];
 }
 
+/** A user with a linked Discord account, which a free-tokens coupon needs. */
+function linkedUser(): User
+{
+    $user = User::factory()->create();
+    UserOAuthAccount::query()->create(['user_id' => $user->id, 'provider' => OAuthProvider::Discord, 'provider_user_id' => (string) (700000 + $user->id)]);
+
+    return $user;
+}
+
 function cleanUp(Coupon $coupon, User ...$users): void
 {
     while (DB::transactionLevel() > 0) {
@@ -94,21 +105,22 @@ function cleanUp(Coupon $coupon, User ...$users): void
     CouponRedemption::query()->where('coupon_id', $coupon->id)->delete();
     $coupon->delete();
     foreach ($users as $user) {
+        UserOAuthAccount::query()->where('user_id', $user->id)->delete();
         $user->delete();
     }
 }
 
 test('two users racing for the last redemption: exactly one gets it', function (): void {
     $coupon = Coupon::query()->forceCreate(['code' => 'RACE'.mb_strtoupper(bin2hex(random_bytes(3))), 'type' => Coupon::TYPE_TOKENS, 'value' => 300, 'max_redemptions' => 1, 'enabled' => true]);
-    $first = User::factory()->create();
-    $second = User::factory()->create();
+    $first = linkedUser();
+    $second = linkedUser();
 
     try {
         [$allWaited, $results] = race($coupon, [[$first->id, '198.51.100.7'], [$second->id, '203.0.113.9']]);
 
         expect($allWaited)->toBeTrue('Both workers should have waited on the coupon row lock.')
             ->and(collect($results)->pluck('ok')->sort()->values()->all())->toBe([false, true])
-            ->and(collect($results)->firstWhere('ok', false)['message'] ?? null)->toBe('This coupon has been used up.')
+            ->and(collect($results)->firstWhere('ok', false)['message'] ?? null)->toBe("This code can't be used.")
             ->and($coupon->refresh()->redemptions_count)->toBe(1)
             ->and(CouponRedemption::query()->where('coupon_id', $coupon->id)->count())->toBe(1)
             ->and(resolve(TokenWallet::class)->balance($first) + resolve(TokenWallet::class)->balance($second))->toBe(300)
@@ -120,7 +132,7 @@ test('two users racing for the last redemption: exactly one gets it', function (
 
 test('one user redeeming the same coupon twice at once is credited once', function (): void {
     $coupon = Coupon::query()->forceCreate(['code' => 'TWICE'.mb_strtoupper(bin2hex(random_bytes(3))), 'type' => Coupon::TYPE_TOKENS, 'value' => 300, 'enabled' => true]);
-    $user = User::factory()->create();
+    $user = linkedUser();
 
     try {
         [$allWaited, $results] = race($coupon, [[$user->id, '198.51.100.7'], [$user->id, '198.51.100.7']]);

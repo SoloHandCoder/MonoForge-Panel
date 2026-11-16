@@ -241,7 +241,8 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
 |
 */
 Route::prefix('/billing')->name('api.admin.billing')->group(function (): void {
-    Route::get('/revenue', RevenueController::class)->name('.revenue');
+    // Each new range is built once and cached for five minutes; ten a minute bounds the work.
+    Route::get('/revenue', RevenueController::class)->middleware('throttle:10,1')->name('.revenue');
 });
 
 /*
@@ -361,9 +362,11 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/playit', [PlayitController::class, 'show'])->name('.playit');
     Route::put('/playit', [PlayitController::class, 'update'])->name('.playit.update');
     Route::post('/playit/test', [PlayitController::class, 'test'])->name('.playit.test');
-    // "Set up automatic tunnels" changes the node's agent key: a browser session only.
-    Route::get('/playit/switch', [PlayitSwitchController::class, 'show'])->name('.playit.switch');
+    // "Set up automatic tunnels" changes the node's agent key (and its state shows the claim URL):
+    // a browser session only.
     Route::middleware(RequireSessionAuthentication::class)->group(function (): void {
+        Route::get('/playit/switch', [PlayitSwitchController::class, 'show'])->name('.playit.switch');
+        Route::post('/playit/switch/reconcile', [PlayitSwitchController::class, 'reconcile'])->name('.playit.switch.reconcile');
         Route::post('/playit/switch', [PlayitSwitchController::class, 'start'])->name('.playit.switch.start');
         Route::post('/playit/switch/check', [PlayitSwitchController::class, 'check'])->name('.playit.switch.check');
         Route::post('/playit/switch/token', [PlayitSwitchController::class, 'token'])->name('.playit.switch.token');

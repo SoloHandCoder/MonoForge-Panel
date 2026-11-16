@@ -8,6 +8,7 @@ import {
     useCreatePermissionTemplate,
 } from '@/api/account/permission-templates/queries';
 import { useCurrentUser } from '@/api/account/queries';
+import { useServerSubscription } from '@/api/billing/subscriptions';
 import { useCurrentServerPermissions } from '@/api/server/queries';
 import {
     createServerSubuserInput,
@@ -28,6 +29,9 @@ import { attempt } from './attempt';
 import { useLoadedServer } from './loadedServer';
 import { permissionGroupRows, replaceEditablePermissions } from './permissionSelection';
 
+/** Shown instead of the invite button on a free trial server (the panel refuses it too). */
+const TRIAL_SUBUSERS_BLOCKED = 'A free trial server cannot have subusers. Keep this server to add users.';
+
 export interface SubuserSummary {
     readonly uuid: string;
     readonly email: string;
@@ -46,6 +50,11 @@ export interface SubuserListModel {
     readonly serverId: string;
     readonly subusers: readonly SubuserSummary[];
     readonly canCreate: boolean;
+    /**
+     * Why no user can be added although the viewer may create subusers (a free trial server, until
+     * it is kept), or null.
+     */
+    readonly createBlocked: string | null;
     readonly canUpdate: boolean;
     readonly canDelete: boolean;
     readonly deleting: boolean;
@@ -188,7 +197,10 @@ function useSubuserListModel(): SubuserListModel {
     const { uuid, identifier } = useLoadedServer().attributes;
     const viewer = useCurrentUser().uuid;
     const { data } = useServerSubusers(uuid);
-    const [canCreate, canUpdate, canDelete] = usePermissions(['user.create', 'user.update', 'user.delete']);
+    const [mayCreate, canUpdate, canDelete] = usePermissions(['user.create', 'user.update', 'user.delete']);
+    const trial = useServerSubscription(identifier)?.is_trial === true;
+    const createBlocked = mayCreate && trial ? TRIAL_SUBUSERS_BLOCKED : null;
+    const canCreate = mayCreate && !trial;
     const { mutateAsync, isPending: deleting } = useDeleteSubuser();
     const remove = useCallback(
         async (subuserUuid: string) => {
@@ -212,12 +224,13 @@ function useSubuserListModel(): SubuserListModel {
             serverId: identifier,
             subusers: (data?.data ?? []).map((subuser) => subuserSummary(subuser, viewer)),
             canCreate,
+            createBlocked,
             canUpdate,
             canDelete,
             deleting,
             remove,
         }),
-        [identifier, data, viewer, canCreate, canUpdate, canDelete, deleting, remove]
+        [identifier, data, viewer, canCreate, createBlocked, canUpdate, canDelete, deleting, remove]
     );
 }
 
@@ -451,6 +464,7 @@ const listFixture = (options: Partial<SubuserListModel> = {}): SubuserListModel 
     serverId: 'a1b2c3d4',
     subusers: subuserFixtures,
     canCreate: true,
+    createBlocked: null,
     canUpdate: true,
     canDelete: true,
     deleting: false,
@@ -571,6 +585,7 @@ implementViews({
             subusers: () => listFixture(),
             empty: () => listFixture({ subusers: [] }),
             readOnly: () => listFixture({ canCreate: false, canUpdate: false, canDelete: false }),
+            trial: () => listFixture({ canCreate: false, createBlocked: TRIAL_SUBUSERS_BLOCKED }),
         },
     },
     'page.server.users.create': {

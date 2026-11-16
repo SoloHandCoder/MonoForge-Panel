@@ -7,6 +7,7 @@ import {
     useFinishPlayitSwitch,
     usePlayitClaimPolling,
     usePlayitSwitch,
+    useReconcilePlayitSwitch,
     useRemoveOldTunnels,
     useStartPlayitClaim,
     useUndoPlayitSwitch,
@@ -185,6 +186,7 @@ function OldTunnels({ nodeId, state }: { nodeId: number; state: PlayitSwitchStat
 
 function SelfManaged({ nodeId, state }: { nodeId: number; state: PlayitSwitchState }) {
     const undo = useUndoPlayitSwitch(nodeId);
+    const reconcile = useReconcilePlayitSwitch(nodeId);
 
     return (
         <>
@@ -199,8 +201,16 @@ function SelfManaged({ nodeId, state }: { nodeId: number; state: PlayitSwitchSta
                 </Alert>
             )}
             <OldTunnels nodeId={nodeId} state={state} />
-            {state.can_undo && (
-                <div className='mt-4 flex flex-wrap justify-end gap-3'>
+            <div className='mt-4 flex flex-wrap justify-end gap-3'>
+                <Button
+                    type='button'
+                    isSecondary
+                    isLoading={reconcile.isPending}
+                    onClick={() => reconcile.mutate()}
+                >
+                    Check status
+                </Button>
+                {state.can_undo && (
                     <Dialog.ConfirmTrigger
                         title='Go back to the previous agent?'
                         confirm='Undo switch'
@@ -216,8 +226,8 @@ function SelfManaged({ nodeId, state }: { nodeId: number; state: PlayitSwitchSta
                         old agent again. The panel then deletes the tunnels it made on the new agent and gives the
                         servers their old tunnels and addresses back.
                     </Dialog.ConfirmTrigger>
-                </div>
-            )}
+                )}
+            </div>
         </>
     );
 }

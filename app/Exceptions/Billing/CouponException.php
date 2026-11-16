@@ -11,14 +11,19 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 class CouponException extends HttpException
 {
+    /**
+     * The one answer for a code that is unknown, disabled, not valid yet, expired, used up or
+     * not for this player, so codes cannot be probed for.
+     */
+    public const string GENERIC = "This code can't be used.";
+
     public function __construct(string $message)
     {
         parent::__construct(422, $message);
     }
 
-    /** An unknown or disabled code: the same answer, so codes cannot be probed for. */
     public static function invalid(): self
     {
-        return new self('This coupon code is not valid.');
+        return new self(self::GENERIC);
     }
 }

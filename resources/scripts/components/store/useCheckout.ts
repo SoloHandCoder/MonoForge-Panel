@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
+import { toast } from 'sonner';
 import { httpErrorToHuman } from '@/api/http';
 import { newIdempotencyKey, selectionBody, usePurchaseServer, useStoreQuote } from '@/api/store/queries';
 import type {
@@ -280,6 +281,10 @@ export function usePurchaseFlow() {
 
             await wait(MIN_WORKING_MS - (Date.now() - started));
             setResult(response.attributes);
+            // The purchase stands; a step after it did not finish and setup carries on.
+            if (response.attributes.warning) {
+                toast.warning(response.attributes.warning);
+            }
         } catch (cause) {
             await wait(MIN_FAILURE_MS - (Date.now() - started));
             // An answered request is settled, so the next attempt is a new purchase; one lost on

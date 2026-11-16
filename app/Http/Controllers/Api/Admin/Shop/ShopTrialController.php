@@ -30,6 +30,7 @@ class ShopTrialController extends AdminApiController
         'plan_ids' => [3],
         'hours' => 48,
         'max_concurrent' => 10,
+        'daily_cap' => 10,
         'require_verified' => true,
     ];
 
@@ -86,7 +87,7 @@ class ShopTrialController extends AdminApiController
         ]);
     }
 
-    #[Endpoint('Update free trial settings', 'Turns free trial servers on or off and sets the plans that can be tried, the trial length (24, 48 or 72 hours), the most trials running at once panel-wide, and whether an account needs a linked Discord or Google account.')]
+    #[Endpoint('Update free trial settings', 'Turns free trial servers on or off and sets the plans that can be tried, the trial length (24, 48 or 72 hours), the most trials running at once panel-wide, the most trials started per day (in the panel timezone; 0 allows none), and whether an account needs a linked Discord or Google account.')]
     #[ScribeResponse(self::SETTINGS_EXAMPLE, description: 'Trial settings updated.')]
     public function update(UpdateShopTrialsRequest $request): JsonResponse
     {
@@ -97,6 +98,7 @@ class ShopTrialController extends AdminApiController
             ->property('enabled', $settings['enabled'] ? 'on' : 'off')
             ->property('hours', $settings['hours'])
             ->property('max_concurrent', $settings['max_concurrent'])
+            ->property('daily_cap', $settings['daily_cap'])
             ->log();
 
         return new JsonResponse(TrialSettings::all());

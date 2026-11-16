@@ -26,6 +26,8 @@ class UpdateReferralSettingsRequest extends AdminApiRequest
             'enabled' => ['required', 'boolean'],
             'reward_tokens' => ['required', 'integer', 'min:1', 'max:'.ReferralSettings::MAX_REWARD],
             'monthly_cap' => ['required', 'integer', 'min:0', 'max:'.ReferralSettings::MAX_MONTHLY_CAP],
+            'hold_days' => ['sometimes', 'integer', 'min:1', 'max:'.ReferralSettings::MAX_HOLD_DAYS],
+            'min_purchase_tokens' => ['sometimes', 'integer', 'min:0', 'max:'.ReferralSettings::MAX_MIN_PURCHASE],
         ];
     }
 }

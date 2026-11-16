@@ -286,6 +286,7 @@ return [
             'playit-switch' => 'Switched the :name node to the self-managed playit.gg agent',
             'playit-switch-reported' => 'The :name node reported that it runs the self-managed playit.gg agent',
             'playit-rollback-reported' => 'The :name node reported that it is back on its previous playit.gg agent',
+            'playit-reconcile' => 'Checked the playit.gg switch status of the :name node (:action)',
             'playit-undo' => 'Put the previous playit.gg agent of the :name node back',
             'playit-old-tunnels' => 'Removed :removed old playit.gg tunnels of the :name node',
             'playit-old-tunnels-dismiss' => 'Dismissed the old playit.gg tunnels of the :name node',
@@ -371,7 +372,7 @@ return [
                 'delete' => 'Deleted the coupon :code',
             ],
             'referrals' => [
-                'update' => 'Updated the referral settings (on: :enabled, reward :reward tokens, cap :cap a month)',
+                'update' => 'Updated the referral settings (on: :enabled, reward :reward tokens, cap :cap a month, hold :hold days)',
             ],
         ],
         'referral' => [

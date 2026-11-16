@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Actions\Schedules;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ValidatedInput;
 use Illuminate\Validation\Rule;
 use Pterodactyl\Contracts\Schedules\CreatesScheduleTasks;
+use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Exceptions\Http\HttpForbiddenException;
 use Pterodactyl\Exceptions\Service\ServiceLimitExceededException;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Task;
+use Pterodactyl\Models\User;
 use Pterodactyl\Services\Query\ServerQuery;
 
 final readonly class CreateScheduleTask implements CreatesScheduleTasks
@@ -71,6 +74,10 @@ final readonly class CreateScheduleTask implements CreatesScheduleTasks
             default => $currentKeep,
         };
         throw_if($keep !== null && $keep > $server->backup_limit, DisplayException::class, sprintf('A backup task can keep at most %d backups on this server.', $server->backup_limit));
+
+        // Keeping only the newest backups deletes the older ones the task made.
+        $user = Auth::user();
+        throw_if($keep !== null && $keep !== $currentKeep && $user instanceof User && ! $user->can(Permissions::BackupDelete->value, $server), HttpForbiddenException::class, 'Keeping only the newest backups deletes older ones, so it needs the backup.delete permission.');
 
         $payload = $validated['payload'] ?? '';
 

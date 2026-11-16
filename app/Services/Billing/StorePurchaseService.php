@@ -308,7 +308,8 @@ class StorePurchaseService
     private function previewCoupon(User $user, string $code, ShopPlan $plan, Quote $quote): CouponDiscount
     {
         try {
-            return $this->coupons->preview($user, $code, $plan, $quote->totalPerPeriod);
+            // Counted like a quote, so the purchase endpoint cannot be used to guess codes either.
+            return $this->coupons->attempt($user, fn (): CouponDiscount => $this->coupons->preview($user, $code, $plan, $quote->totalPerPeriod));
         } catch (CouponException $couponException) {
             throw StorePurchaseException::unavailable($couponException->getMessage());
         }
@@ -431,8 +432,16 @@ class StorePurchaseService
             $this->refund($user, $charged, $reference, $server, $throwable);
         }
 
+        $warning = null;
         if ($discount instanceof CouponDiscount) {
-            $this->coupons->attachServer($reference, $server);
+            try {
+                $this->coupons->attachServer($reference, $server);
+            } catch (Throwable $throwable) {
+                // The purchase is paid and the server exists; only the audit link is missing.
+                report($throwable);
+                Log::warning('A coupon redemption could not be linked to its server; the purchase stands.', ['reference' => $reference, 'server' => $server->uuid]);
+                $warning = 'Your server was bought and is being set up. One last step did not finish; the panel carries on, and support can help if anything looks wrong.';
+            }
         }
 
         return new StorePurchaseResult(
@@ -442,6 +451,7 @@ class StorePurchaseService
             address: $this->provisionTunnel($server, $subdomain),
             discountTokens: $discount instanceof CouponDiscount ? $discount->discount : 0,
             couponCode: $discount?->coupon->code,
+            warning: $warning,
         );
     }
 

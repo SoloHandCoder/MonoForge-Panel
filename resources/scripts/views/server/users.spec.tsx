@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { friendsQueryOptions } from '@/api/account/friends/queries';
 import { permissionTemplatesQueryOptions } from '@/api/account/permission-templates/queries';
+import { serverSubscriptionsQueryOptions } from '@/api/billing/subscriptions';
 import http from '@/api/http';
 import { serverSubusersQueryOptions, type Subuser } from '@/api/server/users/queries';
 import { systemPermissionsQueryOptions } from '@/api/system/queries';
@@ -75,7 +76,12 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-async function renderInServer(children: ReactNode, options: TestServerOptions = {}, path = '/server/a1b2c3d4/users') {
+async function renderInServer(
+    children: ReactNode,
+    options: TestServerOptions = {},
+    path = '/server/a1b2c3d4/users',
+    seed?: (client: ExtensionTestHost['queryClient']) => void
+) {
     const server = createTestServer({ identifier: 'a1b2c3d4', ...options });
 
     host = createExtensionTestHost({ server, path });
@@ -126,6 +132,8 @@ async function renderInServer(children: ReactNode, options: TestServerOptions = 
         ],
     });
 
+    seed?.(host.queryClient);
+
     await act(async () => {
         render(children, { wrapper: host!.Wrapper });
     });
@@ -134,6 +142,18 @@ async function renderInServer(children: ReactNode, options: TestServerOptions = 
 }
 
 describe('server.subusers', () => {
+    it('hides the invite on a free trial server and says why', async () => {
+        await renderInServer(<View name='server.subusers' />, {}, '/server/a1b2c3d4/users', (client) =>
+            client.setQueryData(serverSubscriptionsQueryOptions().queryKey, {
+                object: 'list',
+                data: [{ object: 'server_subscription', attributes: { server_identifier: 'a1b2c3d4', is_trial: true } }],
+            } as never)
+        );
+
+        expect(screen.queryByRole('link', { name: 'New user' })).not.toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('A free trial server cannot have subusers.');
+    });
+
     it('offers actions for everyone but the viewer', async () => {
         await renderInServer(<View name='server.subusers' />);
 

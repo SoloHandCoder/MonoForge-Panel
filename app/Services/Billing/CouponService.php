@@ -13,7 +13,9 @@ use Pterodactyl\Data\CouponDiscount;
 use Pterodactyl\Exceptions\Billing\CouponException;
 use Pterodactyl\Models\Billing\Coupon;
 use Pterodactyl\Models\Billing\CouponRedemption;
+use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopPlan;
+use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
@@ -29,6 +31,9 @@ class CouponService
 {
     /** The reference type of a coupon's wallet credit in the token ledger. */
     public const string LEDGER_REFERENCE = 'coupon';
+
+    /** Why a free-tokens coupon is refused to an account without a linked login. */
+    public const string LINK_ACCOUNT = 'Link a Discord or Google account on your account page to redeem coupons for free tokens.';
 
     /** Unknown or refused codes a user may try in FAILURE_WINDOW seconds, so codes cannot be guessed. */
     public const int MAX_FAILURES = 10;
@@ -138,23 +143,35 @@ class CouponService
      * Redeems a free-tokens coupon on the Wallet page: credits its tokens once.
      *
      * Free tokens are the easiest thing to farm with new accounts, so on top of the usual
-     * limits a free-tokens coupon is redeemed once per network (/24 or /48), and never by
-     * the administrator who created it.
+     * limits the account needs a linked Discord or Google account, and a free-tokens coupon is
+     * redeemed once per linked account and once per network (/24 or /48), and never by the
+     * administrator who created it.
      *
      * @throws CouponException
      */
     public function redeemTokens(User $user, string $code, ?string $ip): CouponRedemption
     {
-        return DB::transaction(function () use ($user, $code, $ip): CouponRedemption {
+        // Asked before the code is looked at, so it says nothing about the code.
+        $identities = TrialFingerprint::linkedIdentities($user);
+        throw_if($identities === [], CouponException::class, self::LINK_ACCOUNT);
+
+        return DB::transaction(function () use ($user, $code, $ip, $identities): CouponRedemption {
             $coupon = $this->lock($code);
             $this->lockUser($user);
             $network = NetworkHash::of($ip);
             $this->check($coupon, $user, null, $network);
 
+            $sameIdentity = CouponRedemption::query()->where('coupon_id', $coupon->id)->where(function (Builder $query) use ($identities): void {
+                foreach ($identities as $column => $hash) {
+                    $query->orWhere($column, $hash);
+                }
+            })->exists();
+            throw_if($sameIdentity, CouponException::invalid());
+
             $tokens = min($coupon->value, Coupon::MAX_TOKENS);
             throw_if($tokens < 1, CouponException::invalid());
 
-            $redemption = $this->record($coupon, $user, $tokens, null, $network);
+            $redemption = $this->record($coupon, $user, $tokens, null, $network, $identities);
             $this->wallet->credit(
                 $user,
                 $tokens,
@@ -170,15 +187,24 @@ class CouponService
     }
 
     /**
-     * Whether the user has bought anything: a Tebex token purchase, or a store server whose
-     * charge was not refunded.
+     * Whether the user is not a new customer: any Tebex payment, any server subscription (a free
+     * trial included), any server or add-on charge other than a store purchase that failed and
+     * was refunded (renewals and a kept trial count), or a Tebex token purchase.
      */
     public function hasPurchased(User $user): bool
     {
+        if (TebexPayment::query()->where('user_id', $user->id)->exists()
+            || ServerSubscription::query()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
         return TokenTransaction::query()
             ->where('user_id', $user->id)
             ->where(fn (Builder $query): Builder => $query
                 ->where('type', TokenTransaction::TYPE_PURCHASE)
+                ->orWhere(fn (Builder $query): Builder => $query
+                    ->whereIn('type', [TokenTransaction::TYPE_SERVER_CHARGE, TokenTransaction::TYPE_ADDON_CHARGE])
+                    ->where(fn (Builder $query): Builder => $query->whereNull('reference_type')->orWhere('reference_type', '!=', StorePurchaseService::REFERENCE_TYPE)))
                 ->orWhere(fn (Builder $query): Builder => $query
                     ->where('type', TokenTransaction::TYPE_SERVER_CHARGE)
                     ->where('reference_type', StorePurchaseService::REFERENCE_TYPE)
@@ -215,30 +241,31 @@ class CouponService
      */
     private function check(Coupon $coupon, User $user, ?ShopPlan $plan, ?string $network): void
     {
+        // One answer for every reason a code cannot be used, so codes cannot be probed for.
         throw_unless($coupon->enabled, CouponException::invalid());
 
         $now = now();
-        throw_if($coupon->valid_from !== null && $coupon->valid_from->isAfter($now), CouponException::class, 'This coupon is not valid yet.');
-        throw_if($coupon->valid_until !== null && ! $coupon->valid_until->isAfter($now), CouponException::class, 'This coupon has expired.');
+        throw_if($coupon->valid_from !== null && $coupon->valid_from->isAfter($now), CouponException::invalid());
+        throw_if($coupon->valid_until !== null && ! $coupon->valid_until->isAfter($now), CouponException::invalid());
 
         if ($plan instanceof ShopPlan) {
             throw_unless($coupon->isDiscount(), CouponException::class, 'This coupon adds tokens to your wallet. Redeem it on the Wallet page.');
-            throw_unless($coupon->allowsPlan($plan), CouponException::class, 'This coupon does not apply to this plan.');
+            throw_unless($coupon->allowsPlan($plan), CouponException::invalid());
         } else {
             throw_if($coupon->isDiscount(), CouponException::class, 'This coupon is a discount. Enter it at the store checkout.');
-            throw_if($coupon->created_by === $user->id, CouponException::class, 'You cannot redeem a coupon you created.');
+            throw_if($coupon->created_by === $user->id, CouponException::invalid());
         }
 
-        throw_if($coupon->max_redemptions !== null && $coupon->redemptions_count >= $coupon->max_redemptions, CouponException::class, 'This coupon has been used up.');
+        throw_if($coupon->max_redemptions !== null && $coupon->redemptions_count >= $coupon->max_redemptions, CouponException::invalid());
 
         $used = CouponRedemption::query()->where('coupon_id', $coupon->id)->where('user_id', $user->id)->exists();
         throw_if($used, CouponException::class, 'You have already used this coupon.');
 
-        throw_if($coupon->new_customers_only && $this->hasPurchased($user), CouponException::class, 'This coupon is only for new customers.');
+        throw_if($coupon->new_customers_only && $this->hasPurchased($user), CouponException::invalid());
 
         if (! $coupon->isDiscount() && $network !== null) {
             $sameNetwork = CouponRedemption::query()->where('coupon_id', $coupon->id)->where('network_hash', $network)->exists();
-            throw_if($sameNetwork, CouponException::class, 'This coupon was already redeemed from your network.');
+            throw_if($sameNetwork, CouponException::invalid());
         }
     }
 
@@ -250,9 +277,11 @@ class CouponService
     }
 
     /**
+     * @param  array<'discord_hash'|'google_hash', string>  $identities  the linked accounts of a free-tokens redemption
+     *
      * @throws CouponException
      */
-    private function record(Coupon $coupon, User $user, int $tokens, ?string $reference, ?string $network): CouponRedemption
+    private function record(Coupon $coupon, User $user, int $tokens, ?string $reference, ?string $network, array $identities = []): CouponRedemption
     {
         try {
             $redemption = CouponRedemption::query()->create([
@@ -261,6 +290,8 @@ class CouponService
                 'tokens' => $tokens,
                 'purchase_reference' => $reference,
                 'network_hash' => $network,
+                'discord_hash' => $identities['discord_hash'] ?? null,
+                'google_hash' => $identities['google_hash'] ?? null,
             ]);
         } catch (UniqueConstraintViolationException) {
             throw new CouponException('You have already used this coupon.');

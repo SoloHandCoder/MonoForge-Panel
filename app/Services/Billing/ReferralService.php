@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Billing;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Pterodactyl\Models\ActivityLog;
@@ -24,12 +25,21 @@ use Throwable;
  * period both users get the reward. A refund, chargeback or dispute before the payout cancels
  * it, and one after the payout takes both rewards back.
  *
+ * Only a referred user with a linked Discord or Google account qualifies, once per linked
+ * account (their hashes are kept on the referral, unique), and only when the first purchase
+ * credits at least ReferralSettings::minPurchaseTokens().
+ *
  * Locks are always taken in the same order, so the payout cannot deadlock with a webhook:
  * the Tebex payment, then the users (by id), then the referral row.
  */
 class ReferralService
 {
     public const string PATH_PREFIX = '/r/';
+
+    /** Why a referral was refused at its first purchase, as kept on the row (never shown to the referrer). */
+    public const string NO_LINKED_ACCOUNT = 'The referred user has no linked Discord or Google account.';
+
+    public const string LINKED_ACCOUNT_USED = "The referred user's linked Discord or Google account already earned a referral reward.";
 
     /** No 0/O or 1/I/L, so a code read aloud or typed from a screenshot comes out right. */
     private const string CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -107,8 +117,10 @@ class ReferralService
     }
 
     /**
-     * A Tebex payment was credited to the user. Their first one starts the referral's hold.
-     * Called inside the payment's locked transaction.
+     * A Tebex payment was credited to the user. Their first one starts the referral's hold, if
+     * it qualifies: a linked Discord or Google account that never earned a reward, and at least
+     * the minimum purchase. Otherwise the referral is refused for good. Called inside the
+     * payment's locked transaction.
      */
     public function paymentCredited(TebexPayment $payment, User $user): void
     {
@@ -122,13 +134,36 @@ class ReferralService
             return;
         }
 
+        $identities = TrialFingerprint::linkedIdentities($user);
+        $minimum = ReferralSettings::minPurchaseTokens();
+        $problem = match (true) {
+            $identities === [] => self::NO_LINKED_ACCOUNT,
+            $this->identityUsed($identities, $referral) => self::LINKED_ACCOUNT_USED,
+            $payment->tokens < $minimum => sprintf('The first purchase credited %s tokens; at least %s are needed.', number_format($payment->tokens), number_format($minimum)),
+            default => null,
+        };
+
+        if ($problem !== null) {
+            $this->refuse($referral, $payment, $problem);
+
+            return;
+        }
+
         $now = now()->toImmutable();
-        $referral->forceFill([
-            'status' => Referral::STATUS_HELD,
-            'tebex_payment_id' => $payment->id,
-            'qualified_at' => $now,
-            'payout_after' => $now->addDays(ReferralSettings::HOLD_DAYS),
-        ])->save();
+        try {
+            DB::transaction(fn () => $referral->forceFill([
+                'status' => Referral::STATUS_HELD,
+                'tebex_payment_id' => $payment->id,
+                'qualified_at' => $now,
+                'payout_after' => $now->addDays(ReferralSettings::holdDays()),
+                'discord_hash' => $identities['discord_hash'] ?? null,
+                'google_hash' => $identities['google_hash'] ?? null,
+            ])->save());
+        } catch (UniqueConstraintViolationException) {
+            // Another referral took the same linked account at the same moment.
+            $referral->refresh();
+            $this->refuse($referral, $payment, self::LINKED_ACCOUNT_USED);
+        }
     }
 
     /**
@@ -362,6 +397,29 @@ class ReferralService
 
         $this->wallet->credit($user, $tokens, TokenTransaction::TYPE_REFERRAL, $description, Referral::LEDGER_REFERENCE, $reference, ['referral_id' => $referral->id]);
         $this->notices->notify($user, 'success', 'Referral reward', number_format($tokens).' tokens from a referral were added to your wallet.', null, 'Open referrals', '/account/referrals');
+    }
+
+    /**
+     * Whether any of the linked accounts is already on another referral that qualified.
+     *
+     * @param  array<'discord_hash'|'google_hash', string>  $identities
+     */
+    private function identityUsed(array $identities, Referral $referral): bool
+    {
+        return Referral::query()->whereKeyNot($referral->id)->where(function (Builder $query) use ($identities): void {
+            foreach ($identities as $column => $hash) {
+                $query->orWhere($column, $hash);
+            }
+        })->exists();
+    }
+
+    private function refuse(Referral $referral, TebexPayment $payment, string $reason): void
+    {
+        $referral->forceFill([
+            'status' => Referral::STATUS_REJECTED,
+            'tebex_payment_id' => $payment->id,
+            'flag_reason' => mb_substr($reason, 0, 255),
+        ])->save();
     }
 
     /**

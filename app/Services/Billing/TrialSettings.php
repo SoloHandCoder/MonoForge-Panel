@@ -19,6 +19,10 @@ final class TrialSettings
 
     public const int MAX_CONCURRENT = 10000;
 
+    public const int DEFAULT_DAILY_CAP = 10;
+
+    public const int MAX_DAILY_CAP = 10000;
+
     public static function enabled(): bool
     {
         return config()->boolean('monoforge.shop.trials.enabled');
@@ -56,6 +60,15 @@ final class TrialSettings
         return max(0, min(self::MAX_CONCURRENT, config()->integer('monoforge.shop.trials.max_concurrent', 10)));
     }
 
+    /**
+     * How many trials may be started per day (in the panel's timezone) across the panel; 0
+     * allows none. Keeps a farmer from taking every slot in one go.
+     */
+    public static function dailyCap(): int
+    {
+        return max(0, min(self::MAX_DAILY_CAP, config()->integer('monoforge.shop.trials.daily_cap', self::DEFAULT_DAILY_CAP)));
+    }
+
     /** Whether the account needs a linked Discord or Google account (a provider-verified email). */
     public static function requireVerified(): bool
     {
@@ -63,7 +76,7 @@ final class TrialSettings
     }
 
     /**
-     * @return array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, require_verified: bool}
+     * @return array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, daily_cap: int, require_verified: bool}
      */
     public static function all(): array
     {
@@ -72,6 +85,7 @@ final class TrialSettings
             'plan_ids' => self::planIds(),
             'hours' => self::hours(),
             'max_concurrent' => self::maxConcurrent(),
+            'daily_cap' => self::dailyCap(),
             'require_verified' => self::requireVerified(),
         ];
     }
@@ -79,7 +93,7 @@ final class TrialSettings
     /**
      * Stores the settings and applies them to this request's configuration.
      *
-     * @param  array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, require_verified: bool}  $values
+     * @param  array{enabled: bool, plan_ids: list<int>, hours: int, max_concurrent: int, daily_cap: int, require_verified: bool}  $values
      */
     public static function store(array $values): void
     {
@@ -88,6 +102,7 @@ final class TrialSettings
             'plan_ids' => implode(',', $values['plan_ids']),
             'hours' => $values['hours'],
             'max_concurrent' => $values['max_concurrent'],
+            'daily_cap' => $values['daily_cap'],
             'require_verified' => $values['require_verified'],
         ];
 

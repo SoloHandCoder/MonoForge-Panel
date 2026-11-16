@@ -8,6 +8,7 @@ namespace Pterodactyl\Services\Billing;
  * A keyed hash of the network an address belongs to: its /24 for IPv4 and its /48 for IPv6.
  * Keyed with the application key, so the stored hashes cannot be turned back into networks
  * by hashing every possible one. Used to spot sign-ups and redemptions from the same place.
+ * Without an app key the hashes could be reversed, so it throws instead of hashing.
  */
 final class NetworkHash
 {
@@ -47,8 +48,6 @@ final class NetworkHash
 
     private static function key(): string
     {
-        $key = config('app.key');
-
-        return is_string($key) && $key !== '' ? $key : 'monoforge';
+        return TrialFingerprint::key();
     }
 }

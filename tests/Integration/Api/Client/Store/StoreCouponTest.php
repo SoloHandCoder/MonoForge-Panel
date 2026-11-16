@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Store\StoreCouponTest;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Mockery;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Billing\Coupon;
@@ -142,7 +144,7 @@ test('the quote shows what a coupon takes off the first period, without redeemin
     $this->actingAs($this->user)->postJson('/api/client/store/quote', quoteBody(['coupon' => 'NOPE']))
         ->assertOk()
         ->assertJsonPath('coupon.valid', false)
-        ->assertJsonPath('coupon.message', 'This coupon code is not valid.')
+        ->assertJsonPath('coupon.message', "This code can't be used.")
         ->assertJsonPath('coupon.first_period_tokens', 500);
 
     $this->actingAs($this->user)->postJson('/api/client/store/quote', quoteBody(['coupon' => null]))
@@ -238,25 +240,25 @@ test('the redemption limit, the validity window and the enabled switch are enfor
     $this->actingAs($other)->postJson('/api/client/store/purchase', couponOrder(['idempotency_key' => 'key-'.str_repeat('o', 20)]))->assertCreated();
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon has been used up.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 
     $coupon->forceFill(['max_redemptions' => null, 'valid_from' => now()->addDay()])->save();
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon is not valid yet.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 
     // The purchase endpoint allows three attempts a minute.
     $this->travel(61)->seconds();
     $coupon->forceFill(['valid_from' => null, 'valid_until' => now()->subMinute()])->save();
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon has expired.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 
     $this->travel(61)->seconds();
     $coupon->forceFill(['valid_until' => null, 'enabled' => false])->save();
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon code is not valid.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 
     expect(couponBalance($this->user))->toBe(1000);
 });
@@ -267,7 +269,7 @@ test('a coupon limited to plans or categories only applies to those', function (
 
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon does not apply to this plan.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 
     $coupon->forceFill(['category_ids' => [$this->category->id]])->save();
     $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())->assertCreated();
@@ -287,7 +289,7 @@ test('a new-customers coupon is refused after a purchase, but not after a purcha
     resolve(TokenWallet::class)->credit($buyer, 900, 'purchase', 'Bought tokens on Tebex', 'tebex_payment', 'tbx-1');
     $this->actingAs($buyer)->postJson('/api/client/store/purchase', couponOrder(['idempotency_key' => 'key-'.str_repeat('b', 20)]))
         ->assertStatus(422)
-        ->assertJsonPath('errors.0.detail', 'This coupon is only for new customers.');
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
 });
 
 test('a purchase that fails after the charge refunds the discounted amount and gives the coupon back', function (): void {
@@ -339,4 +341,57 @@ test('refused codes are counted, so codes cannot be guessed through the quote', 
         ->assertOk()
         ->assertJsonPath('coupon.valid', false)
         ->assertJsonPath('coupon.message', 'Too many coupon codes were tried. Please wait a few minutes and try again.');
+});
+
+test('refused codes on the purchase itself are counted too', function (): void {
+    for ($i = 0; $i < CouponService::MAX_FAILURES; $i++) {
+        $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder(['coupon' => 'GUESS'.$i, 'idempotency_key' => 'key-guess-'.$i.str_repeat('x', 12)]))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.0.detail', "This code can't be used.");
+        // The purchase limiter (3 a minute) is not what is tested here.
+        $this->travel(21)->seconds();
+    }
+
+    coupon();
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
+        ->assertStatus(422)
+        ->assertJsonPath('errors.0.detail', 'Too many coupon codes were tried. Please wait a few minutes and try again.');
+    expect(CouponRedemption::query()->count())->toBe(0);
+});
+
+test('a new-customers coupon also refuses players with a subscription, a kept trial or any Tebex payment', function (string $history): void {
+    coupon(['new_customers_only' => true]);
+    $player = User::factory()->create();
+    resolve(TokenWallet::class)->credit($player, 1000, 'admin_adjust', 'Test balance');
+
+    match ($history) {
+        'subscription' => ServerSubscription::query()->create([
+            'server_id' => $this->createServerModel(['user_id' => $player->id])->id, 'user_id' => $player->id, 'period_days' => 30,
+            'price_tokens' => 300, 'status' => ServerSubscription::STATUS_ACTIVE, 'next_renewal_at' => now()->addDays(10),
+        ]),
+        'kept trial' => resolve(TokenWallet::class)->debit($player, 300, TokenTransaction::TYPE_SERVER_CHARGE, 'Kept the trial', 'subscription', 'trial-convert:7'),
+        'tebex payment' => DB::table('tebex_payments')->insert([
+            'transaction_id' => 'tbx-refunded', 'user_id' => $player->id, 'status' => 'refunded', 'tokens' => 0, 'tokens_reversed' => 0,
+            'amount' => '4.99', 'currency' => 'EUR', 'raw' => '[]', 'created_at' => now(), 'updated_at' => now(),
+        ]),
+    };
+
+    $this->actingAs($player)->postJson('/api/client/store/purchase', couponOrder(['idempotency_key' => 'key-'.str_repeat('n', 20)]))
+        ->assertStatus(422)
+        ->assertJsonPath('errors.0.detail', "This code can't be used.");
+})->with(['subscription', 'kept trial', 'tebex payment']);
+
+test('a failure linking the coupon to the server after the purchase keeps the purchase and warns', function (): void {
+    coupon();
+    $coupons = Mockery::mock(CouponService::class, [resolve(TokenWallet::class)])->makePartial();
+    $coupons->shouldReceive('attachServer')->andThrow(new RuntimeException('database went away'));
+    $this->app->instance(CouponService::class, $coupons);
+
+    $this->actingAs($this->user)->postJson('/api/client/store/purchase', couponOrder())
+        ->assertCreated()
+        ->assertJsonPath('attributes.tokens_charged', 400)
+        ->assertJsonPath('attributes.warning', fn (?string $warning): bool => is_string($warning) && str_contains($warning, 'being set up'));
+
+    expect(Server::query()->where('owner_id', $this->user->id)->count())->toBe(1)
+        ->and(couponBalance($this->user))->toBe(600);
 });

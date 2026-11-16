@@ -82,6 +82,8 @@ class PlayitAgentSwitchService
     /** How often the switch script's status checks may try creating a tunnel. */
     public const int PROBE_SECONDS = 20;
 
+    public const string NOT_SELF_MANAGED = 'playit.gg says the claimed agent is not a self-managed agent, so the panel will not use it. Start again.';
+
     /** Where the panel serves the switch script (see routes/base.php). */
     public const string SCRIPT_PATH = '/scripts/playit-switch-agent.sh';
 
@@ -242,25 +244,68 @@ class PlayitAgentSwitchService
             return null;
         }
 
-        $tunnels = $this->nodeTunnels($node);
+        return $this->tunnelCounts($node->refresh());
+    }
+
+    /**
+     * "Check status" on the node's playit card: brings the panel in line with the agent the node
+     * really runs. A script report the panel never acted on (a lost answer) is applied: a
+     * `switched` report finishes the switch and a `rolled_back` one undoes it. Then the node's
+     * key is checked against playit's run data, missing tunnels are queued and, on a
+     * self-managed agent, one tunnel is tried so the counts show whether the agent is online.
+     *
+     * @return array{action: string, message: string, agent_online: bool|null, tunnels: int, created: int, active: int, waiting_for_agent: int, last_error: string|null}
+     */
+    public function reconcile(Node $node): array
+    {
         $node->refresh();
-        if ($node->isPlayitSelfManaged() && $tunnels->whereNotNull('playit_tunnel_id')->isEmpty()) {
-            $first = $tunnels->first();
-            if ($first instanceof ServerTunnel && Cache::add('playit-probe:'.$node->id, true, self::PROBE_SECONDS)) {
-                $this->tunnels->sync($first);
-                $tunnels = $this->nodeTunnels($node);
-            }
+        $claim = PlayitAgentClaim::query()->where('node_id', $node->id)->first();
+        $action = 'none';
+
+        if ($claim instanceof PlayitAgentClaim && $claim->report === PlayitAgentClaim::REPORT_SWITCHED && $claim->status === PlayitClaimStatus::Ready) {
+            $this->finish($claim);
+            $action = 'finished';
+        } elseif ($claim instanceof PlayitAgentClaim
+            && $claim->report === PlayitAgentClaim::REPORT_ROLLED_BACK
+            && $node->isPlayitSelfManaged()
+            && $node->playit_agent_id === $claim->agent_id
+            && $node->playit_previous_agent_id !== null
+            && $node->playit_previous_secret !== null) {
+            $this->undo($node);
+            $action = 'undone';
         }
 
-        $failed = $tunnels->first(fn (ServerTunnel $tunnel): bool => $tunnel->status === TunnelStatus::Failed && $tunnel->last_error !== null);
+        $node->refresh();
+        if (! $node->hasPlayitAgent()) {
+            return ['action' => $action, 'message' => 'This node has no playit.gg agent.', 'agent_online' => null, ...$this->tunnelCounts($node, false)];
+        }
 
-        return [
-            'tunnels' => $tunnels->count(),
-            'created' => $tunnels->whereNotNull('playit_tunnel_id')->count(),
-            'active' => $tunnels->where('status', TunnelStatus::Active)->count(),
-            'waiting_for_agent' => $tunnels->where('last_error', TunnelService::AGENT_NOT_RUNNING)->count(),
-            'last_error' => $failed instanceof ServerTunnel ? $failed->last_error : null,
-        ];
+        try {
+            $agent = $this->client->agentOf((string) $node->playit_secret);
+        } catch (PlayitException $playitException) {
+            return ['action' => $action, 'message' => "playit.gg did not accept the node's agent key: ".$playitException->getMessage(), 'agent_online' => false, ...$this->tunnelCounts($node, false)];
+        }
+
+        if ($agent['agent_id'] !== $node->playit_agent_id) {
+            $node->forceFill(['playit_agent_id' => $agent['agent_id']])->save();
+            $action = $action === 'none' ? 'agent_corrected' : $action;
+        }
+
+        if ($node->isPlayitSelfManaged()) {
+            $this->tunnels->provisionMissing($node);
+        }
+
+        $counts = $this->tunnelCounts($node, $node->isPlayitSelfManaged());
+        $online = $counts['waiting_for_agent'] === 0 && ($counts['tunnels'] === 0 || $counts['created'] > 0);
+        $message = match (true) {
+            $action === 'finished' => 'The node had reported the switch; the panel now uses the new agent.',
+            $action === 'undone' => 'The node had rolled back; the panel uses the previous agent again.',
+            $action === 'agent_corrected' => 'The panel had the wrong agent id for this key; it was corrected.',
+            ! $online && $node->isPlayitSelfManaged() => 'playit.gg does not see the new agent running. If the node was rolled back, choose "Undo switch"; otherwise start playit on the node.',
+            default => 'The panel and the node agree.',
+        };
+
+        return ['action' => $action, 'message' => $message, 'agent_online' => $online, ...$counts];
     }
 
     /**
@@ -503,6 +548,34 @@ class PlayitAgentSwitchService
     }
 
     /**
+     * The node's tunnels as the switch script and "Check status" report them. With `$probe`,
+     * while none was created yet one is tried right away, at most every PROBE_SECONDS.
+     *
+     * @return array{tunnels: int, created: int, active: int, waiting_for_agent: int, last_error: string|null}
+     */
+    private function tunnelCounts(Node $node, bool $probe = true): array
+    {
+        $tunnels = $this->nodeTunnels($node);
+        if ($probe && $node->isPlayitSelfManaged() && $tunnels->whereNotNull('playit_tunnel_id')->isEmpty()) {
+            $first = $tunnels->first();
+            if ($first instanceof ServerTunnel && Cache::add('playit-probe:'.$node->id, true, self::PROBE_SECONDS)) {
+                $this->tunnels->sync($first);
+                $tunnels = $this->nodeTunnels($node);
+            }
+        }
+
+        $failed = $tunnels->first(fn (ServerTunnel $tunnel): bool => $tunnel->status === TunnelStatus::Failed && $tunnel->last_error !== null);
+
+        return [
+            'tunnels' => $tunnels->count(),
+            'created' => $tunnels->whereNotNull('playit_tunnel_id')->count(),
+            'active' => $tunnels->where('status', TunnelStatus::Active)->count(),
+            'waiting_for_agent' => $tunnels->where('last_error', TunnelService::AGENT_NOT_RUNNING)->count(),
+            'last_error' => $failed instanceof ServerTunnel ? $failed->last_error : null,
+        ];
+    }
+
+    /**
      * @throws PlayitException
      */
     private function advance(PlayitAgentClaim $claim): void
@@ -549,6 +622,20 @@ class PlayitAgentSwitchService
         }
 
         $agent = $this->client->agentOf((string) $claim->secret);
+
+        // Only a self-managed agent may become the node's agent: a key for any other agent
+        // (one someone else accepted the claim with, for example) is never used.
+        if ($agent['self_managed'] !== true) {
+            $claim->fill([
+                'status' => PlayitClaimStatus::Rejected,
+                'secret' => null,
+                'agent_id' => null,
+                'last_error' => self::NOT_SELF_MANAGED,
+            ])->save();
+
+            return;
+        }
+
         $claim->fill(['status' => PlayitClaimStatus::Ready, 'agent_id' => $agent['agent_id'], 'last_error' => null])->save();
     }
 

@@ -142,6 +142,8 @@ return [
             'plan_ids' => '',
             'hours' => 48,
             'max_concurrent' => 10,
+            // Trials started per day panel-wide; 0 allows none.
+            'daily_cap' => 10,
             'require_verified' => true,
         ],
     ],

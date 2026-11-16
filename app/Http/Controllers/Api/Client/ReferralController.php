@@ -19,6 +19,9 @@ use Pterodactyl\Services\Billing\ReferralSettings;
 #[Subgroup('Account Referrals', 'The referral link of the authenticated user and the rewards it earned.')]
 class ReferralController extends ClientApiController
 {
+    /** What the referrer sees of a referral: no review details, no purchase or payout dates. */
+    public const array STATUSES = ['pending', 'paid', 'not_eligible'];
+
     /** The latest referrals shown on the page. */
     private const int LIST_LIMIT = 50;
 
@@ -27,16 +30,13 @@ class ReferralController extends ClientApiController
         'code' => 'K7Q2M9XA',
         'path' => '/r/K7Q2M9XA',
         'reward_tokens' => 200,
-        'hold_days' => 7,
+        'hold_days' => 30,
         'stats' => ['signed_up' => 3, 'pending' => 1, 'paid' => 1, 'tokens_earned' => 200],
         'referrals' => [[
             'id' => 4,
             'username' => 'al•••',
-            'status' => 'held',
-            'under_review' => false,
+            'status' => 'pending',
             'reward_tokens' => null,
-            'payout_after' => '2026-11-23T12:00:00+00:00',
-            'paid_at' => null,
             'created_at' => '2026-11-15T12:00:00+00:00',
         ]],
     ];
@@ -47,11 +47,8 @@ class ReferralController extends ClientApiController
     #[ResponseField('code', 'string', 'The referral code; null while the programme is off.', nullable: true)]
     #[ResponseField('path', 'string', 'The referral link path on the panel; null while the programme is off.', nullable: true)]
     #[ResponseField('referrals[].username', 'string', 'The start of the referred username, masked.')]
-    #[ResponseField('referrals[].status', 'string', 'registered (signed up), held (bought, waiting for the hold period), paid, reversed (the purchase was refunded), rejected or capped (over the monthly limit).', enum: Referral::STATUSES)]
-    #[ResponseField('referrals[].under_review', 'boolean', 'Whether an administrator has to look at it before it is paid.')]
+    #[ResponseField('referrals[].status', 'string', 'pending (signed up, or bought and waiting), paid, or not_eligible (it will not be rewarded).', enum: self::STATUSES)]
     #[ResponseField('referrals[].reward_tokens', 'integer', 'The tokens you got once paid.', nullable: true)]
-    #[ResponseField('referrals[].payout_after', 'string', 'When a held reward is paid at the earliest.', nullable: true)]
-    #[ResponseField('referrals[].paid_at', 'string', 'When it was paid.', nullable: true)]
     #[ScribeResponse(self::EXAMPLE, description: 'Referrals returned.')]
     public function index(ClientApiRequest $request): JsonResponse
     {
@@ -71,16 +68,17 @@ class ReferralController extends ClientApiController
             'code' => $code,
             'path' => $code === null ? null : ReferralService::PATH_PREFIX.$code,
             'reward_tokens' => ReferralSettings::reward(),
-            'hold_days' => ReferralSettings::HOLD_DAYS,
+            'hold_days' => ReferralSettings::holdDays(),
             'stats' => $this->referrals->stats($user),
             'referrals' => $referrals->map(fn (Referral $referral): array => [
                 'id' => $referral->id,
                 'username' => mb_substr($referral->referred->username, 0, 2).'•••',
-                'status' => $referral->status,
-                'under_review' => $referral->awaitingReview(),
+                'status' => match ($referral->status) {
+                    Referral::STATUS_REGISTERED, Referral::STATUS_HELD => 'pending',
+                    Referral::STATUS_PAID => 'paid',
+                    default => 'not_eligible',
+                },
                 'reward_tokens' => $referral->status === Referral::STATUS_PAID ? $referral->reward_tokens : null,
-                'payout_after' => $referral->payout_after?->toAtomString(),
-                'paid_at' => $referral->paid_at?->toAtomString(),
                 'created_at' => $referral->created_at?->toAtomString(),
             ])->values()->all(),
         ]);

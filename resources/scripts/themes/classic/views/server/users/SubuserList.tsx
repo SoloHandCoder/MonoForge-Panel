@@ -118,6 +118,11 @@ export default function SubuserList({ model, className }: ViewProps<'server.subu
                     <NewUserButton model={model} />
                 </ListToolbar>
             )}
+            {model.createBlocked !== null && (
+                <p role='status' className='mb-3 text-sm text-muted-foreground'>
+                    {model.createBlocked}
+                </p>
+            )}
             <Table
                 rows={model.subusers}
                 columns={tableColumns}

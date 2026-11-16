@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Pterodactyl\Console\Scheduler;
+use Pterodactyl\Enum\OAuthProvider;
 use Pterodactyl\Models\ActivityLog;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Billing\Referral;
@@ -18,6 +19,7 @@ use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserNotice;
+use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Services\Billing\NetworkHash;
 use Pterodactyl\Services\Billing\ReferralService;
 use Pterodactyl\Services\Billing\ReferralSettings;
@@ -31,7 +33,8 @@ beforeEach(function (): void {
     Notification::fake();
     config()->set('monoforge.captcha.provider', 'none');
     config()->set('monoforge.auth.registration.enabled', true);
-    ReferralSettings::store(true, 200, 10);
+    // The tests below were written for a 7-day hold; the default is 30 days.
+    ReferralSettings::store(true, 200, 10, 7);
 
     $this->pack = TokenPack::query()->create(['tebex_package_id' => '6012345', 'name' => '500 tokens', 'tokens' => 500, 'bonus_tokens' => 0]);
     $this->referrer = User::factory()->create(['username' => 'sam']);
@@ -42,10 +45,17 @@ function referralWallet(): TokenWallet
     return resolve(TokenWallet::class);
 }
 
+/** Links a Discord account to the user, which a referral needs to qualify. */
+function linkDiscord(User $user, ?string $discordId = null): void
+{
+    UserOAuthAccount::query()->create(['user_id' => $user->id, 'provider' => OAuthProvider::Discord, 'provider_user_id' => $discordId ?? (string) (100000 + $user->id)]);
+}
+
 /**
- * Signs a visitor up with the referral cookie set, from an address.
+ * Signs a visitor up with the referral cookie set, from an address, and links a Discord account
+ * (unless `$link` is false).
  */
-function signUpReferred(string $code, string $username = 'alexander', string $ip = '203.0.113.9'): User
+function signUpReferred(string $code, string $username = 'alexander', string $ip = '203.0.113.9', bool $link = true): User
 {
     Auth::guard('web')->logout();
     Auth::forgetGuards();
@@ -68,7 +78,12 @@ function signUpReferred(string $code, string $username = 'alexander', string $ip
     Auth::guard('web')->logout();
     Auth::forgetGuards();
 
-    return User::query()->where('username', $username)->firstOrFail();
+    $user = User::query()->where('username', $username)->firstOrFail();
+    if ($link) {
+        linkDiscord($user);
+    }
+
+    return $user;
 }
 
 /**
@@ -313,7 +328,10 @@ test('the account page shows the link, the stats and masked referrals', function
         ->assertJsonPath('stats.paid', 1)
         ->assertJsonPath('stats.tokens_earned', 200)
         ->assertJsonPath('referrals.0.username', 'an•••')
-        ->assertJsonPath('referrals.0.status', 'registered')
+        ->assertJsonPath('referrals.0.status', 'pending')
+        ->assertJsonMissingPath('referrals.0.under_review')
+        ->assertJsonMissingPath('referrals.0.payout_after')
+        ->assertJsonMissingPath('referrals.1.paid_at')
         ->assertJsonPath('referrals.1.status', 'paid')
         ->assertJsonPath('referrals.1.reward_tokens', 200)
         ->assertJsonMissing(['email' => 'alexander@example.com']);
@@ -330,11 +348,15 @@ test('admins read and change the settings; approving is root-only from a session
 
     $this->actingAs($admin)->getJson(route('api.admin.shop.referrals.settings'))
         ->assertOk()
-        ->assertExactJson(['enabled' => true, 'reward_tokens' => 200, 'monthly_cap' => 10, 'hold_days' => 7]);
+        ->assertExactJson(['enabled' => true, 'reward_tokens' => 200, 'monthly_cap' => 10, 'hold_days' => 7, 'min_purchase_tokens' => 0, 'effective_min_purchase_tokens' => 500]);
     $this->actingAs($admin)->putJson(route('api.admin.shop.referrals.settings.update'), ['enabled' => true, 'reward_tokens' => 300, 'monthly_cap' => 0])
         ->assertOk()
         ->assertJsonPath('reward_tokens', 300)
-        ->assertJsonPath('monthly_cap', 0);
+        ->assertJsonPath('monthly_cap', 0)
+        ->assertJsonPath('hold_days', 7);
+    $this->actingAs($admin)->putJson(route('api.admin.shop.referrals.settings.update'), ['enabled' => true, 'reward_tokens' => 200, 'monthly_cap' => 10, 'hold_days' => 7, 'min_purchase_tokens' => 0])
+        ->assertOk();
+    $this->actingAs($admin)->putJson(route('api.admin.shop.referrals.settings.update'), ['enabled' => true, 'reward_tokens' => 200, 'monthly_cap' => 0, 'hold_days' => 0])->assertUnprocessable();
     $this->actingAs($admin)->putJson(route('api.admin.shop.referrals.settings.update'), ['enabled' => true, 'reward_tokens' => 0, 'monthly_cap' => 0])->assertUnprocessable();
 
     $referred = signUpReferred(resolve(ReferralService::class)->codeFor($this->referrer));
@@ -373,4 +395,63 @@ test('referral payouts run hourly on one server', function (): void {
         ->and($events[0]->expression)->toBe('0 * * * *')
         ->and($events[0]->onOneServer)->toBeTrue()
         ->and($events[0]->withoutOverlapping)->toBeTrue();
+});
+
+test('the default hold is 30 days and the first purchase must reach the smallest token pack', function (): void {
+    ReferralSettings::store(true, 200, 10, ReferralSettings::DEFAULT_HOLD_DAYS);
+    expect(ReferralSettings::holdDays())->toBe(30)
+        ->and(ReferralSettings::minPurchaseTokens())->toBe(500);
+
+    $code = resolve(ReferralService::class)->codeFor($this->referrer);
+    $referred = signUpReferred($code);
+    tebex('payment.completed', 'tbx-first', $referred);
+    expect(referralOf($referred)->status)->toBe(Referral::STATUS_HELD)
+        ->and(referralOf($referred)->payout_after?->toDateString())->toBe(now()->addDays(30)->toDateString());
+
+    // A first purchase below the minimum never qualifies.
+    ReferralSettings::store(true, 200, 10, 30, 1000);
+    $small = signUpReferred($code, 'smallbuyer', '198.51.100.40');
+    tebex('payment.completed', 'tbx-small', $small);
+    expect(referralOf($small)->status)->toBe(Referral::STATUS_REJECTED)
+        ->and(referralOf($small)->flag_reason)->toContain('at least 1,000');
+});
+
+test('a referred user needs a linked account, and each linked account earns one reward', function (): void {
+    $code = resolve(ReferralService::class)->codeFor($this->referrer);
+
+    $unlinked = signUpReferred($code, 'unlinked', '198.51.100.41', link: false);
+    tebex('payment.completed', 'tbx-unlinked', $unlinked);
+    expect(referralOf($unlinked)->status)->toBe(Referral::STATUS_REJECTED)
+        ->and(referralOf($unlinked)->flag_reason)->toBe(ReferralService::NO_LINKED_ACCOUNT);
+
+    $first = signUpReferred($code, 'firstalt', '198.51.100.42', link: false);
+    linkDiscord($first, '424242');
+    tebex('payment.completed', 'tbx-alt1', $first);
+    expect(referralOf($first)->status)->toBe(Referral::STATUS_HELD)
+        ->and(referralOf($first)->discord_hash)->not->toBeNull();
+
+    // The same Discord account on another new account (after unlinking it from the first).
+    UserOAuthAccount::query()->where('user_id', $first->id)->delete();
+    $second = signUpReferred($code, 'secondalt', '198.51.100.43', link: false);
+    linkDiscord($second, '424242');
+    tebex('payment.completed', 'tbx-alt2', $second);
+    expect(referralOf($second)->status)->toBe(Referral::STATUS_REJECTED)
+        ->and(referralOf($second)->flag_reason)->toBe(ReferralService::LINKED_ACCOUNT_USED);
+
+    // The referrer sees "not eligible", never the reason.
+    $this->actingAs($this->referrer)->getJson('/api/client/account/referrals')
+        ->assertOk()
+        ->assertJsonPath('referrals.0.status', 'not_eligible')
+        ->assertDontSee(ReferralService::LINKED_ACCOUNT_USED);
+});
+
+test('the first referral link a visitor followed is kept', function (): void {
+    $first = resolve(ReferralService::class)->codeFor($this->referrer);
+    $other = resolve(ReferralService::class)->codeFor(User::factory()->create());
+
+    $this->withCookie(ReferralSettings::COOKIE, $first)->get('/r/'.$other)
+        ->assertRedirect('/auth/register')
+        ->assertCookieMissing(ReferralSettings::COOKIE);
+    // A stale cookie for an unknown code is replaced.
+    $this->withCookie(ReferralSettings::COOKIE, 'ZZZZZZZZ')->get('/r/'.$other)->assertCookie(ReferralSettings::COOKIE, $other);
 });

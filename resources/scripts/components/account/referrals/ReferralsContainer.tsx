@@ -25,35 +25,20 @@ import { formatDate } from '@/lib/dates';
 import type { UiTone } from '@/sdk/theme';
 
 const statusTones = {
-    registered: 'neutral',
-    held: 'info',
+    pending: 'info',
     paid: 'success',
-    reversed: 'danger',
-    rejected: 'danger',
-    capped: 'warning',
+    not_eligible: 'neutral',
 } as const satisfies Record<Referral['status'], UiTone>;
 
-/** What the referrer sees about one referral: its state in words. */
+/** What the referrer sees about one referral: its state in words, without review details or dates. */
 export function referralNote(referral: Referral): string {
-    if (referral.underReview && (referral.status === 'registered' || referral.status === 'held')) {
-        return 'Under review before it can be paid.';
-    }
-
     switch (referral.status) {
-        case 'registered':
-            return 'Signed up; waiting for their first token purchase.';
-        case 'held':
-            return referral.payoutAfter
-                ? `Bought tokens; paid out on ${formatDate(referral.payoutAfter, 'MMM D, YYYY')} unless refunded.`
-                : 'Bought tokens; waiting for the hold period.';
+        case 'pending':
+            return 'Pending: the reward is paid once their first purchase qualifies and the hold period has passed.';
         case 'paid':
-            return `You got ${formatTokens(referral.rewardTokens ?? 0)} tokens${referral.paidAt ? ` on ${formatDate(referral.paidAt, 'MMM D, YYYY')}` : ''}.`;
-        case 'reversed':
-            return 'Their purchase was refunded, so there is no reward.';
-        case 'rejected':
+            return `You got ${formatTokens(referral.rewardTokens ?? 0)} tokens.`;
+        case 'not_eligible':
             return 'Not eligible for a reward.';
-        case 'capped':
-            return 'You reached the monthly limit of rewards.';
     }
 }
 
@@ -64,7 +49,8 @@ function LinkBox({ overview }: { overview: ReferralOverview }) {
     return (
         <ContentBox title='Your link' className='animate-rise'>
             <p className='text-sm text-muted-foreground'>
-                Share it with friends. When someone signs up through it and buys tokens for the first time, you both get{' '}
+                Share it with friends. When someone signs up through it, links a Discord or Google account and buys
+                tokens for the first time, you both get{' '}
                 <strong className='text-foreground'>{formatTokens(overview.rewardTokens)} tokens</strong> once the
                 purchase has stayed paid for {overview.holdDays} days.
             </p>
@@ -147,18 +133,8 @@ function ReferralList({ referrals }: { referrals: Referral[] }) {
                     </div>
                     <div className='flex items-center gap-3 text-xs text-muted-foreground'>
                         <span>Joined {formatDate(referral.createdAt, 'MMM D, YYYY')}</span>
-                        <Badge
-                            size='sm'
-                            variant='soft'
-                            tone={
-                                referral.underReview && referral.status !== 'paid'
-                                    ? 'warning'
-                                    : statusTones[referral.status]
-                            }
-                        >
-                            {referral.underReview && (referral.status === 'registered' || referral.status === 'held')
-                                ? 'Under review'
-                                : referralStatusLabels[referral.status]}
+                        <Badge size='sm' variant='soft' tone={statusTones[referral.status]}>
+                            {referralStatusLabels[referral.status]}
                         </Badge>
                     </div>
                 </li>

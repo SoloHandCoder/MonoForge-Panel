@@ -232,6 +232,15 @@ test('a backup rotation needs backup.create', function (): void {
     $this->actingAs($user)->postJson(presetsUrl($server), ['preset' => 'backup_rotation', 'every_hours' => 6, 'keep' => 1])->assertForbidden();
 });
 
+test('a backup rotation deletes old backups, so it needs backup.delete too', function (): void {
+    [$user, $server] = $this->generateTestAccount([Permissions::ScheduleRead->value, Permissions::ScheduleCreate->value, Permissions::BackupCreate->value]);
+    $server->forceFill(['backup_limit' => 3])->save();
+
+    $presets = $this->actingAs($user)->getJson(presetsUrl($server))->assertOk()->json('attributes.presets');
+    expect(array_column($presets, 'reason', 'key')['backup_rotation'])->toBe('You need the backup.delete permission.');
+    $this->actingAs($user)->postJson(presetsUrl($server), ['preset' => 'backup_rotation', 'every_hours' => 6, 'keep' => 1])->assertForbidden();
+});
+
 // Restart when empty and weekly cleanup
 
 test('a restart when empty checks every 15 minutes', function (): void {

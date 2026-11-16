@@ -38,16 +38,18 @@ test('updates the trial settings and stores them', function (): void {
         'plan_ids' => [$this->plan->id],
         'hours' => 72,
         'max_concurrent' => 5,
+        'daily_cap' => 3,
         'require_verified' => false,
     ])->assertOk()->assertExactJson([
         'enabled' => true,
         'plan_ids' => [$this->plan->id],
         'hours' => 72,
         'max_concurrent' => 5,
+        'daily_cap' => 3,
         'require_verified' => false,
     ]);
 
-    expect(TrialSettings::all())->toBe(['enabled' => true, 'plan_ids' => [$this->plan->id], 'hours' => 72, 'max_concurrent' => 5, 'require_verified' => false])
+    expect(TrialSettings::all())->toBe(['enabled' => true, 'plan_ids' => [$this->plan->id], 'hours' => 72, 'max_concurrent' => 5, 'daily_cap' => 3, 'require_verified' => false])
         ->and(Setting::query()->where('key', 'settings::monoforge:shop:trials:plan_ids')->value('value'))->toBe((string) $this->plan->id)
         ->and(Setting::query()->where('key', 'settings::monoforge:shop:trials:hours')->value('value'))->toBe('72');
     $this->assertActivityLogged('admin:shop.trials.update');
@@ -61,6 +63,7 @@ test('refuses other trial lengths, unknown plans and negative limits', function 
     'hours 36' => [['hours' => 36]],
     'unknown plan' => [['plan_ids' => [999999]]],
     'negative max' => [['max_concurrent' => -1]],
+    'negative daily cap' => [['daily_cap' => -1]],
     'no plan list' => [['plan_ids' => null]],
 ]);
 

@@ -182,3 +182,21 @@ test('a restart when empty task needs a game that tells who is online', function
     $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'restart_if_empty', 'payload' => '2', 'time_offset' => 0])
         ->assertBadRequest();
 });
+
+test('keeping only the newest backups deletes older ones, so it needs backup.delete', function (): void {
+    [$user, $server] = $this->generateTestAccount([Permissions::ScheduleCreate->value, Permissions::ScheduleUpdate->value, Permissions::BackupCreate->value]);
+    $server->forceFill(['backup_limit' => 3])->save();
+    $schedule = Schedule::factory()->create(['server_id' => $server->id]);
+
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'backup', 'time_offset' => 0, 'keep_backups' => 1])
+        ->assertForbidden()
+        ->assertJsonPath('errors.0.detail', 'Keeping only the newest backups deletes older ones, so it needs the backup.delete permission.');
+    // Without a keep number it is a plain backup task.
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'backup', 'time_offset' => 0])->assertOk();
+
+    // Editing someone else's task to rotate is refused too; leaving its number as it is is fine.
+    $task = Task::factory()->create(['schedule_id' => $schedule->id, 'action' => 'backup', 'payload' => '', 'keep_backups' => 2, 'sequence_id' => 5]);
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks/'.$task->id), ['action' => 'backup', 'time_offset' => 0, 'keep_backups' => 1])->assertForbidden();
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks/'.$task->id), ['action' => 'backup', 'time_offset' => 0])->assertOk();
+    expect($task->refresh()->keep_backups)->toBe(2);
+});

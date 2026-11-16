@@ -22,6 +22,7 @@ interface TrialsFormValues {
     plan_ids: (string | number)[];
     hours: string | number;
     max_concurrent: number | null;
+    daily_cap: number | null;
     require_verified: boolean;
 }
 
@@ -35,6 +36,7 @@ function TrialsForm({ data }: { data: ShopTrials }) {
         plan_ids: data.settings.plan_ids,
         hours: data.settings.hours,
         max_concurrent: data.settings.max_concurrent,
+        daily_cap: data.settings.daily_cap,
         require_verified: data.settings.require_verified,
     };
     const form = useAppForm({
@@ -47,6 +49,7 @@ function TrialsForm({ data }: { data: ShopTrials }) {
                         plan_ids: value.plan_ids.map(Number),
                         hours: trialHours(value.hours),
                         max_concurrent: value.max_concurrent ?? 0,
+                        daily_cap: value.daily_cap ?? 0,
                         require_verified: value.require_verified,
                     },
                 });
@@ -108,12 +111,30 @@ function TrialsForm({ data }: { data: ShopTrials }) {
                                 />
                             )}
                         </form.AppField>
+                        <form.AppField
+                            name='daily_cap'
+                            validators={{
+                                onChange: ({ value }) =>
+                                    value === null || value < 0 || value > 10_000
+                                        ? 'Use a number between 0 and 10000.'
+                                        : undefined,
+                            }}
+                        >
+                            {(field) => (
+                                <field.NumberField
+                                    label='Trials per day'
+                                    description='The most trials started per day, panel-wide, so new accounts cannot take every slot at once.'
+                                    min={0}
+                                    max={10_000}
+                                />
+                            )}
+                        </form.AppField>
                     </div>
                     <form.AppField name='require_verified'>
                         {(field) => (
                             <field.SwitchField
                                 label='Require a linked Discord or Google account'
-                                description='Recommended: it makes farming trials with new accounts much harder.'
+                                description='Keep this on: it is the main protection against farming trials with new accounts. Turned off, only the network check is left.'
                             />
                         )}
                     </form.AppField>

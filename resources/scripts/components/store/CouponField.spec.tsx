@@ -141,7 +141,7 @@ describe('coupon field', () => {
                     result: {
                         code: 'WELCOME',
                         valid: false,
-                        message: 'This coupon has expired.',
+                        message: "This code can't be used.",
                         discount: 0,
                         firstPeriod: 500,
                     },
@@ -151,7 +151,7 @@ describe('coupon field', () => {
             />
         );
 
-        expect(screen.getByRole('alert')).toHaveTextContent('This coupon has expired.');
+        expect(screen.getByRole('alert')).toHaveTextContent("This code can't be used.");
         fireEvent.click(screen.getByRole('button', { name: 'Remove the coupon WELCOME' }));
         expect(onRemove).toHaveBeenCalled();
     });

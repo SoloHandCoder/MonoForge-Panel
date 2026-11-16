@@ -35,6 +35,7 @@ class StorePurchaseController extends ClientApiController
             'address' => 'example.joinmc.link',
             'discount_tokens' => 0,
             'coupon' => null,
+            'warning' => null,
         ],
     ];
 
@@ -51,6 +52,7 @@ class StorePurchaseController extends ClientApiController
     #[ResponseField('attributes.tokens_charged', 'integer', 'What the first period cost, after the coupon. Renewals cost the full price.')]
     #[ResponseField('attributes.discount_tokens', 'integer', 'Tokens the coupon took off the first period; 0 without one.')]
     #[ResponseField('attributes.coupon', 'string', 'The coupon code used, or null.', nullable: true)]
+    #[ResponseField('attributes.warning', 'string', 'Set when the purchase went through but a step after it failed; the server exists and setup continues. Null normally.', nullable: true)]
     public function store(PurchaseServerRequest $request): JsonResponse
     {
         // Buying accepts the Terms of Service, so only the version the user accepted counts.
@@ -75,6 +77,7 @@ class StorePurchaseController extends ClientApiController
             'address' => $result->address,
             'discount_tokens' => $result->discountTokens,
             'coupon' => $result->couponCode,
+            'warning' => $result->warning,
         ])->respond($result->replayed ? Response::HTTP_OK : Response::HTTP_CREATED);
     }
 }
