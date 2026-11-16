@@ -19,6 +19,7 @@ import { type NumberInputValue, requiredNumber, submittedNumber } from '@/compon
 import { type AdminUser, useAllAdminUsers } from '@/api/admin/users/queries';
 import { type LocationWithNodes, useAdminNodesGroupedByLocation, useAdminNodeTags } from '@/api/admin/nodes/queries';
 import { type AdminEggListItem, useAdminEggs } from '@/api/admin/eggs/queries';
+import { gatewayAllocationOptions, useAdminNodeGateway } from '@/api/admin/nodes/gateway';
 import AdminContentBlock from '@/components/admin/AdminContentBlock';
 import TagCheckAlert from '@/components/admin/tags/TagCheckAlert';
 import {
@@ -183,10 +184,16 @@ const AllocationBox = ({
 
     const defaultAllocationId = useStore(form.store, (state) => state.values.allocationId);
 
-    const allocationOptions = allocations.map((allocation) => ({
-        value: allocation.attributes.id,
-        label: allocationLabel(allocation),
-    }));
+    // On a node in game gateway mode, the ports it forwards come first; the others are marked.
+    const { data: gateway } = useAdminNodeGateway(nodeId);
+    const allocationOptions = gatewayAllocationOptions(
+        allocations.map((allocation) => ({
+            value: allocation.attributes.id,
+            label: allocationLabel(allocation),
+            port: allocation.attributes.port,
+        })),
+        gateway
+    );
 
     const additionalOptions = allocationOptions.filter((option) => option.value !== defaultAllocationId);
 

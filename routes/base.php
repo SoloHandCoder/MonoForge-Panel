@@ -5,10 +5,12 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
+use Pterodactyl\Http\Controllers\Base\GatewayScriptController;
 use Pterodactyl\Http\Controllers\Base\HelpPageController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
 use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
+use Pterodactyl\Http\Controllers\Base\MinecraftRouterScriptController;
 use Pterodactyl\Http\Controllers\Base\PlayitSwitchScriptController;
 use Pterodactyl\Http\Controllers\Base\ReferralLinkController;
 use Pterodactyl\Http\Controllers\Base\ServerDiscoveryPageController;
@@ -33,6 +35,16 @@ Route::get('/locales/locale.json', LocaleController::class)
 Route::get('/scripts/playit-switch-agent.sh', PlayitSwitchScriptController::class)
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->name('scripts.playit-switch-agent');
+
+// The game gateway script for a VPS and a node (scripts/monoforge/gateway.sh): public, it holds no secret.
+Route::get('/scripts/gateway.sh', GatewayScriptController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('scripts.gateway');
+
+// The shared Minecraft entrance router for a node (scripts/monoforge/mc-router.sh): public, it holds no secret.
+Route::get('/scripts/mc-router.sh', MinecraftRouterScriptController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('scripts.mc-router');
 
 // The Terms of Service, Privacy Policy and Refund Policy: public, and reachable by a user
 // who still has to set up two-factor authentication.

@@ -4,18 +4,29 @@ import type { Server } from '@/api/server/types';
 type ServerAttributes = Server['attributes'] & {
     readonly playit_address?: string | null;
     readonly address_pending?: boolean;
+    readonly address_source?: 'entrance' | 'gateway' | 'playit' | null;
 };
 
 /**
- * The playit.gg address of a server (such as `xyz.joinmc.link`), or null when the server has no live
- * tunnel and its primary allocation is the address.
+ * The public address of a server: its playit.gg tunnel (such as `xyz.joinmc.link`) or, on a node in
+ * game gateway mode, the gateway address (such as `play.example.com:25570`). Null when it has none and
+ * its primary allocation is the address.
  */
 export function playitAddress(attributes: ServerAttributes): string | null {
     return attributes.playit_address || null;
 }
 
+/** Whether the public address is a playit.gg tunnel of its own (not the game gateway or the shared entrance). */
+export function isPlayitAddress(attributes: ServerAttributes): boolean {
+    return (
+        playitAddress(attributes) !== null &&
+        attributes.address_source !== 'gateway' &&
+        attributes.address_source !== 'entrance'
+    );
+}
+
 /**
- * Whether the server is on a node with a playit.gg agent but has no live tunnel yet. Its allocation
+ * Whether the server is on a node with a playit.gg agent or the game gateway but has no public address yet. Its allocation
  * (such as `0.0.0.0:25569`) is not reachable from outside then, so players see "Address pending".
  */
 export function addressPending(attributes: ServerAttributes): boolean {

@@ -33,7 +33,7 @@ test('the shipped articles are listed with the guides for administrators', funct
 
     // Help center order: the players' articles first, the guides for administrators last.
     expect($slugs[0])->toBe('getting-started')
-        ->and(array_slice($slugs, -2))->toBe(['operating-monoforge', 'setting-up-the-shop']);
+        ->and(array_slice($slugs, -4))->toBe(['operating-monoforge', 'setting-up-the-shop', 'game-gateway-vps', 'shared-minecraft-entrance']);
 
     $guide = collect($response->json('data'))->firstWhere('slug', 'operating-monoforge');
     expect($guide['audience'])->toBe('admin')
@@ -161,13 +161,15 @@ test('markup in an edited article is stored as it was written, as text', functio
 
 test('the guides for administrators are only for administrators', function (): void {
     $this->getJson('/api/admin/help')->assertOk()
-        ->assertJsonCount(2, 'data')
+        ->assertJsonCount(4, 'data')
         ->assertJsonPath('data.0.slug', 'operating-monoforge')
-        ->assertJsonPath('data.1.slug', 'setting-up-the-shop');
+        ->assertJsonPath('data.1.slug', 'setting-up-the-shop')
+        ->assertJsonPath('data.2.slug', 'game-gateway-vps')
+        ->assertJsonPath('data.3.slug', 'shared-minecraft-entrance');
 
     // Turned off, a guide leaves Admin > Help.
     $this->putJson('/api/admin/settings/help/setting-up-the-shop', helpBody(['enabled' => false]))->assertOk();
-    $this->getJson('/api/admin/help')->assertOk()->assertJsonCount(1, 'data');
+    $this->getJson('/api/admin/help')->assertOk()->assertJsonCount(3, 'data');
 
     $this->actingAsNonAdmin();
     $this->getJson('/api/admin/help')->assertForbidden();

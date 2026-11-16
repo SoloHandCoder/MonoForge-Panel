@@ -5,18 +5,23 @@ import { mapListItems, removeListItems, upsertListItem } from '@/api/queryData';
 import {
     clientCreateServerAllocationMutation,
     clientDeleteServerAllocationMutation,
+    clientGetServerMinecraftHostnameOptions,
+    clientGetServerMinecraftHostnameQueryKey,
     clientListServerAllocationsOptions,
     clientListServerAllocationsQueryKey,
     clientSetPrimaryAllocationMutation,
     clientUpdateAllocationNotesMutation,
+    clientUpdateServerMinecraftHostnameMutation,
 } from '@/api/generated/@tanstack/react-query.gen';
 import type {
     ClientCreateServerAllocationData,
     ClientDeleteServerAllocationData,
+    ClientGetServerMinecraftHostnameResponse,
     ClientListServerAllocationsData,
     ClientListServerAllocationsResponse,
     ClientSetPrimaryAllocationData,
     ClientUpdateAllocationNotesData,
+    ClientUpdateServerMinecraftHostnameData,
     Options,
 } from '@/api/generated';
 import { notifyHttpError } from '@/plugins/notifications';
@@ -142,5 +147,34 @@ export const useDeleteServerAllocation = () => {
             toast.success('Allocation deleted');
         },
         onError: (error) => notifyHttpError(error, 'Unable to delete allocation'),
+    });
+};
+
+// The server's name in its node's shared Minecraft entrance (`<hostname>.<domain>`).
+
+export type ServerMinecraftHostname = ClientGetServerMinecraftHostnameResponse;
+
+const minecraftHostnameInput = (uuid: string) => ({ path: { server_uuid: uuid } });
+
+export const useServerMinecraftHostname = (uuid: string) =>
+    useQuery({ ...clientGetServerMinecraftHostnameOptions(minecraftHostnameInput(uuid)), enabled: uuid.length > 0 });
+
+export const updateServerMinecraftHostnameInput = (
+    uuid: string,
+    hostname: string
+): Options<ClientUpdateServerMinecraftHostnameData> => ({ ...minecraftHostnameInput(uuid), body: { hostname } });
+
+export const useUpdateServerMinecraftHostname = (uuid: string) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        ...clientUpdateServerMinecraftHostnameMutation(),
+        onSuccess: async (result) => {
+            queryClient.setQueryData(clientGetServerMinecraftHostnameQueryKey(minecraftHostnameInput(uuid)), result);
+            // The server's address (dashboard, console) comes from the server resource.
+            await queryClient.invalidateQueries(serverQueryFilters(uuid));
+            toast.success('Address changed', { description: result.address ?? undefined });
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to change the address'),
     });
 };

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Billing;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -33,11 +34,13 @@ use Pterodactyl\Models\Billing\ShopAddon;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Billing\TokenTransaction;
+use Pterodactyl\Models\Builders\AllocationBuilder;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Gateway\GatewayPorts;
 use Pterodactyl\Services\Notices\NoticeService;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Services\Tunnels\TunnelSettings;
@@ -100,6 +103,16 @@ class StorePurchaseService
     public static function trialReference(User $user, string $idempotencyKey): string
     {
         return 'trial-'.mb_substr(hash('sha256', 'trial:'.$user->id.':'.$idempotencyKey), 0, 40);
+    }
+
+    /** The admin-facing explanation of a gateway node the shop cannot sell on. */
+    public static function gatewayFullMessage(Node $node): string
+    {
+        return sprintf(
+            'The shop skipped node "%s": it uses the game gateway, but none of its free allocations is inside the forwarded ports (%s). Add allocations inside those ports in Admin > Nodes > Allocations, or forward more ports on the gateway.',
+            $node->name,
+            GatewayPorts::normalize((string) $node->gateway_ports),
+        );
     }
 
     /**
@@ -372,10 +385,10 @@ class StorePurchaseService
         );
     }
 
-    private function warnAdmins(string $body, string $action, string $url): void
+    private function warnAdmins(string $body, string $action, string $url, string $title = 'Store over capacity'): void
     {
-        User::query()->where('root_admin', true)->each(function (User $admin) use ($body, $action, $url): void {
-            $this->notices->notify($admin, 'warning', 'Store over capacity', $body, null, $action, $url);
+        User::query()->where('root_admin', true)->each(function (User $admin) use ($body, $action, $url, $title): void {
+            $this->notices->notify($admin, 'warning', $title, $body, null, $action, $url);
         });
     }
 
@@ -617,15 +630,56 @@ class StorePurchaseService
      */
     private function chooseNode(Collection $candidates): Node
     {
-        $node = Node::query()
+        $nodes = Node::query()
             ->where('nodes.maintenance_mode', false)
             ->whereIn('nodes.id', $candidates->modelKeys())
             ->whereHas('allocations', fn (Builder $query) => $query->whereNull('server_id'))
             ->orderByRaw('(SELECT IFNULL(SUM(servers.memory), 0) FROM servers WHERE servers.node_id = nodes.id) / GREATEST(nodes.memory, 1)')
             ->orderBy('nodes.id')
-            ->first();
+            ->get();
 
-        return $node instanceof Node ? $node : throw StorePurchaseException::noNode();
+        foreach ($nodes as $node) {
+            // A node in game gateway mode only sells servers on ports the gateway forwards.
+            if (! $node->hasGateway() || $this->freeAllocations($node)->exists()) {
+                return $node;
+            }
+
+            $this->warnGatewayFull($node);
+        }
+
+        throw StorePurchaseException::noNode();
+    }
+
+    /**
+     * The node's free allocations the shop may pick: on a node in game gateway mode, only those
+     * the gateway forwards, so players can reach the server.
+     *
+     * @return AllocationBuilder<Allocation>
+     */
+    private function freeAllocations(Node $node): AllocationBuilder
+    {
+        return Allocation::query()->unassigned()->onNodes([$node->id])
+            ->when($node->hasGateway(), fn (AllocationBuilder $query): AllocationBuilder => $query->onPorts([], $node->gatewayRanges()));
+    }
+
+    /**
+     * Tells root administrators that a gateway node was skipped by the shop because none of its
+     * free allocations is inside the forwarded ports, at most once an hour per node.
+     */
+    private function warnGatewayFull(Node $node): void
+    {
+        $message = self::gatewayFullMessage($node);
+        Log::warning($message, ['node' => $node->id]);
+
+        if (! Cache::add('store:gateway-full:'.$node->id, true, CarbonImmutable::now()->addHour())) {
+            return;
+        }
+
+        try {
+            $this->warnAdmins($message, 'Open the node', '/panel/nodes/'.$node->id.'/allocation', 'Shop: no forwarded allocation');
+        } catch (Throwable $throwable) {
+            report($throwable);
+        }
     }
 
     /** @return Builder<Node> */
@@ -652,9 +706,9 @@ class StorePurchaseService
 
         $tried = [];
         for ($attempt = 1; ; $attempt++) {
-            $allocation = Allocation::query()->unassigned()->onNodes([$node->id])
+            $allocation = $this->freeAllocations($node)
                 ->whereNotIn('id', $tried)->inRandomOrder()->first()
-                ?? throw new NoViableAllocationException(trans('exceptions.deployment.no_viable_allocations'));
+                ?? throw new NoViableAllocationException($node->hasGateway() ? self::gatewayFullMessage($node) : trans('exceptions.deployment.no_viable_allocations'));
             $tried[] = $allocation->id;
 
             try {
@@ -730,10 +784,11 @@ class StorePurchaseService
      */
     private function provisionTunnel(Server $server, ?string $subdomain): ?string
     {
-        // Servers on nodes without a playit agent keep their node address (TunnelListener skips
-        // them too); provisioning there would only leave a failed tunnel row behind.
-        if (! $server->loadMissing('node')->node->hasPlayitAgent()) {
-            return null;
+        // Servers on nodes without a playit agent, or in game gateway mode, get no tunnel
+        // (TunnelListener skips them too): their address, if any, comes from the gateway.
+        $node = $server->loadMissing('node')->node;
+        if ($node->hasGateway() || ! $node->hasPlayitAgent()) {
+            return $this->tunnelAddress($server);
         }
 
         try {

@@ -5,12 +5,16 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as NodeQueries from '@/api/admin/nodes/queries';
+import type * as GatewayQueries from '@/api/admin/nodes/gateway';
 import type { AdminAllocation, useAdminNodeAllocations } from '@/api/admin/nodes/queries';
 import NodeAllocationTab from './NodeAllocationTab';
 
 type AllocationPage = NonNullable<ReturnType<typeof useAdminNodeAllocations>['data']>;
 
-const state = vi.hoisted(() => ({ updateAlias: vi.fn() }));
+const state = vi.hoisted(() => ({
+    updateAlias: vi.fn(),
+    gateway: undefined as { active: boolean; ranges: number[][] } | undefined,
+}));
 let page: AllocationPage;
 
 vi.mock('@/api/admin/nodes/queries', async (importOriginal) => ({
@@ -21,6 +25,10 @@ vi.mock('@/api/admin/nodes/queries', async (importOriginal) => ({
     useDeleteAdminNodeAllocation: () => ({ mutate: vi.fn() }),
     useBulkDeleteAdminNodeAllocations: () => ({ mutate: vi.fn() }),
     useDeleteAdminNodeIpBlockAllocations: () => ({ mutate: vi.fn() }),
+}));
+vi.mock('@/api/admin/nodes/gateway', async (importOriginal) => ({
+    ...(await importOriginal<typeof GatewayQueries>()),
+    useAdminNodeGateway: () => ({ data: state.gateway }),
 }));
 vi.mock('@/components/admin/nodes/useNodeDetail', () => ({
     useNodeDetail: () => ({ node: { attributes: { id: 7 } } }),
@@ -59,6 +67,7 @@ const allocationPage = (data: AdminAllocation[]): AllocationPage => ({
 afterEach(cleanup);
 beforeEach(() => {
     vi.clearAllMocks();
+    state.gateway = undefined;
     page = allocationPage([allocation(1, 25565, null), allocation(2, 25566, 'proxy')]);
 });
 
@@ -130,5 +139,24 @@ describe('NodeAllocationTab', () => {
         rerender(<NodeAllocationTab />);
 
         expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled();
+    });
+
+    it('marks the ports the game gateway does not forward', () => {
+        state.gateway = { active: true, ranges: [[25565, 25565]] };
+        page = allocationPage([allocation(1, 25565, null), allocation(2, 30000, null)]);
+
+        render(<NodeAllocationTab />);
+
+        expect(screen.getAllByText('not forwarded')).toHaveLength(1);
+        expect(screen.getByText('30000').parentElement).toHaveTextContent('not forwarded');
+    });
+
+    it('marks nothing without an active gateway', () => {
+        state.gateway = { active: false, ranges: [[25565, 25565]] };
+        page = allocationPage([allocation(2, 30000, null)]);
+
+        render(<NodeAllocationTab />);
+
+        expect(screen.queryByText('not forwarded')).not.toBeInTheDocument();
     });
 });

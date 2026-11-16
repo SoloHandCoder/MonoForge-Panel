@@ -18,7 +18,7 @@ test('every shipped article has a title, a category, a summary and markdown', fu
         'getting-started', 'joining-your-server', 'tokens-and-wallet', 'buying-a-server', 'renewals-and-unpaid-servers',
         'the-console', 'the-file-editor', 'plugins-mods-and-modpacks', 'backups-and-schedules', 'ai-assistant-and-crash-doctor',
         'friends-and-sharing-access', 'public-server-page', 'support-tickets', 'account-security', 'troubleshooting',
-        'operating-monoforge', 'setting-up-the-shop',
+        'operating-monoforge', 'setting-up-the-shop', 'game-gateway-vps', 'shared-minecraft-entrance',
     ]);
 
     foreach ($defaults as $slug => $article) {
@@ -37,7 +37,7 @@ test('every shipped article has a title, a category, a summary and markdown', fu
     }
 
     expect(array_keys(array_filter($defaults, fn (array $article): bool => $article['audience'] === 'admin')))
-        ->toBe(['operating-monoforge', 'setting-up-the-shop']);
+        ->toBe(['game-gateway-vps', 'operating-monoforge', 'setting-up-the-shop', 'shared-minecraft-entrance']);
 });
 
 test('front matter is read with quotes, defaults and windows line endings', function (): void {

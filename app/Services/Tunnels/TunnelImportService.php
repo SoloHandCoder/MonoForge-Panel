@@ -81,11 +81,18 @@ class TunnelImportService
     {
         $nodes = $only instanceof Node
             ? new Collection([$only])
-            : Node::query()->whereNotNull('playit_agent_id')->orderBy('id')->get();
+            : Node::query()->whereNotNull('playit_agent_id')->where('gateway_enabled', false)->orderBy('id')->get();
 
         $summary = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'results' => []];
 
         foreach ($nodes as $node) {
+            if ($node->hasGateway()) {
+                // Its players join through the game gateway: nothing is linked from playit.
+                $summary['errors'][] = ['node_id' => $node->id, 'node_name' => $node->name, 'message' => TunnelService::GATEWAY];
+
+                continue;
+            }
+
             if (! $node->hasPlayitAgent()) {
                 $summary['errors'][] = ['node_id' => $node->id, 'node_name' => $node->name, 'message' => TunnelService::NOT_CONFIGURED];
 
@@ -119,7 +126,7 @@ class TunnelImportService
     public function unlinked(): array
     {
         $nodes = Node::query()->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')->orderBy('id')->get()
-            ->filter(fn (Node $node): bool => $node->hasPlayitAgent())
+            ->filter(fn (Node $node): bool => $node->hasPlayitAgent() && ! $node->hasGateway())
             ->values();
 
         $servers = Server::query()

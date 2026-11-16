@@ -32,6 +32,8 @@ export interface ServerTunnel {
         /** Why the scheduler leaves the tunnel alone: its egg is not a game, or the playit account is full. */
         hold_reason?: 'not_a_game' | 'tunnel_limit' | null;
         retry_after?: string | null;
+        /** The node uses the game gateway: the tunnel is kept on playit but inactive. */
+        replaced_by_gateway?: boolean;
         created_at: string;
         updated_at: string;
     };

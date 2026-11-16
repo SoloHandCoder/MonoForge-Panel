@@ -7,6 +7,8 @@ namespace Pterodactyl\Http\Resources\Api\Admin;
 use Illuminate\Http\Request;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseField;
 use Pterodactyl\Models\Billing\ServerTunnel;
+use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Entrance\MinecraftEntrance;
 
 /**
  * @extends AdminResource<ServerTunnel>
@@ -26,6 +28,8 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 #[ResponseField('hold_reason', description: 'Why the scheduler leaves this tunnel alone: `not_a_game` (its egg belongs to no game that creates tunnels) or `tunnel_limit` (the playit account is full; retried after `retry_after`).', example: null, enum: ['not_a_game', 'tunnel_limit', null], nullable: true)]
 #[ResponseField('retry_after', description: 'When a held tunnel is tried again, or null.', example: null, nullable: true)]
 #[ResponseField('imported_at', description: 'When the tunnel, made by hand on playit.gg, was linked by an import. The panel leaves imported tunnels alone on playit.', example: null, nullable: true)]
+#[ResponseField('replaced_by_gateway', 'boolean', description: "True while the server's node is in game gateway mode: the tunnel is left on playit.gg but inactive, players join through the gateway, and nothing is synced or retried until the gateway is turned off.", example: false)]
+#[ResponseField('replaced_by_entrance', 'boolean', description: "True for the main tunnel of a Minecraft server joined through its node's shared Minecraft entrance: it is left on playit.gg but inactive, and nothing is synced or retried while the entrance is on.", example: false)]
 class ServerTunnelResource extends AdminResource
 {
     public function resourceName(): string
@@ -58,6 +62,8 @@ class ServerTunnelResource extends AdminResource
             'protocol' => $tunnel->protocol,
             'hold_reason' => $tunnel->hold_reason,
             'retry_after' => $tunnel->retry_after === null ? null : $this->formatTimestamp($tunnel->retry_after),
+            'replaced_by_gateway' => $server?->node->hasGateway() ?? false,
+            'replaced_by_entrance' => $server instanceof Server && $tunnel->isMain() && MinecraftEntrance::isRouted($server),
             'created_at' => $this->formatTimestamp($tunnel->created_at),
             'updated_at' => $this->formatTimestamp($tunnel->updated_at),
         ];
