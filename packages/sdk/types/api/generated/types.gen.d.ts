@@ -1500,11 +1500,54 @@ export type ClientRecoveryTokensResource = {
     object: string;
     attributes: ClientRecoveryTokensAttributes;
 };
+export type ClientSchedulePresetsAttributes = {
+    /**
+     * The timezone schedule times are in (the panel's).
+     */
+    timezone: string;
+    /**
+     * The server runs Minecraft Java: restart warnings use `say` and the weekly cleanup is offered.
+     */
+    is_minecraft: boolean;
+    /**
+     * The most backups the server keeps; a backup rotation keeps at most this many.
+     */
+    backup_limit: number;
+    /**
+     * The viewer has control.console, which a daily restart needs to warn players first.
+     */
+    can_send_commands: boolean;
+    /**
+     * Each preset, in display order.
+     */
+    presets: Array<{
+        /**
+         * The preset.
+         */
+        key: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup';
+        /**
+         * The viewer can set it up on this server.
+         */
+        available: boolean;
+        /**
+         * Why it cannot be set up, or null.
+         */
+        reason: string | null;
+    }>;
+};
+export type ClientSchedulePresetsResource = {
+    object: string;
+    attributes: ClientSchedulePresetsAttributes;
+};
 export type ClientScheduleTaskAttributes = {
     id: number;
     sequence_id: number;
-    action: 'power' | 'command' | 'backup';
+    action: 'power' | 'command' | 'backup' | 'restart_if_empty' | 'delete_logs';
     payload: string;
+    /**
+     * A backup task keeps only its newest this many backups, rotating out its oldest unlocked one; null keeps them until the server limit.
+     */
+    keep_backups: number | null;
     time_offset: number;
     is_queued: boolean;
     continue_on_failure: boolean;
@@ -1645,6 +1688,10 @@ export type ClientServerResourcesResponse = {
 export type ClientServerScheduleAttributes = {
     id: number;
     name: string;
+    /**
+     * The Quick setup preset the schedule was made from, or null for a schedule made by hand.
+     */
+    preset: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup' | null;
     cron: {
         day_of_week: string;
         day_of_month: string;
@@ -1705,6 +1752,19 @@ export type ClientServerSubscriptionAttributes = {
     server_identifier: string;
     server_name: string;
     status: string;
+    is_trial: boolean;
+    /**
+     * A free trial: when it ends (or ended) and what keeping the server costs for each billing period. Null for a paid subscription.
+     */
+    trial: {
+        ends_at: string;
+        options: Array<{
+            period_id: number;
+            name: string;
+            days: number;
+            price_tokens: number;
+        }>;
+    } | null;
     price_tokens: number;
     period_days: number;
     addons: Array<{
@@ -1820,6 +1880,27 @@ export type ClientStorePurchaseAttributes = {
 export type ClientStorePurchaseResource = {
     object: string;
     attributes: ClientStorePurchaseAttributes;
+};
+export type ClientStoreTrialAttributes = {
+    server: {
+        identifier: string;
+        uuid: string;
+        name: string;
+    };
+    hours: number;
+    /**
+     * When the trial ends (ISO 8601).
+     */
+    ends_at: string | null;
+    replayed: boolean;
+    /**
+     * The playit.gg address of the server once its tunnel is ready; null until then.
+     */
+    address: string | null;
+};
+export type ClientStoreTrialResource = {
+    object: string;
+    attributes: ClientStoreTrialAttributes;
 };
 export type ClientSystemPermissionsResponse = {
     object: string;
@@ -2349,6 +2430,28 @@ export type AdminUpdatePriceMultiplierRequest = {
      * The label. Must not be greater than 191 characters.
      */
     label?: string | null;
+};
+export type AdminUpdateFreeTrialSettingsRequest = {
+    /**
+     * The enabled.
+     */
+    enabled: boolean;
+    /**
+     * Must match an existing stored value.
+     */
+    plan_ids?: Array<number>;
+    /**
+     * The hours.
+     */
+    hours: 24 | 48 | 72;
+    /**
+     * The max concurrent. Must be at least 0. Must not be greater than 10000.
+     */
+    max_concurrent: number;
+    /**
+     * The require verified.
+     */
+    require_verified: boolean;
 };
 export type AdminUpdateShopNodeRequest = {
     /**
@@ -4743,6 +4846,36 @@ export type ClientPurchaseServerRequest = {
      */
     idempotency_key: string;
 };
+export type ClientStartFreeTrialRequest = {
+    /**
+     * The plan id. Must be at least 1.
+     */
+    plan_id: number;
+    /**
+     * The egg ID. Must be at least 1.
+     */
+    egg_id: number;
+    /**
+     * The location ID. Must be at least 1.
+     */
+    location_id?: number | null;
+    /**
+     * The node ID. Must be at least 1.
+     */
+    node_id?: number | null;
+    /**
+     * The display name. Must match the regex /^[^<>]+$/u. Must be at least 1 character. Must not be greater than 60 characters.
+     */
+    name: string;
+    /**
+     * The idempotency key. Must match the regex /^[A-Za-z0-9_-]+$/. Must be at least 16 characters. Must not be greater than 100 characters.
+     */
+    idempotency_key: string;
+    /**
+     * The captcha token (Turnstile action trial), required when the panel uses a captcha.
+     */
+    'g-recaptcha-response'?: string;
+};
 export type ClientBuyTokenPackRequest = {
     /**
      * The token pack to buy.
@@ -4758,6 +4891,16 @@ export type ClientUpdateServerSubscriptionRequest = {
      * Let the server sleep while nobody plays. Required without auto_renew.
      */
     auto_sleep?: boolean;
+};
+export type ClientKeepTrialServerRequest = {
+    /**
+     * The billing period to pay for.
+     */
+    period_id: number;
+    /**
+     * The price the player confirmed; a different current price is refused.
+     */
+    expected_total?: number;
 };
 export type ClientEnableTwoFactorAuthenticationRequest = {
     /**
@@ -5037,6 +5180,44 @@ export type ClientCreateServerScheduleRequest = {
      */
     only_when_online?: boolean;
 };
+export type ClientCreateScheduleFromPresetRequest = {
+    /**
+     * The preset: daily_restart, backup_rotation, restart_when_empty or weekly_cleanup.
+     */
+    preset: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup';
+    /**
+     * Daily restart: the hour to restart at (0-23), in the panel's timezone.
+     */
+    hour?: number;
+    /**
+     * Daily restart: the minute to restart at (0-59).
+     */
+    minute?: number;
+    /**
+     * Daily restart: how many minutes ahead players are warned (0-15, 0 for no warning).
+     */
+    warning_minutes?: number;
+    /**
+     * Daily restart on a game other than Minecraft: the console command that broadcasts the warning (defaults to say).
+     */
+    warning_command?: string | null;
+    /**
+     * Backup rotation: hours between backups (1, 2, 3, 4, 6, 8, 12 or 24).
+     */
+    every_hours?: number;
+    /**
+     * Backup rotation: how many of its backups to keep, at most the server's backup limit.
+     */
+    keep?: number;
+    /**
+     * Restart when empty: hours with nobody online before the restart (1-72).
+     */
+    hours?: number;
+    /**
+     * Weekly cleanup: logs older than this many days are deleted (1-365).
+     */
+    days?: number;
+};
 export type ClientUpdateServerScheduleRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -5075,11 +5256,15 @@ export type ClientCreateScheduleTaskRequest = {
     /**
      * The action to perform.
      */
-    action: 'command' | 'power' | 'backup';
+    action: 'command' | 'power' | 'backup' | 'restart_if_empty' | 'delete_logs';
     /**
      * The payload. This field is required unless <code>action</code> is in <code>backup</code>.
      */
     payload?: string | null;
+    /**
+     * A backup task keeps only its newest this many backups (at most the server limit), rotating out its oldest unlocked one; null keeps them until the server limit. Must be at least 1. Must not be greater than 1000.
+     */
+    keep_backups?: number | null;
     /**
      * The delay before this task runs. Must be at least 0. Must not be greater than 900.
      */
@@ -5097,11 +5282,15 @@ export type ClientUpdateScheduleTaskRequest = {
     /**
      * The action to perform.
      */
-    action: 'command' | 'power' | 'backup';
+    action: 'command' | 'power' | 'backup' | 'restart_if_empty' | 'delete_logs';
     /**
      * The payload. This field is required unless <code>action</code> is in <code>backup</code>.
      */
     payload?: string | null;
+    /**
+     * A backup task keeps only its newest this many backups (at most the server limit), rotating out its oldest unlocked one; null keeps them until the server limit. Must be at least 1. Must not be greater than 1000.
+     */
+    keep_backups?: number | null;
     /**
      * The delay before this task runs. Must be at least 0. Must not be greater than 900.
      */
@@ -5917,6 +6106,66 @@ export type AdminUpdatePriceMultiplierResponseBody = {
     multiplier?: number;
     label?: string;
 };
+export type AdminGetFreeTrialsResponseBody = {
+    settings?: {
+        enabled?: boolean;
+        plan_ids?: Array<number>;
+        hours?: number;
+        max_concurrent?: number;
+        require_verified?: boolean;
+    };
+    stats?: {
+        started?: number;
+        running?: number;
+        converted?: number;
+        lapsed?: number;
+        /**
+         * Percent of the trials that are over (kept, ended or deleted) that were kept.
+         */
+        conversion_rate: number;
+    };
+    /**
+     * The most recent trials, newest first; state is running, expired (ended, suspended until it is deleted), converted or deleted.
+     */
+    trials: Array<{
+        id?: number;
+        state?: string;
+        /**
+         * The player; null once the account was deleted.
+         */
+        user: {
+            id?: number;
+            username?: string;
+        } | null;
+        /**
+         * The trial server; null once it was deleted.
+         */
+        server: {
+            id?: number;
+            identifier?: string;
+            name?: string;
+        } | null;
+        /**
+         * The plan; null once it was deleted.
+         */
+        plan: {
+            id?: number;
+            name?: string;
+        } | null;
+        hours?: number;
+        started_at?: string;
+        ends_at?: string;
+        converted_at?: string | null;
+        expired_at?: string | null;
+    }>;
+};
+export type AdminUpdateFreeTrialSettingsResponseBody = {
+    enabled?: boolean;
+    plan_ids?: Array<number>;
+    hours?: number;
+    max_concurrent?: number;
+    require_verified?: boolean;
+};
 export type AdminListShopNodesResponseBody = {
     data?: Array<{
         id?: number;
@@ -6282,6 +6531,292 @@ export type AdminRejectReferralResponseBody = {
     paid_at?: string | null;
     reversed_at?: string | null;
     created_at?: string;
+};
+export type AdminGetRevenueResponseBody = {
+    /**
+     * The days reported on.
+     */
+    range: {
+        /**
+         * The first day, as YYYY-MM-DD.
+         */
+        from: string;
+        /**
+         * The last day, as YYYY-MM-DD.
+         */
+        to: string;
+        /**
+         * How many days the range covers.
+         */
+        days: number;
+    };
+    /**
+     * When the report was built; it is cached for five minutes.
+     */
+    generated_at: string;
+    /**
+     * Tokens moved in the range.
+     */
+    tokens: {
+        /**
+         * Tokens credited for purchases.
+         */
+        sold: number;
+        /**
+         * Purchases credited.
+         */
+        purchases: number;
+        /**
+         * Tokens taken back for payments refunded in the range.
+         */
+        refunded: number;
+        /**
+         * Tokens taken back for payments charged back in the range.
+         */
+        charged_back: number;
+        /**
+         * Tokens sold less those refunded and charged back.
+         */
+        net: number;
+        /**
+         * Tokens charged for servers and add-ons.
+         */
+        spent_on_servers: number;
+    };
+    /**
+     * Money per currency, by currency code.
+     */
+    money: Array<{
+        /**
+         * The currency code Tebex reported.
+         */
+        currency: string;
+        /**
+         * Paid for payments credited in the range, as a decimal.
+         */
+        gross: string;
+        /**
+         * Paid for payments refunded in the range, as a decimal.
+         */
+        refunded: string;
+        /**
+         * Paid for payments charged back in the range, as a decimal.
+         */
+        charged_back: string;
+        /**
+         * Gross less refunded and charged back, as a decimal; can be negative.
+         */
+        net: string;
+        /**
+         * Payments credited.
+         */
+        payments: number;
+        /**
+         * Payments refunded.
+         */
+        refunds: number;
+        /**
+         * Payments charged back.
+         */
+        chargebacks: number;
+    }>;
+    /**
+     * Payments with a dispute open now, whatever the range.
+     */
+    disputes_open: number;
+    /**
+     * Subscriptions now, whatever the range.
+     */
+    subscriptions: {
+        /**
+         * Active subscriptions.
+         */
+        active: number;
+        /**
+         * Subscriptions suspended for not being paid.
+         */
+        suspended: number;
+        /**
+         * What the active subscriptions charge per 30 days, in tokens, before sleep discounts.
+         */
+        mrr_tokens: number;
+    };
+    /**
+     * Renewals due from now, whatever the range.
+     */
+    renewals_due: {
+        /**
+         * How many days ahead renewals are counted.
+         */
+        days: number;
+        /**
+         * Active, auto-renewing subscriptions that renew in those days.
+         */
+        count: number;
+        /**
+         * Tokens moved in the range.
+         */
+        tokens: number;
+        /**
+         * Renewals the owner's balance does not cover now, paying each owner's renewals in date order.
+         */
+        short_of_balance: number;
+    };
+    /**
+     * Subscriptions that ended in the range.
+     */
+    churn: {
+        /**
+         * Cancelled.
+         */
+        cancelled: number;
+        /**
+         * Deleted after not being paid.
+         */
+        unpaid: number;
+        /**
+         * Deleted while running (by the owner or an administrator).
+         */
+        deleted: number;
+        /**
+         * All of them.
+         */
+        total: number;
+        /**
+         * What they charged per 30 days, in tokens.
+         */
+        mrr_tokens: number;
+    };
+    /**
+     * The plans with the most active subscriptions, at most 5.
+     */
+    top_plans: Array<{
+        /**
+         * The plan ID, or null for subscriptions whose plan was deleted.
+         */
+        id: number | null;
+        /**
+         * The plan name.
+         */
+        name: string;
+        /**
+         * Active subscriptions on it.
+         */
+        active: number;
+        /**
+         * What they charge per 30 days, in tokens.
+         */
+        mrr_tokens: number;
+    }>;
+    /**
+     * Tokens renewals in the range did not charge because the server slept.
+     */
+    sleep_saved_tokens: number;
+    /**
+     * Coupons and referrals in the range. These tokens are not in tokens.sold: only Tebex purchases are sold tokens.
+     */
+    promotions: {
+        /**
+         * Tokens coupons took off first periods of store purchases; tokens.spent_on_servers already counts only what was charged.
+         */
+        coupon_discount_tokens: number;
+        /**
+         * Store purchases made with a discount coupon.
+         */
+        coupon_purchases: number;
+        /**
+         * Free tokens credited by coupons redeemed on the wallet.
+         */
+        coupon_credit_tokens: number;
+        /**
+         * Free-token coupons redeemed.
+         */
+        coupon_credits: number;
+        /**
+         * Tokens paid as referral rewards (the referrer and the referred user each count).
+         */
+        referral_reward_tokens: number;
+        /**
+         * Referral rewards paid.
+         */
+        referral_rewards: number;
+        /**
+         * Referral reward tokens taken back after the purchase was refunded or charged back.
+         */
+        referral_clawback_tokens: number;
+    };
+    /**
+     * Free trial servers since trials began, whatever the range.
+     */
+    trials: {
+        /**
+         * Trials ever started.
+         */
+        started: number;
+        /**
+         * Trials running now.
+         */
+        running: number;
+        /**
+         * Trials kept by buying a period.
+         */
+        converted: number;
+        /**
+         * Trials that ended without being kept.
+         */
+        lapsed: number;
+        /**
+         * Kept trials as a percentage of the trials that are over, to one decimal.
+         */
+        conversion_rate: number;
+    };
+    /**
+     * AI assistant usage in the range.
+     */
+    ai: {
+        /**
+         * Panel tokens charged for AI usage.
+         */
+        charged_tokens: number;
+        /**
+         * AI model tokens used, free allowance included.
+         */
+        ai_tokens: number;
+    };
+    /**
+     * Users in the range.
+     */
+    users: {
+        /**
+         * Accounts created.
+         */
+        new: number;
+        /**
+         * Users with at least one purchase credited.
+         */
+        paying: number;
+    };
+    /**
+     * One row per day of the range, oldest first.
+     */
+    daily: Array<{
+        /**
+         * The day, as YYYY-MM-DD.
+         */
+        date: string;
+        /**
+         * Tokens credited for purchases.
+         */
+        tokens_sold: number;
+        /**
+         * Tokens charged for servers and add-ons.
+         */
+        tokens_spent: number;
+        /**
+         * Accounts created.
+         */
+        new_users: number;
+    }>;
 };
 export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
@@ -8132,6 +8667,19 @@ export type ClientGetTheStoreCatalogResponseBody = {
      * The token balance of the requesting user.
      */
     balance: number;
+    /**
+     * Free trial servers: whether the store offers them, their length in hours, the plans that can be tried, and whether this user may start one (with the reason when not).
+     */
+    trial: {
+        enabled?: boolean;
+        hours?: number;
+        plan_ids?: Array<number>;
+        eligible?: boolean;
+        /**
+         * Why this user cannot start a free trial; null when they can.
+         */
+        reason: string | null;
+    };
     categories?: Array<{
         id?: number;
         name?: string;
@@ -9448,6 +9996,18 @@ export type AdminListReferralsFlaggedQueryParameter = boolean;
 export type AdminListReferralsPageQueryParameter = number;
 export type AdminApproveReferralReferralIdPathParameter = number;
 export type AdminRejectReferralReferralIdPathParameter = number;
+/**
+ * The last 7, 30 or 90 days (today included), or custom with from and to. 30 by default.
+ */
+export type AdminGetRevenueRangeQueryParameter = '7' | '30' | '90' | 'custom';
+/**
+ * The first day of a custom range, as YYYY-MM-DD.
+ */
+export type AdminGetRevenueFromQueryParameter = string;
+/**
+ * The last day of a custom range, as YYYY-MM-DD; today at the latest, and at most 366 days after from.
+ */
+export type AdminGetRevenueToQueryParameter = string;
 export type AdminGetAnAdminAssistantConversationConversationUuidPathParameter = string;
 export type AdminSendAnAdminAssistantMessageConversationUuidPathParameter = string;
 export type AdminAllowAnAdminAssistantActionConversationUuidPathParameter = string;
@@ -10261,6 +10821,7 @@ export type ClientGetASupportAttachmentTicketPathParameter = number;
 export type ClientGetASupportAttachmentAttachmentPathParameter = number;
 export type ClientUpdateServerSubscriptionServerUuidPathParameter = string;
 export type ClientRenewServerSubscriptionServerUuidPathParameter = string;
+export type ClientKeepTrialServerServerUuidPathParameter = string;
 /**
  * Page number to retrieve.
  */
@@ -10419,6 +10980,7 @@ export type ClientGetFileUploadUrlServerUuidPathParameter = string;
  */
 export type ClientListServerSchedulesIncludeQueryParameter = string;
 export type ClientListServerSchedulesServerUuidPathParameter = string;
+export type ClientListSchedulePresetsServerUuidPathParameter = string;
 /**
  * Comma-separated relationships to include. Supports tasks.
  */
@@ -11952,6 +12514,58 @@ export type AdminUpdatePriceMultiplierResponses = {
     200: AdminUpdatePriceMultiplierResponseBody;
 };
 export type AdminUpdatePriceMultiplierResponse = AdminUpdatePriceMultiplierResponses[keyof AdminUpdatePriceMultiplierResponses];
+export type AdminGetFreeTrialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/trials';
+};
+export type AdminGetFreeTrialsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminGetFreeTrialsError = AdminGetFreeTrialsErrors[keyof AdminGetFreeTrialsErrors];
+export type AdminGetFreeTrialsResponses = {
+    /**
+     * Trials returned.
+     */
+    200: AdminGetFreeTrialsResponseBody;
+};
+export type AdminGetFreeTrialsResponse = AdminGetFreeTrialsResponses[keyof AdminGetFreeTrialsResponses];
+export type AdminUpdateFreeTrialSettingsData = {
+    body: AdminUpdateFreeTrialSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/shop/trials';
+};
+export type AdminUpdateFreeTrialSettingsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateFreeTrialSettingsError = AdminUpdateFreeTrialSettingsErrors[keyof AdminUpdateFreeTrialSettingsErrors];
+export type AdminUpdateFreeTrialSettingsResponses = {
+    /**
+     * Trial settings updated.
+     */
+    200: AdminUpdateFreeTrialSettingsResponseBody;
+};
+export type AdminUpdateFreeTrialSettingsResponse = AdminUpdateFreeTrialSettingsResponses[keyof AdminUpdateFreeTrialSettingsResponses];
 export type AdminListShopNodesData = {
     body?: never;
     path?: never;
@@ -12714,6 +13328,47 @@ export type AdminRejectReferralResponses = {
     200: AdminRejectReferralResponseBody;
 };
 export type AdminRejectReferralResponse = AdminRejectReferralResponses[keyof AdminRejectReferralResponses];
+export type AdminGetRevenueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * The last 7, 30 or 90 days (today included), or custom with from and to. 30 by default.
+         */
+        range?: AdminGetRevenueRangeQueryParameter;
+        /**
+         * The first day of a custom range, as YYYY-MM-DD.
+         */
+        from?: AdminGetRevenueFromQueryParameter;
+        /**
+         * The last day of a custom range, as YYYY-MM-DD; today at the latest, and at most 366 days after from.
+         */
+        to?: AdminGetRevenueToQueryParameter;
+    };
+    url: '/api/admin/billing/revenue';
+};
+export type AdminGetRevenueErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminGetRevenueError = AdminGetRevenueErrors[keyof AdminGetRevenueErrors];
+export type AdminGetRevenueResponses = {
+    /**
+     * Revenue returned.
+     */
+    200: AdminGetRevenueResponseBody;
+};
+export type AdminGetRevenueResponse = AdminGetRevenueResponses[keyof AdminGetRevenueResponses];
 export type AdminListAdminAssistantConversationsData = {
     body?: never;
     path?: never;
@@ -21451,6 +22106,42 @@ export type ClientPurchaseServerResponses = {
     201: ClientStorePurchaseResource;
 };
 export type ClientPurchaseServerResponse = ClientPurchaseServerResponses[keyof ClientPurchaseServerResponses];
+export type ClientStartFreeTrialData = {
+    body: ClientStartFreeTrialRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/store/trial';
+};
+export type ClientStartFreeTrialErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The player cannot start a free trial.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The store is at its capacity limits, busy, or the user has to accept the updated Terms of Service first.
+     */
+    409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientStartFreeTrialError = ClientStartFreeTrialErrors[keyof ClientStartFreeTrialErrors];
+export type ClientStartFreeTrialResponses = {
+    /**
+     * The idempotency key already started this trial.
+     */
+    200: ClientStoreTrialResource;
+    /**
+     * Trial server created and installing.
+     */
+    201: ClientStoreTrialResource;
+};
+export type ClientStartFreeTrialResponse = ClientStartFreeTrialResponses[keyof ClientStartFreeTrialResponses];
 export type ClientListTokenPacksData = {
     body?: never;
     path?: never;
@@ -21605,6 +22296,47 @@ export type ClientRenewServerSubscriptionResponses = {
     200: ClientServerSubscriptionResource;
 };
 export type ClientRenewServerSubscriptionResponse = ClientRenewServerSubscriptionResponses[keyof ClientRenewServerSubscriptionResponses];
+export type ClientKeepTrialServerData = {
+    body: ClientKeepTrialServerRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientKeepTrialServerServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/subscriptions/{server_uuid}/keep';
+};
+export type ClientKeepTrialServerErrors = {
+    /**
+     * The balance is too low, the period is not offered, the price changed or the server is not a trial.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientKeepTrialServerError = ClientKeepTrialServerErrors[keyof ClientKeepTrialServerErrors];
+export type ClientKeepTrialServerResponses = {
+    /**
+     * The server is kept and paid for one period.
+     */
+    200: ClientServerSubscriptionResource;
+};
+export type ClientKeepTrialServerResponse = ClientKeepTrialServerResponses[keyof ClientKeepTrialServerResponses];
 export type ClientGetAccountData = {
     body?: never;
     path?: never;
@@ -23897,6 +24629,80 @@ export type ClientCreateServerScheduleResponses = {
     200: ClientServerScheduleResource;
 };
 export type ClientCreateServerScheduleResponse = ClientCreateServerScheduleResponses[keyof ClientCreateServerScheduleResponses];
+export type ClientListSchedulePresetsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListSchedulePresetsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/schedules/presets';
+};
+export type ClientListSchedulePresetsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientListSchedulePresetsError = ClientListSchedulePresetsErrors[keyof ClientListSchedulePresetsErrors];
+export type ClientListSchedulePresetsResponses = {
+    /**
+     * Schedule presets returned.
+     */
+    200: ClientSchedulePresetsResource;
+};
+export type ClientListSchedulePresetsResponse = ClientListSchedulePresetsResponses[keyof ClientListSchedulePresetsResponses];
+export type ClientCreateScheduleFromPresetData = {
+    body: ClientCreateScheduleFromPresetRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListSchedulePresetsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/schedules/presets';
+};
+export type ClientCreateScheduleFromPresetErrors = {
+    /**
+     * The preset is already set up, or not available on this server.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientCreateScheduleFromPresetError = ClientCreateScheduleFromPresetErrors[keyof ClientCreateScheduleFromPresetErrors];
+export type ClientCreateScheduleFromPresetResponses = {
+    /**
+     * Schedule created from the preset.
+     */
+    200: ClientServerScheduleResource;
+};
+export type ClientCreateScheduleFromPresetResponse = ClientCreateScheduleFromPresetResponses[keyof ClientCreateScheduleFromPresetResponses];
 export type ClientDeleteServerScheduleData = {
     body?: never;
     path: {
