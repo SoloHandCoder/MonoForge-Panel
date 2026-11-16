@@ -1661,11 +1661,56 @@ export type ClientRecoveryTokensResource = {
     attributes: ClientRecoveryTokensAttributes;
 };
 
+export type ClientSchedulePresetsAttributes = {
+    /**
+     * The timezone schedule times are in (the panel's).
+     */
+    timezone: string;
+    /**
+     * The server runs Minecraft Java: restart warnings use `say` and the weekly cleanup is offered.
+     */
+    is_minecraft: boolean;
+    /**
+     * The most backups the server keeps; a backup rotation keeps at most this many.
+     */
+    backup_limit: number;
+    /**
+     * The viewer has control.console, which a daily restart needs to warn players first.
+     */
+    can_send_commands: boolean;
+    /**
+     * Each preset, in display order.
+     */
+    presets: Array<{
+        /**
+         * The preset.
+         */
+        key: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup';
+        /**
+         * The viewer can set it up on this server.
+         */
+        available: boolean;
+        /**
+         * Why it cannot be set up, or null.
+         */
+        reason: string | null;
+    }>;
+};
+
+export type ClientSchedulePresetsResource = {
+    object: string;
+    attributes: ClientSchedulePresetsAttributes;
+};
+
 export type ClientScheduleTaskAttributes = {
     id: number;
     sequence_id: number;
-    action: 'power' | 'command' | 'backup';
+    action: 'power' | 'command' | 'backup' | 'restart_if_empty' | 'delete_logs';
     payload: string;
+    /**
+     * A backup task keeps only its newest this many backups, rotating out its oldest unlocked one; null keeps them until the server limit.
+     */
+    keep_backups: number | null;
     time_offset: number;
     is_queued: boolean;
     continue_on_failure: boolean;
@@ -1819,6 +1864,10 @@ export type ClientServerResourcesResponse = {
 export type ClientServerScheduleAttributes = {
     id: number;
     name: string;
+    /**
+     * The Quick setup preset the schedule was made from, or null for a schedule made by hand.
+     */
+    preset: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup' | null;
     cron: {
         day_of_week: string;
         day_of_month: string;
@@ -5252,6 +5301,45 @@ export type ClientCreateServerScheduleRequest = {
     only_when_online?: boolean;
 };
 
+export type ClientCreateScheduleFromPresetRequest = {
+    /**
+     * The preset: daily_restart, backup_rotation, restart_when_empty or weekly_cleanup.
+     */
+    preset: 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup';
+    /**
+     * Daily restart: the hour to restart at (0-23), in the panel's timezone.
+     */
+    hour?: number;
+    /**
+     * Daily restart: the minute to restart at (0-59).
+     */
+    minute?: number;
+    /**
+     * Daily restart: how many minutes ahead players are warned (0-15, 0 for no warning).
+     */
+    warning_minutes?: number;
+    /**
+     * Daily restart on a game other than Minecraft: the console command that broadcasts the warning (defaults to say).
+     */
+    warning_command?: string | null;
+    /**
+     * Backup rotation: hours between backups (1, 2, 3, 4, 6, 8, 12 or 24).
+     */
+    every_hours?: number;
+    /**
+     * Backup rotation: how many of its backups to keep, at most the server's backup limit.
+     */
+    keep?: number;
+    /**
+     * Restart when empty: hours with nobody online before the restart (1-72).
+     */
+    hours?: number;
+    /**
+     * Weekly cleanup: logs older than this many days are deleted (1-365).
+     */
+    days?: number;
+};
+
 export type ClientUpdateServerScheduleRequest = {
     /**
      * The display name. Must not be greater than 191 characters.
@@ -5291,11 +5379,15 @@ export type ClientCreateScheduleTaskRequest = {
     /**
      * The action to perform.
      */
-    action: 'command' | 'power' | 'backup';
+    action: 'command' | 'power' | 'backup' | 'restart_if_empty' | 'delete_logs';
     /**
      * The payload. This field is required unless <code>action</code> is in <code>backup</code>.
      */
     payload?: string | null;
+    /**
+     * A backup task keeps only its newest this many backups (at most the server limit), rotating out its oldest unlocked one; null keeps them until the server limit. Must be at least 1. Must not be greater than 1000.
+     */
+    keep_backups?: number | null;
     /**
      * The delay before this task runs. Must be at least 0. Must not be greater than 900.
      */
@@ -5314,11 +5406,15 @@ export type ClientUpdateScheduleTaskRequest = {
     /**
      * The action to perform.
      */
-    action: 'command' | 'power' | 'backup';
+    action: 'command' | 'power' | 'backup' | 'restart_if_empty' | 'delete_logs';
     /**
      * The payload. This field is required unless <code>action</code> is in <code>backup</code>.
      */
     payload?: string | null;
+    /**
+     * A backup task keeps only its newest this many backups (at most the server limit), rotating out its oldest unlocked one; null keeps them until the server limit. Must be at least 1. Must not be greater than 1000.
+     */
+    keep_backups?: number | null;
     /**
      * The delay before this task runs. Must be at least 0. Must not be greater than 900.
      */
@@ -10494,6 +10590,8 @@ export type ClientGetFileUploadUrlServerUuidPathParameter = string;
 export type ClientListServerSchedulesIncludeQueryParameter = string;
 
 export type ClientListServerSchedulesServerUuidPathParameter = string;
+
+export type ClientListSchedulePresetsServerUuidPathParameter = string;
 
 /**
  * Comma-separated relationships to include. Supports tasks.
@@ -25248,6 +25346,90 @@ export type ClientCreateServerScheduleResponses = {
 };
 
 export type ClientCreateServerScheduleResponse = ClientCreateServerScheduleResponses[keyof ClientCreateServerScheduleResponses];
+
+export type ClientListSchedulePresetsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListSchedulePresetsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/schedules/presets';
+};
+
+export type ClientListSchedulePresetsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+
+export type ClientListSchedulePresetsError = ClientListSchedulePresetsErrors[keyof ClientListSchedulePresetsErrors];
+
+export type ClientListSchedulePresetsResponses = {
+    /**
+     * Schedule presets returned.
+     */
+    200: ClientSchedulePresetsResource;
+};
+
+export type ClientListSchedulePresetsResponse = ClientListSchedulePresetsResponses[keyof ClientListSchedulePresetsResponses];
+
+export type ClientCreateScheduleFromPresetData = {
+    body: ClientCreateScheduleFromPresetRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListSchedulePresetsServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/schedules/presets';
+};
+
+export type ClientCreateScheduleFromPresetErrors = {
+    /**
+     * The preset is already set up, or not available on this server.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type ClientCreateScheduleFromPresetError = ClientCreateScheduleFromPresetErrors[keyof ClientCreateScheduleFromPresetErrors];
+
+export type ClientCreateScheduleFromPresetResponses = {
+    /**
+     * Schedule created from the preset.
+     */
+    200: ClientServerScheduleResource;
+};
+
+export type ClientCreateScheduleFromPresetResponse = ClientCreateScheduleFromPresetResponses[keyof ClientCreateScheduleFromPresetResponses];
 
 export type ClientDeleteServerScheduleData = {
     body?: never;

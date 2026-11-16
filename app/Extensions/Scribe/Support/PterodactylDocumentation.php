@@ -174,6 +174,7 @@ class PterodactylDocumentation
         'ip' => 'The IP address.',
         'is_active' => 'Whether the resource is active.',
         'is_locked' => 'Whether the resource is locked.',
+        'keep_backups' => 'A backup task keeps only its newest this many backups (at most the server limit), rotating out its oldest unlocked one; null keeps them until the server limit.',
         'language' => 'The locale code.',
         'location_id' => 'The location ID.',
         'max_connections' => 'The maximum number of connections allowed.',

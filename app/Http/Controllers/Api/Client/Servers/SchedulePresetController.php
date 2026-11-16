@@ -65,18 +65,10 @@ class SchedulePresetController extends ClientApiController
     #[ResponseField('attributes.is_minecraft', 'boolean', 'The server runs Minecraft Java: restart warnings use `say` and the weekly cleanup is offered.', example: true)]
     #[ResponseField('attributes.backup_limit', 'integer', 'The most backups the server keeps; a backup rotation keeps at most this many.', example: 3)]
     #[ResponseField('attributes.can_send_commands', 'boolean', 'The viewer has control.console, which a daily restart needs to warn players first.', example: true)]
-    #[ResponseField('attributes.presets', 'object[]', 'Each preset, in display order.', schema: [
-        'type' => 'array',
-        'items' => [
-            'type' => 'object',
-            'required' => ['key', 'available', 'reason'],
-            'properties' => [
-                'key' => ['type' => 'string', 'enum' => ['daily_restart', 'backup_rotation', 'restart_when_empty', 'weekly_cleanup'], 'description' => 'The preset.', 'example' => 'daily_restart'],
-                'available' => ['type' => 'boolean', 'description' => 'The viewer can set it up on this server.', 'example' => true],
-                'reason' => ['type' => 'string', 'nullable' => true, 'description' => 'Why it cannot be set up, or null.', 'example' => null],
-            ],
-        ],
-    ])]
+    #[ResponseField('attributes.presets', description: 'Each preset, in display order.')]
+    #[ResponseField('attributes.presets[].key', 'string', 'The preset.', example: 'daily_restart', enum: ['daily_restart', 'backup_rotation', 'restart_when_empty', 'weekly_cleanup'])]
+    #[ResponseField('attributes.presets[].available', 'boolean', 'The viewer can set it up on this server.', example: true)]
+    #[ResponseField('attributes.presets[].reason', 'string', 'Why it cannot be set up, or null.', example: 'You need the file.delete permission.', nullable: true)]
     public function index(ViewScheduleRequest $request, Server $server): JsonResponse
     {
         $user = $request->user();

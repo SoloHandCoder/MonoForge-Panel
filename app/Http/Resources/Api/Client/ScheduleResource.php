@@ -15,7 +15,7 @@ use Pterodactyl\Models\Task;
  * @extends ClientResource<Schedule>
  */
 #[ResponseField('next_run_at', example: '2026-06-30T04:00:00+00:00', nullable: true)]
-#[ResponseField('preset', 'string', 'The Quick setup preset the schedule was made from, or null for a schedule made by hand.', example: 'daily_restart', enum: ['daily_restart', 'backup_rotation', 'restart_when_empty', 'weekly_cleanup'], nullable: true)]
+#[ResponseField('preset', description: 'The Quick setup preset the schedule was made from, or null for a schedule made by hand.', schema: ['type' => 'string', 'nullable' => true, 'enum' => ['daily_restart', 'backup_rotation', 'restart_when_empty', 'weekly_cleanup', null], 'example' => null])]
 class ScheduleResource extends ClientResource
 {
     protected array $includeRelations = [
