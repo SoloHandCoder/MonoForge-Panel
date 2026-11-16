@@ -53,12 +53,8 @@
                         "skip_scripts": false,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -167,12 +163,8 @@
                         "skip_scripts": true,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -278,12 +270,8 @@
                         "skip_scripts": false,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -453,12 +441,8 @@
                         "skip_scripts": true,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -593,12 +577,8 @@
                         "skip_scripts": false,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -728,12 +708,8 @@
                         "skip_scripts": true,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -861,12 +837,8 @@
                         "skip_scripts": false,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
@@ -1003,12 +975,8 @@
                         "skip_scripts": true,
                         "playit_address": null,
                         "address_pending": false,
-                        "game": "minecraft",
-                        "game_features": [
-                            "plugins",
-                            "versions",
-                            "player_count"
-                        ],
+                        "game": null,
+                        "game_features": [],
                         "extra_addresses": [],
                         "relationships": {
                             "allocations": {
