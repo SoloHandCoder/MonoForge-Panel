@@ -12,6 +12,7 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Share\ServerPage;
+use Pterodactyl\Services\Query\QueryStatus;
 use Pterodactyl\Services\Query\ServerQuery;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Pterodactyl\Support\LockedCache;
@@ -128,7 +129,7 @@ final readonly class PublicServerPages
         }
 
         $answer = $this->query->status($server);
-        if ($answer !== null) {
+        if ($answer instanceof QueryStatus) {
             return ['online', ['online' => $answer->online, 'max' => $answer->max], $this->clean($answer->version)];
         }
 

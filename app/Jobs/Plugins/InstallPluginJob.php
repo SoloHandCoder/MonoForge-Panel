@@ -82,6 +82,7 @@ class InstallPluginJob implements ShouldQueue
             ? Activity::event('server:plugin.install')->property(['file' => $this->directory.'/'.$name, 'version' => $this->versionNumber, 'source' => $this->sourceLabel])
             : Activity::event('server:plugin.update')->property(['old' => $this->directory.'/'.$this->replaces, 'file' => $this->directory.'/'.$name, 'version' => $this->versionNumber]);
         $activity->subject($server);
+
         $user = User::query()->find($this->userId);
         if ($user instanceof User) {
             $activity->actor($user);

@@ -69,7 +69,7 @@ final readonly class InstalledPlugins
 
         $jars = $this->installer->jars($server, $directory);
         $scan = $this->stored($server, $directory);
-        $scanning = $scan === null || $scan['signature'] !== self::signature($jars);
+        $scanning = $scan === null || $scan['signature'] !== $this->signature($jars);
         if ($scanning) {
             $this->queueScan($server, $directory);
         }
@@ -135,7 +135,7 @@ final readonly class InstalledPlugins
             }
         }
 
-        Cache::put($this->scanKey($server, $directory), ['signature' => self::signature($jars), 'files' => $files], self::SCAN_CACHE_SECONDS);
+        Cache::put($this->scanKey($server, $directory), ['signature' => $this->signature($jars), 'files' => $files], self::SCAN_CACHE_SECONDS);
     }
 
     /** Lets the next look at the folder queue a scan at once (after an install changed it). */
@@ -147,7 +147,7 @@ final readonly class InstalledPlugins
     }
 
     /** @param  list<array{name: string, size: int, modified: string}>  $jars */
-    private static function signature(array $jars): string
+    private function signature(array $jars): string
     {
         return hash('sha256', json_encode($jars, JSON_THROW_ON_ERROR));
     }

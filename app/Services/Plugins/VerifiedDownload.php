@@ -50,7 +50,7 @@ final readonly class VerifiedDownload
 
         // An MD5 alone is only accepted together with the size the catalog gives.
         $md5Only = array_diff_key($expected, ['md5' => true]) === [] && isset($expected['md5']);
-        throw_if($requireHash && array_diff_key($expected, ['md5' => true]) === [] && ! ($md5Only && $expectedSize > 0), MarketplaceException::class, "The catalog gave no hash for {$label}, so it was not installed.");
+        throw_if($requireHash && array_diff_key($expected, ['md5' => true]) === [] && (! $md5Only || $expectedSize <= 0), MarketplaceException::class, "The catalog gave no hash for {$label}, so it was not installed.");
 
         $files = Daemon::server($server)->files();
         $root = '/'.$directory;

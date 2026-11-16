@@ -223,7 +223,7 @@ class PublicServerPageController extends Controller
             $this->pages->forget($page);
         }
 
-        throw_if($result['retry_after'] !== null, new TooManyRequestsHttpException($result['retry_after'], 'This server was woken a moment ago. Please try again shortly.'));
+        throw_if($result['retry_after'] !== null, TooManyRequestsHttpException::class, $result['retry_after'], 'This server was woken a moment ago. Please try again shortly.');
 
         return new JsonResponse(['woken' => $result['woken'], 'sleeping' => $result['sleeping']], headers: ['Cache-Control' => 'no-store']);
     }

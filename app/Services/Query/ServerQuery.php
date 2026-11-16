@@ -45,7 +45,7 @@ class ServerQuery
     /** Whether the game's last pings kept timing out (it is left alone for a while). */
     public function isUnresponsive(Server $server): bool
     {
-        $timeouts = Cache::get(self::timeoutsKey($server), 0);
+        $timeouts = Cache::get($this->timeoutsKey($server), 0);
 
         return is_int($timeouts) && $timeouts >= self::UNRESPONSIVE_AFTER;
     }
@@ -75,7 +75,7 @@ class ServerQuery
         return $status === null ? null : new QueryStatus($status['online'], $status['max'], $status['motd'], $status['version'], $status['players']);
     }
 
-    private static function timeoutsKey(Server $server): string
+    private function timeoutsKey(Server $server): string
     {
         return "server-query:timeouts:{$server->uuid}";
     }
@@ -91,11 +91,11 @@ class ServerQuery
         $status = $this->minecraftJava->ping($this->host($server, $allocation), $allocation->port);
 
         if ($status instanceof QueryStatus) {
-            Cache::forget(self::timeoutsKey($server));
+            Cache::forget($this->timeoutsKey($server));
         } elseif (microtime(true) - $started >= MinecraftJavaPing::TIMEOUT_SECONDS * 0.9) {
             // It used the whole timeout: count it, so a game that stalls is skipped for a while.
-            $timeouts = Cache::get(self::timeoutsKey($server), 0);
-            Cache::put(self::timeoutsKey($server), (is_int($timeouts) ? $timeouts : 0) + 1, self::UNRESPONSIVE_SECONDS);
+            $timeouts = Cache::get($this->timeoutsKey($server), 0);
+            Cache::put($this->timeoutsKey($server), (is_int($timeouts) ? $timeouts : 0) + 1, self::UNRESPONSIVE_SECONDS);
         }
 
         return $status;
