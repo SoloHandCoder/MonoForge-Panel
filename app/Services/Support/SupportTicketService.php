@@ -30,6 +30,7 @@ class SupportTicketService
     public function __construct(
         private readonly SupportAttachmentStore $attachments,
         private readonly SupportNotifier $notifier,
+        private readonly SupportAttachmentQuota $quota,
     ) {}
 
     /**
@@ -163,8 +164,15 @@ class SupportTicketService
         $message->ticket_id = $ticket->id;
         $message->save();
 
-        foreach (array_slice($files, 0, SupportAttachmentStore::MAX_PER_MESSAGE) as $file) {
-            $this->stored[] = $this->attachments->store($message, $file)->path;
+        $files = array_slice($files, 0, SupportAttachmentStore::MAX_PER_MESSAGE);
+        // The cheap count first (it also locks the author's row), then decode and re-encode, then
+        // the size limit on what will really be stored.
+        $this->quota->assertDailyCount($author, count($files), $staff);
+        $prepared = array_map($this->attachments->prepare(...), $files);
+        $this->quota->assertStorage($author, array_sum(array_map(fn (array $image): int => mb_strlen($image['bytes'], '8bit'), $prepared)));
+
+        foreach ($prepared as $image) {
+            $this->stored[] = $this->attachments->put($message, $image)->path;
         }
 
         return $message;

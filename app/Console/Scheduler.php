@@ -16,6 +16,7 @@ use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
 use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
+use Pterodactyl\Console\Commands\Support\PruneSupportAttachmentsCommand;
 use Pterodactyl\Console\Commands\Tunnels\SyncTunnelsCommand;
 use Pterodactyl\Contracts\Telemetry\SendsTelemetry;
 use Pterodactyl\Models\ActivityLog;
@@ -77,6 +78,8 @@ final class Scheduler
         $schedule->command(PruneCommand::class, ['--model' => [ServerCrash::class]])->daily()->withoutOverlapping()->onOneServer();
         // Friend requests nobody answered within 30 days.
         $schedule->command(PruneCommand::class, ['--model' => [FriendRequest::class]])->daily()->withoutOverlapping()->onOneServer();
+        // Images on support tickets closed more than 180 days ago (the messages stay).
+        $schedule->command(PruneSupportAttachmentsCommand::class)->daily()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

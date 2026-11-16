@@ -10,14 +10,15 @@ use Illuminate\Http\UploadedFile;
 use Pterodactyl\Services\Support\SupportAttachmentStore;
 
 /**
- * A support attachment: a PNG, JPEG or WebP image of at most 5 MB, judged by its bytes.
+ * A support attachment: a PNG, JPEG or WebP image of at most 5 MB and 8 megapixels, judged by its bytes.
  */
 class SupportImage implements ValidationRule
 {
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (! $value instanceof UploadedFile || resolve(SupportAttachmentStore::class)->inspect($value) === null) {
-            $fail('Each attachment must be a PNG, JPEG or WebP image of at most 5 MB.');
+        $problem = $value instanceof UploadedFile ? resolve(SupportAttachmentStore::class)->problem($value) : SupportAttachmentStore::INVALID;
+        if ($problem !== null) {
+            $fail($problem);
         }
     }
 }

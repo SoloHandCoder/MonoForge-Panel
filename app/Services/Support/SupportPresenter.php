@@ -48,6 +48,7 @@ class SupportPresenter
         'author' => 'player1',
         'is_staff' => false,
         'attachments' => [self::ATTACHMENT_EXAMPLE],
+        'expired_attachments' => 0,
         'created_at' => '2026-11-15T12:00:00+00:00',
     ];
 
@@ -151,10 +152,11 @@ class SupportPresenter
         'author' => ['type' => 'string', 'description' => 'The username of the author.'],
         'is_staff' => self::BOOLEAN,
         'attachments' => ['type' => 'array', 'items' => self::ATTACHMENT_SCHEMA],
+        'expired_attachments' => ['type' => 'integer', 'description' => 'How many images of the message were removed because the ticket was closed more than 180 days ago.'],
         'created_at' => self::DATE,
     ];
 
-    private const array MESSAGE_REQUIRED = ['id', 'body', 'author', 'is_staff', 'attachments', 'created_at'];
+    private const array MESSAGE_REQUIRED = ['id', 'body', 'author', 'is_staff', 'attachments', 'expired_attachments', 'created_at'];
 
     private const array TICKET_PROPERTIES = [
         'id' => self::INTEGER,
@@ -301,6 +303,7 @@ class SupportPresenter
                 'width' => $attachment->width,
                 'height' => $attachment->height,
             ])->values()->all(),
+            'expired_attachments' => $message->expired_attachments,
             'created_at' => $message->created_at?->toAtomString(),
         ];
     }

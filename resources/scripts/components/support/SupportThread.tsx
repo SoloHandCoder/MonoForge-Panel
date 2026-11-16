@@ -83,6 +83,13 @@ export default function SupportThread({ messages, loadAttachment, viewer }: Prop
                                     ))}
                                 </ul>
                             )}
+                            {message.expired_attachments > 0 && (
+                                <p className='mt-3 text-xs text-muted-foreground italic' data-testid='support-expired'>
+                                    {message.expired_attachments === 1
+                                        ? 'Attachment expired'
+                                        : `${message.expired_attachments} attachments expired`}
+                                </p>
+                            )}
                         </article>
                     </li>
                 );
