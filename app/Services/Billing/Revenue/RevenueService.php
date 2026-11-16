@@ -14,6 +14,7 @@ use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Billing\TrialService;
 
 /**
  * The admin revenue dashboard: what came in, what went out again and what the subscriptions are
@@ -23,6 +24,11 @@ use Pterodactyl\Models\User;
  *
  * Tokens are whole numbers throughout; money is summed in cents per currency and never mixed
  * across currencies.
+ *
+ * Promotions are reported apart and never added to the sales: tokens sold are Tebex purchases
+ * only, so free tokens from coupons and referral rewards (their own ledger types) are not sold
+ * tokens, and a coupon purchase or a kept free trial is spent once, at what it actually charged.
+ * The coupon discount is what those purchases did not charge.
  *
  * @phpstan-type MoneyRow array{currency: string, gross: string, refunded: string, charged_back: string, net: string, payments: int, refunds: int, chargebacks: int}
  * @phpstan-type DailyRow array{date: string, tokens_sold: int, tokens_spent: int, new_users: int}
@@ -38,6 +44,8 @@ use Pterodactyl\Models\User;
  *     churn: array{cancelled: int, unpaid: int, deleted: int, total: int, mrr_tokens: int},
  *     top_plans: list<PlanRow>,
  *     sleep_saved_tokens: int,
+ *     promotions: array{coupon_discount_tokens: int, coupon_purchases: int, coupon_credit_tokens: int, coupon_credits: int, referral_reward_tokens: int, referral_rewards: int, referral_clawback_tokens: int},
+ *     trials: array{started: int, running: int, converted: int, lapsed: int, conversion_rate: float},
  *     ai: array{charged_tokens: int, ai_tokens: int},
  *     users: array{new: int, paying: int},
  *     daily: list<DailyRow>,
@@ -57,6 +65,8 @@ class RevenueService
 
     /** @var list<string> */
     private const array SPEND_TYPES = [TokenTransaction::TYPE_SERVER_CHARGE, TokenTransaction::TYPE_ADDON_CHARGE];
+
+    public function __construct(private readonly TrialService $trials) {}
 
     /**
      * A decimal amount ("12.34", from a DECIMAL column or a SUM of one) as whole cents, without
@@ -105,6 +115,7 @@ class RevenueService
         $sold = $this->int($purchases?->tokens);
         $refunded = $reversals['tokens'][TebexPayment::STATUS_REFUNDED];
         $chargedBack = $reversals['tokens'][TebexPayment::STATUS_CHARGEBACK];
+        $charges = $this->serverCharges($range);
 
         return [
             'range' => ['from' => $range->from->toDateString(), 'to' => $range->to->toDateString(), 'days' => $range->days()],
@@ -123,7 +134,9 @@ class RevenueService
             'renewals_due' => $this->renewalsDue(),
             'churn' => $this->churn($range),
             'top_plans' => $this->topPlans(),
-            'sleep_saved_tokens' => $this->sleepSaved($range),
+            'sleep_saved_tokens' => $charges['sleep_saved'],
+            'promotions' => $this->promotions($range, $charges),
+            'trials' => $this->trials->stats(),
             'ai' => [
                 'charged_tokens' => -$this->int($this->ledger($range, [TokenTransaction::TYPE_AI_USAGE])->sum('amount')),
                 'ai_tokens' => $this->int(AiUsage::query()->whereBetween('created_at', [$range->from, $range->to])->sum('ai_tokens')),
@@ -388,15 +401,53 @@ class RevenueService
     }
 
     /**
-     * Tokens renewals did not charge because the server slept, from the renewal ledger rows.
+     * From the server charges in the range, in one pass: tokens renewals did not charge because
+     * the server slept, and what coupons took off first periods (with how many purchases used one).
+     *
+     * @return array{sleep_saved: int, coupon_discount: int, coupon_purchases: int}
      */
-    private function sleepSaved(RevenueRange $range): int
+    private function serverCharges(RevenueRange $range): array
     {
-        $saved = $this->ledger($range, [TokenTransaction::TYPE_SERVER_CHARGE])
+        $row = $this->ledger($range, [TokenTransaction::TYPE_SERVER_CHARGE])
             ->selectRaw("COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sleep_saved_tokens')) AS UNSIGNED)), 0) AS saved")
-            ->value('saved');
+            ->selectRaw("COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.coupon_discount')) AS UNSIGNED)), 0) AS discount")
+            ->selectRaw("COUNT(JSON_EXTRACT(meta, '$.coupon_id')) AS coupons")
+            ->first();
 
-        return $this->int($saved);
+        return [
+            'sleep_saved' => $this->int($row?->saved),
+            'coupon_discount' => $this->int($row?->discount),
+            'coupon_purchases' => $this->int($row?->coupons),
+        ];
+    }
+
+    /**
+     * Coupon discounts and the tokens coupons and referrals gave away in the range. A referral
+     * reward taken back (a refund after the payout) is a negative referral row.
+     *
+     * @param  array{sleep_saved: int, coupon_discount: int, coupon_purchases: int}  $charges
+     * @return array{coupon_discount_tokens: int, coupon_purchases: int, coupon_credit_tokens: int, coupon_credits: int, referral_reward_tokens: int, referral_rewards: int, referral_clawback_tokens: int}
+     */
+    private function promotions(RevenueRange $range, array $charges): array
+    {
+        $credits = $this->ledger($range, [TokenTransaction::TYPE_COUPON])
+            ->selectRaw('COALESCE(SUM(amount), 0) AS tokens, COUNT(*) AS credits')
+            ->first();
+        $referrals = $this->ledger($range, [TokenTransaction::TYPE_REFERRAL])
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS rewarded')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 THEN 1 ELSE 0 END), 0) AS rewards')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS clawed_back')
+            ->first();
+
+        return [
+            'coupon_discount_tokens' => $charges['coupon_discount'],
+            'coupon_purchases' => $charges['coupon_purchases'],
+            'coupon_credit_tokens' => $this->int($credits?->tokens),
+            'coupon_credits' => $this->int($credits?->credits),
+            'referral_reward_tokens' => $this->int($referrals?->rewarded),
+            'referral_rewards' => $this->int($referrals?->rewards),
+            'referral_clawback_tokens' => $this->int($referrals?->clawed_back),
+        ];
     }
 
     /**

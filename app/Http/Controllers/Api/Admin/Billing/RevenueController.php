@@ -39,6 +39,16 @@ class RevenueController extends AdminApiController
         'churn' => ['cancelled' => 1, 'unpaid' => 2, 'deleted' => 0, 'total' => 3, 'mrr_tokens' => 1500],
         'top_plans' => [['id' => 3, 'name' => 'Minecraft 4 GB', 'active' => 9, 'mrr_tokens' => 4500]],
         'sleep_saved_tokens' => 640,
+        'promotions' => [
+            'coupon_discount_tokens' => 300,
+            'coupon_purchases' => 2,
+            'coupon_credit_tokens' => 500,
+            'coupon_credits' => 5,
+            'referral_reward_tokens' => 800,
+            'referral_rewards' => 4,
+            'referral_clawback_tokens' => 0,
+        ],
+        'trials' => ['started' => 12, 'running' => 3, 'converted' => 4, 'lapsed' => 5, 'conversion_rate' => 44.4],
         'ai' => ['charged_tokens' => 42, 'ai_tokens' => 512000],
         'users' => ['new' => 37, 'paying' => 11],
         'daily' => [['date' => '2026-11-16', 'tokens_sold' => 1000, 'tokens_spent' => 350, 'new_users' => 2]],
@@ -47,7 +57,7 @@ class RevenueController extends AdminApiController
     /**
      * Return the revenue dashboard for a range of days.
      */
-    #[Endpoint('Get revenue', "Returns the token shop revenue for the last 7, 30 or 90 days, or a custom range of up to 366 days: tokens sold, money in per currency (never converted or mixed), refunds and chargebacks, net, active subscriptions and what they bring in per 30 days, renewals due in the next 7 days and how many the owner's balance does not cover, churn, the top plans, tokens saved by auto-sleep, AI usage charged and new and paying users, with a row per day. Days are in the panel's timezone, both ends included. Reports are cached for five minutes. Users are only counted, never listed.")]
+    #[Endpoint('Get revenue', "Returns the token shop revenue for the last 7, 30 or 90 days, or a custom range of up to 366 days: tokens sold, money in per currency (never converted or mixed), refunds and chargebacks, net, active subscriptions and what they bring in per 30 days, renewals due in the next 7 days and how many the owner's balance does not cover, churn, the top plans, tokens saved by auto-sleep, coupon discounts and the tokens coupons and referrals gave away (reported apart, never counted as sold), free trial conversions, AI usage charged and new and paying users, with a row per day. Days are in the panel's timezone, both ends included. Reports are cached for five minutes. Users are only counted, never listed.")]
     #[QueryParam('range', 'string', 'The last 7, 30 or 90 days (today included), or custom with from and to. 30 by default.', required: false, example: '30', enum: GetRevenueRequest::RANGES)]
     #[QueryParam('from', 'string', 'The first day of a custom range, as YYYY-MM-DD.', required: false, example: '2026-10-01')]
     #[QueryParam('to', 'string', 'The last day of a custom range, as YYYY-MM-DD; today at the latest, and at most 366 days after from.', required: false, example: '2026-10-31')]
@@ -95,6 +105,20 @@ class RevenueController extends AdminApiController
     #[ResponseField('top_plans.active', 'integer', 'Active subscriptions on it.', required: true)]
     #[ResponseField('top_plans.mrr_tokens', 'integer', 'What they charge per 30 days, in tokens.', required: true)]
     #[ResponseField('sleep_saved_tokens', 'integer', 'Tokens renewals in the range did not charge because the server slept.', required: true)]
+    #[ResponseField('promotions', 'object', 'Coupons and referrals in the range. These tokens are not in tokens.sold: only Tebex purchases are sold tokens.', required: true)]
+    #[ResponseField('promotions.coupon_discount_tokens', 'integer', 'Tokens coupons took off first periods of store purchases; tokens.spent_on_servers already counts only what was charged.', required: true)]
+    #[ResponseField('promotions.coupon_purchases', 'integer', 'Store purchases made with a discount coupon.', required: true)]
+    #[ResponseField('promotions.coupon_credit_tokens', 'integer', 'Free tokens credited by coupons redeemed on the wallet.', required: true)]
+    #[ResponseField('promotions.coupon_credits', 'integer', 'Free-token coupons redeemed.', required: true)]
+    #[ResponseField('promotions.referral_reward_tokens', 'integer', 'Tokens paid as referral rewards (the referrer and the referred user each count).', required: true)]
+    #[ResponseField('promotions.referral_rewards', 'integer', 'Referral rewards paid.', required: true)]
+    #[ResponseField('promotions.referral_clawback_tokens', 'integer', 'Referral reward tokens taken back after the purchase was refunded or charged back.', required: true)]
+    #[ResponseField('trials', 'object', 'Free trial servers since trials began, whatever the range.', required: true)]
+    #[ResponseField('trials.started', 'integer', 'Trials ever started.', required: true)]
+    #[ResponseField('trials.running', 'integer', 'Trials running now.', required: true)]
+    #[ResponseField('trials.converted', 'integer', 'Trials kept by buying a period.', required: true)]
+    #[ResponseField('trials.lapsed', 'integer', 'Trials that ended without being kept.', required: true)]
+    #[ResponseField('trials.conversion_rate', 'number', 'Kept trials as a percentage of the trials that are over, to one decimal.', required: true)]
     #[ResponseField('ai', 'object', 'AI assistant usage in the range.', required: true)]
     #[ResponseField('ai.charged_tokens', 'integer', 'Panel tokens charged for AI usage.', required: true)]
     #[ResponseField('ai.ai_tokens', 'integer', 'AI model tokens used, free allowance included.', required: true)]

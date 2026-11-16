@@ -68,6 +68,9 @@ describe('revenue CSV', () => {
 
         expect(lines[0]).toBe('metric,value');
         expect(lines).toContain('tokens_sold,1500');
+        expect(lines).toContain('coupon_discount_tokens,120');
+        expect(lines).toContain('referral_tokens_taken_back,200');
+        expect(lines).toContain('trial_conversion_rate_percent,50');
         expect(lines).toContain('renewals_next_7_days,2');
         expect(lines).toContain('EUR,14.98,4.99,0.00,9.99,2,1,0');
         expect(lines).toContain('USD,0.00,0.00,3.50,-3.50,0,0,1');

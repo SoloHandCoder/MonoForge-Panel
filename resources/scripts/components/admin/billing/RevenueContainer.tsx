@@ -5,8 +5,11 @@ import {
     CalendarClock,
     Coins,
     Download,
+    FlaskConical,
+    Gift,
     Moon,
     Repeat,
+    Ticket,
     TrendingDown,
     UserPlus,
     Wallet,
@@ -219,6 +222,40 @@ function TopPlansCard({ report }: { report: AdminRevenue }) {
     );
 }
 
+/**
+ * Coupons and referrals in the range. These tokens are not sold tokens: the discount is what coupon
+ * purchases did not charge (Spent on servers already counts what they did), and the free tokens
+ * came from coupons and referral rewards, not from Tebex.
+ */
+function PromotionsCard({ report }: { report: AdminRevenue }) {
+    const promotions = report.promotions;
+
+    return (
+        <Card title='Coupons and referrals' icon={Ticket}>
+            <p className='mb-2 text-xs text-muted-foreground'>Given away, not sold: none of this is in Tokens sold.</p>
+            <dl className='divide-y divide-border'>
+                <Fact
+                    label='Coupon discounts'
+                    value={`${tokens(promotions.coupon_discount_tokens)} off ${formatCount(promotions.coupon_purchases)} ${promotions.coupon_purchases === 1 ? 'purchase' : 'purchases'}`}
+                />
+                <Fact
+                    label='Free tokens from coupons'
+                    value={`${tokens(promotions.coupon_credit_tokens)} · ${formatCount(promotions.coupon_credits)} redeemed`}
+                />
+                <Fact
+                    label='Referral rewards paid'
+                    value={`${tokens(promotions.referral_reward_tokens)} · ${formatCount(promotions.referral_rewards)} ${promotions.referral_rewards === 1 ? 'reward' : 'rewards'}`}
+                />
+                <Fact
+                    label='Referral rewards taken back'
+                    tone={promotions.referral_clawback_tokens > 0 ? 'warning' : undefined}
+                    value={tokens(promotions.referral_clawback_tokens)}
+                />
+            </dl>
+        </Card>
+    );
+}
+
 function RevenueReport({ report }: { report: AdminRevenue }) {
     const sold = useMemo(() => report.daily.map((day) => ({ date: day.date, value: day.tokens_sold })), [report]);
     const users = useMemo(() => report.daily.map((day) => ({ date: day.date, value: day.new_users })), [report]);
@@ -279,6 +316,23 @@ function RevenueReport({ report }: { report: AdminRevenue }) {
                         label='AI assistant usage'
                         value={tokens(report.ai.charged_tokens)}
                         detail={`${formatCount(report.ai.ai_tokens)} model tokens, free allowance included`}
+                    />
+                </div>
+            </div>
+            <div className='grid grid-cols-1 gap-4 xl:grid-cols-2'>
+                <PromotionsCard report={report} />
+                <div className='grid grid-cols-1 content-start gap-4'>
+                    <Kpi
+                        icon={FlaskConical}
+                        label='Free trial conversion'
+                        value={`${report.trials.conversion_rate}%`}
+                        detail={`${formatCount(report.trials.converted)} kept of ${formatCount(report.trials.converted + report.trials.lapsed)} ended · ${formatCount(report.trials.running)} running · all time`}
+                    />
+                    <Kpi
+                        icon={Gift}
+                        label='Free trials started'
+                        value={formatCount(report.trials.started)}
+                        detail='All time; a kept trial is counted in Spent on servers once'
                     />
                 </div>
             </div>

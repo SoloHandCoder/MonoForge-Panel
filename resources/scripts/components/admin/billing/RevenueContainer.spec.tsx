@@ -53,6 +53,18 @@ describe('RevenueContainer', () => {
         expect(screen.getByText('7 tokens')).toBeInTheDocument();
     });
 
+    it('labels coupon discounts and free tokens apart from sales, with the trial conversion', () => {
+        render(<RevenueContainer />);
+
+        expect(screen.getByText(/none of this is in Tokens sold/)).toBeInTheDocument();
+        expect(screen.getByText('Coupon discounts').nextSibling).toHaveTextContent('120 tokens off 1 purchase');
+        expect(screen.getByText('Free tokens from coupons').nextSibling).toHaveTextContent('250 tokens · 1 redeemed');
+        expect(screen.getByText('Referral rewards paid').nextSibling).toHaveTextContent('400 tokens · 2 rewards');
+        expect(screen.getByText('Referral rewards taken back').nextSibling).toHaveTextContent('200 tokens');
+        expect(screen.getByText('Free trial conversion', { selector: 'p' }).nextSibling).toHaveTextContent('50%');
+        expect(screen.getByText(/2 kept of 4 ended · 1 running · all time/)).toBeInTheDocument();
+    });
+
     it('labels each chart with its total and reads a day with the arrow keys', () => {
         render(<RevenueContainer />);
 

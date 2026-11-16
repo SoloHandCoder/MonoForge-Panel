@@ -223,3 +223,52 @@ test('only root administrators, or the billing read permission, see revenue', fu
     $this->actingAsNonAdmin();
     $this->getJson(route('api.admin.billing.revenue'))->assertForbidden();
 });
+
+test('coupons, referrals and kept trials are reported apart and never counted as sold', function (): void {
+    $buyer = User::factory()->create();
+    $friend = User::factory()->create();
+
+    ledger($buyer, TokenTransaction::TYPE_PURCHASE, 1000, '2026-11-15 10:00:00');
+    // A store purchase with a coupon: 20 off a 200-token first period, charged 180.
+    ledger($buyer, TokenTransaction::TYPE_SERVER_CHARGE, -180, '2026-11-15 11:00:00', ['meta' => json_encode(['coupon_id' => 1, 'coupon_discount' => 20, 'full_price' => 200])]);
+    // A free trial kept by buying a period: one ordinary server charge.
+    ledger($friend, TokenTransaction::TYPE_SERVER_CHARGE, -300, '2026-11-15 12:00:00', ['reference_type' => 'subscription', 'reference_id' => 'trial-convert:9']);
+    // Free tokens: a wallet coupon and two referral rewards, one taken back after a refund.
+    ledger($buyer, TokenTransaction::TYPE_COUPON, 250, '2026-11-15 13:00:00');
+    ledger($buyer, TokenTransaction::TYPE_REFERRAL, 200, '2026-11-15 14:00:00');
+    ledger($friend, TokenTransaction::TYPE_REFERRAL, 200, '2026-11-15 14:00:00');
+    ledger($buyer, TokenTransaction::TYPE_REFERRAL, -200, '2026-11-16 09:00:00');
+    // Outside the range.
+    ledger($buyer, TokenTransaction::TYPE_COUPON, 999, '2026-10-01 13:00:00');
+
+    $running = $this->createServerModel();
+    subscription($running, ['status' => ServerSubscription::STATUS_TRIAL, 'price_tokens' => 0, 'is_trial' => true]);
+    $trial = fn (array $attributes): bool => DB::table('shop_trials')->insert(array_merge([
+        'hours' => 48, 'ends_at' => '2026-11-17 00:00:00', 'created_at' => '2026-11-10 00:00:00', 'updated_at' => '2026-11-10 00:00:00',
+    ], $attributes));
+    $trial(['user_id' => $running->owner_id, 'server_id' => $running->id]);
+    $trial(['user_id' => $buyer->id, 'converted_at' => '2026-11-12 00:00:00']);
+    $trial(['user_id' => $friend->id, 'expired_at' => '2026-11-12 00:00:00']);
+
+    $this->getJson(route('api.admin.billing.revenue', ['range' => '7']))
+        ->assertOk()
+        ->assertJsonPath('tokens.sold', 1000)
+        ->assertJsonPath('tokens.net', 1000)
+        ->assertJsonPath('tokens.spent_on_servers', 480)
+        ->assertJsonPath('users.paying', 1)
+        ->assertJsonPath('promotions', [
+            'coupon_discount_tokens' => 20,
+            'coupon_purchases' => 1,
+            'coupon_credit_tokens' => 250,
+            'coupon_credits' => 1,
+            'referral_reward_tokens' => 400,
+            'referral_rewards' => 2,
+            'referral_clawback_tokens' => 200,
+        ])
+        ->assertJsonPath('trials.started', 3)
+        ->assertJsonPath('trials.running', 1)
+        ->assertJsonPath('trials.converted', 1)
+        ->assertJsonPath('trials.lapsed', 1)
+        ->assertJsonPath('trials.conversion_rate', 50)
+        ->assertJsonPath('daily.5.tokens_sold', 1000);
+});

@@ -36,6 +36,16 @@ export const revenueFixture: AdminRevenue = {
         { id: null, name: 'Deleted plan', active: 1, mrr_tokens: 300 },
     ],
     sleep_saved_tokens: 40,
+    promotions: {
+        coupon_discount_tokens: 120,
+        coupon_purchases: 1,
+        coupon_credit_tokens: 250,
+        coupon_credits: 1,
+        referral_reward_tokens: 400,
+        referral_rewards: 2,
+        referral_clawback_tokens: 200,
+    },
+    trials: { started: 5, running: 1, converted: 2, lapsed: 2, conversion_rate: 50 },
     ai: { charged_tokens: 7, ai_tokens: 9000 },
     users: { new: 4, paying: 2 },
     daily: [
