@@ -68,7 +68,7 @@ class ReferralController extends AdminApiController
         ReferralSettings::store($request->boolean('enabled'), $request->integer('reward_tokens'), $request->integer('monthly_cap'));
 
         Activity::event('admin:shop.referrals.update')
-            ->property(['enabled' => $request->boolean('enabled'), 'reward' => $request->integer('reward_tokens'), 'cap' => $request->integer('monthly_cap')])
+            ->property(['enabled' => $request->boolean('enabled') ? 'yes' : 'no', 'reward' => $request->integer('reward_tokens'), 'cap' => $request->integer('monthly_cap')])
             ->log();
 
         return new JsonResponse(ReferralSettings::toArray());
