@@ -69,6 +69,7 @@ describe('NodeMinecraftEntrance', () => {
 
     it('applies PROXY protocol on demand', async () => {
         const user = userEvent.setup();
+
         render(<NodeMinecraftEntrance nodeId={4} />);
 
         await user.click(screen.getByRole('button', { name: 'Apply to servers' }));
