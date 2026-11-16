@@ -106,6 +106,9 @@ enum Permissions: string
     case AdminSupportRead = 'admin:support.read';
     case AdminSupportReply = 'admin:support.reply';
 
+    // Phase 7 Task R: the revenue dashboard (money in, refunds, subscriptions, churn).
+    case AdminBillingRead = 'admin:billing.read';
+
     // Server subuser permissions, granted per-server and checked via ServerPolicy.
     case WebsocketConnect = 'websocket.connect';
 
