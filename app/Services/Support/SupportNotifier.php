@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Pterodactyl\Models\Support\SupportTicket;
 use Pterodactyl\Models\User;
@@ -65,7 +66,7 @@ class SupportNotifier
     {
         $staff = User::query()
             ->where('root_admin', true)
-            ->when($ticket->assigned_to !== null, fn ($query) => $query->whereKey($ticket->assigned_to))
+            ->when($ticket->assigned_to !== null, fn (Builder $query): Builder => $query->whereKey($ticket->assigned_to))
             ->whereKeyNot($ticket->user_id)
             ->limit(50)
             ->get();

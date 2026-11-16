@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -174,7 +175,7 @@ class SupportTicketController extends ClientApiController
         // Only images on messages the player can see: never one on an internal note.
         $file = SupportAttachment::query()
             ->whereKey($attachment)
-            ->whereHas('message', fn ($query) => $query->where('ticket_id', $model->id)->where('is_internal', false))
+            ->whereHas('message', fn (Builder $query): Builder => $query->where('ticket_id', $model->id)->where('is_internal', false))
             ->firstOrFail();
 
         return SupportAttachmentResponse::make($file);

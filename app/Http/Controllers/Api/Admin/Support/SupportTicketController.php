@@ -189,7 +189,7 @@ class SupportTicketController extends AdminApiController
     {
         $file = SupportAttachment::query()
             ->whereKey($attachment)
-            ->whereHas('message', fn ($query) => $query->where('ticket_id', $ticket))
+            ->whereHas('message', fn (Builder $query): Builder => $query->where('ticket_id', $ticket))
             ->firstOrFail();
 
         return SupportAttachmentResponse::make($file);
