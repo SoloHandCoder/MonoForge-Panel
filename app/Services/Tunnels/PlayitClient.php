@@ -25,6 +25,29 @@ class PlayitClient
     /** playit's error when the agent key may read but not create or delete tunnels. */
     public const string READ_ONLY = 'NotAllowedWithReadOnly';
 
+    /** playit's error on create while no agent program has connected with the key yet. */
+    public const string AGENT_VERSION_TOO_OLD = 'AgentVersionTooOld';
+
+    /** Where the administrator accepts a claim: the official agent's `claim_url()`. */
+    public const string CLAIM_URL = 'https://playit.gg/claim/';
+
+    /** The agent version the panel claims as, which playit accepts for self-managed agents. */
+    public const string CLAIM_VERSION = 'playit 2.0.2';
+
+    /** `/claim/setup` answers, as the official agent's ClaimSetupResponse names them. */
+    public const string CLAIM_WAITING_FOR_VISIT = 'WaitingForUserVisit';
+
+    public const string CLAIM_WAITING_FOR_USER = 'WaitingForUser';
+
+    public const string CLAIM_ACCEPTED = 'UserAccepted';
+
+    public const string CLAIM_REJECTED = 'UserRejected';
+
+    /** What playit's agent secrets look like: the agent checks they are hex. */
+    public const string SECRET_PATTERN = '/^[0-9a-fA-F]{16,512}$/';
+
+    public const string UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+
     /**
      * The address players connect to, or null while playit has not allocated one or has disabled
      * the tunnel. The v1 agent run data carries it as `display_address`; the older tunnel list
@@ -151,6 +174,66 @@ class PlayitClient
     }
 
     /**
+     * Register (or poll) a claim for a new self-managed agent, as `playit claim exchange` does:
+     * `POST /claim/setup {code, agent_type: "self-managed", version}` with no agent key. Returns
+     * one of the CLAIM_* answers.
+     *
+     * @throws PlayitException
+     */
+    public function claimSetup(string $code): string
+    {
+        $data = $this->call(null, '/claim/setup', [
+            'code' => $code,
+            'agent_type' => 'self-managed',
+            'version' => self::CLAIM_VERSION,
+        ]);
+
+        $known = [self::CLAIM_WAITING_FOR_VISIT, self::CLAIM_WAITING_FOR_USER, self::CLAIM_ACCEPTED, self::CLAIM_REJECTED];
+        throw_if(! is_string($data) || ! in_array($data, $known, true), PlayitException::class, 'playit.gg answered the claim with something the panel does not know.');
+
+        return $data;
+    }
+
+    /**
+     * Exchange an accepted claim for the new agent's secret (`POST /claim/exchange {code}`). Until
+     * the claim is accepted playit fails it with `NotAccepted`; a refused or expired claim fails
+     * with `UserRejected`, `CodeExpired` or `CodeNotFound`.
+     *
+     * The secret is returned to the caller only; it is never logged or put in a message.
+     *
+     * @throws PlayitException
+     */
+    public function claimExchange(string $code): string
+    {
+        $data = $this->call(null, '/claim/exchange', ['code' => $code]);
+        $secret = is_array($data) ? ($data['secret_key'] ?? null) : null;
+
+        throw_if(! is_string($secret) || preg_match(self::SECRET_PATTERN, mb_trim($secret)) !== 1, PlayitException::class, 'playit.gg did not return a usable agent secret.');
+
+        return mb_trim($secret);
+    }
+
+    /**
+     * The agent behind a secret, from its run data: its id and whether it is self-managed.
+     *
+     * @return array{agent_id: string, self_managed: bool|null}
+     *
+     * @throws PlayitException
+     */
+    public function agentOf(string $secret): array
+    {
+        $data = $this->call($secret, '/v1/agents/rundata', []);
+        $agentId = is_array($data) ? ($data['agent_id'] ?? null) : null;
+
+        throw_if(! is_string($agentId) || preg_match(self::UUID_PATTERN, $agentId) !== 1, PlayitException::class, 'playit.gg did not say which agent the new key belongs to.');
+
+        $permissions = $data['permissions'] ?? null;
+        $selfManaged = is_array($permissions) && is_bool($permissions['is_self_managed'] ?? null) ? $permissions['is_self_managed'] : null;
+
+        return ['agent_id' => mb_strtolower($agentId), 'self_managed' => $selfManaged];
+    }
+
+    /**
      * Create a tunnel to a port on the agent's machine and return playit's id for it, with the
      * v1 API. Only a write-capable agent key may do this; a read-only one is refused with
      * `NotAllowedWithReadOnly` (see READ_ONLY).
@@ -161,26 +244,49 @@ class PlayitClient
      */
     public function createTunnel(string $secret, string $agentId, array $tunnel): string
     {
-        $data = $this->call($secret, '/v1/tunnels/create', [
-            'name' => $tunnel['name'],
-            'protocol' => $tunnel['tunnel_type'] !== null
-                ? ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']]
-                : ['type' => 'raw-ports', 'details' => ['port_type' => $tunnel['port_type'], 'port_count' => 1]],
-            'origin' => [
-                'type' => 'agent',
-                'data' => [
-                    'agent_id' => $agentId,
-                    'config' => [
-                        'fields' => [
-                            ['name' => 'local_ip', 'value' => $tunnel['local_ip']],
-                            ['name' => 'local_port', 'value' => (string) $tunnel['local_port']],
-                        ],
+        $origin = [
+            'type' => 'agent',
+            'data' => [
+                'agent_id' => $agentId,
+                'config' => [
+                    'fields' => [
+                        ['name' => 'local_ip', 'value' => $tunnel['local_ip']],
+                        ['name' => 'local_port', 'value' => (string) $tunnel['local_port']],
                     ],
                 ],
             ],
-            'endpoint' => ['type' => 'region', 'details' => ['region' => 'global', 'port' => null]],
-            'enabled' => true,
-        ]);
+        ];
+
+        try {
+            $data = $this->call($secret, '/v1/tunnels/create', [
+                'name' => $tunnel['name'],
+                'protocol' => $tunnel['tunnel_type'] !== null
+                    ? ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']]
+                    : ['type' => 'raw-ports', 'details' => ['port_type' => $tunnel['port_type'], 'port_count' => 1]],
+                'origin' => $origin,
+                'endpoint' => ['type' => 'region', 'details' => ['region' => 'global', 'port' => null]],
+                'enabled' => true,
+            ]);
+        } catch (PlayitException $playitException) {
+            // playit does not document the body. When it refuses this one as malformed, send the
+            // shape the official agent's api_client uses for ReqTunnelsCreateV1 instead.
+            throw_if($playitException->reason !== 'validation', $playitException);
+
+            $data = $this->call($secret, '/v1/tunnels/create', [
+                'ports' => $tunnel['tunnel_type'] !== null
+                    ? ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']]
+                    : ['type' => match ($tunnel['port_type']) {
+                        'udp' => 'custom-udp',
+                        'both' => 'custom-both',
+                        default => 'custom-tcp',
+                    }, 'details' => 1],
+                'origin' => $origin,
+                'enabled' => true,
+                'alloc' => null,
+                'name' => $tunnel['name'],
+                'firewall_id' => null,
+            ]);
+        }
 
         $id = is_array($data) ? ($data['id'] ?? null) : null;
         throw_unless(is_string($id) && $id !== '', PlayitException::class, 'playit.gg did not return an id for the new tunnel.');
@@ -264,22 +370,27 @@ class PlayitClient
     }
 
     /**
-     * POST to the API and unwrap its envelope.
+     * POST to the API and unwrap its envelope, with the agent key when there is one.
      *
      * @param  array<string, mixed>  $body
      *
      * @throws PlayitException
      */
-    protected function call(string $secret, string $path, array $body): mixed
+    protected function call(?string $secret, string $path, array $body): mixed
     {
+        $request = Http::acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(15)
+            ->withoutRedirecting();
+
+        // The claim calls are made before there is a key, like the official agent's.
+        if ($secret !== null) {
+            $request = $request->withHeaders(['Authorization' => 'Agent-Key '.mb_trim($secret)]);
+        }
+
         try {
-            $response = Http::acceptJson()
-                ->asJson()
-                ->connectTimeout(5)
-                ->timeout(15)
-                ->withoutRedirecting()
-                ->withHeaders(['Authorization' => 'Agent-Key '.mb_trim($secret)])
-                ->post(self::API_BASE.$path, $body);
+            $response = $request->post(self::API_BASE.$path, $body);
         } catch (ConnectionException) {
             throw new PlayitException('Could not reach playit.gg.');
         }

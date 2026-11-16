@@ -35,7 +35,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'playit_previous_agent_id', 'playit_previous_secret', 'playit_previous_mode', 'playit_switched_at', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -50,6 +50,9 @@ class Node extends Model implements Identifiable
 
     /** `playit_mode` once playit refused to create a tunnel because the agent key is read-only. */
     public const string PLAYIT_READ_ONLY = 'read_only';
+
+    /** `playit_mode` once the node runs a self-managed agent the panel set up, which may create tunnels. */
+    public const string PLAYIT_SELF_MANAGED = 'self_managed';
 
     public const int DAEMON_TOKEN_ID_LENGTH = 16;
 
@@ -100,6 +103,8 @@ class Node extends Model implements Identifiable
             'shop_limit_disk_mb' => 'integer',
             'shop_limit_cpu_percent' => 'integer',
             'playit_secret' => 'encrypted',
+            'playit_previous_secret' => 'encrypted',
+            'playit_switched_at' => 'immutable_datetime',
         ];
     }
 
@@ -127,6 +132,15 @@ class Node extends Model implements Identifiable
     public function isPlayitReadOnly(): bool
     {
         return $this->playit_mode === self::PLAYIT_READ_ONLY;
+    }
+
+    /**
+     * Whether the node runs the self-managed playit.gg agent the panel set up ("Set up automatic
+     * tunnels"), whose key may create tunnels.
+     */
+    public function isPlayitSelfManaged(): bool
+    {
+        return $this->playit_mode === self::PLAYIT_SELF_MANAGED;
     }
 
     public function getConnectionAddress(): string

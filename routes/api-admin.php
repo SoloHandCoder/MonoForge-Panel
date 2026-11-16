@@ -41,6 +41,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeleteAllocationBlockController
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeployTokenController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\NodeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
+use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitSwitchController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\SystemInformationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UniqueIpsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\UtilizationController;
@@ -325,6 +326,17 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/playit', [PlayitController::class, 'show'])->name('.playit');
     Route::put('/playit', [PlayitController::class, 'update'])->name('.playit.update');
     Route::post('/playit/test', [PlayitController::class, 'test'])->name('.playit.test');
+    // "Set up automatic tunnels" changes the node's agent key: a browser session only.
+    Route::get('/playit/switch', [PlayitSwitchController::class, 'show'])->name('.playit.switch');
+    Route::middleware(RequireSessionAuthentication::class)->group(function (): void {
+        Route::post('/playit/switch', [PlayitSwitchController::class, 'start'])->name('.playit.switch.start');
+        Route::post('/playit/switch/check', [PlayitSwitchController::class, 'check'])->name('.playit.switch.check');
+        Route::post('/playit/switch/token', [PlayitSwitchController::class, 'token'])->name('.playit.switch.token');
+        Route::post('/playit/switch/finish', [PlayitSwitchController::class, 'finish'])->name('.playit.switch.finish');
+        Route::post('/playit/switch/undo', [PlayitSwitchController::class, 'undo'])->name('.playit.switch.undo');
+        Route::post('/playit/old-tunnels/remove', [PlayitSwitchController::class, 'removeOld'])->name('.playit.old-tunnels.remove');
+        Route::post('/playit/old-tunnels/dismiss', [PlayitSwitchController::class, 'dismissOld'])->name('.playit.old-tunnels.dismiss');
+    });
 });
 
 /*

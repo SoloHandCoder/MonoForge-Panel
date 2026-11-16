@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Remote\ActivityProcessingController;
 use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupRemoteUploadController;
 use Pterodactyl\Http\Controllers\Api\Remote\Backups\BackupStatusController;
+use Pterodactyl\Http\Controllers\Api\Remote\PlayitAgentSwitchController;
 use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerDetailsController;
 use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerInstallController;
 use Pterodactyl\Http\Controllers\Api\Remote\Servers\ServerTransferController;
@@ -30,4 +31,11 @@ Route::group(['prefix' => '/backups'], function (): void {
     Route::get('/{backup}', BackupRemoteUploadController::class);
     Route::post('/{backup}', [BackupStatusController::class, 'index']);
     Route::post('/{backup}/restore', [BackupStatusController::class, 'restore']);
+});
+
+// The node's playit switch script: the one-time secret fetch and its report.
+Route::middleware('throttle:30,1')->group(function (): void {
+    Route::post('/playit/agent-secret', [PlayitAgentSwitchController::class, 'secret']);
+    Route::post('/playit/agent-switch', [PlayitAgentSwitchController::class, 'report']);
+    Route::post('/playit/agent-status', [PlayitAgentSwitchController::class, 'status']);
 });

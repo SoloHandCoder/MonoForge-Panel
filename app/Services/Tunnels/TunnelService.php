@@ -33,6 +33,9 @@ class TunnelService
     /** Shown on tunnels of a node whose agent key playit only lets read. */
     public const string READ_ONLY = 'This agent key is read-only: create tunnels in the playit dashboard; the panel links them automatically.';
 
+    /** Shown while playit refuses to create tunnels because no agent program runs with the key yet. */
+    public const string AGENT_NOT_RUNNING = 'The playit agent on this node is not running with the new key yet. Run the switch script on the node; the panel retries every ten minutes.';
+
     public function __construct(private readonly PlayitClient $client) {}
 
     /**
@@ -91,6 +94,31 @@ class TunnelService
         dispatch(new ProvisionTunnelJob($tunnel->id))->afterCommit();
 
         return $tunnel;
+    }
+
+    /**
+     * Give every server on the node that has no tunnel row yet a tunnel, such as servers created
+     * before the node had an agent the panel can create tunnels with. Returns how many were queued.
+     */
+    public function provisionMissing(Node $node, int $limit = 50): int
+    {
+        if (! $node->hasPlayitAgent() || $node->isPlayitReadOnly()) {
+            return 0;
+        }
+
+        $servers = Server::query()
+            ->where('node_id', $node->id)
+            ->whereDoesntHave('tunnel')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+
+        foreach ($servers as $server) {
+            $server->setRelation('node', $node);
+            $this->provision($server);
+        }
+
+        return $servers->count();
     }
 
     /**
@@ -291,7 +319,7 @@ class TunnelService
                 return;
             }
 
-            $this->fail($tunnel, $playitException->getMessage());
+            $this->fail($tunnel, $playitException->reason === PlayitClient::AGENT_VERSION_TOO_OLD ? self::AGENT_NOT_RUNNING : $playitException->getMessage());
 
             return;
         }

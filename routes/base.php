@@ -8,6 +8,7 @@ use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
 use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
+use Pterodactyl\Http\Controllers\Base\PlayitSwitchScriptController;
 use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
@@ -22,6 +23,11 @@ Route::get('/account', [IndexController::class, 'index'])
 Route::get('/locales/locale.json', LocaleController::class)
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->where('namespace', '.*');
+
+// The script a node runs to switch playit.gg to the agent the panel set up: public, it holds no secret.
+Route::get('/scripts/playit-switch-agent.sh', PlayitSwitchScriptController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('scripts.playit-switch-agent');
 
 // The Terms of Service, Privacy Policy and Refund Policy: public, and reachable by a user
 // who still has to set up two-factor authentication.
