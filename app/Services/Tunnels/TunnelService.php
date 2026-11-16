@@ -19,7 +19,9 @@ use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Games\ExtraPortPlanner;
 use Pterodactyl\Services\Games\GameResolver;
+use Pterodactyl\Services\Servers\ServerAddress;
 use Throwable;
 
 /**
@@ -51,10 +53,13 @@ class TunnelService
     /** Shown while the playit account has no room for another tunnel. */
     public const string TUNNEL_LIMIT = 'Your playit.gg account reached its tunnel limit. Delete unused tunnels in the playit.gg dashboard or upgrade your playit plan; the panel tries again in six hours.';
 
+    /** Why a server on a node in game gateway mode gets no playit.gg tunnel. */
+    public const string GATEWAY = 'This node uses the game gateway: players join through the gateway VPS, so its servers get no playit.gg tunnels.';
+
     /** How long the scheduler waits before retrying a tunnel that hit the account's limit. */
     public const int TUNNEL_LIMIT_BACKOFF_HOURS = 6;
 
-    public function __construct(private readonly PlayitClient $client) {}
+    public function __construct(private readonly PlayitClient $client, private readonly ServerAddress $addresses) {}
 
     /**
      * Whether a server's tunnel row may be taken over by an imported tunnel: it was deleted, or
@@ -102,6 +107,11 @@ class TunnelService
     public function provisionAutomatic(Server $server): ?ServerTunnel
     {
         $server->loadMissing(['node', 'egg']);
+        if ($server->node->hasGateway()) {
+            // Players join through the gateway; existing tunnels are left as they are.
+            return null;
+        }
+
         $game = GameResolver::forServer($server);
 
         if (! $game instanceof Game || ! $game->auto_tunnels) {
@@ -141,43 +151,13 @@ class TunnelService
     }
 
     /**
-     * The extra tunnels a server's game asks for, by port key: each extra port matched against
-     * the server's allocations other than the primary, first by its port, otherwise by its
-     * position among them (1 is the first extra allocation). An allocation serves one port.
+     * The extra tunnels a server's game asks for, by port key ({@see ExtraPortPlanner}).
      *
-     * @return array<string, array{name: string, protocol: string, allocation_id: int}>
+     * @return array<string, array{name: string, protocol: string, allocation_id: int, port: int}>
      */
     public function plannedExtras(Server $server, Game $game): array
     {
-        $ports = $game->extraPorts();
-        if ($ports === []) {
-            return [];
-        }
-
-        $extras = Allocation::query()->where('server_id', $server->id)->where('id', '!=', $server->allocation_id)->orderBy('id')->get()->values();
-        $planned = [];
-        $used = [];
-
-        foreach ($ports as $port) {
-            $allocation = null;
-            if ($port['port'] !== null) {
-                $allocation = $extras->first(fn (Allocation $candidate): bool => (int) $candidate->port === $port['port'] && ! in_array($candidate->id, $used, true));
-            }
-
-            if (! $allocation instanceof Allocation && $port['allocation'] !== null) {
-                $allocation = $extras->get($port['allocation'] - 1);
-                if ($allocation instanceof Allocation && in_array($allocation->id, $used, true)) {
-                    $allocation = null;
-                }
-            }
-
-            if ($allocation instanceof Allocation) {
-                $used[] = $allocation->id;
-                $planned[$port['key']] = ['name' => $port['name'], 'protocol' => $port['protocol'], 'allocation_id' => $allocation->id];
-            }
-        }
-
-        return $planned;
+        return ExtraPortPlanner::plan($server, $game);
     }
 
     /**
@@ -204,7 +184,7 @@ class TunnelService
      */
     public function provisionMissing(Node $node, int $limit = 50, bool $extrasOnly = false): int
     {
-        if (! $node->hasPlayitAgent() || $node->isPlayitReadOnly()) {
+        if (! $node->hasPlayitAgent() || $node->isPlayitReadOnly() || $node->hasGateway()) {
             return 0;
         }
 
@@ -304,44 +284,23 @@ class TunnelService
     }
 
     /**
-     * The playit address players connect to (the main tunnel's), or null when the server has no
-     * live tunnel and the node's own address should be shown.
+     * The address players connect to, or null when there is none to show: the game gateway's
+     * on a gateway node, otherwise the main playit tunnel's. {@see ServerAddress} decides.
      */
     public function displayAddress(Server $server): ?string
     {
-        $tunnel = $server->relationLoaded('tunnel')
-            ? $server->getRelation('tunnel')
-            : ServerTunnel::query()->where('server_id', $server->id)->where('port_key', ServerTunnel::MAIN)->first();
-
-        if (! $tunnel instanceof ServerTunnel || $tunnel->status !== TunnelStatus::Active) {
-            return null;
-        }
-
-        return $tunnel->address;
+        return $this->addresses->main($server);
     }
 
     /**
-     * The live extra tunnels of a server (voice chat and the like), for its own pages. The
-     * public page only ever shows the main address.
+     * The extra addresses of a server (voice chat and the like), for its own pages. The public
+     * page only ever shows the main address.
      *
      * @return list<array{key: string, label: string, address: string, protocol: string}>
      */
     public function extraAddresses(Server $server): array
     {
-        $tunnels = $server->relationLoaded('tunnels')
-            ? $server->tunnels->sortBy('id')
-            : ServerTunnel::query()->where('server_id', $server->id)->orderBy('id')->get();
-
-        $addresses = [];
-        foreach ($tunnels as $tunnel) {
-            if ($tunnel->isMain() || $tunnel->status !== TunnelStatus::Active || $tunnel->address === null) {
-                continue;
-            }
-
-            $addresses[] = ['key' => $tunnel->port_key, 'label' => $tunnel->label ?? $tunnel->port_key, 'address' => $tunnel->address, 'protocol' => $tunnel->protocol ?? 'both'];
-        }
-
-        return $addresses;
+        return $this->addresses->extras($server);
     }
 
     /**
@@ -353,6 +312,11 @@ class TunnelService
      */
     public function recreate(ServerTunnel $tunnel, bool $deleteImported = false): ServerTunnel
     {
+        if ($tunnel->server()->with('node')->first()?->node->hasGateway() === true) {
+            // Left alone while the node is in gateway mode; turning the gateway off resumes playit.
+            return $tunnel;
+        }
+
         try {
             $this->locked($tunnel, function () use ($tunnel, $deleteImported): void {
                 $tunnel->refresh()->load('server');
@@ -408,6 +372,12 @@ class TunnelService
             }
 
             return $tunnel;
+        }
+
+        if ($server->node->hasGateway()) {
+            // Nothing is made on playit while the node uses the game gateway. A row an
+            // administrator just asked for says why; an existing one is left as it is.
+            return $tunnel->wasRecentlyCreated ? $this->fail($tunnel, self::GATEWAY) : $tunnel;
         }
 
         $tunnel->fill(['hold_reason' => null, 'retry_after' => null]);
@@ -466,6 +436,11 @@ class TunnelService
         }
 
         $node = $server->node;
+        if ($node->hasGateway()) {
+            // Nothing is created, synced or retried on playit while the node uses the gateway.
+            return;
+        }
+
         if (! $node->hasPlayitAgent()) {
             $this->fail($tunnel, self::NOT_CONFIGURED);
 

@@ -48,7 +48,7 @@ class StorePurchaseController extends ClientApiController
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 201, description: 'Server bought and installing.')]
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 200, description: 'The idempotency key already bought this server; nothing was charged again.')]
     #[ScribeResponse(status: 409, description: 'The user has to accept the updated Terms of Service or Privacy Policy first.')]
-    #[ResponseField('attributes.address', 'string', 'The playit.gg address of the server once its tunnel is ready; null until then.', nullable: true)]
+    #[ResponseField('attributes.address', 'string', 'The address players join the server with: the game gateway address on a gateway node, otherwise its playit.gg address once its tunnel is ready; null until then.', nullable: true)]
     #[ResponseField('attributes.tokens_charged', 'integer', 'What the first period cost, after the coupon. Renewals cost the full price.')]
     #[ResponseField('attributes.discount_tokens', 'integer', 'Tokens the coupon took off the first period; 0 without one.')]
     #[ResponseField('attributes.coupon', 'string', 'The coupon code used, or null.', nullable: true)]

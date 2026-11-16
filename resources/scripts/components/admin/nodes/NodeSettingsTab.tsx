@@ -12,6 +12,7 @@ import { useNodeDetail } from '@/components/admin/nodes/useNodeDetail';
 import ExtensionFormFields from '@/components/admin/extensions/ExtensionFormFields';
 import { initialExtensionValues, useExtensionPayload } from '@/extensions/forms';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
+import NodeGatewaySettings from '@/components/admin/nodes/NodeGatewaySettings';
 import NodePlayitSettings from '@/components/admin/nodes/NodePlayitSettings';
 import NodeShopSettings from '@/components/admin/nodes/NodeShopSettings';
 
@@ -247,6 +248,7 @@ export default function NodeSettingsTab() {
         <>
             <NodeSettingsForm key={node.attributes.id} />
             <NodeShopSettings nodeId={node.attributes.id} />
+            <NodeGatewaySettings nodeId={node.attributes.id} />
             <NodePlayitSettings nodeId={node.attributes.id} />
         </>
     );

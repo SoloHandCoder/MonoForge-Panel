@@ -13,6 +13,8 @@ export interface TestServerOptions {
     eggTags?: string[];
     /** The server is on a playit.gg node without a tunnel yet, so players see "Address pending". */
     addressPending?: boolean;
+    /** Where `playit_address` comes from: the game gateway or a playit.gg tunnel. */
+    addressSource?: Server['attributes']['address_source'];
     /** The game the server's egg belongs to in Admin > Games (`minecraft`, `terraria`, a custom slug). */
     game?: string | null;
     gameFeatures?: string[];
@@ -50,6 +52,7 @@ export function createTestServer(options: TestServerOptions = {}): Server {
             is_transferring: false,
             skip_scripts: false,
             playit_address: null,
+            address_source: options.addressSource ?? null,
             address_pending: options.addressPending ?? false,
             game: options.game ?? null,
             game_features: options.gameFeatures ?? [],

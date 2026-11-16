@@ -34,13 +34,14 @@ class SyncTunnelsCommand extends Command
         // Nodes on the self-managed agent the panel set up can create tunnels: give servers that
         // never had one (such as those from before the switch) a tunnel too.
         $created = 0;
-        foreach (Node::query()->where('playit_mode', Node::PLAYIT_SELF_MANAGED)->get() as $node) {
+        // Nodes in game gateway mode get no playit tunnels at all: they are skipped everywhere below.
+        foreach (Node::query()->where('playit_mode', Node::PLAYIT_SELF_MANAGED)->where('gateway_enabled', false)->get() as $node) {
             $created += $tunnels->provisionMissing($node);
         }
 
         // On every other node that can create tunnels, servers that have their main tunnel get
         // the extra ones their game asks for (such as a voice chat port added later).
-        $others = Node::query()->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')
+        $others = Node::query()->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')->where('gateway_enabled', false)
             ->where(fn (Builder $query) => $query->whereNull('playit_mode')->orWhereNotIn('playit_mode', [Node::PLAYIT_SELF_MANAGED, Node::PLAYIT_READ_ONLY]))
             ->get();
         foreach ($others as $node) {
@@ -50,7 +51,7 @@ class SyncTunnelsCommand extends Command
         $pending = ServerTunnel::query()
             ->whereIn('status', [TunnelStatus::Pending, TunnelStatus::Failed])
             // A node without an agent stays failed until an administrator configures it.
-            ->whereHas('server.node', fn (Builder $query) => $query->whereNotNull('playit_agent_id')->whereNotNull('playit_secret'))
+            ->whereHas('server.node', fn (Builder $query) => $query->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')->where('gateway_enabled', false))
             // A read-only agent key cannot create tunnels: those wait for the dashboard and the link above.
             ->where(fn (Builder $query) => $query->whereNotNull('playit_tunnel_id')
                 ->orWhereHas('server.node', fn (Builder $node) => $node->whereNull('playit_mode')->orWhere('playit_mode', '!=', Node::PLAYIT_READ_ONLY)))

@@ -177,7 +177,18 @@ const columns = [
                             Tunnel limit
                         </Badge>
                     )}
+                    {row.original.attributes.replaced_by_gateway && (
+                        <Badge tone='neutral' variant='soft' size='sm'>
+                            Replaced by gateway
+                        </Badge>
+                    )}
                 </div>
+                {row.original.attributes.replaced_by_gateway && (
+                    <p className='mt-1 text-xs break-words text-muted-foreground'>
+                        Inactive: the node uses the game gateway, so players never see this tunnel and nothing is
+                        retried. Turn the gateway off to use it again.
+                    </p>
+                )}
                 {!!row.original.attributes.last_error && (
                     <p className='mt-1 text-xs break-words text-destructive'>{row.original.attributes.last_error}</p>
                 )}

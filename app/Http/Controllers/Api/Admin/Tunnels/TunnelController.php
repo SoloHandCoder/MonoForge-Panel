@@ -7,6 +7,7 @@ namespace Pterodactyl\Http\Controllers\Api\Admin\Tunnels;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
@@ -51,6 +52,7 @@ class TunnelController extends AdminApiController
             'protocol' => null,
             'hold_reason' => null,
             'retry_after' => null,
+            'replaced_by_gateway' => false,
             'created_at' => '2026-11-16T10:00:00+00:00',
             'updated_at' => '2026-11-16T10:00:20+00:00',
         ],
@@ -157,11 +159,12 @@ class TunnelController extends AdminApiController
     /**
      * Create a tunnel for a server.
      */
-    #[Endpoint('Create tunnel', 'Creates a playit.gg tunnel for a server that has none, such as one created before its node had an agent. A server that already has one keeps it.')]
+    #[Endpoint('Create tunnel', 'Creates a playit.gg tunnel for a server that has none, such as one created before its node had an agent. A server that already has one keeps it. A server on a node in game gateway mode gets none (422).')]
     #[ScribeResponse(self::TUNNEL_EXAMPLE, status: 201, description: 'Tunnel created or queued.')]
     public function store(StoreTunnelRequest $request, TunnelService $tunnels): JsonResponse
     {
-        $server = Server::query()->findOrFail($request->integer('server_id'));
+        $server = Server::query()->with('node')->findOrFail($request->integer('server_id'));
+        $this->refuseOnGateway($server);
         $tunnel = $tunnels->provision($server);
 
         return ServerTunnelResource::make($this->checkNow($tunnels, $tunnel))->respond(Response::HTTP_CREATED);
@@ -174,7 +177,8 @@ class TunnelController extends AdminApiController
     #[ScribeResponse(self::TUNNEL_EXAMPLE, description: 'Tunnel checked.')]
     public function retry(UpdateTunnelRequest $request, ServerTunnel $tunnel, TunnelService $tunnels): ServerTunnelResource
     {
-        $tunnel->load('server');
+        $tunnel->load('server.node');
+        $this->refuseOnGateway($tunnel->server);
         if ($tunnel->status === TunnelStatus::Deleted && $tunnel->server instanceof Server) {
             $tunnel = $tunnels->provision($tunnel->server);
         }
@@ -189,6 +193,8 @@ class TunnelController extends AdminApiController
     #[ScribeResponse(self::TUNNEL_EXAMPLE, description: 'Tunnel recreated or queued.')]
     public function recreate(UpdateTunnelRequest $request, ServerTunnel $tunnel, TunnelService $tunnels): ServerTunnelResource
     {
+        $this->refuseOnGateway($tunnel->load('server.node')->server);
+
         // The administrator asked for it, so an imported tunnel is deleted on playit too.
         return ServerTunnelResource::make($this->checkNow($tunnels, $tunnels->recreate($tunnel, deleteImported: true)));
     }
@@ -214,6 +220,17 @@ class TunnelController extends AdminApiController
     public function unlinked(GetUnlinkedTunnelsRequest $request, TunnelImportService $importer): JsonResponse
     {
         return new JsonResponse($importer->unlinked());
+    }
+
+    /**
+     * A server on a node in game gateway mode gets no playit tunnel: players join through the
+     * gateway VPS. Turning the gateway off on the node makes these work again.
+     *
+     * @throws ValidationException
+     */
+    private function refuseOnGateway(?Server $server): void
+    {
+        throw_if($server?->node->hasGateway() === true, ValidationException::withMessages(['server_id' => TunnelService::GATEWAY]));
     }
 
     /** The administrator is waiting, so move the tunnel on now instead of on the queue. */

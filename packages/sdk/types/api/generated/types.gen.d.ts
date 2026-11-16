@@ -727,6 +727,7 @@ export type AdminServerTunnelAttributes = {
     protocol: string | null;
     hold_reason: string | null;
     retry_after: string | null;
+    replaced_by_gateway: boolean;
     created_at: string;
     updated_at: string;
 };
@@ -1708,11 +1709,15 @@ export type ClientServerAttributes = {
     is_transferring: boolean;
     skip_scripts: boolean;
     /**
-     * The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.
+     * The public address players connect to: the game gateway address (`<gateway host>:<port>`, the port left out for Minecraft Java on 25565) when the server is on a node in gateway mode and its port is forwarded, otherwise the address of its live playit.gg tunnel. Null when there is none, and the primary allocation is the address unless `address_pending` is true. It is never the address of the node itself.
      */
     playit_address: string | null;
     /**
-     * True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
+     * Where `playit_address` comes from: `gateway` (the game gateway VPS) or `playit` (a playit.gg tunnel); null when there is no public address.
+     */
+    address_source: 'gateway' | 'playit' | null;
+    /**
+     * True when the server is on a node with a playit.gg agent or the game gateway but has no public address yet (no live tunnel, or a port the gateway does not forward): players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
      */
     address_pending: boolean;
     /**
@@ -1724,7 +1729,7 @@ export type ClientServerAttributes = {
      */
     game_features: Array<string>;
     /**
-     * The server's live extra playit.gg tunnels, such as voice chat. The public page never shows them.
+     * The server's extra public addresses, such as voice chat: its live extra playit.gg tunnels, or on a game gateway node the extra ports of its game that match a forwarded allocation. The public page never shows them.
      */
     extra_addresses: Array<{
         key: string;
@@ -1989,7 +1994,7 @@ export type ClientStorePurchaseAttributes = {
     period_days: number;
     replayed: boolean;
     /**
-     * The playit.gg address of the server once its tunnel is ready; null until then.
+     * The address players join the server with: the game gateway address on a gateway node, otherwise its playit.gg address once its tunnel is ready; null until then.
      */
     address: string | null;
     /**
@@ -3147,6 +3152,26 @@ export type AdminUpdateNodePlayitGgAgentRequest = {
      * The secret. Must match the regex /^[A-Za-z0-9_-]{16,512}$/.
      */
     secret?: string | null;
+};
+export type AdminUpdateNodeGameGatewayRequest = {
+    /**
+     * Whether players join the node's servers through the gateway.
+     */
+    enabled: boolean;
+    /**
+     * The public host players join: a host name (an A record pointing at the VPS, DNS only) or the VPS's public IPv4 address. Required while enabled.
+     */
+    host?: string;
+    /**
+     * The ports gateway.sh forwards, such as 25565-25700,7777. Required while enabled.
+     */
+    ports?: string;
+};
+export type AdminCheckNodeGameGatewayPortsRequest = {
+    /**
+     * Ports to check instead of the stored ones, such as ones not saved yet.
+     */
+    ports?: string;
 };
 export type AdminCreateTunnelRequest = {
     /**
@@ -7704,6 +7729,175 @@ export type AdminTestNodePlayitGgAgentResponseBody = {
     message?: string;
     tunnel_count?: number;
 };
+export type AdminGetNodeGameGatewayResponseBody = {
+    /**
+     * Whether the gateway is turned on.
+     */
+    enabled: boolean;
+    /**
+     * Whether players join through the gateway now: it is on and has a host and ports. The node gets no playit.gg tunnels then.
+     */
+    active: boolean;
+    /**
+     * The public host players join, such as play.example.com, or null when none is set.
+     */
+    host: string | null;
+    /**
+     * The forwarded ports as gateway.sh takes them; the script default 25565-25700 when none are set.
+     */
+    ports: string;
+    /**
+     * The forwarded ports as [from, to] pairs.
+     */
+    ranges: Array<Array<number>>;
+    /**
+     * The gateway script the commands download.
+     */
+    script: {
+        /**
+         * Where the panel serves gateway.sh.
+         */
+        url: string;
+        /**
+         * The SHA-256 of gateway.sh, to check the download.
+         */
+        sha256: string | null;
+    };
+    /**
+     * The gateway.sh commands, filled with the ports.
+     */
+    commands: {
+        /**
+         * Downloads gateway.sh and checks it, on both machines.
+         */
+        download: string;
+        /**
+         * Run on the VPS first: installs WireGuard and forwards the ports.
+         */
+        vps_init: string;
+        /**
+         * Run on the node with the IP and key vps-init printed.
+         */
+        node_init: string;
+        /**
+         * Run on the VPS with the key node-init printed.
+         */
+        vps_add_node: string;
+        /**
+         * Shows the WireGuard link and the forwarded ports, on either machine.
+         */
+        status: string;
+    };
+};
+export type AdminUpdateNodeGameGatewayResponseBody = {
+    /**
+     * Whether the gateway is turned on.
+     */
+    enabled: boolean;
+    /**
+     * Whether players join through the gateway now.
+     */
+    active: boolean;
+    /**
+     * The public host players join.
+     */
+    host: string | null;
+    /**
+     * The forwarded ports.
+     */
+    ports: string;
+    /**
+     * The forwarded ports as [from, to] pairs.
+     */
+    ranges: Array<Array<number>>;
+    /**
+     * The gateway script the commands download.
+     */
+    script: {
+        /**
+         * Where the panel serves gateway.sh.
+         */
+        url: string;
+        /**
+         * The SHA-256 of gateway.sh.
+         */
+        sha256: string | null;
+    };
+    /**
+     * The gateway.sh commands, filled with the ports.
+     */
+    commands: {
+        /**
+         * Downloads gateway.sh and checks it.
+         */
+        download: string;
+        /**
+         * Run on the VPS first.
+         */
+        vps_init: string;
+        /**
+         * Run on the node next.
+         */
+        node_init: string;
+        /**
+         * Run on the VPS last.
+         */
+        vps_add_node: string;
+        /**
+         * Shows the link on either machine.
+         */
+        status: string;
+    };
+};
+export type AdminCheckNodeGameGatewayPortsResponseBody = {
+    /**
+     * The ports checked, as [from, to] pairs.
+     */
+    ranges: Array<Array<number>>;
+    /**
+     * The allocations inside the ports.
+     */
+    forwarded: {
+        /**
+         * Allocations inside the ports.
+         */
+        total: number;
+        /**
+         * Of those, the ones a server uses.
+         */
+        assigned: number;
+        /**
+         * Their ports, as runs such as 25565-25600, 25700.
+         */
+        ports: string;
+    };
+    /**
+     * The allocations outside the ports.
+     */
+    not_forwarded: {
+        /**
+         * Allocations outside the ports: players cannot reach them through the gateway.
+         */
+        total: number;
+        /**
+         * Of those, the ones a server uses.
+         */
+        assigned: number;
+        /**
+         * Their ports, as runs.
+         */
+        ports: string;
+    };
+    /**
+     * Servers using a port outside the forwarded ones; `primary` is true for their main port.
+     */
+    servers_not_forwarded: Array<{
+        server_id: number;
+        server_name: string;
+        port: number;
+        primary: boolean;
+    }>;
+};
 export type AdminGetNodePlayitGgSwitchResponseBody = {
     /**
      * The playit mode of the node: `read_only`, `self_managed` or null.
@@ -11011,6 +11205,8 @@ export type AdminCreateNodeDeployTokenNodeIdPathParameter = number;
 export type AdminGetNodeUtilizationNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminTestNodePlayitGgAgentNodeIdPathParameter = number;
+export type AdminGetNodeGameGatewayNodeIdPathParameter = number;
+export type AdminCheckNodeGameGatewayPortsNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgSwitchNodeIdPathParameter = number;
 export type AdminCheckNodePlayitGgSwitchStatusNodeIdPathParameter = number;
 export type AdminCheckNodePlayitGgClaimNodeIdPathParameter = number;
@@ -16005,6 +16201,113 @@ export type AdminTestNodePlayitGgAgentResponses = {
     200: AdminTestNodePlayitGgAgentResponseBody;
 };
 export type AdminTestNodePlayitGgAgentResponse = AdminTestNodePlayitGgAgentResponses[keyof AdminTestNodePlayitGgAgentResponses];
+export type AdminGetNodeGameGatewayData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodeGameGatewayNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/gateway';
+};
+export type AdminGetNodeGameGatewayErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetNodeGameGatewayError = AdminGetNodeGameGatewayErrors[keyof AdminGetNodeGameGatewayErrors];
+export type AdminGetNodeGameGatewayResponses = {
+    /**
+     * Game gateway returned.
+     */
+    200: AdminGetNodeGameGatewayResponseBody;
+};
+export type AdminGetNodeGameGatewayResponse = AdminGetNodeGameGatewayResponses[keyof AdminGetNodeGameGatewayResponses];
+export type AdminUpdateNodeGameGatewayData = {
+    body: AdminUpdateNodeGameGatewayRequest;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminGetNodeGameGatewayNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/gateway';
+};
+export type AdminUpdateNodeGameGatewayErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateNodeGameGatewayError = AdminUpdateNodeGameGatewayErrors[keyof AdminUpdateNodeGameGatewayErrors];
+export type AdminUpdateNodeGameGatewayResponses = {
+    /**
+     * Game gateway saved.
+     */
+    200: AdminUpdateNodeGameGatewayResponseBody;
+};
+export type AdminUpdateNodeGameGatewayResponse = AdminUpdateNodeGameGatewayResponses[keyof AdminUpdateNodeGameGatewayResponses];
+export type AdminCheckNodeGameGatewayPortsData = {
+    body?: AdminCheckNodeGameGatewayPortsRequest;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminCheckNodeGameGatewayPortsNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/gateway/check';
+};
+export type AdminCheckNodeGameGatewayPortsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCheckNodeGameGatewayPortsError = AdminCheckNodeGameGatewayPortsErrors[keyof AdminCheckNodeGameGatewayPortsErrors];
+export type AdminCheckNodeGameGatewayPortsResponses = {
+    /**
+     * Allocations checked.
+     */
+    200: AdminCheckNodeGameGatewayPortsResponseBody;
+};
+export type AdminCheckNodeGameGatewayPortsResponse = AdminCheckNodeGameGatewayPortsResponses[keyof AdminCheckNodeGameGatewayPortsResponses];
 export type AdminGetNodePlayitGgSwitchData = {
     body?: never;
     path: {

@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Pterodactyl\Models\Builders\NodeBuilder;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
+use Pterodactyl\Services\Gateway\GatewayPorts;
 use Symfony\Component\Yaml\Yaml;
 use UnexpectedValueException;
 
@@ -35,7 +36,7 @@ use UnexpectedValueException;
     'daemonSFTP', 'daemonListen',
     'maintenance_mode',
 ])]
-#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'playit_previous_agent_id', 'playit_previous_secret', 'playit_previous_mode', 'playit_switched_at', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
+#[Hidden(['daemon_token_id', 'daemon_token', 'playit_agent_id', 'playit_secret', 'playit_mode', 'playit_previous_agent_id', 'playit_previous_secret', 'playit_previous_mode', 'playit_switched_at', 'gateway_enabled', 'gateway_host', 'gateway_ports', 'shop_enabled', 'shop_limit_memory_mb', 'shop_limit_disk_mb', 'shop_limit_cpu_percent'])]
 #[UseEloquentBuilder(NodeBuilder::class)]
 class Node extends Model implements Identifiable
 {
@@ -77,6 +78,7 @@ class Node extends Model implements Identifiable
         'shop_limit_memory_mb' => 0,
         'shop_limit_disk_mb' => 0,
         'shop_limit_cpu_percent' => 0,
+        'gateway_enabled' => false,
     ];
 
     /**
@@ -105,6 +107,7 @@ class Node extends Model implements Identifiable
             'playit_secret' => 'encrypted',
             'playit_previous_secret' => 'encrypted',
             'playit_switched_at' => 'immutable_datetime',
+            'gateway_enabled' => 'boolean',
         ];
     }
 
@@ -141,6 +144,33 @@ class Node extends Model implements Identifiable
     public function isPlayitSelfManaged(): bool
     {
         return $this->playit_mode === self::PLAYIT_SELF_MANAGED;
+    }
+
+    /**
+     * Whether players reach this node's servers through the game gateway (a VPS forwarding
+     * {@see gatewayRanges()} over WireGuard) instead of playit.gg tunnels.
+     */
+    public function hasGateway(): bool
+    {
+        return $this->gateway_enabled === true
+            && is_string($this->gateway_host) && $this->gateway_host !== ''
+            && $this->gatewayRanges() !== [];
+    }
+
+    /**
+     * The port ranges the gateway forwards, as [from, to] pairs.
+     *
+     * @return list<array{int, int}>
+     */
+    public function gatewayRanges(): array
+    {
+        return GatewayPorts::parse(is_string($this->gateway_ports) ? $this->gateway_ports : null);
+    }
+
+    /** Whether the gateway is on and forwards this port. */
+    public function gatewayForwards(int $port): bool
+    {
+        return $this->hasGateway() && GatewayPorts::contains($this->gatewayRanges(), $port);
     }
 
     public function getConnectionAddress(): string

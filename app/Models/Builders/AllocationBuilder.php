@@ -6,6 +6,7 @@ namespace Pterodactyl\Models\Builders;
 
 use Illuminate\Database\Eloquent\Builder;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\Node;
 
 /**
  * @template TModel of Allocation
@@ -55,6 +56,40 @@ class AllocationBuilder extends Builder
                 $inner->orWhereBetween('port', $range);
             }
         });
+
+        return $this;
+    }
+
+    /**
+     * Orders allocations the game gateway forwards before those it does not, on the given nodes
+     * in gateway mode, so a new server there is reachable by players when it can be. Nodes
+     * without the gateway are unaffected.
+     *
+     * @param  array<int>  $nodes
+     */
+    public function forwardedFirst(array $nodes): static
+    {
+        $clauses = [];
+        $bindings = [];
+        foreach (Node::query()->whereIn('id', $nodes)->where('gateway_enabled', true)->get() as $node) {
+            if (! $node->hasGateway()) {
+                continue;
+            }
+
+            $ranges = [];
+            $bindings[] = $node->id;
+            foreach ($node->gatewayRanges() as [$from, $to]) {
+                $ranges[] = 'port BETWEEN ? AND ?';
+                $bindings[] = $from;
+                $bindings[] = $to;
+            }
+
+            $clauses[] = '(node_id = ? AND ('.implode(' OR ', $ranges).'))';
+        }
+
+        if ($clauses !== []) {
+            $this->orderByRaw('CASE WHEN '.implode(' OR ', $clauses).' THEN 0 ELSE 1 END', $bindings);
+        }
 
         return $this;
     }

@@ -294,6 +294,7 @@ return [
             'playit-undo' => 'Put the previous playit.gg agent of the :name node back',
             'playit-old-tunnels' => 'Removed :removed old playit.gg tunnels of the :name node',
             'playit-old-tunnels-dismiss' => 'Dismissed the old playit.gg tunnels of the :name node',
+            'gateway' => 'Updated the game gateway of the :name node (:state)',
             'tags' => 'Updated the egg tags for a node',
             'tags_one' => 'Set the node tags to :tags.0',
             'tags_other' => 'Set :count tags on the node',

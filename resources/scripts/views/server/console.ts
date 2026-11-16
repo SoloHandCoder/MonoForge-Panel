@@ -18,7 +18,7 @@ import {
 } from '@/components/server/console/useServerTerminal';
 import { SocketRequest } from '@/components/server/events';
 import { ip, mbToBytes } from '@/lib/formatters';
-import { addressPending, playitAddress } from '@/lib/playit';
+import { addressPending, isPlayitAddress, playitAddress } from '@/lib/playit';
 import { usePermissions } from '@/plugins/usePermissions';
 import {
     useServerGraphs,
@@ -275,7 +275,7 @@ function useServerStatsModel(): ServerStatsModel {
         return {
             state,
             address: primaryAddress(server),
-            tunnel: playitAddress(server.attributes) !== null,
+            tunnel: isPlayitAddress(server.attributes),
             addressPending: addressPending(server.attributes),
             extraAddresses: server.attributes.extra_addresses ?? [],
             players: state === 'running' ? players : null,

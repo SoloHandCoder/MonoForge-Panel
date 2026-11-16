@@ -19,6 +19,7 @@ import {
     useUpdateAdminNodeAllocationAlias,
 } from '@/api/admin/nodes/queries';
 import { useNodeDetail } from '@/components/admin/nodes/useNodeDetail';
+import { activeGatewayRanges, isForwarded, useAdminNodeGateway, type NodeGateway } from '@/api/admin/nodes/gateway';
 import TitledGreyBox from '@/components/elements/TitledGreyBox';
 import Icon from '@/components/elements/Icon';
 import { TextInput } from '@/components/form/controls';
@@ -75,6 +76,8 @@ interface AllocationTableContextValue {
     toggle: (id: number) => void;
     toggleGroup: (items: AdminAllocation[]) => void;
     deleteAllocation: (allocation: AdminAllocation) => void;
+    /** The ports the node's game gateway forwards, or null when it has none. */
+    forwardedRanges: NodeGateway['ranges'] | null;
 }
 
 const AllocationTableContext = createContext<AllocationTableContextValue | null>(null);
@@ -87,6 +90,26 @@ const useAllocationTable = (): AllocationTableContextValue => {
     }
 
     return context;
+};
+
+/** The port, marked when the node's game gateway does not forward it (players cannot reach it). */
+const AllocationPort = ({ allocation }: { allocation: AdminAllocation }) => {
+    const { forwardedRanges } = useAllocationTable();
+    const port = allocation.attributes.port;
+
+    return (
+        <span className='inline-flex flex-wrap items-center gap-1.5'>
+            <span className='font-mono text-sm tabular-nums text-foreground'>{port}</span>
+            {forwardedRanges && !isForwarded(forwardedRanges, port) && (
+                <span
+                    className='rounded-sm border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-xs font-medium leading-none text-warning'
+                    title='The game gateway does not forward this port, so players cannot reach it.'
+                >
+                    not forwarded
+                </span>
+            )}
+        </span>
+    );
 };
 
 const AllocationGroupCheckbox = ({ allocations }: { allocations: AdminAllocation[] }) => {
@@ -220,10 +243,8 @@ const allocationColumns = [
     {
         id: 'port',
         header: 'Port',
-        cell: ({ row }) => (
-            <span className='font-mono text-sm tabular-nums text-foreground'>{row.original.attributes.port}</span>
-        ),
-        meta: { headerClassName: 'w-24', cellClassName: 'w-24' },
+        cell: ({ row }) => <AllocationPort allocation={row.original} />,
+        meta: { headerClassName: 'w-36', cellClassName: 'w-36' },
     },
     {
         id: 'alias',
@@ -529,6 +550,9 @@ export default function NodeAllocationTab() {
         [attributes.id, ipBlockDeleteAllocations]
     );
 
+    const { data: gateway } = useAdminNodeGateway(attributes.id);
+    const forwardedRanges = activeGatewayRanges(gateway);
+
     const tableContext = useMemo<AllocationTableContextValue>(
         () => ({
             nodeId: attributes.id,
@@ -536,8 +560,9 @@ export default function NodeAllocationTab() {
             toggle,
             toggleGroup,
             deleteAllocation: onDeleteSingle,
+            forwardedRanges,
         }),
-        [attributes.id, onDeleteSingle, selected, toggle, toggleGroup]
+        [attributes.id, onDeleteSingle, selected, toggle, toggleGroup, forwardedRanges]
     );
 
     const showPagination = allocations !== undefined && (allocations.meta.pagination.total_pages > 1 || page > 1);

@@ -150,6 +150,8 @@ final readonly class CreateServer implements CreatesServers
             ->onNodes($nodes)
             ->onPorts($ports, $ranges)
             ->when($deployment->isDedicated(), fn (Builder $query) => $query->onDedicatedIp($nodes))
+            // On a node in game gateway mode, a port the gateway forwards when one is free.
+            ->forwardedFirst($nodes)
             ->inRandomOrder()
             ->first() ?? throw new NoViableAllocationException(trans('exceptions.deployment.no_viable_allocations'));
     }

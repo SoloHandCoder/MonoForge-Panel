@@ -41,6 +41,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Nodes\BulkDeleteAllocationsController
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\ConfigurationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeleteAllocationBlockController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\DeployTokenController;
+use Pterodactyl\Http\Controllers\Api\Admin\Nodes\GatewayController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\NodeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitController;
 use Pterodactyl\Http\Controllers\Api\Admin\Nodes\PlayitSwitchController;
@@ -369,6 +370,9 @@ Route::prefix('/nodes/{node:id}')->name('api.admin.nodes')->group(function (): v
     Route::get('/playit', [PlayitController::class, 'show'])->name('.playit');
     Route::put('/playit', [PlayitController::class, 'update'])->name('.playit.update');
     Route::post('/playit/test', [PlayitController::class, 'test'])->name('.playit.test');
+    Route::get('/gateway', [GatewayController::class, 'show'])->name('.gateway');
+    Route::put('/gateway', [GatewayController::class, 'update'])->name('.gateway.update');
+    Route::post('/gateway/check', [GatewayController::class, 'check'])->name('.gateway.check');
     // "Set up automatic tunnels" changes the node's agent key (and its state shows the claim URL):
     // a browser session only.
     Route::middleware(RequireSessionAuthentication::class)->group(function (): void {
