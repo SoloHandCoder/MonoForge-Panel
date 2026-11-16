@@ -66,7 +66,7 @@ export default function Stats({ model, className }: ViewProps<'server.stats'>) {
                 <div className='min-w-0 flex-1'>
                     <Row
                         icon={<Globe aria-hidden='true' className='size-4' />}
-                        label={model.tunnel ? 'Address · playit.gg' : 'Address'}
+                        label={`${model.extraAddresses?.length ? 'Game' : 'Address'}${model.tunnel ? ' · playit.gg' : ''}`}
                     >
                         <span className='font-mono'>
                             {address ?? (model.addressPending ? 'Address pending' : 'Not available')}
@@ -75,6 +75,19 @@ export default function Stats({ model, className }: ViewProps<'server.stats'>) {
                 </div>
                 {address && <AddressCopy address={address} />}
             </div>
+            {model.extraAddresses?.map((extra) => (
+                <div key={extra.key} className='flex items-center gap-1'>
+                    <div className='min-w-0 flex-1'>
+                        <Row
+                            icon={<Globe aria-hidden='true' className='size-4' />}
+                            label={`${extra.label} · ${extra.protocol === 'both' ? 'TCP/UDP' : extra.protocol.toUpperCase()}`}
+                        >
+                            <span className='font-mono'>{extra.address}</span>
+                        </Row>
+                    </div>
+                    <AddressCopy address={extra.address} />
+                </div>
+            ))}
             <Row icon={<Clock aria-hidden='true' className='size-4' />} label='Uptime'>
                 <span className='tabular-nums'>{uptimeText(model.state, model.uptime)}</span>
             </Row>

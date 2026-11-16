@@ -24,6 +24,14 @@ export interface ServerTunnel {
         last_error: string | null;
         /** Set when the tunnel was made by hand on playit.gg and linked by an import. */
         imported_at: string | null;
+        /** `game` for the main tunnel, otherwise the key of an extra port of the server's game. */
+        port_key?: string;
+        /** The extra port's name, such as "Voice chat"; null for the main tunnel. */
+        label?: string | null;
+        protocol?: string | null;
+        /** Why the scheduler leaves the tunnel alone: its egg is not a game, or the playit account is full. */
+        hold_reason?: 'not_a_game' | 'tunnel_limit' | null;
+        retry_after?: string | null;
         created_at: string;
         updated_at: string;
     };

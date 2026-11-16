@@ -88,6 +88,12 @@ export interface ServerPowerModel {
     /** The server as the API returns it, which the power slots receive. */
     readonly server: Server;
 }
+export interface ServerExtraAddress {
+    readonly key: string;
+    readonly label: string;
+    readonly address: string;
+    readonly protocol: string;
+}
 export interface ServerStatsModel {
     readonly state: ServerRunState | null;
     /** The playit.gg address when the server has a live tunnel, otherwise the primary allocation as "host:port". */
@@ -96,6 +102,11 @@ export interface ServerStatsModel {
     readonly tunnel: boolean;
     /** The server is on a playit.gg node and has no tunnel yet: `address` is null and players see "Address pending". */
     readonly addressPending?: boolean;
+    /**
+     * The live extra playit.gg tunnels of the server's game, such as voice chat; the main one is
+     * `address`. Players never see these on the public page.
+     */
+    readonly extraAddresses?: readonly ServerExtraAddress[];
     /** Players online as the console reports them (Minecraft and Terraria); null when unknown or not running. */
     readonly players: ServerPlayers | null;
     /** Milliseconds since the server started; 0 while it is not running. */

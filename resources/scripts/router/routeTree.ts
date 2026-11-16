@@ -55,6 +55,7 @@ import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
 import { adminGuidesQueryOptions, adminHelpArticlesQueryOptions } from '@/api/admin/settings/help';
 import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
+import { adminGamesQueryOptions } from '@/api/admin/games/queries';
 import { adminPermissionTemplatesQueryOptions } from '@/api/admin/settings/permissionTemplates';
 import { adminStatusPageSettingsQueryOptions } from '@/api/admin/settings/status';
 import { adminPluginSettingsQueryOptions } from '@/api/admin/settings/plugins';
@@ -459,13 +460,30 @@ const serverChildren = [
         component: componentRoute(() => import('@/components/server/files/ide/EditorPage')),
     }),
     // Phase 6: one-click plugins, mods and Modrinth modpacks. Browsing needs file.read;
-    // installing needs plugins.manage, which the page checks itself.
+    // installing needs plugins.manage, which the page checks itself. Only listed for servers
+    // whose egg belongs to Minecraft in Admin > Games.
     createRoute({
         getParentRoute: () => serverRoute,
         path: 'plugins',
-        staticData: { nav: { label: 'Plugins & mods', permission: 'file.read', icon: 'puzzle' } },
+        staticData: { nav: { label: 'Plugins & mods', permission: 'file.read', icon: 'puzzle', game: 'minecraft' } },
         beforeLoad: requireServerPermission('file.read'),
         component: componentRoute(() => import('@/components/server/plugins/PluginsPage')),
+    }),
+    // Admin > Games: switch a Minecraft server between Vanilla, Paper, Fabric, Forge...
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'versions',
+        staticData: { nav: { label: 'Versions', permission: 'file.read', icon: 'layers', game: 'minecraft' } },
+        beforeLoad: requireServerPermission('file.read'),
+        component: componentRoute(() => import('@/components/server/minecraft/VersionsPage')),
+    }),
+    // Admin > Games: Terraria's world settings, edited through the startup variables.
+    createRoute({
+        getParentRoute: () => serverRoute,
+        path: 'world',
+        staticData: { nav: { label: 'World', permission: 'startup.read', icon: 'trees', game: 'terraria' } },
+        beforeLoad: requireServerPermission('startup.read'),
+        component: componentRoute(() => import('@/components/server/terraria/WorldSettingsPage')),
     }),
     createRoute({
         getParentRoute: () => serverRoute,
@@ -1494,6 +1512,16 @@ const panelChildren = [
         getParentRoute: () => panelRoute,
         path: 'eggs/catalog',
         component: componentRoute(() => import('@/components/admin/eggs/EggCatalogContainer')),
+    }),
+    // Which eggs run which game: decides game pages and automatic playit tunnels.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'games',
+        staticData: { nav: { label: 'Games', icon: 'gamepad-2' } },
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminGamesQueryOptions());
+        },
+        component: componentRoute(() => import('@/components/admin/games/GamesContainer')),
     }),
     createRoute({
         getParentRoute: () => panelRoute,

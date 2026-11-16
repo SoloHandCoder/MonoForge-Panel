@@ -19,6 +19,11 @@ export interface RouteNavMeta {
     icon?: string;
     /** Hides the link while the feature is off. */
     feature?: NavFeature;
+    /**
+     * Server links only: the game (a slug from Admin > Games) the server's egg must belong to,
+     * such as `minecraft` for the plugins and versions pages.
+     */
+    game?: string;
     /** Gates the link and supplies its live badge. */
     screen?: ExtensionScreenRegistration;
 }

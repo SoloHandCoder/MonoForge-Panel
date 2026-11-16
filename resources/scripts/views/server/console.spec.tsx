@@ -154,6 +154,16 @@ describe('server.stats', () => {
         expect(screen.queryByRole('button', { name: 'Copy the address' })).not.toBeInTheDocument();
     });
 
+    it('lists the extra playit.gg tunnels of the game, such as voice chat, beside the game address', async () => {
+        await renderServer(<View name='server.stats' />, {
+            extraAddresses: [{ key: 'voice', label: 'Voice chat', address: 'voice.ply.gg:41000', protocol: 'udp' }],
+        });
+
+        expect(screen.getByText('Voice chat · UDP')).toBeVisible();
+        expect(screen.getByText('voice.ply.gg:41000')).toBeVisible();
+        expect(screen.getByText(/^Game/)).toBeVisible();
+    });
+
     it('counts the players the console reports while the server runs', async () => {
         await renderServer(
             <>

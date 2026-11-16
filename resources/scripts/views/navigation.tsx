@@ -82,13 +82,21 @@ const toNavItem = (area: NavArea, entry: AreaNavEntry, order: number, params: Re
     extensionId: entry.screen?.extensionId,
 });
 
-/** Server items need one of their subuser permissions and, for extension screens, a matching egg. */
+/** Whether a game-specific link fits the server: its egg belongs to that game in Admin > Games. */
+export const matchesGame = (game: string | undefined, server: Server | undefined): boolean =>
+    game === undefined || server?.attributes.game === game;
+
+/**
+ * Server items need one of their subuser permissions, the server's game for game-specific
+ * pages and, for extension screens, a matching egg.
+ */
 function isListed(entry: AreaNavEntry, server: Server | undefined): boolean {
     const permissions = server ? selectServerPermissions(server) : [];
     const required = entry.permission === undefined ? [] : [entry.permission].flat();
 
     return (
         (!required.length || required.some((permission) => hasPermission(permissions, permission))) &&
+        matchesGame(entry.game, server) &&
         matchesScreenCondition(entry.screen?.when, server)
     );
 }

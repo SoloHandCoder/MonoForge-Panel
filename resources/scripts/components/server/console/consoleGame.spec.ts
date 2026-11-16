@@ -10,6 +10,13 @@ describe('consoleGame', () => {
         expect(consoleGame(createTestServer({ eggTags: ['tshock'] }))).toBe('terraria');
         expect(consoleGame(createTestServer({ eggTags: ['valheim'] }))).toBeNull();
     });
+
+    it('follows the game the egg belongs to in Admin > Games first', () => {
+        expect(consoleGame(createTestServer({ game: 'terraria', eggFeatures: ['eula'] }))).toBe('terraria');
+        expect(consoleGame(createTestServer({ game: 'minecraft', eggTags: ['tshock'] }))).toBe('minecraft');
+        // A custom game has no known console, whatever its egg is called.
+        expect(consoleGame(createTestServer({ game: 'valheim', eggTags: ['paper'] }))).toBeNull();
+    });
 });
 
 describe('suggestCommands', () => {

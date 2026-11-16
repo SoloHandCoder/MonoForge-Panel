@@ -12,8 +12,20 @@ const GAME_PATTERNS: readonly (readonly [ConsoleGame, RegExp])[] = [
     ['terraria', /\b(terraria|tmodloader|tshock)\b/],
 ];
 
-/** The game a server runs, read from its egg's tags and features and its image; null when unknown. */
+/**
+ * The game a server runs: the game its egg belongs to in Admin > Games when the panel names one,
+ * otherwise read from its egg's tags and features and its image; null when unknown.
+ */
 export function consoleGame({ attributes }: Server): ConsoleGame | null {
+    if (attributes.game === 'minecraft' || attributes.game === 'terraria') {
+        return attributes.game;
+    }
+
+    // A custom game the panel knows nothing about has no known console.
+    if (attributes.game) {
+        return null;
+    }
+
     const features = (attributes.egg_features ?? []).map((feature) => feature.toLowerCase());
 
     if (features.includes('eula')) {
