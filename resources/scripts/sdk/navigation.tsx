@@ -21,6 +21,7 @@ export type CorePanelPath =
     | '/store/$planId'
     | '/help'
     | '/help/$slug'
+    | '/servers'
     | `/account${'' | '/api' | '/ssh' | '/activity' | '/wallet'}`
     | `/server/$id${'' | '/files' | '/databases' | '/schedules' | '/users' | '/users/new' | '/backups' | '/network' | '/startup' | '/settings' | '/activity'}`
     | '/server/$id/files/$action'

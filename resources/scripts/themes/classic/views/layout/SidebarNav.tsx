@@ -7,6 +7,7 @@ import {
     CalendarClock,
     ChevronDown,
     CircleHelp,
+    Compass,
     Database,
     Egg,
     ExternalLink,
@@ -483,6 +484,10 @@ export default function SidebarNav({ model }: { model: AppLayoutModel }) {
                 <PanelLink destination={{ to: '/help' }} className={sidebarItemClass}>
                     <Icon icon={CircleHelp} className='size-4 shrink-0' aria-hidden />
                     <span className='min-w-0 flex-1 truncate'>Help</span>
+                </PanelLink>
+                <PanelLink destination={{ to: '/servers' }} className={sidebarItemClass}>
+                    <Icon icon={Compass} className='size-4 shrink-0' aria-hidden />
+                    <span className='min-w-0 flex-1 truncate'>Discover servers</span>
                 </PanelLink>
                 <a {...discordLinkProps} className={sidebarItemClass}>
                     <Icon icon={MessageCircle} className='size-4 shrink-0' aria-hidden />

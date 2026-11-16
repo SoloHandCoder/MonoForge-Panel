@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as PageQueries from '@/api/public/serverPage';
 import type { PublicServerPage } from '@/api/public/serverPage';
-import { PublicServerView, bannerStyle } from './PublicServerPage';
+import { PublicServerView } from './PublicServerPage';
 
 interface MutationState {
     mutate: ReturnType<typeof vi.fn>;
@@ -41,6 +41,16 @@ const page = (overrides: Partial<PublicServerPage> = {}): PublicServerPage => ({
     join_url: null,
     votes: 42,
     can_wake: false,
+    tagline: '',
+    theme: {
+        accent: '#22c55e',
+        accent_text: '#000000',
+        background: { style: 'solid', from: '#241a44', to: null, image_url: null },
+        text: '#ffffff',
+        button_style: 'rounded',
+    },
+    sections: { players: true, votes: true, address: true, description: true },
+    links: { discord: null, website: null },
     ...overrides,
 });
 
@@ -162,16 +172,47 @@ describe('public server page', () => {
     });
 });
 
-describe('banner style', () => {
-    it('uses the image only for a panel banner path and falls back to the colour', () => {
-        expect(bannerStyle({ color: null, image_url: null }).backgroundColor).toBe('#8b5cf6');
-        expect(bannerStyle({ color: '#22c55e', image_url: null }).backgroundImage).toContain('#22c55e');
-        expect(
-            bannerStyle({ color: null, image_url: `/s/skyblock/banner/${'a'.repeat(40)}.png` }).backgroundImage
-        ).toBe(`url("/s/skyblock/banner/${'a'.repeat(40)}.png")`);
-        expect(
-            bannerStyle({ color: null, image_url: 'https://evil.example/x.png") ; background: red' }).backgroundImage
-        ).toContain('linear-gradient');
-        expect(bannerStyle({ color: 'red;x:y', image_url: null }).backgroundColor).toBe('#8b5cf6');
+describe('the owner’s look and sections', () => {
+    it('draws the banner in the owner’s colours with the panel’s text colour and the tagline', () => {
+        renderView(
+            page({
+                tagline: 'Islands and events',
+                theme: {
+                    accent: '#ffd166',
+                    accent_text: '#000000',
+                    background: { style: 'gradient', from: '#0e0d15', to: '#5b21b6', image_url: null },
+                    text: '#ffffff',
+                    button_style: 'square',
+                },
+            })
+        );
+
+        const banner = screen.getByTestId('server-banner');
+
+        expect(banner).toHaveStyle({ color: '#ffffff', backgroundColor: '#0e0d15' });
+        expect(banner.style.backgroundImage).toContain('linear-gradient(135deg, #0e0d15 0%, #5b21b6 100%)');
+        expect(screen.getByText('Islands and events')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Copy address/ })).toHaveStyle({
+            borderRadius: 'var(--page-radius)',
+        });
+    });
+
+    it('leaves out the sections the owner hides', () => {
+        renderView(page({ sections: { players: false, votes: false, address: false, description: false } }));
+
+        expect(screen.queryByRole('button', { name: /Copy address/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Vote/ })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('About this server')).not.toBeInTheDocument();
+    });
+
+    it('links to discord and the website without passing on rank or the opener', () => {
+        renderView(page({ links: { discord: 'https://discord.gg/skyblock', website: 'javascript:alert(1)' } }));
+
+        const discord = screen.getByRole('link', { name: /Discord/ });
+
+        expect(discord).toHaveAttribute('href', 'https://discord.gg/skyblock');
+        expect(discord).toHaveAttribute('rel', 'nofollow ugc noopener noreferrer');
+        expect(discord).toHaveAttribute('target', '_blank');
+        expect(screen.queryByRole('link', { name: /Website/ })).not.toBeInTheDocument();
     });
 });

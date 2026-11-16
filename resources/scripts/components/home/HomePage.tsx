@@ -493,6 +493,7 @@ function Header() {
                         ['#plans', 'Plans'],
                         ['#features', 'Features'],
                         ['#faq', 'FAQ'],
+                        ['/servers', 'Servers'],
                     ].map(([href, label]) => (
                         <a key={href} href={href} className='text-muted-foreground no-underline hover:text-foreground'>
                             {label}
@@ -528,6 +529,9 @@ function Footer() {
                 <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-2'>
                     <a href='/help' className='text-muted-foreground no-underline hover:text-foreground'>
                         Help center
+                    </a>
+                    <a href='/servers' className='text-muted-foreground no-underline hover:text-foreground'>
+                        Discover servers
                     </a>
                     <LegalLinks className='text-sm' />
                     <a {...discordLink} className='font-medium text-(--accent-soft) no-underline hover:text-foreground'>
