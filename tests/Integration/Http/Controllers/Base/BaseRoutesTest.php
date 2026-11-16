@@ -48,7 +48,7 @@ test('the panel is never indexed: signed-in pages and every other path stay noin
     $html = (string) $this->get('/auth/login')->assertOk()->getContent();
     expect($html)->toContain('<meta name="robots" content="noindex">')->not->toContain('og:title');
 });
-test('robots.txt lets crawlers reach the homepage only', function (): void {
+test('robots.txt lets crawlers reach the public pages only', function (): void {
     $rules = preg_split('/\R/', (string) file_get_contents(public_path('robots.txt')));
 
     expect($rules)->toContain('Allow: /$')->toContain('Disallow: /')->not->toContain('Allow: /auth');

@@ -25,6 +25,17 @@ class LegalPageController extends Controller
             return new RedirectResponse($external);
         }
 
-        return view('templates/base.core', ['legalPage' => LegalSettings::pagePayload($document)]);
+        // From the configured address, never the request's Host header, which a client chooses.
+        $root = mb_rtrim(config()->string('app.url'), '/');
+
+        return view('templates/base.core', [
+            'legalPage' => LegalSettings::pagePayload($document),
+            'seo' => [
+                'title' => $document->label().' | MonoForge',
+                'description' => "The {$document->label()} of MonoForge game server hosting.",
+                'url' => $root.$document->path(),
+                'image' => $root.'/favicons/android-chrome-512x512.png',
+            ],
+        ]);
     }
 }

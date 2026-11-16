@@ -12,6 +12,7 @@ use Pterodactyl\Http\Controllers\Base\LocaleController;
 use Pterodactyl\Http\Controllers\Base\PlayitSwitchScriptController;
 use Pterodactyl\Http\Controllers\Base\ReferralLinkController;
 use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
+use Pterodactyl\Http\Controllers\Base\SitemapController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
 use Pterodactyl\Services\Help\HelpArticles;
@@ -74,6 +75,12 @@ Route::get('/s/{slug}/banner/{file}', ServerPageBannerController::class)
     ->where('slug', ServerPageSlug::PATTERN)
     ->where('file', ServerPageBanners::NAME_PATTERN)
     ->name('server-page.banner');
+
+// The sitemap of the public pages. Stateless: no session or cookies, so it can be cached.
+Route::get('/sitemap.xml', SitemapController::class)
+    ->withoutMiddleware(['web', 'auth.session', RequireTwoFactorAuthentication::class])
+    ->middleware('throttle:60,1')
+    ->name('sitemap');
 
 // Files uploaded through extension `file` settings. Public and stateless: no
 // session, no cookies, so the immutable cache headers are safe behind a proxy.

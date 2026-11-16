@@ -11,6 +11,7 @@ use Illuminate\View\View;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
+use Pterodactyl\Services\Status\StatusPageSettings;
 
 class IndexController extends Controller
 {
@@ -23,6 +24,18 @@ class IndexController extends Controller
     {
         if ($request->user() === null && $request->path() === '/') {
             return view('templates/base.core', ['seo' => $this->homeSeo()]);
+        }
+
+        // The public status page may be indexed too, for anyone, while it is turned on.
+        if ($request->path() === 'status' && StatusPageSettings::enabled()) {
+            $root = mb_rtrim(config()->string('app.url'), '/');
+
+            return view('templates/base.core', ['seo' => [
+                'title' => 'Status | MonoForge',
+                'description' => 'Live status and uptime of the MonoForge panel and game server nodes.',
+                'url' => $root.'/status',
+                'image' => $root.'/favicons/android-chrome-512x512.png',
+            ]]);
         }
 
         return view('templates/base.core');

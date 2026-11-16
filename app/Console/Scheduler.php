@@ -15,6 +15,7 @@ use Pterodactyl\Console\Commands\Billing\PruneAntiAbuseHashesCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
 use Pterodactyl\Console\Commands\Maintenance\PruneOrphanedBackupsCommand;
+use Pterodactyl\Console\Commands\MonoForge\RobotsCommand;
 use Pterodactyl\Console\Commands\MonoForge\UpdateCommand;
 use Pterodactyl\Console\Commands\Schedule\ProcessRunnableCommand;
 use Pterodactyl\Console\Commands\Status\CheckStatusCommand;
@@ -89,6 +90,9 @@ final class Scheduler
         $schedule->command(PruneCommand::class, ['--model' => [FriendRequest::class]])->daily()->withoutOverlapping()->onOneServer();
         // Images on support tickets closed more than 180 days ago (the messages stay).
         $schedule->command(PruneSupportAttachmentsCommand::class)->daily()->withoutOverlapping()->onOneServer();
+
+        // robots.txt names the sitemap by the full panel address, which only the panel knows.
+        $schedule->command(RobotsCommand::class)->hourly()->withoutOverlapping()->onOneServer();
 
         $this->scheduleMonoForgeUpdates($schedule);
 

@@ -322,6 +322,12 @@ class MonoForgeUpdateService
             // Cached config, routes, events and views make the panel much lighter on the CPU.
             $cacheWarning = $this->optimize();
             $this->artisan(['queue:restart']);
+            // The new build ships robots.txt without the sitemap line, which needs the panel address.
+            try {
+                $this->artisan(['p:monoforge:robots']);
+            } catch (Throwable $throwable) {
+                Log::warning('MonoForge: robots.txt was not rewritten after the update: '.$throwable->getMessage());
+            }
             $this->artisan(['up']);
 
             $this->clearRun();

@@ -141,7 +141,7 @@ test('a successful update caches config, routes, events and views after migratin
     expect($status['state'])->toBe('success')
         ->and($status['message'])->toBe('Updated MonoForge from build 3f9c2ab to 9e8d7c6.')
         ->and(file_get_contents($this->base.'/artisan'))->toBe('new')
-        ->and($artisan)->toBe(['down', 'migrate', 'optimize:clear', 'optimize', 'queue:restart', 'up']);
+        ->and($artisan)->toBe(['down', 'migrate', 'optimize:clear', 'optimize', 'queue:restart', 'p:monoforge:robots', 'up']);
 });
 
 test('an update whose caching fails clears the caches and still finishes', function (): void {
@@ -153,7 +153,7 @@ test('an update whose caching fails clears the caches and still finishes', funct
     expect($status['state'])->toBe('success')
         ->and($status['message'])->toContain('The panel caches could not be built (php artisan optimize failed: optimize broke), so the panel runs without them.')
         ->and(file_get_contents($this->base.'/artisan'))->toBe('new')
-        ->and($artisan)->toBe(['down', 'migrate', 'optimize:clear', 'optimize', 'optimize:clear', 'queue:restart', 'up']);
+        ->and($artisan)->toBe(['down', 'migrate', 'optimize:clear', 'optimize', 'optimize:clear', 'queue:restart', 'p:monoforge:robots', 'up']);
 });
 
 test('optimize never throws, even when clearing the caches fails too', function (): void {
