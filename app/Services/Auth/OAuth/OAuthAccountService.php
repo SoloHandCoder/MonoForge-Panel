@@ -15,6 +15,7 @@ use Pterodactyl\Facades\Activity;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\UserOAuthAccount;
 use Pterodactyl\Rules\Username;
+use Pterodactyl\Services\Billing\TrialFingerprint;
 
 /**
  * Links provider identities to panel users and creates accounts from them. Accounts are
@@ -122,7 +123,8 @@ final readonly class OAuthAccountService
                     'name_last' => $last,
                 ]);
 
-                $user->forceFill(['has_password' => false])->save();
+                // The network it signed up from, hashed: one free trial per network (TrialService).
+                $user->forceFill(['has_password' => false, 'signup_subnet_hash' => TrialFingerprint::subnet(request()->ip())])->save();
                 $this->link($user, $identity);
 
                 return $user;

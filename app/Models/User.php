@@ -33,6 +33,7 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
  * @property int|null $terms_accepted_version the Terms of Service version the user accepted (see LegalSettings)
  * @property CarbonImmutable|null $terms_accepted_at
  * @property int|null $privacy_accepted_version the Privacy Policy version the user accepted
+ * @property string|null $signup_subnet_hash HMAC of the network the account signed up from (free trial anti-abuse)
  */
 #[Attributes\Identifiable('user')]
 #[Fillable([
@@ -49,7 +50,7 @@ use Pterodactyl\Traits\Helpers\AvailableLanguages;
     'gravatar',
     'root_admin',
 ])]
-#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at', 'has_password', 'terms_accepted_version', 'terms_accepted_at', 'privacy_accepted_version'])]
+#[Hidden(['password', 'remember_token', 'totp_secret', 'totp_authenticated_at', 'has_password', 'terms_accepted_version', 'terms_accepted_at', 'privacy_accepted_version', 'signup_subnet_hash'])]
 #[RouteKey('uuid')]
 class User extends Authenticatable implements Identifiable
 {

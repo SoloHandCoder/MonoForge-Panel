@@ -5,6 +5,7 @@ import {
     adminCancelServerSubscriptionMutation,
     adminExtendServerSubscriptionMutation,
     adminGetServerSubscriptionOptions,
+    clientKeepTrialServerMutation,
     clientListServerSubscriptionsOptions,
     clientRenewServerSubscriptionMutation,
     clientUpdateServerSubscriptionMutation,
@@ -66,6 +67,29 @@ export const useRenewServerSubscription = () => {
 };
 
 export const renewServerSubscriptionInput = (identifier: string) => ({ path: { server_uuid: identifier } });
+
+/** "Keep this server": pays the first period of a free trial, which becomes a normal subscription. */
+export const useKeepTrialServer = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        ...clientKeepTrialServerMutation(),
+        onSuccess: async (_data, variables) => {
+            await Promise.all([
+                refreshAfterBilling(queryClient, variables.path.server_uuid),
+                // The store's trial offer and balance changed too.
+                queryClient.invalidateQueries({ queryKey: ['store'] }),
+            ]);
+            toast.success('The server is yours. It renews from your balance.');
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to keep the server'),
+    });
+};
+
+export const keepTrialInput = (identifier: string, periodId: number, expectedTotal: number) => ({
+    path: { server_uuid: identifier },
+    body: { period_id: periodId, expected_total: expectedTotal },
+});
 
 export const updateServerSubscriptionInput = (identifier: string, autoRenew: boolean) => ({
     path: { server_uuid: identifier },
@@ -189,13 +213,17 @@ export const timeUntil = (iso: string, now: number): string => {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 };
 
-/** The dashboard card's line for a suspended shop server, or null when nothing is wrong. */
+/** The dashboard card's line for a suspended shop server or an ended trial, or null when nothing is wrong. */
 export const billingNotice = (subscription: ServerSubscription | null, now: number): string | null => {
     if (subscription?.status !== 'suspended') {
         return null;
     }
 
     const left = subscription.delete_at === null ? '0m' : timeUntil(subscription.delete_at, now);
+
+    if (subscription.is_trial) {
+        return left === '0m' ? 'Trial ended — deleting now' : `Trial ended — deletes in ${left}. Keep this server`;
+    }
 
     return left === '0m' ? 'Suspended — deleting now' : `Suspended — deletes in ${left}. Top up and renew`;
 };

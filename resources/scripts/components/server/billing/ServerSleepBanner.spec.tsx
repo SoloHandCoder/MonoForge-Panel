@@ -57,6 +57,8 @@ const subscription = (
     suspended_at: null,
     delete_at: null,
     can_renew_now: false,
+    is_trial: false,
+    trial: null,
     sleep: {
         allowed: true,
         supported: true,

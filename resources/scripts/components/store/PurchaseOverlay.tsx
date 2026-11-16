@@ -15,6 +15,9 @@ export const PURCHASE_STEPS = [
     'Setting up the network',
 ] as const;
 
+/** A free trial charges nothing, so it skips the charging step. */
+export const TRIAL_STEPS = ['Reserving your resources', 'Creating your server', 'Setting up the network'] as const;
+
 /** How long each step shows while the request runs; the last one waits for the answer. */
 export const PURCHASE_STEP_MS = 900;
 
@@ -32,17 +35,18 @@ export function Orb({ icon = Server }: { icon?: LucideIcon }) {
     );
 }
 
-function Working() {
+function Working({ trial }: { trial: boolean }) {
     const [step, setStep] = useState(0);
+    const steps: readonly string[] = trial ? TRIAL_STEPS : PURCHASE_STEPS;
 
     useEffect(() => {
         const timer = window.setInterval(
-            () => setStep((current) => Math.min(current + 1, PURCHASE_STEPS.length - 1)),
+            () => setStep((current) => Math.min(current + 1, steps.length - 1)),
             PURCHASE_STEP_MS
         );
 
         return () => window.clearInterval(timer);
-    }, []);
+    }, [steps.length]);
 
     return (
         <div className='flex flex-col items-center text-center'>
@@ -50,7 +54,7 @@ function Working() {
             <h2 className='mt-8 font-header text-2xl font-semibold text-foreground'>Setting up your server</h2>
             <p className='mt-1 text-sm text-muted-foreground'>This only takes a moment. Please keep this page open.</p>
             <ol className='mt-7 grid w-full max-w-xs gap-2.5 text-left' aria-live='polite'>
-                {PURCHASE_STEPS.map((label, index) => {
+                {steps.map((label, index) => {
                     const done = index < step;
                     const current = index === step;
 
@@ -88,14 +92,14 @@ function Working() {
             <div className='mt-7 h-1 w-full max-w-xs overflow-hidden rounded-full bg-(--sunken)'>
                 <div
                     className='h-full rounded-full bg-linear-to-r from-(--usage-from) to-(--usage-to) transition-[width] duration-700 ease-out'
-                    style={{ width: `${((step + 1) / (PURCHASE_STEPS.length + 1)) * 100}%` }}
+                    style={{ width: `${((step + 1) / (steps.length + 1)) * 100}%` }}
                 />
             </div>
         </div>
     );
 }
 
-function Done({ result }: { result: PurchaseResult }) {
+function Done({ result, trialHours }: { result: PurchaseResult; trialHours: number | null }) {
     const goRef = useRef<HTMLAnchorElement>(null);
 
     useEffect(() => goRef.current?.focus(), []);
@@ -109,10 +113,17 @@ function Done({ result }: { result: PurchaseResult }) {
                     <Icon icon={Check} className='size-10' strokeWidth={3} />
                 </div>
             </div>
-            <h2 className='mt-8 font-header text-3xl font-bold text-foreground'>Purchase complete!</h2>
+            <h2 className='mt-8 font-header text-3xl font-bold text-foreground'>
+                {trialHours === null ? 'Purchase complete!' : 'Free trial started!'}
+            </h2>
             <p className='mt-2 text-muted-foreground'>
                 Your server <span className='font-medium text-foreground'>{result.server.name}</span> is installing.
             </p>
+            {trialHours !== null && (
+                <p className='mt-1 text-sm text-muted-foreground'>
+                    It is free for {trialHours} hours. Keep it from its page before the trial ends.
+                </p>
+            )}
             {result.tokens_charged > 0 && (
                 <p className='mt-1 text-sm text-muted-foreground'>
                     {tokens(result.tokens_charged)} paid — it renews {everyDays(result.period_days)} from your balance.
@@ -153,9 +164,21 @@ function Done({ result }: { result: PurchaseResult }) {
     );
 }
 
-/** The full-screen state between confirming a purchase and its result. */
-export default function PurchaseOverlay({ result }: { result: PurchaseResult | null }) {
+/** The full-screen state between confirming a purchase (or a free trial) and its result. */
+export default function PurchaseOverlay({
+    result,
+    trialHours = null,
+}: {
+    result: PurchaseResult | null;
+    /** Set for a free trial: its length in hours. */
+    trialHours?: number | null;
+}) {
     const rootRef = useRef<HTMLDivElement>(null);
+    let label = 'Setting up your server';
+
+    if (result) {
+        label = trialHours === null ? 'Purchase complete' : 'Free trial started';
+    }
 
     useEffect(() => {
         const { overflow } = document.body.style;
@@ -174,7 +197,7 @@ export default function PurchaseOverlay({ result }: { result: PurchaseResult | n
                 ref={rootRef}
                 role='dialog'
                 aria-modal='true'
-                aria-label={result ? 'Purchase complete' : 'Setting up your server'}
+                aria-label={label}
                 tabIndex={-1}
                 className='fixed inset-0 z-50 grid animate-fade-in place-items-center overflow-y-auto bg-background/95 px-4 py-10 outline-none backdrop-blur-md'
             >
@@ -182,7 +205,13 @@ export default function PurchaseOverlay({ result }: { result: PurchaseResult | n
                     aria-hidden
                     className='pointer-events-none absolute top-1/4 left-1/2 size-128 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl'
                 />
-                <div className='relative w-full max-w-md'>{result ? <Done result={result} /> : <Working />}</div>
+                <div className='relative w-full max-w-md'>
+                    {result ? (
+                        <Done result={result} trialHours={trialHours} />
+                    ) : (
+                        <Working trial={trialHours !== null} />
+                    )}
+                </div>
             </div>
         </Portal>
     );

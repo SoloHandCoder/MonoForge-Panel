@@ -7,13 +7,16 @@ namespace Pterodactyl\Services\Billing;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Contracts\Servers\DeletesServers;
 use Pterodactyl\Data\StorePurchaseOrder;
 use Pterodactyl\Data\StorePurchaseResult;
+use Pterodactyl\Data\StoreTrialOrder;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
 use Pterodactyl\Exceptions\Billing\InvalidQuoteException;
 use Pterodactyl\Exceptions\DisplayException;
@@ -69,6 +72,7 @@ class StorePurchaseService
         private readonly DeletesServers $deletion,
         private readonly TunnelService $tunnels,
         private readonly NoticeService $notices,
+        private readonly TrialService $trials,
     ) {}
 
     /**
@@ -78,6 +82,15 @@ class StorePurchaseService
     public static function reference(User $user, string $idempotencyKey): string
     {
         return 'store-'.mb_substr(hash('sha256', $user->id.':'.$idempotencyKey), 0, 40);
+    }
+
+    /**
+     * The external id of a free trial server (nothing is charged, so there is no ledger row):
+     * the player and their idempotency key, hashed.
+     */
+    public static function trialReference(User $user, string $idempotencyKey): string
+    {
+        return 'trial-'.mb_substr(hash('sha256', 'trial:'.$user->id.':'.$idempotencyKey), 0, 40);
     }
 
     /**
@@ -110,26 +123,117 @@ class StorePurchaseService
         }
     }
 
+    /**
+     * Starts the one free trial server of a player: the same checks and node choice as a
+     * purchase (the plan must be trialable), nothing is charged, and the subscription runs in
+     * the `trial` state until the trial ends. The anti-abuse checks are made again under the
+     * store-wide capacity lock, so concurrent trial starts cannot pass them together.
+     *
+     * @throws StorePurchaseException
+     */
+    public function startTrial(User $user, StoreTrialOrder $order, ?string $ip): StorePurchaseResult
+    {
+        $reference = self::trialReference($user, $order->idempotencyKey);
+
+        if (($replay = $this->replay($user, $reference)) instanceof StorePurchaseResult) {
+            return $replay;
+        }
+
+        // One trial start per player at a time.
+        $lock = Cache::lock('monoforge:store:trial:'.$user->id, 120);
+        throw_unless($lock->get(), StorePurchaseException::inProgress());
+
+        try {
+            if (($replay = $this->replay($user, $reference)) instanceof StorePurchaseResult) {
+                return $replay;
+            }
+
+            throw_unless(ShopSettings::enabled(), StorePurchaseException::disabled());
+            $problem = $this->trials->problem($user, $ip);
+            throw_if($problem !== null, StorePurchaseException::trialRefused((string) $problem));
+            throw_unless(in_array($order->planId, TrialSettings::planIds(), true), StorePurchaseException::unavailable('That plan has no free trial.'));
+
+            $plan = $this->sellablePlan($order->planId);
+            [$egg, $image] = $this->orderEgg($plan, $order->eggId);
+
+            $candidates = $this->candidateNodes($plan, $egg, $order->locationId, $order->nodeId);
+            throw_if($candidates->isEmpty(), StorePurchaseException::noNode());
+
+            // A trial is the plan as it is (no add-ons), and it takes capacity like a sale.
+            $hours = TrialSettings::hours();
+            $quote = new Quote(0, 1.0, 0, 0, max(1, (int) ceil($hours / 24)), [], $plan->resources());
+            $candidates = $candidates->filter(fn (Node $node): bool => $this->capacity->canProvisionOn($node, $quote->resources))->values();
+            throw_if($candidates->isEmpty(), StorePurchaseException::capacity());
+
+            $node = $this->chooseNode($candidates);
+
+            $result = $this->underCapacityLock(fn (): StorePurchaseResult => $this->createTrial($user, $order, $plan, $egg, $image, $node, $quote, $hours, $reference, $ip));
+            $this->warnIfOversold($result);
+
+            return $result;
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Checks capacity and the trial rules again, then creates the trial server and records the
+     * trial. Called under the capacity lock. A failure removes the half-made server.
+     *
+     * @throws StorePurchaseException
+     */
+    private function createTrial(User $user, StoreTrialOrder $order, ShopPlan $plan, Egg $egg, string $image, Node $node, Quote $quote, int $hours, string $reference, ?string $ip): StorePurchaseResult
+    {
+        throw_unless(
+            $this->capacity->canProvision($quote->resources) && $this->capacity->canProvisionOn($node, $quote->resources),
+            StorePurchaseException::capacity(),
+        );
+        $problem = $this->trials->problem($user, $ip);
+        throw_if($problem !== null, StorePurchaseException::trialRefused((string) $problem));
+
+        $server = null;
+        try {
+            $server = $this->createServer($user, $order->name, sprintf('%s, free trial from the store.', $plan->name), $plan, $egg, $image, $node, $quote, $reference);
+            DB::transaction(function () use ($server, $user, $plan, $hours, $ip): void {
+                $this->subscriptions->startTrial($server, $user, $plan, $hours);
+                $this->trials->record($user, $server, $plan->id, $hours, $ip);
+            });
+        } catch (Throwable $throwable) {
+            report($throwable);
+            if ($server instanceof Server) {
+                try {
+                    $this->deletion->withForce()->delete($server);
+                } catch (Throwable $cleanup) {
+                    report($cleanup);
+                }
+            }
+
+            throw_if($throwable instanceof UniqueConstraintViolationException, StorePurchaseException::trialRefused('You have already used your free trial.'));
+
+            throw StorePurchaseException::trialFailed(match (true) {
+                $throwable instanceof NoViableNodeException, $throwable instanceof NoViableAllocationException => 'There is no free spot for it on that location right now.',
+                $throwable instanceof DisplayException => $throwable->getMessage(),
+                default => 'Please try again in a few minutes or contact support.',
+            }, $throwable);
+        }
+
+        return new StorePurchaseResult($server, 0, 0, address: $this->provisionTunnel($server, null));
+    }
+
     private function buy(User $user, StorePurchaseOrder $order, string $reference): StorePurchaseResult
     {
         throw_unless(ShopSettings::enabled(), StorePurchaseException::disabled());
 
-        $plan = ShopPlan::query()->with('category')->whereKey($order->planId)->where('visible', true)->first()
-            ?? throw StorePurchaseException::unavailable('That plan is not for sale.');
-        throw_unless($plan->category->visible, StorePurchaseException::unavailable('That plan is not for sale.'));
+        $plan = $this->sellablePlan($order->planId);
         $period = ShopPeriod::query()->whereKey($order->periodId)->where('enabled', true)->first()
             ?? throw StorePurchaseException::unavailable('That billing period is not offered.');
 
-        $allowedEggs = array_map(intval(...), (array) $plan->egg_ids);
-        throw_unless(in_array($order->eggId, $allowedEggs, true), StorePurchaseException::unavailable('That game is not available on this plan.'));
-        $egg = Egg::query()->with(['tags', 'variables'])->findOrFail($order->eggId);
-        $image = collect($egg->docker_images)->first();
-        throw_unless(is_string($image) && $image !== '', StorePurchaseException::unavailable('That game has no image to run on yet.'));
+        [$egg, $image] = $this->orderEgg($plan, $order->eggId);
 
         $addons = $this->addons($order->addons);
         $subdomain = $this->subdomain($order->subdomain);
 
-        $candidates = $this->candidateNodes($plan, $egg, $order);
+        $candidates = $this->candidateNodes($plan, $egg, $order->locationId, $order->nodeId);
         throw_if($candidates->isEmpty(), StorePurchaseException::noNode());
 
         // A custom subdomain needs a playit tunnel: refuse it rather than drop it after the charge.
@@ -159,6 +263,32 @@ class StorePurchaseService
         $this->warnIfOversold($result);
 
         return $result;
+    }
+
+    /** A visible plan in a visible category. */
+    private function sellablePlan(int $planId): ShopPlan
+    {
+        $plan = ShopPlan::query()->with('category')->whereKey($planId)->where('visible', true)->first()
+            ?? throw StorePurchaseException::unavailable('That plan is not for sale.');
+        throw_unless($plan->category->visible, StorePurchaseException::unavailable('That plan is not for sale.'));
+
+        return $plan;
+    }
+
+    /**
+     * The game of the order, which the plan must offer, and its default image.
+     *
+     * @return array{Egg, string}
+     */
+    private function orderEgg(ShopPlan $plan, int $eggId): array
+    {
+        $allowedEggs = array_map(intval(...), (array) $plan->egg_ids);
+        throw_unless(in_array($eggId, $allowedEggs, true), StorePurchaseException::unavailable('That game is not available on this plan.'));
+        $egg = Egg::query()->with(['tags', 'variables'])->findOrFail($eggId);
+        $image = collect($egg->docker_images)->first();
+        throw_unless(is_string($image) && $image !== '', StorePurchaseException::unavailable('That game has no image to run on yet.'));
+
+        return [$egg, $image];
     }
 
     /**
@@ -282,7 +412,7 @@ class StorePurchaseService
 
         $server = null;
         try {
-            $server = $this->createServer($user, $order, $plan, $egg, $image, $node, $quote, $reference);
+            $server = $this->createServer($user, $order->name, sprintf('%s, bought in the store.', $plan->name), $plan, $egg, $image, $node, $quote, $reference);
             $this->subscriptions->start($server, $user, $plan, $period, $quote, $addons);
         } catch (Throwable $throwable) {
             $this->refund($user, $quote->totalPerPeriod, $reference, $server, $throwable);
@@ -387,14 +517,14 @@ class StorePurchaseService
      *
      * @return Collection<int, Node>
      */
-    private function candidateNodes(ShopPlan $plan, Egg $egg, StorePurchaseOrder $order): Collection
+    private function candidateNodes(ShopPlan $plan, Egg $egg, ?int $locationId, ?int $nodeId): Collection
     {
         $allowed = is_array($plan->node_ids) ? array_map(intval(...), $plan->node_ids) : [];
 
         return $this->nodes($egg)
             ->when($allowed !== [], fn (Builder $query) => $query->whereIn('nodes.id', $allowed))
-            ->when($order->nodeId !== null, fn (Builder $query) => $query->where('nodes.id', $order->nodeId))
-            ->when($order->locationId !== null, fn (Builder $query) => $query->where('nodes.location_id', $order->locationId))
+            ->when($nodeId !== null, fn (Builder $query) => $query->where('nodes.id', $nodeId))
+            ->when($locationId !== null, fn (Builder $query) => $query->where('nodes.location_id', $locationId))
             ->orderBy('nodes.id')
             ->get();
     }
@@ -435,7 +565,7 @@ class StorePurchaseService
      * node, with the egg's default image, startup and variables. A purchase that raced for
      * the same allocation tries another one.
      */
-    private function createServer(User $user, StorePurchaseOrder $order, ShopPlan $plan, Egg $egg, string $image, Node $node, Quote $quote, string $reference): Server
+    private function createServer(User $user, string $name, string $description, ShopPlan $plan, Egg $egg, string $image, Node $node, Quote $quote, string $reference): Server
     {
         $environment = $egg->variables
             ->mapWithKeys(fn (EggVariable $variable): array => [$variable->env_variable => $variable->default_value ?? ''])
@@ -451,8 +581,8 @@ class StorePurchaseService
             try {
                 return $this->creation->create([
                     'external_id' => $reference,
-                    'name' => $order->name,
-                    'description' => sprintf('%s, bought in the store.', $plan->name),
+                    'name' => $name,
+                    'description' => $description,
                     'owner_id' => $user->id,
                     'egg_id' => $egg->id,
                     'image' => $image,

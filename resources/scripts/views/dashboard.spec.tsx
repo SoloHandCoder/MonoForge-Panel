@@ -77,6 +77,8 @@ it('shows the deletion countdown of a suspended shop server on its card', async 
         suspended_at: new Date().toISOString(),
         delete_at: new Date(Date.now() + (6 * 86_400 + 23 * 3600 + 120) * 1000).toISOString(),
         can_renew_now: true,
+        is_trial: false,
+        trial: null,
         sleep: {
             allowed: false,
             supported: true,

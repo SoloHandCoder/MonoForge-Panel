@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+import { Link, useLocation, useParams } from '@tanstack/react-router';
+import { ArrowLeft, Coins, Gift } from 'lucide-react';
 import { httpErrorToHuman } from '@/api/http';
 import { useStoreCatalog } from '@/api/store/queries';
 import type { StoreCatalog, StoreLocation, StorePlan } from '@/api/store/types';
@@ -12,14 +12,73 @@ import { AddonsStep, EggStep, LocationStep, NameStep, PeriodStep } from '@/compo
 import OrderSummary, { ConfirmPurchaseDialog } from '@/components/store/OrderSummary';
 import { EggAvatars } from '@/components/store/PlanCard';
 import PurchaseOverlay from '@/components/store/PurchaseOverlay';
+import TrialSummary from '@/components/store/TrialSummary';
 import {
     firstLocation,
     planLocations,
+    soldOutInCatalog,
     useCheckoutPrice,
     usePurchaseFlow,
     validateName,
     validateSubdomain,
+    withAddons,
 } from '@/components/store/useCheckout';
+import {
+    tryFreeLabel,
+    useCheckoutTrial,
+    useTrialFlow,
+    type CheckoutMode,
+    type PlanTrial,
+} from '@/components/store/useTrial';
+import { cn } from '@/lib/cn';
+import { useCaptcha } from '@/views/auth/captcha';
+
+/** Buying with tokens or the free trial, for a plan that has one. */
+function ModeSwitch({
+    trial,
+    mode,
+    onChange,
+}: {
+    trial: PlanTrial;
+    mode: CheckoutMode;
+    onChange: (mode: CheckoutMode) => void;
+}) {
+    const options: { value: CheckoutMode; label: string; icon: typeof Coins; disabled: boolean }[] = [
+        { value: 'buy', label: 'Buy with tokens', icon: Coins, disabled: false },
+        { value: 'trial', label: tryFreeLabel(trial.hours), icon: Gift, disabled: !trial.eligible },
+    ];
+
+    return (
+        <div className='mb-6'>
+            <div
+                role='radiogroup'
+                aria-label='How to get this server'
+                className='inline-flex w-full flex-wrap gap-1 rounded-xl border border-border bg-card p-1 sm:w-auto'
+            >
+                {options.map((option) => (
+                    <button
+                        key={option.value}
+                        type='button'
+                        role='radio'
+                        aria-checked={mode === option.value}
+                        disabled={option.disabled}
+                        onClick={() => onChange(option.value)}
+                        className={cn(
+                            'inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none',
+                            mode === option.value
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-(--active-item) hover:text-foreground'
+                        )}
+                    >
+                        <Icon icon={option.icon} className='size-4' aria-hidden />
+                        {option.label}
+                    </button>
+                ))}
+            </div>
+            {!trial.eligible && trial.reason && <p className='mt-2 text-sm text-muted-foreground'>{trial.reason}</p>}
+        </div>
+    );
+}
 
 function useServerName(defaultName: string) {
     const [name, setName] = useState<string | null>(null);
@@ -88,19 +147,92 @@ function CheckoutHeader({ plan }: { plan: StorePlan }) {
     );
 }
 
-function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan }) {
-    const locations = useMemo(() => planLocations(plan, catalog.locations), [plan, catalog.locations]);
-    const picks = useCheckoutChoices(catalog, plan, locations);
-    const { egg, location, period, choices } = picks;
-    const [subdomain, setSubdomain] = useState('');
-    const [confirming, setConfirming] = useState(false);
+type ServerName = ReturnType<typeof useServerName>;
+type CheckoutPicks = ReturnType<typeof useCheckoutChoices>;
+type SubdomainState = { enabled: boolean; value: string; error: string | null; onChange: (value: string) => void };
 
-    const name = useServerName(egg ? `${egg.name} server` : '');
-    const subdomainError = catalog.subdomainsEnabled ? validateSubdomain(subdomain) : null;
+/** Game, location, period, name and add-ons; a free trial has no period, add-ons or subdomain. */
+function ChoiceSteps({
+    catalog,
+    plan,
+    locations,
+    picks,
+    name,
+    subdomain,
+    trialMode,
+}: {
+    catalog: StoreCatalog;
+    plan: StorePlan;
+    locations: StoreLocation[];
+    picks: CheckoutPicks;
+    name: ServerName;
+    subdomain: SubdomainState;
+    trialMode: boolean;
+}) {
+    const { choices, period } = picks;
+    const steps = locations.length > 0 ? 2 : 1;
+
+    return (
+        <div className='grid gap-4'>
+            <EggStep eggs={plan.eggs} eggId={choices.eggId} onChange={picks.setEggId} />
+            {locations.length > 0 && (
+                <LocationStep
+                    locations={locations}
+                    locationId={choices.locationId}
+                    nodeId={choices.nodeId}
+                    onLocation={picks.setLocation}
+                    onNode={picks.setNodeId}
+                />
+            )}
+            {!trialMode && (
+                <PeriodStep
+                    number={steps + 1}
+                    periods={catalog.periods}
+                    periodId={choices.periodId}
+                    onChange={picks.setPeriodId}
+                />
+            )}
+            <NameStep
+                number={trialMode ? steps + 1 : steps + 2}
+                name={name.value}
+                nameError={name.error}
+                onName={name.set}
+                subdomain={{ ...subdomain, base: catalog.subdomainBase }}
+            />
+            {!trialMode && catalog.addons.length > 0 && period && (
+                <AddonsStep
+                    number={steps + 3}
+                    addons={catalog.addons}
+                    units={choices.units}
+                    periodDays={period.days}
+                    onChange={picks.setUnit}
+                />
+            )}
+        </div>
+    );
+}
+
+/** The order card, the confirmation and the purchase of a server bought with tokens. */
+function BuyCheckout({
+    catalog,
+    plan,
+    locations,
+    picks,
+    name,
+    subdomain,
+}: {
+    catalog: StoreCatalog;
+    plan: StorePlan;
+    locations: StoreLocation[];
+    picks: CheckoutPicks;
+    name: ServerName;
+    subdomain: SubdomainState;
+}) {
+    const { egg, location, period, choices } = picks;
+    const [confirming, setConfirming] = useState(false);
     const price = useCheckoutPrice(catalog, plan, choices, locations);
     const flow = usePurchaseFlow();
-    const steps = locations.length > 0 ? 2 : 1;
-    const canBuy = isBuyable(price, name.valid && subdomainError === null && !flow.working);
+    const canBuy = isBuyable(price, name.valid && subdomain.error === null && !flow.working);
 
     const confirm = () => {
         setConfirming(false);
@@ -108,7 +240,7 @@ function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan })
         if (price.selection) {
             void flow.buy(price.selection, {
                 name: name.value.trim(),
-                subdomain: catalog.subdomainsEnabled && subdomain !== '' ? subdomain : null,
+                subdomain: subdomain.enabled && subdomain.value !== '' ? subdomain.value : null,
                 expectedTotal: price.total,
             });
         }
@@ -117,58 +249,15 @@ function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan })
     return (
         <>
             {(flow.working || flow.result) && <PurchaseOverlay result={flow.result} />}
-            <CheckoutHeader plan={plan} />
-            <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start'>
-                <div className='grid gap-4'>
-                    <EggStep eggs={plan.eggs} eggId={choices.eggId} onChange={picks.setEggId} />
-                    {locations.length > 0 && (
-                        <LocationStep
-                            locations={locations}
-                            locationId={choices.locationId}
-                            nodeId={choices.nodeId}
-                            onLocation={picks.setLocation}
-                            onNode={picks.setNodeId}
-                        />
-                    )}
-                    <PeriodStep
-                        number={steps + 1}
-                        periods={catalog.periods}
-                        periodId={choices.periodId}
-                        onChange={picks.setPeriodId}
-                    />
-                    <NameStep
-                        number={steps + 2}
-                        name={name.value}
-                        nameError={name.error}
-                        onName={name.set}
-                        subdomain={{
-                            enabled: catalog.subdomainsEnabled,
-                            base: catalog.subdomainBase,
-                            value: subdomain,
-                            error: subdomainError,
-                            onChange: setSubdomain,
-                        }}
-                    />
-                    {catalog.addons.length > 0 && period && (
-                        <AddonsStep
-                            number={steps + 3}
-                            addons={catalog.addons}
-                            units={choices.units}
-                            periodDays={period.days}
-                            onChange={picks.setUnit}
-                        />
-                    )}
-                </div>
-                <OrderSummary
-                    price={price}
-                    error={flow.error}
-                    canBuy={canBuy}
-                    onBuy={() => {
-                        name.touch();
-                        setConfirming(true);
-                    }}
-                />
-            </div>
+            <OrderSummary
+                price={price}
+                error={flow.error}
+                canBuy={canBuy}
+                onBuy={() => {
+                    name.touch();
+                    setConfirming(true);
+                }}
+            />
             <ConfirmPurchaseDialog
                 open={confirming}
                 title={`${name.value.trim()} · ${plan.name}`}
@@ -177,6 +266,113 @@ function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan })
                 onClose={() => setConfirming(false)}
                 onConfirm={confirm}
             />
+        </>
+    );
+}
+
+/** The order card and the start of a free trial (behind the captcha, when the panel uses one). */
+function TrialCheckout({
+    trial,
+    plan,
+    locations,
+    choices,
+    name,
+}: {
+    trial: PlanTrial;
+    plan: StorePlan;
+    locations: StoreLocation[];
+    choices: CheckoutPicks['choices'];
+    name: ServerName;
+}) {
+    const flow = useTrialFlow();
+    const captcha = useCaptcha('trial');
+    const soldOut = soldOutInCatalog(plan, locations, choices);
+    const { eggId } = choices;
+    const canStart = name.valid && eggId !== null && !soldOut && !flow.working;
+
+    const start = () => {
+        name.touch();
+
+        if (canStart) {
+            void flow.begin(
+                {
+                    planId: plan.id,
+                    eggId,
+                    locationId: choices.locationId,
+                    nodeId: choices.nodeId,
+                    name: name.value.trim(),
+                },
+                captcha.token
+            );
+        }
+    };
+
+    return (
+        <>
+            {(flow.working || flow.result) && <PurchaseOverlay result={flow.result} trialHours={trial.hours} />}
+            <TrialSummary
+                hours={trial.hours}
+                resources={withAddons(plan, [], {})}
+                soldOut={soldOut}
+                error={flow.error}
+                canStart={canStart}
+                working={flow.working}
+                Captcha={captcha.Captcha}
+                onStart={start}
+            />
+        </>
+    );
+}
+
+function Checkout({ catalog, plan }: { catalog: StoreCatalog; plan: StorePlan }) {
+    const locations = useMemo(() => planLocations(plan, catalog.locations), [plan, catalog.locations]);
+    const picks = useCheckoutChoices(catalog, plan, locations);
+    const [subdomain, setSubdomain] = useState('');
+    // "Try free" on a plan card opens the checkout at #trial.
+    const { hash } = useLocation();
+    const { trial, active, setMode } = useCheckoutTrial(catalog, plan, hash);
+    const name = useServerName(picks.egg ? `${picks.egg.name} server` : '');
+    const subdomainsEnabled = catalog.subdomainsEnabled && active === null;
+    const subdomainState: SubdomainState = {
+        enabled: subdomainsEnabled,
+        value: subdomain,
+        error: subdomainsEnabled ? validateSubdomain(subdomain) : null,
+        onChange: setSubdomain,
+    };
+
+    return (
+        <>
+            <CheckoutHeader plan={plan} />
+            {trial && <ModeSwitch trial={trial} mode={active ? 'trial' : 'buy'} onChange={setMode} />}
+            <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start'>
+                <ChoiceSteps
+                    catalog={catalog}
+                    plan={plan}
+                    locations={locations}
+                    picks={picks}
+                    name={name}
+                    subdomain={subdomainState}
+                    trialMode={active !== null}
+                />
+                {active ? (
+                    <TrialCheckout
+                        trial={active}
+                        plan={plan}
+                        locations={locations}
+                        choices={picks.choices}
+                        name={name}
+                    />
+                ) : (
+                    <BuyCheckout
+                        catalog={catalog}
+                        plan={plan}
+                        locations={locations}
+                        picks={picks}
+                        name={name}
+                        subdomain={subdomainState}
+                    />
+                )}
+            </div>
         </>
     );
 }

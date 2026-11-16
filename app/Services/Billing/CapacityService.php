@@ -10,8 +10,8 @@ use Pterodactyl\Models\Node;
 
 /**
  * Keeps the shop within the memory, disk and CPU the owner is willing to sell. Only
- * servers sold through the shop count: those with an active or suspended row in
- * server_subscriptions. A limit of 0 is no limit.
+ * servers sold through the shop count: those with an active, suspended or trial row in
+ * server_subscriptions (free trials take capacity like any other shop server). A limit of 0 is no limit.
  *
  * Each node may also have its own shop limits (nodes.shop_limit_*), counted over the shop
  * servers on that node only, and a purchase has to fit both. The node's own Pterodactyl memory
@@ -20,7 +20,7 @@ use Pterodactyl\Models\Node;
 class CapacityService
 {
     /** Subscription states whose servers still hold their resources. */
-    public const array COUNTED_STATUSES = ['active', 'suspended'];
+    public const array COUNTED_STATUSES = ['active', 'suspended', 'trial'];
 
     private const array KEYS = ['memory', 'disk', 'cpu'];
 

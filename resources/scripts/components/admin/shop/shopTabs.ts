@@ -11,6 +11,7 @@ export const shopTabs = [
     { key: 'addons', label: 'Add-ons', path: '/panel/shop/addons' },
     { key: 'limits', label: 'Limits', path: '/panel/shop/limits' },
     { key: 'nodes', label: 'Nodes', path: '/panel/shop/nodes' },
+    { key: 'trials', label: 'Trials', path: '/panel/shop/trials' },
     { key: 'token-packs', label: 'Token packs & Tebex', path: '/panel/shop/token-packs' },
     { key: 'tunnels', label: 'Tunnels', path: '/panel/shop/tunnels' },
 ] as const;

@@ -1,6 +1,6 @@
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clientGetTheStoreCatalog, clientQuoteAServer } from '@/api/generated';
-import { clientPurchaseServerMutation } from '@/api/generated/@tanstack/react-query.gen';
+import { clientPurchaseServerMutation, clientStartFreeTrialMutation } from '@/api/generated/@tanstack/react-query.gen';
 import { invalidateGeneratedOperations } from '@/api/mutationUtils';
 import {
     mapCatalog,
@@ -63,6 +63,24 @@ export const usePurchaseServer = () => {
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: storeQueryKey }),
                 invalidateGeneratedOperations(queryClient, ['clientListClientServers']),
+            ]);
+        },
+    });
+};
+
+export const useStartTrial = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        ...clientStartFreeTrialMutation(),
+        onSettled: async () => {
+            // The trial offer, the capacity, the server list and the billing all changed.
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: storeQueryKey }),
+                invalidateGeneratedOperations(queryClient, [
+                    'clientListClientServers',
+                    'clientListServerSubscriptions',
+                ]),
             ]);
         },
     });

@@ -80,6 +80,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopNodeController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPeriodController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopPlanController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopSettingsController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopTrialController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexPaymentController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TebexSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\TokenPackController;
@@ -188,6 +189,9 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/multipliers', [ShopMultiplierController::class, 'store'])->name('.multipliers.store');
     Route::put('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'update'])->name('.multipliers.update');
     Route::delete('/multipliers/{multiplier:id}', [ShopMultiplierController::class, 'destroy'])->name('.multipliers.delete');
+
+    Route::get('/trials', [ShopTrialController::class, 'index'])->name('.trials');
+    Route::put('/trials', [ShopTrialController::class, 'update'])->name('.trials.update');
 
     Route::get('/nodes', [ShopNodeController::class, 'index'])->name('.nodes');
     Route::put('/nodes/{node:id}', [ShopNodeController::class, 'update'])->name('.nodes.update');

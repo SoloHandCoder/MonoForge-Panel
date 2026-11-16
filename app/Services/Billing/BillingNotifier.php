@@ -84,6 +84,15 @@ class BillingNotifier
         }
 
         $name = $subscription->server->name;
+        if ($subscription->is_trial) {
+            $body = "The free trial of {$name} has ended and the server is suspended. "
+                .'It will be deleted in '.self::remaining($deleteAt).' ('.$this->date($deleteAt).'). Pick a billing period with "Keep this server" to keep it.';
+
+            $this->notifyUser($subscription->user, $subscription->id, self::SUSPENDED, 'warning', 'Free trial ended', $body, 'Keep this server', $this->serverPath($subscription), "The free trial of {$name} has ended");
+
+            return true;
+        }
+
         $body = "{$name} was suspended because its renewal of {$subscription->price_tokens} tokens could not be paid. "
             .'It will be deleted in '.self::remaining($deleteAt).' ('.$this->date($deleteAt).'). Top up and renew to keep it.';
 
@@ -103,9 +112,11 @@ class BillingNotifier
         }
 
         $name = $subscription->server->name;
-        $body = "{$name} is deleted in ".self::remaining($deleteAt).' ('.$this->date($deleteAt).'), with all of its files. Renew it now to keep it.';
+        $keep = $subscription->is_trial ? 'Keep this server' : 'Renew';
+        $body = "{$name} is deleted in ".self::remaining($deleteAt).' ('.$this->date($deleteAt).'), with all of its files. '
+            .($subscription->is_trial ? 'Pick a billing period with "Keep this server" to keep it.' : 'Renew it now to keep it.');
 
-        $this->notifyUser($subscription->user, $subscription->id, self::DELETION_SOON, 'danger', 'Server deleted tomorrow', $body, 'Renew', $this->serverPath($subscription), "{$name} is deleted tomorrow");
+        $this->notifyUser($subscription->user, $subscription->id, self::DELETION_SOON, 'danger', 'Server deleted tomorrow', $body, $keep, $this->serverPath($subscription), "{$name} is deleted tomorrow");
 
         return true;
     }
@@ -114,9 +125,11 @@ class BillingNotifier
      * The server was deleted after its grace period. The subscription row is gone by now, so this
      * takes what the message needs.
      */
-    public function deleted(User $user, int $subscriptionId, string $serverName): void
+    public function deleted(User $user, int $subscriptionId, string $serverName, bool $trial = false): void
     {
-        $body = "{$serverName} was deleted because its renewal was not paid.";
+        $body = $trial
+            ? "{$serverName} was deleted because its free trial ended and it was not kept."
+            : "{$serverName} was deleted because its renewal was not paid.";
 
         $this->notifyUser($user, $subscriptionId, self::DELETED, 'danger', 'Server deleted', $body, 'Store', self::STORE_PATH, "{$serverName} was deleted");
     }

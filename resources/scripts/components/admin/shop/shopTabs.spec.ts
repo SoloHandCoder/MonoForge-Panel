@@ -9,6 +9,7 @@ describe('shop tabs', () => {
         expect(shopTabFromPath('/panel/shop/token-packs')).toBe('token-packs');
         expect(shopTabFromPath('/panel/shop/tunnels')).toBe('tunnels');
         expect(shopTabFromPath('/panel/shop/nodes')).toBe('nodes');
+        expect(shopTabFromPath('/panel/shop/trials')).toBe('trials');
         expect(shopTabFromPath('/panel/shop/unknown')).toBe('plans');
     });
 
@@ -20,6 +21,7 @@ describe('shop tabs', () => {
             'addons',
             'limits',
             'nodes',
+            'trials',
             'token-packs',
             'tunnels',
         ]);
