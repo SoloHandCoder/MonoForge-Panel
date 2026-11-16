@@ -274,7 +274,7 @@ export function PeriodStep({
                             {note && (
                                 <span
                                     className={cn(
-                                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
                                         period.priceModifierPercent < 0
                                             ? 'bg-(--status-online-bg) text-(--status-online-fg)'
                                             : 'bg-(--status-busy-bg) text-(--status-busy-fg)'

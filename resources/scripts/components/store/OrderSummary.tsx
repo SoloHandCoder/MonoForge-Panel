@@ -82,10 +82,10 @@ function Total({ price }: { price: OrderPrice }) {
                 {price.updating && <Spinner size='small' />}
             </p>
             {price.balance !== null && (
-                <p className='mt-2 flex items-center gap-1.5 text-sm text-muted-foreground'>
-                    <Icon icon={Coins} className='size-3.5' aria-hidden />
-                    Balance {tokens(price.balance)}
-                    {!price.short && <span>· {tokens(price.balance - now)} after</span>}
+                <p className='mt-2 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground'>
+                    <Icon icon={Coins} className='size-3.5 shrink-0' aria-hidden />
+                    <span className='whitespace-nowrap'>Balance {tokens(price.balance)}</span>
+                    {!price.short && <span className='whitespace-nowrap'>· {tokens(price.balance - now)} after</span>}
                 </p>
             )}
         </div>
