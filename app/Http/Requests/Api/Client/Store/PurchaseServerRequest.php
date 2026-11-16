@@ -26,6 +26,8 @@ class PurchaseServerRequest extends ClientApiRequest
             // The format, blocklist and availability are checked by TunnelSettings::subdomainProblem().
             'subdomain' => ['nullable', 'string', 'max:63'],
             'expected_total' => ['nullable', 'integer', 'min:0'],
+            // Checked (case-insensitively) by CouponService.
+            'coupon' => ['nullable', 'string', 'max:32'],
             'idempotency_key' => ['required', 'string', 'min:16', 'max:100', 'regex:/^[A-Za-z0-9_-]+$/'],
         ];
     }
@@ -42,6 +44,7 @@ class PurchaseServerRequest extends ClientApiRequest
             'name' => 'Server name',
             'addons.*' => 'Add-on units',
             'subdomain' => 'Subdomain',
+            'coupon' => 'Coupon',
             'idempotency_key' => 'Idempotency key',
         ];
     }
@@ -68,6 +71,8 @@ class PurchaseServerRequest extends ClientApiRequest
             addons: $addons,
             expectedTotal: $this->filled('expected_total') ? $this->integer('expected_total') : null,
             subdomain: $subdomain,
+            couponCode: $this->filled('coupon') ? mb_trim($this->string('coupon')->toString()) : null,
+            ip: $this->ip(),
         );
     }
 }

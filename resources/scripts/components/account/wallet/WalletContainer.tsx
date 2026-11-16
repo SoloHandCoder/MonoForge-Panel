@@ -5,6 +5,7 @@ import { httpErrorToHuman } from '@/api/http';
 import { formatTokens, useWallet } from '@/api/account/wallet/queries';
 import TokenPacks from '@/components/store/TokenPacks';
 import TokenPurchaseReturn from '@/components/store/TokenPurchaseReturn';
+import RedeemCouponCard from './RedeemCouponCard';
 import TokenLedgerTable from './TokenLedgerTable';
 
 /**
@@ -27,26 +28,29 @@ export default function WalletContainer() {
                 description='Tokens pay for your servers and are taken automatically each billing period.'
             />
             <div className='mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3'>
-                <Card className='animate-rise'>
-                    <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                        <Icon icon={Wallet} className='size-4' aria-hidden />
-                        Balance
-                    </div>
-                    {data ? (
-                        <p
-                            data-testid='wallet-balance'
-                            className={cn(
-                                'mt-3 font-header text-4xl font-semibold tabular-nums',
-                                data.meta.balance < 0 ? 'text-destructive' : 'text-foreground'
-                            )}
-                        >
-                            {formatTokens(data.meta.balance)}
-                            <span className='ml-2 text-base font-normal text-muted-foreground'>tokens</span>
-                        </p>
-                    ) : (
-                        <Spinner size='small' />
-                    )}
-                </Card>
+                <div className='grid content-start gap-6'>
+                    <Card className='animate-rise'>
+                        <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                            <Icon icon={Wallet} className='size-4' aria-hidden />
+                            Balance
+                        </div>
+                        {data ? (
+                            <p
+                                data-testid='wallet-balance'
+                                className={cn(
+                                    'mt-3 font-header text-4xl font-semibold tabular-nums',
+                                    data.meta.balance < 0 ? 'text-destructive' : 'text-foreground'
+                                )}
+                            >
+                                {formatTokens(data.meta.balance)}
+                                <span className='ml-2 text-base font-normal text-muted-foreground'>tokens</span>
+                            </p>
+                        ) : (
+                            <Spinner size='small' />
+                        )}
+                    </Card>
+                    <RedeemCouponCard />
+                </div>
                 <ContentBox title='Buy tokens' className='lg:col-span-2'>
                     <TokenPacks />
                 </ContentBox>

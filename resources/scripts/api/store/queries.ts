@@ -22,6 +22,7 @@ export const selectionBody = (selection: StoreSelection) => ({
     location_id: selection.locationId,
     node_id: selection.nodeId,
     addons: selection.addons,
+    coupon: selection.coupon ?? null,
 });
 
 // The generated response types mark every field optional (they come from examples), so the payloads

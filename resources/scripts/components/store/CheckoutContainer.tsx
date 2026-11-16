@@ -97,9 +97,11 @@ function useServerName(defaultName: string) {
     };
 }
 
-/** Everything the order needs before the buy button wakes up. */
-function isBuyable(price: ReturnType<typeof useCheckoutPrice>, formValid: boolean): boolean {
-    return formValid && price.selection !== null && !price.soldOut && !price.short && !price.updating;
+/** Everything the order needs before the buy button wakes up; an applied coupon must be valid. */
+function isBuyable(price: ReturnType<typeof useCheckoutPrice>, formValid: boolean, coupon: string | null): boolean {
+    const couponOk = coupon === null || price.coupon?.valid === true;
+
+    return formValid && couponOk && price.selection !== null && !price.soldOut && !price.short && !price.updating;
 }
 
 /** The player's picks, starting on the first game, location and period. */
@@ -229,10 +231,11 @@ function BuyCheckout({
     subdomain: SubdomainState;
 }) {
     const { egg, location, period, choices } = picks;
+    const [coupon, setCoupon] = useState<string | null>(null);
     const [confirming, setConfirming] = useState(false);
-    const price = useCheckoutPrice(catalog, plan, choices, locations);
+    const price = useCheckoutPrice(catalog, plan, { ...choices, coupon }, locations);
     const flow = usePurchaseFlow();
-    const canBuy = isBuyable(price, name.valid && subdomain.error === null && !flow.working);
+    const canBuy = isBuyable(price, name.valid && subdomain.error === null && !flow.working, coupon);
 
     const confirm = () => {
         setConfirming(false);
@@ -241,7 +244,9 @@ function BuyCheckout({
             void flow.buy(price.selection, {
                 name: name.value.trim(),
                 subdomain: subdomain.enabled && subdomain.value !== '' ? subdomain.value : null,
-                expectedTotal: price.total,
+                // With a coupon, the confirmed amount is the discounted first period.
+                expectedTotal: price.firstPeriod ?? price.total,
+                coupon,
             });
         }
     };
@@ -253,6 +258,12 @@ function BuyCheckout({
                 price={price}
                 error={flow.error}
                 canBuy={canBuy}
+                coupon={{
+                    applied: coupon,
+                    result: price.coupon,
+                    onApply: setCoupon,
+                    onRemove: () => setCoupon(null),
+                }}
                 onBuy={() => {
                     name.touch();
                     setConfirming(true);

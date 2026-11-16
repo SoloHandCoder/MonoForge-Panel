@@ -22,7 +22,14 @@ class GetStoreQuoteRequest extends ClientApiRequest
             'location_id' => ['nullable', 'integer'],
             'addons' => ['sometimes', 'array', 'max:50'],
             'addons.*' => ['integer', 'min:0', 'max:1000'],
+            'coupon' => ['nullable', 'string', 'max:32'],
         ];
+    }
+
+    /** The coupon to price the first period with, if any. */
+    public function coupon(): ?string
+    {
+        return $this->filled('coupon') ? mb_trim($this->string('coupon')->toString()) : null;
     }
 
     /**

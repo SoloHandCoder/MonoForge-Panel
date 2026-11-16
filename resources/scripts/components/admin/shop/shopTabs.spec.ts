@@ -10,6 +10,8 @@ describe('shop tabs', () => {
         expect(shopTabFromPath('/panel/shop/tunnels')).toBe('tunnels');
         expect(shopTabFromPath('/panel/shop/nodes')).toBe('nodes');
         expect(shopTabFromPath('/panel/shop/trials')).toBe('trials');
+        expect(shopTabFromPath('/panel/shop/coupons')).toBe('coupons');
+        expect(shopTabFromPath('/panel/shop/referrals')).toBe('referrals');
         expect(shopTabFromPath('/panel/shop/unknown')).toBe('plans');
     });
 
@@ -24,6 +26,8 @@ describe('shop tabs', () => {
             'trials',
             'token-packs',
             'tunnels',
+            'coupons',
+            'referrals',
         ]);
     });
 });

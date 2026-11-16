@@ -14,9 +14,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Contracts\Servers\CreatesServers;
 use Pterodactyl\Contracts\Servers\DeletesServers;
+use Pterodactyl\Data\CouponDiscount;
 use Pterodactyl\Data\StorePurchaseOrder;
 use Pterodactyl\Data\StorePurchaseResult;
 use Pterodactyl\Data\StoreTrialOrder;
+use Pterodactyl\Exceptions\Billing\CouponException;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
 use Pterodactyl\Exceptions\Billing\InvalidQuoteException;
 use Pterodactyl\Exceptions\DisplayException;
@@ -24,10 +26,12 @@ use Pterodactyl\Exceptions\Service\Billing\StorePurchaseException;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\Billing\CouponRedemption;
 use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopAddon;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
+use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Node;
@@ -43,6 +47,9 @@ use Throwable;
  * deploys the server on a node the plan allows, starts its subscription and asks for a
  * playit tunnel. Anything that fails after the charge refunds it, and the player's
  * idempotency key makes a repeated request return the server it already bought.
+ *
+ * A discount coupon lowers the first period only (renewals are charged at the full price). It
+ * is redeemed in the same transaction as the charge and given back with the refund.
  */
 class StorePurchaseService
 {
@@ -73,6 +80,7 @@ class StorePurchaseService
         private readonly TunnelService $tunnels,
         private readonly NoticeService $notices,
         private readonly TrialService $trials,
+        private readonly CouponService $coupons,
     ) {}
 
     /**
@@ -255,7 +263,8 @@ class StorePurchaseService
             $quote = $this->sellableQuote($plan, $period, $node, $addons);
         }
 
-        throw_if($order->expectedTotal !== null && $order->expectedTotal !== $quote->totalPerPeriod, StorePurchaseException::priceChanged($quote->totalPerPeriod));
+        $firstPeriod = $order->couponCode === null ? $quote->totalPerPeriod : $this->previewCoupon($user, $order->couponCode, $plan, $quote)->firstPeriod;
+        throw_if($order->expectedTotal !== null && $order->expectedTotal !== $firstPeriod, StorePurchaseException::priceChanged($firstPeriod));
 
         // One purchase at a time from the capacity check to the created server, so concurrent
         // buyers cannot all pass the check and oversell the limits (or take the same subdomain).
@@ -289,6 +298,20 @@ class StorePurchaseService
         throw_unless(is_string($image) && $image !== '', StorePurchaseException::unavailable('That game has no image to run on yet.'));
 
         return [$egg, $image];
+    }
+
+    /**
+     * The coupon's discount on the first period, checked (not redeemed) before the charge.
+     *
+     * @throws StorePurchaseException
+     */
+    private function previewCoupon(User $user, string $code, ShopPlan $plan, Quote $quote): CouponDiscount
+    {
+        try {
+            return $this->coupons->preview($user, $code, $plan, $quote->totalPerPeriod);
+        } catch (CouponException $couponException) {
+            throw StorePurchaseException::unavailable($couponException->getMessage());
+        }
     }
 
     /**
@@ -396,34 +419,71 @@ class StorePurchaseService
         $problem = $subdomain === null ? null : TunnelSettings::subdomainProblem($subdomain);
         throw_if($problem !== null, StorePurchaseException::unavailable((string) $problem));
 
-        try {
-            $this->wallet->debit(
-                $user,
-                $quote->totalPerPeriod,
-                'server_charge',
-                sprintf('Server "%s": %s, first %d days', $order->name, $plan->name, $quote->periodDays),
-                self::REFERENCE_TYPE,
-                $reference,
-                ['plan_id' => $plan->id, 'period_id' => $period->id, 'node_id' => $node->id, 'addons' => $addons],
-            );
-        } catch (InsufficientTokensException $insufficientTokensException) {
-            throw StorePurchaseException::insufficient($quote->totalPerPeriod, $this->wallet->balance($user), $insufficientTokensException);
-        }
+        $discount = $this->chargeFirstPeriod($user, $order, $plan, $period, $node, $quote, $addons, $reference);
+        $charged = $discount instanceof CouponDiscount ? $discount->firstPeriod : $quote->totalPerPeriod;
 
         $server = null;
         try {
             $server = $this->createServer($user, $order->name, sprintf('%s, bought in the store.', $plan->name), $plan, $egg, $image, $node, $quote, $reference);
+            $server = $this->createServer($user, $order, $plan, $egg, $image, $node, $quote, $reference);
+            // The subscription renews at the full price: a coupon only lowers the first period.
             $this->subscriptions->start($server, $user, $plan, $period, $quote, $addons);
         } catch (Throwable $throwable) {
-            $this->refund($user, $quote->totalPerPeriod, $reference, $server, $throwable);
+            $this->refund($user, $charged, $reference, $server, $throwable);
+        }
+
+        if ($discount instanceof CouponDiscount) {
+            $this->coupons->attachServer($reference, $server);
         }
 
         return new StorePurchaseResult(
             $server,
-            $quote->totalPerPeriod,
+            $charged,
             $quote->periodDays,
             address: $this->provisionTunnel($server, $subdomain),
+            discountTokens: $discount instanceof CouponDiscount ? $discount->discount : 0,
+            couponCode: $discount?->coupon->code,
         );
+    }
+
+    /**
+     * Redeems the order's coupon and debits the first period in one transaction, so a refused
+     * charge (a short balance, a coupon that changed meanwhile) leaves the coupon unused.
+     *
+     * @param  array<string, int>  $addons
+     *
+     * @throws StorePurchaseException
+     */
+    private function chargeFirstPeriod(User $user, StorePurchaseOrder $order, ShopPlan $plan, ShopPeriod $period, Node $node, Quote $quote, array $addons, string $reference): ?CouponDiscount
+    {
+        try {
+            return DB::transaction(function () use ($user, $order, $plan, $period, $node, $quote, $addons, $reference): ?CouponDiscount {
+                $discount = null;
+                if ($order->couponCode !== null) {
+                    $discount = $this->coupons->redeemForPurchase($user, $order->couponCode, $plan, $quote->totalPerPeriod, $reference, $order->ip);
+                    // The coupon was edited between the check and the lock: the player confirmed another price.
+                    throw_if($order->expectedTotal !== null && $order->expectedTotal !== $discount->firstPeriod, StorePurchaseException::priceChanged($discount->firstPeriod));
+                }
+
+                $charge = $discount instanceof CouponDiscount ? $discount->firstPeriod : $quote->totalPerPeriod;
+                $description = sprintf('Server "%s": %s, first %d days', $order->name, $plan->name, $quote->periodDays);
+                $meta = ['plan_id' => $plan->id, 'period_id' => $period->id, 'node_id' => $node->id, 'addons' => $addons];
+                if ($discount instanceof CouponDiscount) {
+                    $description .= sprintf(' (coupon %s: %s tokens off)', $discount->coupon->code, number_format($discount->discount));
+                    $meta += ['coupon_id' => $discount->coupon->id, 'coupon_discount' => $discount->discount, 'full_price' => $quote->totalPerPeriod];
+                }
+
+                try {
+                    $this->wallet->debit($user, $charge, 'server_charge', $description, self::REFERENCE_TYPE, $reference, $meta);
+                } catch (InsufficientTokensException $insufficientTokensException) {
+                    throw StorePurchaseException::insufficient($charge, $this->wallet->balance($user), $insufficientTokensException);
+                }
+
+                return $discount;
+            });
+        } catch (CouponException $couponException) {
+            throw StorePurchaseException::unavailable($couponException->getMessage());
+        }
     }
 
     /**
@@ -439,13 +499,22 @@ class StorePurchaseService
         }
 
         $subscription = ServerSubscription::query()->where('server_id', $server->id)->first();
+        // What the first period cost, which a coupon may have lowered below the renewal price.
+        $charged = TokenTransaction::query()
+            ->where('reference_type', self::REFERENCE_TYPE)
+            ->where('reference_id', $reference)
+            ->where('type', TokenTransaction::TYPE_SERVER_CHARGE)
+            ->value('amount');
+        $redemption = CouponRedemption::query()->with('coupon')->where('purchase_reference', $reference)->first();
 
         return new StorePurchaseResult(
             $server,
-            (int) ($subscription->price_tokens ?? 0),
+            is_numeric($charged) ? abs((int) $charged) : (int) ($subscription->price_tokens ?? 0),
             (int) ($subscription->period_days ?? 0),
             replayed: true,
             address: $this->tunnelAddress($server),
+            discountTokens: $redemption->tokens ?? 0,
+            couponCode: $redemption?->coupon->code,
         );
     }
 
@@ -629,7 +698,11 @@ class StorePurchaseService
             }
         }
 
-        $this->wallet->credit($user, $tokens, 'refund', 'Refund: the server could not be created', self::REFERENCE_TYPE, $reference);
+        // The coupon is given back with the tokens, so the player can use it on the next attempt.
+        DB::transaction(function () use ($user, $tokens, $reference): void {
+            $this->wallet->credit($user, $tokens, 'refund', 'Refund: the server could not be created', self::REFERENCE_TYPE, $reference);
+            $this->coupons->release($reference);
+        });
 
         $reason = match (true) {
             $exception instanceof NoViableNodeException, $exception instanceof NoViableAllocationException => 'There is no free spot for it on that location right now.',

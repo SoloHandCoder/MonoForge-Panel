@@ -14,6 +14,8 @@ export const shopTabs = [
     { key: 'trials', label: 'Trials', path: '/panel/shop/trials' },
     { key: 'token-packs', label: 'Token packs & Tebex', path: '/panel/shop/token-packs' },
     { key: 'tunnels', label: 'Tunnels', path: '/panel/shop/tunnels' },
+    { key: 'coupons', label: 'Coupons', path: '/panel/shop/coupons' },
+    { key: 'referrals', label: 'Referrals', path: '/panel/shop/referrals' },
 ] as const;
 
 export type ShopTab = (typeof shopTabs)[number]['key'];

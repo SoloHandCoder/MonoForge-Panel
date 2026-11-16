@@ -33,6 +33,8 @@ class StorePurchaseController extends ClientApiController
             'period_days' => 30,
             'replayed' => false,
             'address' => 'example.joinmc.link',
+            'discount_tokens' => 0,
+            'coupon' => null,
         ],
     ];
 
@@ -41,11 +43,14 @@ class StorePurchaseController extends ClientApiController
     /**
      * Buy a server with tokens.
      */
-    #[Endpoint('Purchase server', 'Charges the first billing period of a store plan and creates the server, which starts installing. Repeating a request with the same idempotency key returns the server it already bought without charging again; a failure after the charge refunds it.')]
+    #[Endpoint('Purchase server', 'Charges the first billing period of a store plan and creates the server, which starts installing. Repeating a request with the same idempotency key returns the server it already bought without charging again; a failure after the charge refunds it. A discount coupon lowers the first period only; expected_total is then the discounted amount (coupon.first_period_tokens of the quote), and a failed purchase gives the coupon back.')]
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 201, description: 'Server bought and installing.')]
     #[ScribeResponse(self::PURCHASE_EXAMPLE, status: 200, description: 'The idempotency key already bought this server; nothing was charged again.')]
     #[ScribeResponse(status: 409, description: 'The user has to accept the updated Terms of Service or Privacy Policy first.')]
     #[ResponseField('attributes.address', 'string', 'The playit.gg address of the server once its tunnel is ready; null until then.', nullable: true)]
+    #[ResponseField('attributes.tokens_charged', 'integer', 'What the first period cost, after the coupon. Renewals cost the full price.')]
+    #[ResponseField('attributes.discount_tokens', 'integer', 'Tokens the coupon took off the first period; 0 without one.')]
+    #[ResponseField('attributes.coupon', 'string', 'The coupon code used, or null.', nullable: true)]
     public function store(PurchaseServerRequest $request): JsonResponse
     {
         // Buying accepts the Terms of Service, so only the version the user accepted counts.
@@ -58,6 +63,7 @@ class StorePurchaseController extends ClientApiController
                 ->subject($result->server)
                 ->property('name', $result->server->name)
                 ->property('tokens', $result->tokensCharged)
+                ->property('coupon', $result->couponCode ?? '')
                 ->log();
         }
 
@@ -67,6 +73,8 @@ class StorePurchaseController extends ClientApiController
             'period_days' => $result->periodDays,
             'replayed' => $result->replayed,
             'address' => $result->address,
+            'discount_tokens' => $result->discountTokens,
+            'coupon' => $result->couponCode,
         ])->respond($result->replayed ? Response::HTTP_OK : Response::HTTP_CREATED);
     }
 }

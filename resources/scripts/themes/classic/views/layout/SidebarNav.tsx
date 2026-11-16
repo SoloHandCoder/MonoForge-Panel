@@ -11,6 +11,7 @@ import {
     ExternalLink,
     Folder,
     FolderTree,
+    Gift,
     HardDrive,
     History,
     KeyRound,
@@ -91,6 +92,7 @@ const icons = new Map<string, LucideIcon>([
     ['palette', Palette],
     ['user-cog', ShieldCheck],
     ['wallet', Wallet],
+    ['gift', Gift],
     ['store', Store],
 ]);
 
@@ -317,7 +319,7 @@ function CategorizedItems({
 }
 
 /** The core account pages the sidebar names itself, by their route. */
-const ACCOUNT_PAGES = new Set(['index', 'activity', 'wallet', 'api', 'ssh']);
+const ACCOUNT_PAGES = new Set(['index', 'activity', 'wallet', 'referrals', 'api', 'ssh']);
 
 const accountPage = (items: readonly NavItem[], id: string) =>
     items.find((item) => item.extensionId === undefined && item.id === id);
@@ -327,6 +329,7 @@ function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accou
     const overview = accountPage(items, 'index');
     const activity = accountPage(items, 'activity');
     const wallet = accountPage(items, 'wallet');
+    const referrals = accountPage(items, 'referrals');
     const keys = [
         { item: accountPage(items, 'api'), label: 'API keys' },
         { item: accountPage(items, 'ssh'), label: 'SSH keys' },
@@ -339,6 +342,7 @@ function AccountItems({ items, accountLink }: { items: readonly NavItem[]; accou
             {!overview && accountLink && <AppLink link={accountLink} label='Account' />}
             {activity && <ItemLink item={activity} label='Activity' />}
             {wallet && <ItemLink item={wallet} label='Wallet' />}
+            {referrals && <ItemLink item={referrals} label='Referrals' />}
             {keys.length + rest.length > 0 && <p className={groupLabelClass}>Developer</p>}
             {keys.map(({ item, label }) => (
                 <ItemLink key={item.id} item={item} label={label} />

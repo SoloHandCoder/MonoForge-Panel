@@ -49,6 +49,9 @@ return [
             'purchase' => 'Bought the server ":name" for :tokens tokens',
             'trial' => 'Started the free trial server ":name" for :hours hours',
         ],
+        'coupon' => [
+            'redeem' => 'Redeemed the coupon :code for :tokens tokens',
+        ],
         'friend' => [
             'request' => 'Sent a friend request to :identifier',
             'accept' => 'Became friends with :username',
@@ -353,6 +356,18 @@ return [
             'trials' => [
                 'update' => 'Updated the free trial settings (trials :enabled, :hours hours, at most :max_concurrent at once)',
             ],
+            'coupon' => [
+                'create' => 'Created the coupon :code (:type, :value)',
+                'update' => 'Updated the coupon :code (:type, :value)',
+                'delete' => 'Deleted the coupon :code',
+            ],
+            'referrals' => [
+                'update' => 'Updated the referral settings (on: :enabled, reward :reward tokens, cap :cap a month)',
+            ],
+        ],
+        'referral' => [
+            'approve' => 'Approved referral #:id',
+            'reject' => 'Rejected referral #:id',
         ],
         'tag' => [
             'create' => 'Created the :slug tag',

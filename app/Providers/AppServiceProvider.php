@@ -298,6 +298,14 @@ class AppServiceProvider extends ServiceProvider
 
         // Store purchases: 3 attempts a minute per player, so one player retrying against a hung
         // node cannot keep the store-wide capacity lock busy for everyone else.
+        // Redeeming a coupon on the Wallet page: 5 a minute per user (refused codes are also
+        // counted by CouponService, across the quote and the wallet).
+        RateLimiter::for('coupon.redeem', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(5)->by('coupon-redeem:'.($user instanceof User ? $user->id : (string) $request->ip()));
+        });
+
         RateLimiter::for('store.purchase', function (Request $request): Limit {
             $user = $request->user();
 

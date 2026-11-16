@@ -9,6 +9,7 @@ use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
 use Pterodactyl\Console\Commands\Assistant\DetectCrashesCommand;
 use Pterodactyl\Console\Commands\Billing\AutoSleepCommand;
+use Pterodactyl\Console\Commands\Billing\PayReferralsCommand;
 use Pterodactyl\Console\Commands\Billing\ProcessSubscriptionsCommand;
 use Pterodactyl\Console\Commands\Billing\PruneTebexPayloadsCommand;
 use Pterodactyl\Console\Commands\Maintenance\CleanServiceBackupFilesCommand;
@@ -59,6 +60,8 @@ final class Scheduler
 
         // Tebex webhook bodies carry the buyer's personal details; keep them 90 days.
         $schedule->command(PruneTebexPayloadsCommand::class)->daily()->withoutOverlapping()->onOneServer();
+        // Referral rewards whose hold has passed: one indexed query an hour, usually nothing to pay.
+        $schedule->command(PayReferralsCommand::class)->hourly()->withoutOverlapping(30)->onOneServer();
         // Token checkouts no payment was ever linked to, after 30 days (abandoned baskets).
         $schedule->command(PruneCommand::class, ['--model' => [TebexCheckout::class]])->daily()->withoutOverlapping()->onOneServer();
 

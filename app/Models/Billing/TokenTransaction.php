@@ -64,6 +64,12 @@ class TokenTransaction extends Model
 
     public const string TYPE_CORRECTION = 'correction';
 
+    /** Tokens a coupon credited to the wallet (phase 7). */
+    public const string TYPE_COUPON = 'coupon';
+
+    /** A referral reward, or taking one back (phase 7). */
+    public const string TYPE_REFERRAL = 'referral';
+
     /** @var list<string> */
     public const array TYPES = [
         self::TYPE_PURCHASE,
@@ -74,6 +80,8 @@ class TokenTransaction extends Model
         self::TYPE_AI_USAGE,
         self::TYPE_ADMIN_ADJUST,
         self::TYPE_CORRECTION,
+        self::TYPE_COUPON,
+        self::TYPE_REFERRAL,
     ];
 
     public const null UPDATED_AT = null;

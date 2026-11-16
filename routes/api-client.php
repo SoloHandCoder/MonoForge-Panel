@@ -12,12 +12,14 @@ use Pterodactyl\Http\Controllers\Api\Client\ApiKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\Assistant\AssistantController;
 use Pterodactyl\Http\Controllers\Api\Client\Assistant\ConversationController as AssistantConversationController;
 use Pterodactyl\Http\Controllers\Api\Client\ClientController;
+use Pterodactyl\Http\Controllers\Api\Client\CouponController;
 use Pterodactyl\Http\Controllers\Api\Client\ExtensionProgressController;
 use Pterodactyl\Http\Controllers\Api\Client\FriendController;
 use Pterodactyl\Http\Controllers\Api\Client\LegalAcceptanceController;
 use Pterodactyl\Http\Controllers\Api\Client\NoticeController;
 use Pterodactyl\Http\Controllers\Api\Client\OAuthAccountController;
 use Pterodactyl\Http\Controllers\Api\Client\PermissionTemplateController;
+use Pterodactyl\Http\Controllers\Api\Client\ReferralController;
 use Pterodactyl\Http\Controllers\Api\Client\ServerResourcesController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\BackupController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\CommandController;
@@ -133,6 +135,10 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function ():
     Route::get('/wallet', WalletController::class)->name('api:client.account.wallet');
     // The return page after a Tebex token checkout follows the user's own checkout (phase 5 Task T).
     Route::get('/wallet/purchases/{checkout}', TokenPurchaseController::class)->name('api:client.account.wallet.purchase');
+    // Free-tokens coupons (phase 7 Task C); discount coupons go with the store purchase.
+    Route::post('/wallet/coupons', [CouponController::class, 'store'])->middleware('throttle:coupon.redeem')->name('api:client.account.wallet.coupons.redeem');
+    // The referral link and its rewards (phase 7 Task C).
+    Route::get('/referrals', [ReferralController::class, 'index'])->name('api:client.account.referrals');
 
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
     Route::post('/api-keys', [ApiKeyController::class, 'store']);

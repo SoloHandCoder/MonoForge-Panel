@@ -73,6 +73,8 @@ use Pterodactyl\Http\Controllers\Api\Admin\Settings\RegistrationController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\SettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\StatusPageController;
 use Pterodactyl\Http\Controllers\Api\Admin\Settings\TestMailController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\CouponController;
+use Pterodactyl\Http\Controllers\Api\Admin\Shop\ReferralController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopAddonController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopCategoryController;
 use Pterodactyl\Http\Controllers\Api\Admin\Shop\ShopMultiplierController;
@@ -211,6 +213,20 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
     Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
     Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
+
+    // Coupons and referrals (phase 7 Task C).
+    Route::get('/coupons', [CouponController::class, 'index'])->name('.coupons');
+    Route::get('/coupons/redemptions', [CouponController::class, 'redemptions'])->name('.coupons.redemptions');
+    Route::post('/coupons', [CouponController::class, 'store'])->name('.coupons.store');
+    Route::put('/coupons/{coupon:id}', [CouponController::class, 'update'])->name('.coupons.update');
+    Route::delete('/coupons/{coupon:id}', [CouponController::class, 'destroy'])->name('.coupons.delete');
+
+    Route::get('/referrals', [ReferralController::class, 'index'])->name('.referrals');
+    Route::get('/referrals/settings', [ReferralController::class, 'settings'])->name('.referrals.settings');
+    Route::put('/referrals/settings', [ReferralController::class, 'updateSettings'])->name('.referrals.settings.update');
+    // Approving lets a referral mint its rewards: a browser session only, never an API key.
+    Route::post('/referrals/{referral:id}/approve', [ReferralController::class, 'approve'])->middleware(RequireSessionAuthentication::class)->name('.referrals.approve');
+    Route::post('/referrals/{referral:id}/reject', [ReferralController::class, 'reject'])->middleware(RequireSessionAuthentication::class)->name('.referrals.reject');
 });
 
 /*

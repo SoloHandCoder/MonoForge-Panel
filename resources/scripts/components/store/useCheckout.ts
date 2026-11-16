@@ -8,6 +8,8 @@ import type {
     StoreCatalog,
     StoreLocation,
     StorePlan,
+    StoreQuote,
+    StoreQuoteCoupon,
     StoreResources,
     StoreSelection,
 } from '@/api/store/types';
@@ -107,6 +109,35 @@ export interface CheckoutChoices {
     nodeId: number | null;
     periodId: number | null;
     units: Record<string, number>;
+    /** The coupon code the player applied, upper case, or null. */
+    coupon?: string | null;
+}
+
+/** A coupon code as the server stores it: trimmed and upper case. */
+export const normalizeCoupon = (code: string): string => code.trim().toUpperCase();
+
+/** A code the server could accept: 3-32 letters, digits, hyphens or underscores. */
+export const validateCoupon = (code: string): string | null =>
+    /^[A-Z0-9_-]{3,32}$/.test(normalizeCoupon(code)) ? null : 'A coupon code is 3 to 32 letters, digits, - or _.';
+
+/**
+ * What the first period costs: the coupon's price once the server confirmed it, the full price
+ * without a coupon. An applied coupon the server has not checked yet leaves it unknown (null).
+ */
+export function firstPeriodPrice(
+    total: number,
+    applied: string | null,
+    coupon: StoreQuoteCoupon | null
+): number | null {
+    if (!applied) {
+        return total;
+    }
+
+    if (!coupon || coupon.code !== applied) {
+        return null;
+    }
+
+    return coupon.valid ? coupon.firstPeriod : total;
 }
 
 function selectionFor(
@@ -121,7 +152,7 @@ function selectionFor(
         return null;
     }
 
-    return { planId: plan.id, periodId, eggId, locationId, nodeId, addons };
+    return { planId: plan.id, periodId, eggId, locationId, nodeId, addons, coupon: choices.coupon ?? null };
 }
 
 function estimateFor(catalog: StoreCatalog, plan: StorePlan, choices: CheckoutChoices, addons: Record<string, number>) {
@@ -153,6 +184,29 @@ export function soldOutInCatalog(
     return !location.available || location.nodes.some((node) => node.id === nodeId && !node.available);
 }
 
+/**
+ * The coupon part of the price: the applied coupon as the matching quote checked it, and what the
+ * first period costs with it (null while the server has not checked the applied code yet).
+ */
+export function couponPart(
+    total: number,
+    applied: string | null | undefined,
+    quote: StoreQuote | null,
+    balance: number | null
+) {
+    const code = applied ?? null;
+    const coupon = quote?.coupon ?? null;
+    const firstPeriod = firstPeriodPrice(total, code, quote ? coupon : null);
+
+    return {
+        firstPeriod,
+        coupon: code !== null && coupon?.code === code ? coupon : null,
+        checking: code !== null && firstPeriod === null,
+        /** The balance cannot pay what is charged now. */
+        short: balance !== null && balance < (firstPeriod ?? total),
+    };
+}
+
 /** The live price of the current choices: the server's quote once it matches, a local estimate until then. */
 export function useCheckoutPrice(
     catalog: StoreCatalog,
@@ -173,16 +227,20 @@ export function useCheckoutPrice(
     const local = estimateFor(catalog, plan, choices, addons);
     const balance = quote.data?.balance ?? catalog.balance;
     const total = data ? data.totalPerPeriod : local.total;
+    const { firstPeriod, coupon, checking, short } = couponPart(total, choices.coupon, data, balance);
 
     return {
         selection,
         total,
+        /** What is charged now: the first period after the coupon; null until the server checked it. */
+        firstPeriod,
+        coupon,
         days: data ? data.periodDays : local.days,
         lines: data?.lines.length ? data.lines : null,
         resources: { ...withAddons(plan, catalog.addons, addons), ...data?.resources },
-        updating: data === null && quote.fetchStatus === 'fetching',
+        updating: (data === null && quote.fetchStatus === 'fetching') || checking,
         balance,
-        short: balance !== null && balance < total,
+        short,
         soldOut: catalogSoldOut || data?.canProvision === false,
     };
 }
@@ -202,7 +260,7 @@ export function usePurchaseFlow() {
 
     const buy = async (
         selection: StoreSelection,
-        details: { name: string; subdomain: string | null; expectedTotal: number }
+        details: { name: string; subdomain: string | null; expectedTotal: number; coupon: string | null }
     ) => {
         setError(null);
         setWorking(true);
@@ -214,6 +272,7 @@ export function usePurchaseFlow() {
                     ...selectionBody(selection),
                     name: details.name,
                     subdomain: details.subdomain,
+                    coupon: details.coupon,
                     expected_total: details.expectedTotal,
                     idempotency_key: keyRef.current,
                 },
