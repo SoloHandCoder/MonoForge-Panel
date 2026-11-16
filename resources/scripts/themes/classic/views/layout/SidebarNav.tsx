@@ -479,11 +479,11 @@ export default function SidebarNav({ model }: { model: AppLayoutModel }) {
                 <AreaNav model={model} />
             </div>
             <div className='flex flex-col gap-0.5'>
-                {/* The public help center, outside the panel layout. */}
-                <a href='/help' className={sidebarItemClass}>
+                {/* The public help center, outside the panel layout; a router link, so no full page load. */}
+                <PanelLink destination={{ to: '/help' }} className={sidebarItemClass}>
                     <Icon icon={CircleHelp} className='size-4 shrink-0' aria-hidden />
                     <span className='min-w-0 flex-1 truncate'>Help</span>
-                </a>
+                </PanelLink>
                 <a {...discordLinkProps} className={sidebarItemClass}>
                     <Icon icon={MessageCircle} className='size-4 shrink-0' aria-hidden />
                     <span className='min-w-0 flex-1 truncate'>Join our Discord</span>

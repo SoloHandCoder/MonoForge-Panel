@@ -81,6 +81,17 @@ describe('SidebarNav on the dashboard', () => {
         expect(screen.getByRole('link', { name: 'Join our Discord' })).toHaveAttribute('rel', 'noopener noreferrer');
     });
 
+    it('links to the help center through the router', async () => {
+        await renderNav(fixture('user'), '/help/the-console');
+
+        const help = screen.getByRole('link', { name: 'Help' });
+
+        expect(help).toHaveAttribute('href', '/help');
+        // A router link marks itself active on the help center; a plain anchor would not.
+        expect(help).toHaveAttribute('data-status', 'active');
+        expect(help).not.toHaveAttribute('target');
+    });
+
     it('offers the Store only while the shop is open', async () => {
         await renderNav(fixture('user'));
         expect(screen.getByRole('link', { name: 'Store' })).toHaveAttribute('href', '/store');
