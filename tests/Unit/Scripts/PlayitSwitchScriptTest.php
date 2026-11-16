@@ -145,7 +145,7 @@ test('only .toml files in the playit locations are accepted as the secret file',
 test('a directory writable by group or others is refused', function (): void {
     if (! function_exists('posix_geteuid') || posix_geteuid() !== 0) {
         // As a normal user the owner check refuses first; check the mode rule on its own.
-        expect(playitScript('mkdir -p "$3/open"; chmod 777 "$3/open"; mode=$(stat -c %a "$3/open"); (( (8#$mode & 8#022) != 0 )) && echo writable'))
+        expect(playitScript('mkdir -p "$3/open"; chmod 777 "$3/open"; mode=$(stat -c %a "$3/open"); (( (8#$mode & 8#022) > 0 )) && echo writable'))
             ->toBe('writable');
 
         return;
