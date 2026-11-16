@@ -334,10 +334,10 @@ test('invalid static head tags fail the registration', function (): void {
 test('root routes mount under each claimed prefix ahead of the SPA catch-all', function (): void {
     extensions('redirect');
     $path = writeRouteFile('root.php', '/{slug}', 'go');
-    provider('redirect', ['routes' => ['root' => ['go', 'r']]])->rootRoutes($path);
+    provider('redirect', ['routes' => ['root' => ['go', 'to']]])->rootRoutes($path);
     Route::getRoutes()->refreshNameLookups();
 
-    foreach (['go', 'r'] as $prefix) {
+    foreach (['go', 'to'] as $prefix) {
         $route = Route::getRoutes()->getByName('extensions.redirect.root.'.$prefix.'.go');
         expect($route)->not->toBeNull();
         expect($route->uri())->toBe($prefix.'/{slug}');
@@ -364,11 +364,11 @@ test('authenticated web routes turn guests away', function (): void {
 
 test('a single claimed prefix can be mounted and undeclared prefixes are refused', function (): void {
     $path = writeRouteFile('root.php', '/{slug}', 'go');
-    $provider = provider('redirect', ['routes' => ['root' => ['go', 'r']]]);
-    $provider->rootRoutes($path, 'r');
+    $provider = provider('redirect', ['routes' => ['root' => ['go', 'to']]]);
+    $provider->rootRoutes($path, 'to');
     Route::getRoutes()->refreshNameLookups();
 
-    expect(Route::has('extensions.redirect.root.r.go'))->toBeTrue();
+    expect(Route::has('extensions.redirect.root.to.go'))->toBeTrue();
     expect(Route::has('extensions.redirect.root.go.go'))->toBeFalse();
     expect(fn () => $provider->rootRoutes($path, 'links'))->toThrow(InvalidExtensionException::class, 'does not declare the root path prefix "links"');
     expect(fn () => provider('plain')->rootRoutes($path))->toThrow(InvalidExtensionException::class, 'declares no "routes.root" prefixes');
