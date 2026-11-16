@@ -28,6 +28,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\DatabaseController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\FileUploadController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\LogController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\Minecraft\MinecraftVersionController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\NetworkAllocationController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\ModpackController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\PluginController;
@@ -338,6 +339,14 @@ Route::group([
         });
         Route::get('/modpack', [ModpackController::class, 'progress']);
         Route::get('/install/{installJob}', [PluginController::class, 'installProgress']);
+    });
+
+    // Admin > Games: the Minecraft Versions page (switch Vanilla, Paper, Fabric, Forge...).
+    Route::prefix('/minecraft/versions')->group(function (): void {
+        Route::get('/', [MinecraftVersionController::class, 'index'])->name('api:client:server.minecraft.versions');
+        Route::post('/install', [MinecraftVersionController::class, 'install'])->middleware('throttle:versions.install');
+        Route::get('/install/{installJob}', [MinecraftVersionController::class, 'progress']);
+        Route::get('/{software}', [MinecraftVersionController::class, 'versions'])->middleware('throttle:plugins.browse');
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

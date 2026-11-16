@@ -2,7 +2,10 @@
 import type { Server } from "../../../api/server/types.js";
 /** A game whose console the panel knows: its commands and its player count lines. */
 export type ConsoleGame = 'minecraft' | 'terraria';
-/** The game a server runs, read from its egg's tags and features and its image; null when unknown. */
+/**
+ * The game a server runs: the game its egg belongs to in Admin > Games when the panel names one,
+ * otherwise read from its egg's tags and features and its image; null when unknown.
+ */
 export declare function consoleGame({ attributes }: Server): ConsoleGame | null;
 /** The common commands of each game, with the arguments worth completing. */
 export declare const GAME_COMMANDS: {

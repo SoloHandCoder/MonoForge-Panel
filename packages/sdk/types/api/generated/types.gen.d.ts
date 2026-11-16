@@ -314,6 +314,68 @@ export type AdminExtensionSettingOption = {
     value: string | number | boolean;
     label: string;
 };
+export type AdminGameAttributes = {
+    id: number;
+    /**
+     * The stable identifier the panel matches on. Built-in games are `minecraft` and `terraria`.
+     */
+    slug: string;
+    name: string;
+    /**
+     * Hex colour of the game chip.
+     */
+    color: string;
+    /**
+     * A lucide icon name.
+     */
+    icon: string | null;
+    /**
+     * Built-in games ship with the panel and cannot be deleted.
+     */
+    built_in: boolean;
+    /**
+     * Whether servers on this game's eggs get playit.gg tunnels automatically.
+     */
+    auto_tunnels: boolean;
+    /**
+     * What the game adds to its servers: plugins, versions, player_count, world_settings.
+     */
+    features: Array<string>;
+    /**
+     * The eggs the game claims. An egg belongs to at most one game.
+     */
+    egg_ids: Array<number>;
+    /**
+     * Eggs no game claims that the built-in detection treats as this game. Always empty for custom games.
+     */
+    detected_egg_ids: Array<number>;
+    /**
+     * Tunnels besides the main game port: each matches an extra allocation of the server by port, or by its position among the extra allocations.
+     */
+    extra_ports: Array<{
+        key: string;
+        name: string;
+        protocol: 'tcp' | 'udp' | 'both';
+        /**
+         * An extra allocation with this port.
+         */
+        port: number | null;
+        /**
+         * Otherwise the Nth extra allocation (1 is the first after the primary).
+         */
+        allocation: number | null;
+    }>;
+    created_at: string;
+    updated_at: string;
+};
+export type AdminGameListResponse = {
+    object: string;
+    data: Array<AdminGameResource>;
+};
+export type AdminGameResource = {
+    object: string;
+    attributes: AdminGameAttributes;
+};
 /**
  * Available panel locales keyed by locale code.
  */
@@ -660,6 +722,11 @@ export type AdminServerTunnelAttributes = {
     status: string;
     last_error: string | null;
     imported_at: string | null;
+    port_key: string;
+    label: string | null;
+    protocol: string | null;
+    hold_reason: string | null;
+    retry_after: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -1367,6 +1434,46 @@ export type ClientFriendListResource = {
     object: string;
     attributes: ClientFriendListAttributes;
 };
+export type ClientMinecraftSoftwareAttributes = {
+    current: {
+        /**
+         * The detected software, or null when the panel cannot tell.
+         */
+        software: string | null;
+        /**
+         * The detected Minecraft version, or null.
+         */
+        minecraft_version: string | null;
+    };
+    software: Array<{
+        id: string;
+        label: string;
+        description: string;
+        has_snapshots: boolean;
+        needs_installer: boolean;
+        available: boolean;
+        /**
+         * Why this server's egg cannot switch to it, or null.
+         */
+        unavailable_reason: string | null;
+    }>;
+};
+export type ClientMinecraftSoftwareResource = {
+    object: string;
+    attributes: ClientMinecraftSoftwareAttributes;
+};
+export type ClientMinecraftVersionInstallAttributes = {
+    id: string;
+    status: string;
+    message: string | null;
+    file_name: string | null;
+    directory: string;
+    version_number: string;
+};
+export type ClientMinecraftVersionInstallResource = {
+    object: string;
+    attributes: ClientMinecraftVersionInstallAttributes;
+};
 export type ClientModpackInstallAttributes = {
     status: string;
     step: string;
@@ -1608,6 +1715,23 @@ export type ClientServerAttributes = {
      * True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.
      */
     address_pending: boolean;
+    /**
+     * The slug of the game the server's egg belongs to in Admin > Games (minecraft, terraria or a custom game), or of the built-in game the panel detects for an egg no game claims; null when unknown.
+     */
+    game: string | null;
+    /**
+     * What the game adds to the server pages: plugins, versions, player_count, world_settings.
+     */
+    game_features: Array<string>;
+    /**
+     * The server's live extra playit.gg tunnels, such as voice chat. The public page never shows them.
+     */
+    extra_addresses: Array<{
+        key: string;
+        label: string;
+        address: string;
+        protocol: 'tcp' | 'udp' | 'both';
+    }>;
     relationships?: {
         allocations?: ClientAllocationListResponse | NullResource;
         variables?: ClientEggVariableListResponse | NullResource;
@@ -1805,7 +1929,7 @@ export type ClientServerSubuserAttributes = {
     image: string;
     '2fa_enabled': boolean;
     created_at: string;
-    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type ClientServerSubuserListResponse = {
     object: string;
@@ -3763,6 +3887,86 @@ export type AdminUpdateEggRequest = {
     config_files?: string | null;
     extensions?: ExtensionFields;
 };
+export type AdminCreateGameRequest = {
+    /**
+     * The display name. Must be between 1 and 64 characters.
+     */
+    name: string;
+    /**
+     * The color. Must be 7 characters.
+     */
+    color?: string;
+    /**
+     * The icon. Must match the regex /^[a-z0-9][a-z0-9-]{0,47}$/.
+     */
+    icon?: string | null;
+    /**
+     * The auto tunnels.
+     */
+    auto_tunnels?: boolean;
+    /**
+     * Must match an existing stored value.
+     */
+    egg_ids?: Array<number>;
+    /**
+     * The extra ports. Must not have more than 5 items.
+     */
+    extra_ports?: Array<{
+        /**
+         * Must be between 1 and 32 characters.
+         */
+        name: string;
+        protocol: 'tcp' | 'udp' | 'both';
+        /**
+         * This field is required when <code>extra_ports.*.allocation</code> is not present. Must be between 1 and 65535.
+         */
+        port?: number | null;
+        /**
+         * This field is required when <code>extra_ports.*.port</code> is not present. Must be between 1 and 20.
+         */
+        allocation?: number | null;
+    }>;
+};
+export type AdminUpdateGameRequest = {
+    /**
+     * The display name. Must be between 1 and 64 characters.
+     */
+    name?: string;
+    /**
+     * The color. Must be 7 characters.
+     */
+    color?: string;
+    /**
+     * The icon. Must match the regex /^[a-z0-9][a-z0-9-]{0,47}$/.
+     */
+    icon?: string | null;
+    /**
+     * The auto tunnels.
+     */
+    auto_tunnels?: boolean;
+    /**
+     * Must match an existing stored value.
+     */
+    egg_ids?: Array<number>;
+    /**
+     * The extra ports. Must not have more than 5 items.
+     */
+    extra_ports?: Array<{
+        /**
+         * Must be between 1 and 32 characters.
+         */
+        name: string;
+        protocol: 'tcp' | 'udp' | 'both';
+        /**
+         * This field is required when <code>extra_ports.*.allocation</code> is not present. Must be between 1 and 65535.
+         */
+        port?: number | null;
+        /**
+         * This field is required when <code>extra_ports.*.port</code> is not present. Must be between 1 and 20.
+         */
+        allocation?: number | null;
+    }>;
+};
 export type AdminCreateTagRequest = {
     /**
      * The display name. Must be between 1 and 191 characters.
@@ -4038,7 +4242,7 @@ export type AdminCreateGlobalPermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type AdminUpdateGlobalPermissionTemplateRequest = {
     /**
@@ -4048,7 +4252,7 @@ export type AdminUpdateGlobalPermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type AdminCreateDatabaseHostRequest = {
     /**
@@ -5021,7 +5225,7 @@ export type ClientCreatePermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type ClientUpdatePermissionTemplateRequest = {
     /**
@@ -5031,7 +5235,7 @@ export type ClientUpdatePermissionTemplateRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type ClientCreateSshKeyRequest = {
     /**
@@ -5360,7 +5564,7 @@ export type ClientCreateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
     /**
      * The UUID of a friend of the authenticated user to invite instead of an email.
      */
@@ -5370,7 +5574,7 @@ export type ClientUpdateServerSubuserRequest = {
     /**
      * Permissions granted to the user.
      */
-    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | string>;
+    permissions?: Array<'websocket.connect' | 'control.console' | 'control.start' | 'control.stop' | 'control.restart' | 'user.create' | 'user.read' | 'user.update' | 'user.delete' | 'file.create' | 'file.read' | 'file.read-content' | 'file.update' | 'file.delete' | 'file.archive' | 'file.sftp' | 'backup.create' | 'backup.read' | 'backup.delete' | 'backup.download' | 'backup.restore' | 'allocation.read' | 'allocation.create' | 'allocation.update' | 'allocation.delete' | 'startup.read' | 'startup.update' | 'startup.docker-image' | 'database.create' | 'database.read' | 'database.update' | 'database.delete' | 'database.view_password' | 'schedule.create' | 'schedule.read' | 'schedule.update' | 'schedule.delete' | 'settings.rename' | 'settings.reinstall' | 'activity.read' | 'assistant.use' | 'share.manage' | 'plugins.manage' | 'versions.manage' | string>;
 };
 export type ClientCreateServerBackupRequest = {
     /**
@@ -5521,6 +5725,16 @@ export type ClientInstallModpackRequest = {
      * Install even though no backup can be made first (the server has no free backup slot). Without it such an install is refused.
      */
     confirm_without_backup?: boolean;
+};
+export type ClientInstallMinecraftVersionRequest = {
+    /**
+     * vanilla, paper, purpur, folia, fabric, forge or neoforge.
+     */
+    software: string;
+    /**
+     * A version id from the versions list.
+     */
+    version: string;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -9822,6 +10036,23 @@ export type ClientListInstalledPluginsResponseBody = {
         scanning: boolean;
     };
 };
+export type ClientListMinecraftVersionsResponseBody = {
+    object: string;
+    /**
+     * The versions, newest first.
+     */
+    data: Array<{
+        /**
+         * The version to install: a Minecraft version, or the Forge/NeoForge version.
+         */
+        id: string;
+        /**
+         * The Minecraft version it runs.
+         */
+        minecraft: string;
+        type: 'release' | 'snapshot';
+    }>;
+};
 export type ApiListPublicHelpArticlesResponseBody = {
     /**
      * The articles in help center order: by category, then by their place in it.
@@ -10592,6 +10823,7 @@ export type AdminListEggsIncludeQueryParameter = 'variables' | 'tags' | 'servers
  */
 export type AdminGetEggIncludeQueryParameter = 'variables' | 'tags' | 'servers' | 'variables,tags' | 'variables,servers' | 'tags,servers' | 'variables,tags,servers';
 export type AdminGetEggEggIdPathParameter = number;
+export type AdminGetGameGameIdPathParameter = number;
 /**
  * Filter tags by name.
  */
@@ -11298,6 +11530,16 @@ export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
 export type ClientInstallModpackServerUuidPathParameter = string;
 export type ClientGetPluginInstallProgressServerUuidPathParameter = string;
 export type ClientGetPluginInstallProgressInstallJobPathParameter = string;
+export type ClientGetMinecraftSoftwareServerUuidPathParameter = string;
+export type ClientInstallMinecraftVersionServerUuidPathParameter = string;
+export type ClientGetMinecraftVersionInstallProgressServerUuidPathParameter = string;
+export type ClientGetMinecraftVersionInstallProgressInstallJobPathParameter = string;
+/**
+ * Include snapshots and pre-releases (Vanilla, Fabric, and Paper release candidates).
+ */
+export type ClientListMinecraftVersionsSnapshotsQueryParameter = boolean;
+export type ClientListMinecraftVersionsServerUuidPathParameter = string;
+export type ClientListMinecraftVersionsSoftwarePathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
@@ -18747,6 +18989,165 @@ export type AdminUpdateEggResponses = {
     200: AdminEggResource;
 };
 export type AdminUpdateEggResponse = AdminUpdateEggResponses[keyof AdminUpdateEggResponses];
+export type AdminListGamesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/games';
+};
+export type AdminListGamesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+};
+export type AdminListGamesError = AdminListGamesErrors[keyof AdminListGamesErrors];
+export type AdminListGamesResponses = {
+    /**
+     * Games returned.
+     */
+    200: AdminGameListResponse;
+};
+export type AdminListGamesResponse = AdminListGamesResponses[keyof AdminListGamesResponses];
+export type AdminCreateGameData = {
+    body: AdminCreateGameRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/games';
+};
+export type AdminCreateGameErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminCreateGameError = AdminCreateGameErrors[keyof AdminCreateGameErrors];
+export type AdminCreateGameResponses = {
+    /**
+     * Game created.
+     */
+    201: AdminGameResource;
+};
+export type AdminCreateGameResponse = AdminCreateGameResponses[keyof AdminCreateGameResponses];
+export type AdminDeleteGameData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the game.
+         */
+        game_id: AdminGetGameGameIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/games/{game_id}';
+};
+export type AdminDeleteGameErrors = {
+    /**
+     * The game is built in.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminDeleteGameError = AdminDeleteGameErrors[keyof AdminDeleteGameErrors];
+export type AdminDeleteGameResponses = {
+    /**
+     * Game deleted.
+     */
+    204: void;
+};
+export type AdminDeleteGameResponse = AdminDeleteGameResponses[keyof AdminDeleteGameResponses];
+export type AdminGetGameData = {
+    body?: never;
+    path: {
+        /**
+         * The ID of the game.
+         */
+        game_id: AdminGetGameGameIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/games/{game_id}';
+};
+export type AdminGetGameErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetGameError = AdminGetGameErrors[keyof AdminGetGameErrors];
+export type AdminGetGameResponses = {
+    /**
+     * Game returned.
+     */
+    200: AdminGameResource;
+};
+export type AdminGetGameResponse = AdminGetGameResponses[keyof AdminGetGameResponses];
+export type AdminUpdateGameData = {
+    body?: AdminUpdateGameRequest;
+    path: {
+        /**
+         * The ID of the game.
+         */
+        game_id: AdminGetGameGameIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/games/{game_id}';
+};
+export type AdminUpdateGameErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateGameError = AdminUpdateGameErrors[keyof AdminUpdateGameErrors];
+export type AdminUpdateGameResponses = {
+    /**
+     * Game updated.
+     */
+    200: AdminGameResource;
+};
+export type AdminUpdateGameResponse = AdminUpdateGameResponses[keyof AdminUpdateGameResponses];
 export type AdminListTagsData = {
     body?: never;
     path?: never;
@@ -27123,6 +27524,179 @@ export type ClientGetPluginInstallProgressResponses = {
     200: ClientPluginInstallResource;
 };
 export type ClientGetPluginInstallProgressResponse = ClientGetPluginInstallProgressResponses[keyof ClientGetPluginInstallProgressResponses];
+export type ClientGetMinecraftSoftwareData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetMinecraftSoftwareServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/minecraft/versions';
+};
+export type ClientGetMinecraftSoftwareErrors = {
+    /**
+     * The server does not run Minecraft Java.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetMinecraftSoftwareError = ClientGetMinecraftSoftwareErrors[keyof ClientGetMinecraftSoftwareErrors];
+export type ClientGetMinecraftSoftwareResponses = {
+    /**
+     * Software returned.
+     */
+    200: ClientMinecraftSoftwareResource;
+};
+export type ClientGetMinecraftSoftwareResponse = ClientGetMinecraftSoftwareResponses[keyof ClientGetMinecraftSoftwareResponses];
+export type ClientInstallMinecraftVersionData = {
+    body: ClientInstallMinecraftVersionRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientInstallMinecraftVersionServerUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/minecraft/versions/install';
+};
+export type ClientInstallMinecraftVersionErrors = {
+    /**
+     * The server does not run Minecraft Java, or its egg cannot switch to this software.
+     */
+    400: ErrorEnvelope;
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientInstallMinecraftVersionError = ClientInstallMinecraftVersionErrors[keyof ClientInstallMinecraftVersionErrors];
+export type ClientInstallMinecraftVersionResponses = {
+    /**
+     * Install queued.
+     */
+    202: ClientMinecraftVersionInstallResource;
+};
+export type ClientInstallMinecraftVersionResponse = ClientInstallMinecraftVersionResponses[keyof ClientInstallMinecraftVersionResponses];
+export type ClientGetMinecraftVersionInstallProgressData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetMinecraftVersionInstallProgressServerUuidPathParameter;
+        /**
+         * The plugin install ID an install or update returned.
+         */
+        installJob: ClientGetMinecraftVersionInstallProgressInstallJobPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/minecraft/versions/install/{installJob}';
+};
+export type ClientGetMinecraftVersionInstallProgressErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * No such install on this server.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetMinecraftVersionInstallProgressError = ClientGetMinecraftVersionInstallProgressErrors[keyof ClientGetMinecraftVersionInstallProgressErrors];
+export type ClientGetMinecraftVersionInstallProgressResponses = {
+    /**
+     * Progress returned.
+     */
+    200: ClientMinecraftVersionInstallResource;
+};
+export type ClientGetMinecraftVersionInstallProgressResponse = ClientGetMinecraftVersionInstallProgressResponses[keyof ClientGetMinecraftVersionInstallProgressResponses];
+export type ClientListMinecraftVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientListMinecraftVersionsServerUuidPathParameter;
+        /**
+         * The Minecraft server software: vanilla, paper, purpur, folia, fabric, forge or neoforge.
+         */
+        software: ClientListMinecraftVersionsSoftwarePathParameter;
+    };
+    query?: {
+        /**
+         * Include snapshots and pre-releases (Vanilla, Fabric, and Paper release candidates).
+         */
+        snapshots?: ClientListMinecraftVersionsSnapshotsQueryParameter;
+    };
+    url: '/api/client/servers/{server_uuid}/minecraft/versions/{software}';
+};
+export type ClientListMinecraftVersionsErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+    /**
+     * The version list did not answer.
+     */
+    502: ErrorEnvelope;
+};
+export type ClientListMinecraftVersionsError = ClientListMinecraftVersionsErrors[keyof ClientListMinecraftVersionsErrors];
+export type ClientListMinecraftVersionsResponses = {
+    /**
+     * Versions returned.
+     */
+    200: ClientListMinecraftVersionsResponseBody;
+};
+export type ClientListMinecraftVersionsResponse = ClientListMinecraftVersionsResponses[keyof ClientListMinecraftVersionsResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {

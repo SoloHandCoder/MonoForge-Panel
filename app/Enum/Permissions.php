@@ -41,6 +41,11 @@ enum Permissions: string
     case AdminTagsUpdate = 'admin:tags.update';
     case AdminTagsDelete = 'admin:tags.delete';
 
+    case AdminGamesRead = 'admin:games.read';
+    case AdminGamesCreate = 'admin:games.create';
+    case AdminGamesUpdate = 'admin:games.update';
+    case AdminGamesDelete = 'admin:games.delete';
+
     case AdminEggsRead = 'admin:eggs.read';
     case AdminEggsCreate = 'admin:eggs.create';
     case AdminEggsUpdate = 'admin:eggs.update';
@@ -169,4 +174,7 @@ enum Permissions: string
 
     // Phase 6: installing, updating and removing plugins, mods and modpacks from the catalogs.
     case PluginsManage = 'plugins.manage';
+
+    // Switching a Minecraft server's software and version from the Versions page.
+    case VersionsManage = 'versions.manage';
 }

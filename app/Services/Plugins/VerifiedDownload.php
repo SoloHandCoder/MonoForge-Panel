@@ -27,14 +27,15 @@ final readonly class VerifiedDownload
      * @param  string  $directory  a clean relative directory ('' for the server root)
      * @param  array<string, string>  $hashes  the catalog's hashes; when $requireHash, one of sha1, sha256 or sha512 must be given
      * @param  string|null  $label  the name shown in errors, when $filename is a temporary one
+     * @param  list<string>|null  $hosts  the hosts allowed instead of the catalog CDNs
      *
      * @throws MarketplaceException
      * @throws DaemonConnectionException
      */
-    public function download(Server $server, string $url, string $directory, string $filename, array $hashes, bool $requireHash = false, ?string $label = null, int $expectedSize = 0): void
+    public function download(Server $server, string $url, string $directory, string $filename, array $hashes, bool $requireHash = false, ?string $label = null, int $expectedSize = 0, ?array $hosts = null): void
     {
         $label ??= $filename;
-        throw_unless(DownloadPolicy::allowedUrl($url), MarketplaceException::class, 'This file is not hosted on an allowed download site, so it was not installed.');
+        throw_unless(DownloadPolicy::allowedUrl($url, $hosts), MarketplaceException::class, 'This file is not hosted on an allowed download site, so it was not installed.');
 
         $expected = [];
         foreach (self::ALGORITHMS as $algorithm) {

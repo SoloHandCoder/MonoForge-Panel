@@ -132,7 +132,10 @@ const columns = [
                 <p className='truncate font-medium text-foreground'>
                     {row.original.attributes.server_name ?? `Server #${row.original.attributes.server_id}`}
                 </p>
-                <p className='truncate text-xs text-muted-foreground'>{row.original.attributes.node_name ?? 'n/a'}</p>
+                <p className='truncate text-xs text-muted-foreground'>
+                    {row.original.attributes.node_name ?? 'n/a'}
+                    {row.original.attributes.label ? ` · ${row.original.attributes.label}` : ''}
+                </p>
             </div>
         ),
         meta: { headerClassName: 'w-auto', cellClassName: 'w-auto' },
@@ -162,6 +165,16 @@ const columns = [
                     {!!row.original.attributes.imported_at && (
                         <Badge tone='neutral' variant='soft' size='sm'>
                             Imported
+                        </Badge>
+                    )}
+                    {row.original.attributes.hold_reason === 'not_a_game' && (
+                        <Badge tone='neutral' variant='soft' size='sm'>
+                            Not a game
+                        </Badge>
+                    )}
+                    {row.original.attributes.hold_reason === 'tunnel_limit' && (
+                        <Badge tone='warning' variant='soft' size='sm'>
+                            Tunnel limit
                         </Badge>
                     )}
                 </div>

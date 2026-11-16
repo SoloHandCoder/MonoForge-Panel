@@ -238,7 +238,7 @@ class TunnelImportService
             return $this->outcome($base, self::NO_MATCH, sprintf('No server on %s uses port %d.', $node->name, $localPort));
         }
 
-        $existing = ServerTunnel::query()->where('server_id', $server->id)->first();
+        $existing = ServerTunnel::query()->where('server_id', $server->id)->where('port_key', ServerTunnel::MAIN)->first();
         if ($existing instanceof ServerTunnel && ! TunnelService::isReplaceable($existing)) {
             return $this->outcome($base, self::SERVER_HAS_TUNNEL, sprintf('%s already has a %s tunnel.', $server->name, $existing->status === TunnelStatus::Active ? 'live' : $existing->status->value), [$server->id]);
         }

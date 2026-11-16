@@ -43,8 +43,13 @@ final class DownloadPolicy
         return in_array(mb_strtolower($parts['host'] ?? ''), self::ICON_HOSTS, true) ? $url : null;
     }
 
-    /** Whether Wings may be asked to download this URL: HTTPS, an allowed host, no credentials or odd port. */
-    public static function allowedUrl(string $url): bool
+    /**
+     * Whether Wings may be asked to download this URL: HTTPS, an allowed host, no credentials or
+     * odd port. `$hosts` replaces the catalog CDNs, such as for server jars.
+     *
+     * @param  list<string>|null  $hosts
+     */
+    public static function allowedUrl(string $url, ?array $hosts = null): bool
     {
         if ($url === '' || mb_strlen($url) > 2048 || preg_match('/[\s\x00-\x1f\x7f\\\\]/', $url) === 1) {
             return false;
@@ -59,7 +64,7 @@ final class DownloadPolicy
             return false;
         }
 
-        return in_array(mb_strtolower($parts['host'] ?? ''), self::ALLOWED_HOSTS, true);
+        return in_array(mb_strtolower($parts['host'] ?? ''), $hosts ?? self::ALLOWED_HOSTS, true);
     }
 
     /**

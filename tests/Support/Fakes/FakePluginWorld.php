@@ -194,6 +194,8 @@ final class FakePluginWorld
 
                 return Http::response('', 204);
             case 'backup':
+            case 'power':
+            case 'reinstall':
                 return Http::response('', 204);
         }
 

@@ -21,7 +21,7 @@ return [
         'file_archive' => 'Allows the user to create file archives and decompress existing archives.',
         'file_sftp' => 'Allows the user to perform the above file actions using a SFTP client.',
         'allocation_read' => 'Allows access to the server allocation management pages.',
-        'allocation_update' => 'Allows user permission to make modifications to the server\'s allocations.',
+        'allocation_update' => "Allows user permission to make modifications to the server's allocations.",
         'database_create' => 'Allows user permission to create a new database for the server.',
         'database_read' => 'Allows user permission to view the server databases.',
         'database_update' => 'Allows a user permission to make modifications to a database. If the user does not have the "View Password" permission as well they will not be able to modify the password.',
@@ -34,5 +34,6 @@ return [
         'assistant_use' => 'Allows a user to chat with the AI assistant on this server, limited to what their other permissions allow.',
         'share_manage' => 'Allows a user to publish, edit and unpublish the public page of this server.',
         'plugins_manage' => 'Install plugins, mods and modpacks — can add code and overwrite files on this server.',
+        'versions_manage' => 'Switch the Minecraft software and version — replaces the server jar and can reinstall the server.',
     ],
 ];

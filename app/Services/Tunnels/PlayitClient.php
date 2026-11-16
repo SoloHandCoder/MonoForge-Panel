@@ -28,6 +28,9 @@ class PlayitClient
     /** playit's error on create while no agent program has connected with the key yet. */
     public const string AGENT_VERSION_TOO_OLD = 'AgentVersionTooOld';
 
+    /** playit's answer when the account has no room for another tunnel. */
+    public const string TUNNEL_LIMIT = 'AccountUnassignedTunnelLimitReached';
+
     /** Where the administrator accepts a claim: the official agent's `claim_url()`. */
     public const string CLAIM_URL = 'https://playit.gg/claim/';
 
@@ -174,6 +177,35 @@ class PlayitClient
     }
 
     /**
+     * The `/tunnels/create` body (the agent api_client's `ReqTunnelsCreate`) for a tunnel to
+     * plain ports, exactly as playit parses it.
+     *
+     * @param  array{name: string|null, tunnel_type: string|null, port_type: string, local_ip: string, local_port: int}  $tunnel
+     * @return array<string, mixed>
+     */
+    public static function rawTunnelBody(string $agentId, array $tunnel): array
+    {
+        return [
+            'name' => $tunnel['name'],
+            'tunnel_type' => null,
+            'port_type' => in_array($tunnel['port_type'], ['tcp', 'udp', 'both'], true) ? $tunnel['port_type'] : 'both',
+            'port_count' => 1,
+            'origin' => [
+                'type' => 'agent',
+                'data' => [
+                    'agent_id' => $agentId,
+                    'local_ip' => $tunnel['local_ip'],
+                    'local_port' => $tunnel['local_port'],
+                ],
+            ],
+            'enabled' => true,
+            'alloc' => null,
+            'firewall_id' => null,
+            'proxy_protocol' => null,
+        ];
+    }
+
+    /**
      * Register (or poll) a claim for a new self-managed agent, as `playit claim exchange` does:
      * `POST /claim/setup {code, agent_type: "self-managed", version}` with no agent key. Returns
      * one of the CLAIM_* answers.
@@ -234,9 +266,16 @@ class PlayitClient
     }
 
     /**
-     * Create a tunnel to a port on the agent's machine and return playit's id for it, with the
-     * v1 API. Only a write-capable agent key may do this; a read-only one is refused with
+     * Create a tunnel to a port on the agent's machine and return playit's id for it. Only a
+     * write-capable agent key may do this; a read-only one is refused with
      * `NotAllowedWithReadOnly` (see READ_ONLY).
+     *
+     * A tunnel for a game playit knows (`tunnel_type`) uses the v1 API, which works. A tunnel
+     * for plain TCP/UDP ports uses the `/tunnels/create` body of the official agent's
+     * api_client (`ReqTunnelsCreate`: flat `tunnel_type`, `port_type` and `port_count`, and an
+     * `agent` origin carrying `local_ip` and a numeric `local_port`), because playit refuses
+     * the v1 raw-port bodies with "validation: failed to parse body". The v1 shape
+     * (`ReqTunnelsCreateV1`, `{"type": "custom-udp", "details": 1}`) stays as the fallback.
      *
      * @param  array{name: string|null, tunnel_type: string|null, port_type: string, local_ip: string, local_port: int}  $tunnel
      *
@@ -244,49 +283,9 @@ class PlayitClient
      */
     public function createTunnel(string $secret, string $agentId, array $tunnel): string
     {
-        $origin = [
-            'type' => 'agent',
-            'data' => [
-                'agent_id' => $agentId,
-                'config' => [
-                    'fields' => [
-                        ['name' => 'local_ip', 'value' => $tunnel['local_ip']],
-                        ['name' => 'local_port', 'value' => (string) $tunnel['local_port']],
-                    ],
-                ],
-            ],
-        ];
-
-        try {
-            $data = $this->call($secret, '/v1/tunnels/create', [
-                'name' => $tunnel['name'],
-                'protocol' => $tunnel['tunnel_type'] !== null
-                    ? ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']]
-                    : ['type' => 'raw-ports', 'details' => ['port_type' => $tunnel['port_type'], 'port_count' => 1]],
-                'origin' => $origin,
-                'endpoint' => ['type' => 'region', 'details' => ['region' => 'global', 'port' => null]],
-                'enabled' => true,
-            ]);
-        } catch (PlayitException $playitException) {
-            // playit does not document the body. When it refuses this one as malformed, send the
-            // shape the official agent's api_client uses for ReqTunnelsCreateV1 instead.
-            throw_if($playitException->reason !== 'validation', $playitException);
-
-            $data = $this->call($secret, '/v1/tunnels/create', [
-                'ports' => $tunnel['tunnel_type'] !== null
-                    ? ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']]
-                    : ['type' => match ($tunnel['port_type']) {
-                        'udp' => 'custom-udp',
-                        'both' => 'custom-both',
-                        default => 'custom-tcp',
-                    }, 'details' => 1],
-                'origin' => $origin,
-                'enabled' => true,
-                'alloc' => null,
-                'name' => $tunnel['name'],
-                'firewall_id' => null,
-            ]);
-        }
+        $data = $tunnel['tunnel_type'] !== null
+            ? $this->createTypedTunnel($secret, $agentId, $tunnel)
+            : $this->createRawTunnel($secret, $agentId, $tunnel);
 
         $id = is_array($data) ? ($data['id'] ?? null) : null;
         throw_unless(is_string($id) && $id !== '', PlayitException::class, 'playit.gg did not return an id for the new tunnel.');
@@ -438,6 +437,86 @@ class PlayitClient
         $origin = $tunnel['origin'] ?? null;
 
         return is_array($origin) && is_array($origin['data'] ?? null) ? $origin['data'] : [];
+    }
+
+    /**
+     * @param  array{name: string|null, tunnel_type: string|null, port_type: string, local_ip: string, local_port: int}  $tunnel
+     *
+     * @throws PlayitException
+     */
+    private function createRawTunnel(string $secret, string $agentId, array $tunnel): mixed
+    {
+        try {
+            return $this->call($secret, '/tunnels/create', self::rawTunnelBody($agentId, $tunnel));
+        } catch (PlayitException $playitException) {
+            throw_if($playitException->reason !== 'validation', $playitException);
+
+            return $this->call($secret, '/v1/tunnels/create', [
+                'ports' => ['type' => match ($tunnel['port_type']) {
+                    'udp' => 'custom-udp',
+                    'tcp' => 'custom-tcp',
+                    default => 'custom-both',
+                }, 'details' => 1],
+                'origin' => $this->v1Origin($agentId, $tunnel),
+                'enabled' => true,
+                'alloc' => null,
+                'name' => $tunnel['name'],
+                'firewall_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * @param  array{name: string|null, tunnel_type: string|null, port_type: string, local_ip: string, local_port: int}  $tunnel
+     *
+     * @throws PlayitException
+     */
+    private function createTypedTunnel(string $secret, string $agentId, array $tunnel): mixed
+    {
+        $origin = $this->v1Origin($agentId, $tunnel);
+
+        try {
+            return $this->call($secret, '/v1/tunnels/create', [
+                'name' => $tunnel['name'],
+                'protocol' => ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']],
+                'origin' => $origin,
+                'endpoint' => ['type' => 'region', 'details' => ['region' => 'global', 'port' => null]],
+                'enabled' => true,
+            ]);
+        } catch (PlayitException $playitException) {
+            // When playit refuses this one as malformed, send the official agent's
+            // ReqTunnelsCreateV1 shape instead.
+            throw_if($playitException->reason !== 'validation', $playitException);
+
+            return $this->call($secret, '/v1/tunnels/create', [
+                'ports' => ['type' => 'tunnel-type', 'details' => $tunnel['tunnel_type']],
+                'origin' => $origin,
+                'enabled' => true,
+                'alloc' => null,
+                'name' => $tunnel['name'],
+                'firewall_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * @param  array{name: string|null, tunnel_type: string|null, port_type: string, local_ip: string, local_port: int}  $tunnel
+     * @return array<string, mixed>
+     */
+    private function v1Origin(string $agentId, array $tunnel): array
+    {
+        return [
+            'type' => 'agent',
+            'data' => [
+                'agent_id' => $agentId,
+                'config' => [
+                    'fields' => [
+                        ['name' => 'local_ip', 'value' => $tunnel['local_ip']],
+                        ['name' => 'local_port', 'value' => (string) $tunnel['local_port']],
+                    ],
+                ],
+            ],
+        ];
     }
 
     /** "auth: InvalidAgentKey", "validation: <text>", "path-not-found: /x" or "internal". */

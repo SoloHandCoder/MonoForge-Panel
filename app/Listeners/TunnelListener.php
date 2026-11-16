@@ -27,7 +27,8 @@ class TunnelListener implements SubscribesToEvents
         $this->safely(function () use ($event): void {
             $event->server->loadMissing('node');
             if ($event->server->node->hasPlayitAgent()) {
-                $this->tunnels->provision($event->server);
+                // Only servers whose egg belongs to a game with automatic tunnels get one.
+                $this->tunnels->provisionAutomatic($event->server);
             }
         });
     }
@@ -52,7 +53,7 @@ class TunnelListener implements SubscribesToEvents
         }
 
         $this->safely(function () use ($event): void {
-            $tunnel = ServerTunnel::query()->where('server_id', $event->server->id)->first();
+            $tunnel = ServerTunnel::query()->where('server_id', $event->server->id)->where('port_key', ServerTunnel::MAIN)->first();
             if ($tunnel instanceof ServerTunnel && $tunnel->allocation_id !== $event->server->allocation_id) {
                 $this->tunnels->recreate($tunnel);
             }

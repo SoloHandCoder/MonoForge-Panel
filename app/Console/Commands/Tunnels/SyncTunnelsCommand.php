@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Console\Commands\Tunnels;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Pterodactyl\Enum\TunnelStatus;
 use Pterodactyl\Models\Billing\ServerTunnel;
+use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
+use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Tunnels\TunnelImportService;
 use Pterodactyl\Services\Tunnels\TunnelService;
 
@@ -34,6 +38,15 @@ class SyncTunnelsCommand extends Command
             $created += $tunnels->provisionMissing($node);
         }
 
+        // On every other node that can create tunnels, servers that have their main tunnel get
+        // the extra ones their game asks for (such as a voice chat port added later).
+        $others = Node::query()->whereNotNull('playit_agent_id')->whereNotNull('playit_secret')
+            ->where(fn (Builder $query) => $query->whereNull('playit_mode')->orWhereNotIn('playit_mode', [Node::PLAYIT_SELF_MANAGED, Node::PLAYIT_READ_ONLY]))
+            ->get();
+        foreach ($others as $node) {
+            $created += $tunnels->provisionMissing($node, extrasOnly: true);
+        }
+
         $pending = ServerTunnel::query()
             ->whereIn('status', [TunnelStatus::Pending, TunnelStatus::Failed])
             // A node without an agent stays failed until an administrator configures it.
@@ -41,18 +54,36 @@ class SyncTunnelsCommand extends Command
             // A read-only agent key cannot create tunnels: those wait for the dashboard and the link above.
             ->where(fn (Builder $query) => $query->whereNotNull('playit_tunnel_id')
                 ->orWhereHas('server.node', fn (Builder $node) => $node->whereNull('playit_mode')->orWhere('playit_mode', '!=', Node::PLAYIT_READ_ONLY)))
+            // Held tunnels wait: "not a game" ones for good, "tunnel limit" ones until their back-off ends.
+            ->where(fn (Builder $query) => $query->whereNull('hold_reason')
+                ->orWhere(fn (Builder $held) => $held->whereNotNull('retry_after')->where('retry_after', '<=', CarbonImmutable::now())))
+            ->with('server.egg')
             ->oldest('updated_at')
             ->limit(max(1, (int) $this->option('limit')))
             ->get();
 
         $active = 0;
+        $held = 0;
         foreach ($pending as $tunnel) {
+            // A failed tunnel nothing exists for on playit, of a server whose egg is not a game
+            // that wants tunnels, is parked instead of being retried every ten minutes.
+            $server = $tunnel->server;
+            if ($server instanceof Server && $tunnel->status === TunnelStatus::Failed && $tunnel->playit_tunnel_id === null && ! $tunnel->isImported()) {
+                $game = GameResolver::forServer($server);
+                if (! $game instanceof Game || ! $game->auto_tunnels) {
+                    $tunnels->holdNotAGame($server);
+                    $held++;
+
+                    continue;
+                }
+            }
+
             if ($tunnels->sync($tunnel)->status === TunnelStatus::Active) {
                 $active++;
             }
         }
 
-        $this->components->info(sprintf('Linked %d playit.gg tunnel(s) from the dashboard. Queued %d new tunnel(s). Checked %d tunnel(s); %d now active.', $linked['imported'], $created, $pending->count(), $active));
+        $this->components->info(sprintf('Linked %d playit.gg tunnel(s) from the dashboard. Queued %d new tunnel(s). Checked %d tunnel(s); %d now active; %d parked as not a game.', $linked['imported'], $created, $pending->count() - $held, $active, $held));
 
         return self::SUCCESS;
     }

@@ -62,6 +62,7 @@ export const ADMIN_NAV: NavCategoryScheme = {
         locations: 'infrastructure',
         databases: 'infrastructure',
         mounts: 'infrastructure',
+        games: 'game',
         eggs: 'game',
         nests: 'game',
         tags: 'game',
@@ -94,6 +95,10 @@ export const SERVER_NAV: NavCategoryScheme = {
         // playit.gg tunnels sit beside the server's allocations.
         tunnels: 'configuration',
         settings: 'configuration',
+        // Game-specific pages (Admin > Games) sit beside the startup settings they change.
+        plugins: 'configuration',
+        versions: 'configuration',
+        world: 'configuration',
         users: 'access',
         // The root admin's "Open Admin Area" link.
         admin: 'admin',

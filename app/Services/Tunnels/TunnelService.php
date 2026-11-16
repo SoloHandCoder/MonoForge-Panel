@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Tunnels;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -13,14 +14,22 @@ use Pterodactyl\Enum\TunnelStatus;
 use Pterodactyl\Exceptions\Tunnels\PlayitException;
 use Pterodactyl\Jobs\Tunnels\DeletePlayitTunnelJob;
 use Pterodactyl\Jobs\Tunnels\ProvisionTunnelJob;
+use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Billing\ServerTunnel;
+use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Games\GameResolver;
 use Throwable;
 
 /**
- * Gives every server on a node with a playit.gg agent a playit tunnel, so players see an address
+ * Gives servers on a node with a playit.gg agent their playit tunnels, so players see an address
  * such as `xyz.joinmc.link` instead of the node's `0.0.0.0:25565`.
+ *
+ * Automatic tunnels only go to servers whose egg belongs to a game in Admin > Games with
+ * "Auto-create playit tunnels" on: a main tunnel to the primary allocation, and one per extra
+ * port the game defines (such as Simple Voice Chat) that matches one of the server's other
+ * allocations. An administrator can still create a main tunnel by hand for any server.
  *
  * playit is an outside, undocumented API, so nothing here ever fails the caller: creating a
  * server or a purchase carries on, the error is kept on the tunnel, the panel keeps showing the
@@ -35,6 +44,15 @@ class TunnelService
 
     /** Shown while playit refuses to create tunnels because no agent program runs with the key yet. */
     public const string AGENT_NOT_RUNNING = 'The playit agent on this node is not running with the new key yet. Run the switch script on the node; the panel retries every ten minutes.';
+
+    /** Shown on a tunnel the scheduler leaves alone because its server's egg is not a game that wants tunnels. */
+    public const string NOT_A_GAME = "Not a game: this server's egg belongs to no game in Admin > Games that creates playit.gg tunnels, so it gets no automatic tunnel. Retry it by hand to create one anyway.";
+
+    /** Shown while the playit account has no room for another tunnel. */
+    public const string TUNNEL_LIMIT = 'Your playit.gg account reached its tunnel limit. Delete unused tunnels in the playit.gg dashboard or upgrade your playit plan; the panel tries again in six hours.';
+
+    /** How long the scheduler waits before retrying a tunnel that hit the account's limit. */
+    public const int TUNNEL_LIMIT_BACKOFF_HOURS = 6;
 
     public function __construct(private readonly PlayitClient $client) {}
 
@@ -58,97 +76,177 @@ class TunnelService
     }
 
     /**
-     * Make sure the server has a tunnel and queue the work to create it. Calling it again for a
-     * server that already has a live or pending tunnel changes nothing.
+     * Make sure the server has its main tunnel and queue the work to create it, whatever its
+     * game: this is the admin "Create tunnel". Calling it again for a server that already has a
+     * live or pending tunnel changes nothing.
      */
     public function provision(Server $server): ServerTunnel
     {
         $server->loadMissing('node');
 
         $tunnel = ServerTunnel::query()->firstOrCreate(
-            ['server_id' => $server->id],
+            ['server_id' => $server->id, 'port_key' => ServerTunnel::MAIN],
             ['allocation_id' => $server->allocation_id, 'status' => TunnelStatus::Pending],
         );
 
-        if (! $tunnel->wasRecentlyCreated && $tunnel->status !== TunnelStatus::Deleted && $tunnel->status !== TunnelStatus::Failed) {
-            return $tunnel;
-        }
-
-        if (! $server->node->hasPlayitAgent()) {
-            return $this->fail($tunnel, self::NOT_CONFIGURED);
-        }
-
-        if ($server->node->isPlayitReadOnly() && ($tunnel->status === TunnelStatus::Deleted || $tunnel->playit_tunnel_id === null)) {
-            // The panel cannot create it; the scheduler links the one made in the playit dashboard.
-            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $server->allocation_id, 'imported_at' => null]);
-
-            return $this->waitForDashboard($tunnel);
-        }
-
-        if ($tunnel->status === TunnelStatus::Deleted) {
-            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $server->allocation_id, 'imported_at' => null]);
-        }
-
-        $tunnel->fill(['status' => TunnelStatus::Pending, 'last_error' => null])->save();
-
-        dispatch(new ProvisionTunnelJob($tunnel->id))->afterCommit();
-
-        return $tunnel;
+        return $this->provisionRow($server, $tunnel, $server->allocation_id);
     }
 
     /**
-     * Give every server on the node that has no tunnel row yet a tunnel, such as servers created
-     * before the node had an agent the panel can create tunnels with. Returns how many were queued.
+     * The automatic tunnels of a server, as the shop, server creation and the scheduler make
+     * them: only for a server whose egg belongs to a game with "Auto-create playit tunnels" on,
+     * then its main tunnel and one per extra port of the game that matches an allocation.
+     * Extra tunnels whose allocation went away are released. Returns the main tunnel, or null
+     * when the server gets no automatic tunnel (an existing tunnel is left alone).
      */
-    public function provisionMissing(Node $node, int $limit = 50): int
+    public function provisionAutomatic(Server $server): ?ServerTunnel
+    {
+        $server->loadMissing(['node', 'egg']);
+        $game = GameResolver::forServer($server);
+
+        if (! $game instanceof Game || ! $game->auto_tunnels) {
+            $this->holdNotAGame($server);
+
+            return null;
+        }
+
+        $main = $this->provision($server);
+        $planned = $this->plannedExtras($server, $game);
+
+        foreach ($planned as $key => $extra) {
+            $tunnel = ServerTunnel::query()->firstOrCreate(
+                ['server_id' => $server->id, 'port_key' => $key],
+                ['allocation_id' => $extra['allocation_id'], 'label' => $extra['name'], 'protocol' => $extra['protocol'], 'status' => TunnelStatus::Pending],
+            );
+
+            if (! $tunnel->wasRecentlyCreated && $tunnel->status !== TunnelStatus::Deleted && $tunnel->allocation_id !== $extra['allocation_id']) {
+                // The port moved to another allocation: throw the old tunnel away first.
+                $this->releaseRow($server, $tunnel, false);
+                $tunnel->refresh();
+            }
+
+            $tunnel->fill(['label' => $extra['name'], 'protocol' => $extra['protocol']]);
+            $this->provisionRow($server, $tunnel, $extra['allocation_id']);
+        }
+
+        ServerTunnel::query()
+            ->where('server_id', $server->id)
+            ->where('port_key', '!=', ServerTunnel::MAIN)
+            ->whereNotIn('port_key', array_keys($planned))
+            ->where('status', '!=', TunnelStatus::Deleted)
+            ->get()
+            ->each(fn (ServerTunnel $stale) => $this->releaseRow($server, $stale, false));
+
+        return $main;
+    }
+
+    /**
+     * The extra tunnels a server's game asks for, by port key: each extra port matched against
+     * the server's allocations other than the primary, first by its port, otherwise by its
+     * position among them (1 is the first extra allocation). An allocation serves one port.
+     *
+     * @return array<string, array{name: string, protocol: string, allocation_id: int}>
+     */
+    public function plannedExtras(Server $server, Game $game): array
+    {
+        $ports = $game->extraPorts();
+        if ($ports === []) {
+            return [];
+        }
+
+        $extras = Allocation::query()->where('server_id', $server->id)->where('id', '!=', $server->allocation_id)->orderBy('id')->get()->values();
+        $planned = [];
+        $used = [];
+
+        foreach ($ports as $port) {
+            $allocation = null;
+            if ($port['port'] !== null) {
+                $allocation = $extras->first(fn (Allocation $candidate): bool => (int) $candidate->port === $port['port'] && ! in_array($candidate->id, $used, true));
+            }
+
+            if (! $allocation instanceof Allocation && $port['allocation'] !== null) {
+                $allocation = $extras->get($port['allocation'] - 1);
+                if ($allocation instanceof Allocation && in_array($allocation->id, $used, true)) {
+                    $allocation = null;
+                }
+            }
+
+            if ($allocation instanceof Allocation) {
+                $used[] = $allocation->id;
+                $planned[$port['key']] = ['name' => $port['name'], 'protocol' => $port['protocol'], 'allocation_id' => $allocation->id];
+            }
+        }
+
+        return $planned;
+    }
+
+    /**
+     * Park the failed tunnels of a server that is not a game wanting tunnels, so the scheduler
+     * stops retrying them. Nothing exists on playit for them, so nothing is deleted there.
+     */
+    public function holdNotAGame(Server $server): void
+    {
+        ServerTunnel::query()
+            ->where('server_id', $server->id)
+            ->where('status', TunnelStatus::Failed)
+            ->whereNull('playit_tunnel_id')
+            ->whereNull('imported_at')
+            ->where(fn (Builder $query) => $query->whereNull('hold_reason')->orWhere('hold_reason', '!=', ServerTunnel::HOLD_NOT_A_GAME))
+            ->update(['hold_reason' => ServerTunnel::HOLD_NOT_A_GAME, 'retry_after' => null, 'last_error' => self::NOT_A_GAME]);
+    }
+
+    /**
+     * Give every server on the node the automatic tunnels it is missing, such as servers created
+     * before the node had an agent the panel can create tunnels with, or a voice chat port added
+     * later. Servers whose egg is not a game wanting tunnels are skipped. With `$extrasOnly`,
+     * only servers that already have a main tunnel are completed. Returns how many servers were
+     * queued.
+     */
+    public function provisionMissing(Node $node, int $limit = 50, bool $extrasOnly = false): int
     {
         if (! $node->hasPlayitAgent() || $node->isPlayitReadOnly()) {
             return 0;
         }
 
-        $servers = Server::query()
-            ->where('node_id', $node->id)
-            ->whereDoesntHave('tunnel')
-            ->orderBy('id')
-            ->limit($limit)
-            ->get();
+        $queued = 0;
+        foreach (Server::query()->where('node_id', $node->id)->with(['egg', 'tunnels'])->lazyById(200) as $server) {
+            if ($queued >= $limit) {
+                break;
+            }
 
-        foreach ($servers as $server) {
+            $game = GameResolver::forServer($server);
+            if (! $game instanceof Game || ! $game->auto_tunnels) {
+                continue;
+            }
+
+            $keys = $server->tunnels->map(fn (ServerTunnel $tunnel): string => $tunnel->port_key)->all();
+            if ($extrasOnly && ! in_array(ServerTunnel::MAIN, $keys, true)) {
+                continue;
+            }
+
+            $wanted = [ServerTunnel::MAIN, ...array_keys($this->plannedExtras($server, $game))];
+            if (array_diff($wanted, $keys) === []) {
+                continue;
+            }
+
             $server->setRelation('node', $node);
-            $this->provision($server);
+            $this->provisionAutomatic($server);
+            $queued++;
         }
 
-        return $servers->count();
+        return $queued;
     }
 
     /**
-     * Delete the server's tunnel on playit. The server keeps working on its node address.
+     * Delete every tunnel of the server on playit. The server keeps working on its node address.
      *
      * A tunnel made by hand and imported is only unlinked here, and left on playit, unless
      * `$deleteImported` says it should go too (the server itself is being deleted).
      */
     public function release(Server $server, bool $deleteImported = false): void
     {
-        $tunnel = ServerTunnel::query()->where('server_id', $server->id)->first();
-        if (! $tunnel instanceof ServerTunnel || $tunnel->status === TunnelStatus::Deleted) {
-            return;
-        }
-
-        $release = function () use ($tunnel, $server, $deleteImported): void {
-            $tunnel->refresh();
-            if ($deleteImported || ! $tunnel->isImported()) {
-                $this->queueRemoteDelete($server->node_id, $tunnel->playit_tunnel_id);
-            }
-
-            // The custom subdomain is released with the tunnel, so the name can be picked again.
-            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'subdomain' => null, 'last_error' => null, 'imported_at' => null])->save();
-        };
-
-        try {
-            $this->locked($tunnel, $release);
-        } catch (LockTimeoutException) {
-            // A stuck worker must not keep the server from being deleted.
-            $release();
+        foreach (ServerTunnel::query()->where('server_id', $server->id)->where('status', '!=', TunnelStatus::Deleted)->get() as $tunnel) {
+            $this->releaseRow($server, $tunnel, $deleteImported);
         }
     }
 
@@ -168,7 +266,7 @@ class TunnelService
             return null;
         }
 
-        $tunnel = ServerTunnel::query()->firstOrNew(['server_id' => $server->id]);
+        $tunnel = ServerTunnel::query()->firstOrNew(['server_id' => $server->id, 'port_key' => ServerTunnel::MAIN]);
         $adopted = null;
 
         $adopt = function () use ($tunnel, $allocationId, $remote, $playitTunnelId, &$adopted): void {
@@ -189,6 +287,8 @@ class TunnelService
                 'status' => $address === null ? TunnelStatus::Pending : TunnelStatus::Active,
                 'last_error' => null,
                 'imported_at' => CarbonImmutable::now(),
+                'hold_reason' => null,
+                'retry_after' => null,
             ])->save();
 
             $adopted = $tunnel;
@@ -204,20 +304,44 @@ class TunnelService
     }
 
     /**
-     * The playit address players connect to, or null when the server has no live tunnel and the
-     * node's own address should be shown.
+     * The playit address players connect to (the main tunnel's), or null when the server has no
+     * live tunnel and the node's own address should be shown.
      */
     public function displayAddress(Server $server): ?string
     {
         $tunnel = $server->relationLoaded('tunnel')
             ? $server->getRelation('tunnel')
-            : ServerTunnel::query()->where('server_id', $server->id)->first();
+            : ServerTunnel::query()->where('server_id', $server->id)->where('port_key', ServerTunnel::MAIN)->first();
 
         if (! $tunnel instanceof ServerTunnel || $tunnel->status !== TunnelStatus::Active) {
             return null;
         }
 
         return $tunnel->address;
+    }
+
+    /**
+     * The live extra tunnels of a server (voice chat and the like), for its own pages. The
+     * public page only ever shows the main address.
+     *
+     * @return list<array{key: string, label: string, address: string, protocol: string}>
+     */
+    public function extraAddresses(Server $server): array
+    {
+        $tunnels = $server->relationLoaded('tunnels')
+            ? $server->tunnels->sortBy('id')
+            : ServerTunnel::query()->where('server_id', $server->id)->orderBy('id')->get();
+
+        $addresses = [];
+        foreach ($tunnels as $tunnel) {
+            if ($tunnel->isMain() || $tunnel->status !== TunnelStatus::Active || $tunnel->address === null) {
+                continue;
+            }
+
+            $addresses[] = ['key' => $tunnel->port_key, 'label' => $tunnel->label ?? $tunnel->port_key, 'address' => $tunnel->address, 'protocol' => $tunnel->protocol ?? 'both'];
+        }
+
+        return $addresses;
     }
 
     /**
@@ -237,10 +361,12 @@ class TunnelService
                         $this->queueRemoteDelete($tunnel->server->node_id, $tunnel->playit_tunnel_id);
                     }
 
-                    $tunnel->allocation_id = $tunnel->server->allocation_id;
+                    if ($tunnel->isMain()) {
+                        $tunnel->allocation_id = $tunnel->server->allocation_id;
+                    }
                 }
 
-                $tunnel->fill(['status' => TunnelStatus::Pending, 'playit_tunnel_id' => null, 'address' => null, 'last_error' => null, 'imported_at' => null])->save();
+                $tunnel->fill(['status' => TunnelStatus::Pending, 'playit_tunnel_id' => null, 'address' => null, 'last_error' => null, 'imported_at' => null, 'hold_reason' => null, 'retry_after' => null])->save();
             });
         } catch (LockTimeoutException) {
             return $tunnel;
@@ -268,6 +394,64 @@ class TunnelService
         }
 
         return $tunnel;
+    }
+
+    /**
+     * Queue the creation of one tunnel row pointing at an allocation, unless it is live or
+     * already pending.
+     */
+    private function provisionRow(Server $server, ServerTunnel $tunnel, ?int $allocationId): ServerTunnel
+    {
+        if (! $tunnel->wasRecentlyCreated && $tunnel->status !== TunnelStatus::Deleted && $tunnel->status !== TunnelStatus::Failed) {
+            if ($tunnel->isDirty()) {
+                $tunnel->save();
+            }
+
+            return $tunnel;
+        }
+
+        $tunnel->fill(['hold_reason' => null, 'retry_after' => null]);
+
+        if (! $server->node->hasPlayitAgent()) {
+            return $this->fail($tunnel, self::NOT_CONFIGURED);
+        }
+
+        if ($server->node->isPlayitReadOnly() && ($tunnel->status === TunnelStatus::Deleted || $tunnel->playit_tunnel_id === null)) {
+            // The panel cannot create it; the scheduler links the one made in the playit dashboard.
+            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $allocationId, 'imported_at' => null]);
+
+            return $this->waitForDashboard($tunnel);
+        }
+
+        if ($tunnel->status === TunnelStatus::Deleted) {
+            $tunnel->fill(['playit_tunnel_id' => null, 'address' => null, 'allocation_id' => $allocationId, 'imported_at' => null]);
+        }
+
+        $tunnel->fill(['status' => TunnelStatus::Pending, 'last_error' => null])->save();
+
+        dispatch(new ProvisionTunnelJob($tunnel->id))->afterCommit();
+
+        return $tunnel;
+    }
+
+    private function releaseRow(Server $server, ServerTunnel $tunnel, bool $deleteImported): void
+    {
+        $release = function () use ($tunnel, $server, $deleteImported): void {
+            $tunnel->refresh();
+            if ($deleteImported || ! $tunnel->isImported()) {
+                $this->queueRemoteDelete($server->node_id, $tunnel->playit_tunnel_id);
+            }
+
+            // The custom subdomain is released with the tunnel, so the name can be picked again.
+            $tunnel->fill(['status' => TunnelStatus::Deleted, 'playit_tunnel_id' => null, 'address' => null, 'subdomain' => null, 'last_error' => null, 'imported_at' => null, 'hold_reason' => null, 'retry_after' => null])->save();
+        };
+
+        try {
+            $this->locked($tunnel, $release);
+        } catch (LockTimeoutException) {
+            // A stuck worker must not keep the server from being deleted.
+            $release();
+        }
     }
 
     private function step(ServerTunnel $tunnel): void
@@ -298,9 +482,18 @@ class TunnelService
 
         try {
             if ($tunnel->playit_tunnel_id === null) {
+                $allocation = $tunnel->isMain()
+                    ? $server->allocation
+                    : Allocation::query()->where('server_id', $server->id)->find($tunnel->allocation_id);
+                if (! $allocation instanceof Allocation) {
+                    $this->fail($tunnel, 'The allocation this tunnel pointed at was removed from the server.');
+
+                    return;
+                }
+
                 $tunnel->fill([
-                    'playit_tunnel_id' => $this->create($server, $node, $secret),
-                    'allocation_id' => $server->allocation_id,
+                    'playit_tunnel_id' => $this->create($server, $tunnel, $allocation, $node, $secret),
+                    'allocation_id' => $allocation->id,
                     'status' => TunnelStatus::Pending,
                     'last_error' => null,
                     // A tunnel the panel made itself, even if it replaces an imported one.
@@ -315,6 +508,13 @@ class TunnelService
                 $node->forceFill(['playit_mode' => Node::PLAYIT_READ_ONLY])->save();
                 Log::info(sprintf('playit.gg agent key of node #%d is read-only; tunnels there are now linked from the playit dashboard.', $node->id));
                 $this->waitForDashboard($tunnel);
+
+                return;
+            }
+
+            if ($playitException->reason === PlayitClient::TUNNEL_LIMIT || str_contains($playitException->getMessage(), PlayitClient::TUNNEL_LIMIT)) {
+                $tunnel->fill(['hold_reason' => ServerTunnel::HOLD_TUNNEL_LIMIT, 'retry_after' => CarbonImmutable::now()->addHours(self::TUNNEL_LIMIT_BACKOFF_HOURS)]);
+                $this->fail($tunnel, self::TUNNEL_LIMIT);
 
                 return;
             }
@@ -335,7 +535,7 @@ class TunnelService
         $address = PlayitClient::addressOf($remote);
 
         if ($address !== null) {
-            $tunnel->fill(['status' => TunnelStatus::Active, 'address' => $address, 'last_error' => null])->save();
+            $tunnel->fill(['status' => TunnelStatus::Active, 'address' => $address, 'last_error' => null, 'hold_reason' => null, 'retry_after' => null])->save();
 
             return;
         }
@@ -354,15 +554,18 @@ class TunnelService
     /**
      * @throws PlayitException
      */
-    private function create(Server $server, Node $node, string $secret): string
+    private function create(Server $server, ServerTunnel $row, Allocation $allocation, Node $node, string $secret): string
     {
-        $profile = TunnelProfile::forEgg($server->egg);
+        // The main tunnel gets the game's playit tunnel type; an extra port is a plain port.
+        $profile = $row->isMain()
+            ? TunnelProfile::forEgg($server->egg)
+            : ['tunnel_type' => null, 'port_type' => in_array($row->protocol, ['tcp', 'udp', 'both'], true) ? (string) $row->protocol : 'both'];
         $tunnel = [
-            'name' => $this->tunnelName($server),
+            'name' => $this->tunnelName($server, $row),
             'tunnel_type' => $profile['tunnel_type'],
             'port_type' => $profile['port_type'],
-            'local_ip' => self::localIpFor($server->allocation?->ip),
-            'local_port' => (int) $server->allocation?->port,
+            'local_ip' => self::localIpFor($allocation->ip),
+            'local_port' => (int) $allocation->port,
         ];
 
         try {
@@ -375,12 +578,13 @@ class TunnelService
         }
     }
 
-    /** "survival-world-1a2b3c4d": the server's name, recognisable in the playit dashboard. */
-    private function tunnelName(Server $server): string
+    /** "survival-world-1a2b3c4d", or "survival-world-1a2b3c4d-voice" for an extra port. */
+    private function tunnelName(Server $server, ServerTunnel $row): string
     {
         $slug = mb_substr(Str::slug($server->name), 0, 40);
+        $suffix = $row->isMain() ? '' : '-'.mb_substr($row->port_key, 0, 16);
 
-        return mb_trim($slug.'-'.$server->uuidShort, '-');
+        return mb_trim($slug.'-'.$server->uuidShort.$suffix, '-');
     }
 
     private function queueRemoteDelete(int $nodeId, ?string $playitTunnelId): void
@@ -408,7 +612,7 @@ class TunnelService
     {
         $tunnel->fill(['status' => TunnelStatus::Failed, 'last_error' => mb_substr($error, 0, 1000)])->save();
 
-        Log::info(sprintf('playit.gg tunnel for server #%d failed: %s', $tunnel->server_id, $error));
+        Log::info(sprintf('playit.gg tunnel %s for server #%d failed: %s', $tunnel->port_key, $tunnel->server_id, $error));
 
         return $tunnel;
     }
@@ -420,6 +624,8 @@ class TunnelService
      */
     private function locked(ServerTunnel $tunnel, callable $callback): void
     {
-        Cache::lock('playit-tunnel:'.$tunnel->server_id, 60)->block(20, $callback);
+        $key = 'playit-tunnel:'.$tunnel->server_id.($tunnel->isMain() ? '' : ':'.$tunnel->port_key);
+
+        Cache::lock($key, 60)->block(20, $callback);
     }
 }
