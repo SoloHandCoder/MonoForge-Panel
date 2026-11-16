@@ -134,6 +134,16 @@ return [
             'disk_mb' => 0,
             'cpu_percent' => 0,
         ],
+        // Free trial servers (Shop > Trials). plan_ids: comma separated plan ids that can be
+        // tried. hours: 24, 48 or 72. max_concurrent: trials running at once panel-wide.
+        // require_verified: the account needs a linked Discord or Google account.
+        'trials' => [
+            'enabled' => false,
+            'plan_ids' => '',
+            'hours' => 48,
+            'max_concurrent' => 10,
+            'require_verified' => true,
+        ],
     ],
 
     /*

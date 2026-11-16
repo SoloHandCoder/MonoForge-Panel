@@ -64,6 +64,12 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:shop:limits:memory_mb',
         'monoforge:shop:limits:disk_mb',
         'monoforge:shop:limits:cpu_percent',
+        // Phase 7 Task T: free trial servers.
+        'monoforge:shop:trials:enabled',
+        'monoforge:shop:trials:plan_ids',
+        'monoforge:shop:trials:hours',
+        'monoforge:shop:trials:max_concurrent',
+        'monoforge:shop:trials:require_verified',
         // Phase 4 Task W: the AI assistant.
         'monoforge:ai:enabled',
         'monoforge:ai:server_enabled',

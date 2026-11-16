@@ -6,6 +6,7 @@ namespace Pterodactyl\Http\Resources\Api\Client;
 
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Services\Billing\TrialService;
 use Pterodactyl\Services\Query\ServerQuery;
 use Pterodactyl\Services\Sleep\ServerSleep;
 
@@ -32,6 +33,12 @@ class ServerSubscriptionResource extends ClientResource
             'server_identifier' => $subscription->server->uuidShort,
             'server_name' => $subscription->server->name,
             'status' => $subscription->status,
+            'is_trial' => $subscription->is_trial,
+            // A free trial: when it ends (or ended) and what keeping the server costs per period.
+            'trial' => $subscription->is_trial ? [
+                'ends_at' => $subscription->isTrial() ? $subscription->next_renewal_at->toAtomString() : $subscription->suspended_at?->toAtomString(),
+                'options' => resolve(TrialService::class)->options($subscription),
+            ] : null,
             'price_tokens' => $subscription->price_tokens,
             'period_days' => $subscription->period_days,
             'addons' => $subscription->addons ?? [],

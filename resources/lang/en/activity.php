@@ -47,6 +47,7 @@ return [
         ],
         'store' => [
             'purchase' => 'Bought the server ":name" for :tokens tokens',
+            'trial' => 'Started the free trial server ":name" for :hours hours',
         ],
         'friend' => [
             'request' => 'Sent a friend request to :identifier',
@@ -70,6 +71,7 @@ return [
             'renew' => 'Renewed the server subscription for :price_tokens tokens',
             'auto-renew' => 'Turned automatic renewal :auto_renew',
             'auto-sleep' => 'Turned auto-sleep :auto_sleep',
+            'keep' => 'Kept the free trial server for :price_tokens tokens every :period_days days',
         ],
         'sleep' => [
             'asleep' => 'Auto-sleep stopped the server after :minutes minutes without players',
@@ -346,6 +348,9 @@ return [
             ],
             'settings' => [
                 'update' => 'Updated the shop settings',
+            ],
+            'trials' => [
+                'update' => 'Updated the free trial settings (trials :enabled, :hours hours, at most :max_concurrent at once)',
             ],
         ],
         'tag' => [

@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 use Pterodactyl\Services\Billing\SubscriptionService;
 use Throwable;
 
-#[Description('Bills shop servers: collects paid top-ups, renews due subscriptions, suspends unpaid ones, sends warnings and deletes servers after the grace period.')]
+#[Description('Bills shop servers: collects paid top-ups, ends free trials, renews due subscriptions, suspends unpaid ones, sends warnings and deletes servers after the grace period.')]
 #[Signature('p:billing:process')]
 class ProcessSubscriptionsCommand extends Command
 {
@@ -19,6 +19,7 @@ class ProcessSubscriptionsCommand extends Command
         // Top-ups first, so a server whose owner just paid is restored instead of deleted.
         $steps = [
             'restored after a top-up' => $subscriptions->collectOverdue(...),
+            'free trials ended' => $subscriptions->expireTrials(...),
             'renewals processed' => $subscriptions->renewDue(...),
             'server states synced with Wings' => $subscriptions->syncServerStates(...),
             'short balance warnings' => $subscriptions->warnUpcoming(...),

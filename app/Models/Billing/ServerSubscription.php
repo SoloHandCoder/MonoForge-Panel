@@ -24,6 +24,7 @@ use Pterodactyl\Models\User;
  * @property int $price_tokens
  * @property list<array{key: string, units: int}>|null $addons
  * @property string $status
+ * @property bool $is_trial a free trial nobody has paid for yet (running, or ended and suspended)
  * @property CarbonImmutable $next_renewal_at
  * @property CarbonImmutable|null $suspended_at
  * @property CarbonImmutable|null $server_suspended_at when billing's suspension reached the server
@@ -51,6 +52,7 @@ use Pterodactyl\Models\User;
     'price_tokens',
     'addons',
     'status',
+    'is_trial',
     'next_renewal_at',
     'suspended_at',
     'server_suspended_at',
@@ -73,9 +75,13 @@ class ServerSubscription extends Model
 
     public const string STATUS_CANCELLED = 'cancelled';
 
+    /** A free trial that is running; `next_renewal_at` is the end of the trial. */
+    public const string STATUS_TRIAL = 'trial';
+
     /** @var array<string, mixed> */
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
+        'is_trial' => false,
         'auto_renew' => true,
         'auto_sleep' => false,
         'idle_checks' => 0,
@@ -96,6 +102,7 @@ class ServerSubscription extends Model
             'price_tokens' => 'int',
             'terms_version' => 'int',
             'addons' => 'array',
+            'is_trial' => 'bool',
             'next_renewal_at' => 'immutable_datetime',
             'suspended_at' => 'immutable_datetime',
             'server_suspended_at' => 'immutable_datetime',
@@ -151,6 +158,12 @@ class ServerSubscription extends Model
         return $this->status === self::STATUS_SUSPENDED;
     }
 
+    /** A free trial that is still running. */
+    public function isTrial(): bool
+    {
+        return $this->status === self::STATUS_TRIAL;
+    }
+
     /** Whether auto-sleep stopped the server and nobody has started it since. */
     public function isSleeping(): bool
     {
@@ -168,6 +181,11 @@ class ServerSubscription extends Model
      */
     public function canRenewNow(): bool
     {
+        // A trial has no price yet: the player keeps it by picking a period ("Keep this server").
+        if ($this->is_trial) {
+            return false;
+        }
+
         return $this->isSuspended()
             || ($this->isActive() && $this->next_renewal_at->lessThanOrEqualTo(CarbonImmutable::now()->addDays($this->period_days)));
     }

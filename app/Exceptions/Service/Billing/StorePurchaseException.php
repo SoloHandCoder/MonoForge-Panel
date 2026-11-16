@@ -62,6 +62,17 @@ class StorePurchaseException extends HttpException
         return new self(409, 'This checkout already failed and was refunded. Please start the purchase again.');
     }
 
+    /** A free trial the player cannot start (already used, network, verification, slots). */
+    public static function trialRefused(string $reason): self
+    {
+        return new self(403, $reason);
+    }
+
+    public static function trialFailed(string $reason, Throwable $previous): self
+    {
+        return new self(502, "We couldn't create your free trial server. ".$reason, $previous);
+    }
+
     public static function refunded(int $tokens, string $reason, Throwable $previous): self
     {
         return new self(502, sprintf("We couldn't create your server, so your %s tokens were refunded. %s", number_format($tokens), $reason), $previous);

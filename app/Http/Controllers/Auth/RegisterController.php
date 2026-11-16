@@ -14,6 +14,7 @@ use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Http\Requests\Auth\RegisterRequest;
+use Pterodactyl\Services\Billing\TrialFingerprint;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Throwable;
 
@@ -74,6 +75,9 @@ class RegisterController extends Controller
             'name_first' => $username,
             'name_last' => $username,
         ], notify: false);
+
+        // The network it signed up from, hashed: one free trial per network (TrialService).
+        $user->forceFill(['signup_subnet_hash' => TrialFingerprint::subnet($request->ip())])->save();
 
         // The form cannot be sent without ticking the Terms of Service and Privacy Policy.
         LegalSettings::recordAcceptance($user);

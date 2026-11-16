@@ -44,6 +44,7 @@ use Pterodactyl\Http\Controllers\Api\Client\SSHKeyController;
 use Pterodactyl\Http\Controllers\Api\Client\Store\TokenPackController;
 use Pterodactyl\Http\Controllers\Api\Client\StoreController;
 use Pterodactyl\Http\Controllers\Api\Client\StorePurchaseController;
+use Pterodactyl\Http\Controllers\Api\Client\StoreTrialController;
 use Pterodactyl\Http\Controllers\Api\Client\SubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Client\Support\SupportTicketController;
 use Pterodactyl\Http\Controllers\Api\Client\TokenPurchaseController;
@@ -93,6 +94,10 @@ Route::prefix('/support')->name('api:client.support')->group(function (): void {
 Route::get('/store/catalog', [StoreController::class, 'catalog'])->name('api:client.store.catalog');
 Route::post('/store/quote', [StoreController::class, 'quote'])->name('api:client.store.quote');
 Route::post('/store/purchase', [StorePurchaseController::class, 'store'])->middleware('throttle:store.purchase')->name('api:client.store.purchase');
+// The one free trial server of a player: browser sessions only, behind the captcha.
+Route::post('/store/trial', [StoreTrialController::class, 'store'])
+    ->middleware([RequireSessionAuthentication::class, 'captcha:trial', 'throttle:store.purchase'])
+    ->name('api:client.store.trial');
 // Buying tokens through Tebex.
 Route::get('/store/tokens/packs', [TokenPackController::class, 'index'])->name('api:client.store.tokens.packs');
 Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])
@@ -102,6 +107,7 @@ Route::post('/store/tokens/checkout', [TokenPackController::class, 'checkout'])
 Route::get('/subscriptions', [SubscriptionController::class, 'index'])->name('api:client.subscriptions');
 Route::patch('/subscriptions/{server}', [SubscriptionController::class, 'update'])->name('api:client.subscriptions.update');
 Route::post('/subscriptions/{server}/renew', [SubscriptionController::class, 'renew'])->name('api:client.subscriptions.renew');
+Route::post('/subscriptions/{server}/keep', [SubscriptionController::class, 'keep'])->middleware('throttle:10,1')->name('api:client.subscriptions.keep');
 
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function (): void {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function (): void {

@@ -13,6 +13,7 @@ use Knuckles\Scribe\Attributes\Subgroup;
 use Pterodactyl\Exceptions\Billing\SubscriptionRenewalException;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use Pterodactyl\Http\Requests\Api\Client\Subscriptions\KeepTrialRequest;
 use Pterodactyl\Http\Requests\Api\Client\Subscriptions\UpdateSubscriptionRequest;
 use Pterodactyl\Http\Resources\Api\ApiResourceCollection;
 use Pterodactyl\Http\Resources\Api\Client\ServerSubscriptionResource;
@@ -20,6 +21,7 @@ use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\SubscriptionService;
+use Pterodactyl\Services\Billing\TrialService;
 use Pterodactyl\Services\Query\ServerQuery;
 use Pterodactyl\Services\Sleep\ServerSleep;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -34,6 +36,8 @@ class SubscriptionController extends ClientApiController
             'server_identifier' => '1a7ce997',
             'server_name' => 'Survival',
             'status' => 'active',
+            'is_trial' => false,
+            'trial' => null,
             'price_tokens' => 500,
             'period_days' => 30,
             'addons' => [['key' => 'backup', 'units' => 1]],
@@ -124,6 +128,7 @@ class SubscriptionController extends ClientApiController
     public function renew(ClientApiRequest $request, SubscriptionService $subscriptions, Server $server): ServerSubscriptionResource
     {
         $subscription = $this->subscriptionOf($request->user(), $server);
+        throw_if($subscription->is_trial, SubscriptionRenewalException::class, 'This is a free trial: pick a billing period with "Keep this server" to keep it.');
         throw_unless($subscription->canRenewNow(), SubscriptionRenewalException::class, 'This server is already paid for the next period.');
 
         $subscriptions->renewNow($subscription);
@@ -131,6 +136,34 @@ class SubscriptionController extends ClientApiController
         Activity::event('server:subscription.renew')
             ->subject($server)
             ->property('price_tokens', $subscription->price_tokens)
+            ->log();
+
+        return ServerSubscriptionResource::make($subscription->fresh(['server.egg', 'plan']) ?? $subscription);
+    }
+
+    /**
+     * Keep a free trial server.
+     */
+    #[Endpoint('Keep trial server', 'Keeps a free trial server by paying its first billing period from the token balance (the prices are in the trial options of the subscription). The subscription becomes a normal one in place: the same server, renewing every period from now. A trial that already ended is unsuspended. A repeated request never charges twice.')]
+    #[BodyParam('period_id', 'integer', 'The billing period to pay for.', required: true, example: 1)]
+    #[BodyParam('expected_total', 'integer', 'The price the player confirmed; a different current price is refused.', required: false, example: 500)]
+    #[ScribeResponse(self::SUBSCRIPTION_EXAMPLE, description: 'The server is kept and paid for one period.')]
+    #[ScribeResponse(['errors' => [['code' => 'SubscriptionRenewalException', 'status' => '400', 'detail' => 'You need 500 tokens to keep this server. Top up your wallet and try again.']]], status: 400, description: 'The balance is too low, the period is not offered, the price changed or the server is not a trial.')]
+    public function keep(KeepTrialRequest $request, TrialService $trials, SubscriptionService $subscriptions, Server $server): ServerSubscriptionResource
+    {
+        $subscription = $this->subscriptionOf($request->user(), $server);
+
+        $trials->convert(
+            $subscription,
+            $request->integer('period_id'),
+            $request->filled('expected_total') ? $request->integer('expected_total') : null,
+            $subscriptions,
+        );
+
+        Activity::event('server:subscription.keep')
+            ->subject($server)
+            ->property('price_tokens', $subscription->price_tokens)
+            ->property('period_days', $subscription->period_days)
             ->log();
 
         return ServerSubscriptionResource::make($subscription->fresh(['server.egg', 'plan']) ?? $subscription);

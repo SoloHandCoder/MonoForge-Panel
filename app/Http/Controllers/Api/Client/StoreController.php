@@ -21,6 +21,7 @@ use Pterodactyl\Services\Billing\PricingService;
 use Pterodactyl\Services\Billing\ShopSettings;
 use Pterodactyl\Services\Billing\StoreCatalogService;
 use Pterodactyl\Services\Billing\TokenWallet;
+use Pterodactyl\Services\Billing\TrialService;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
 #[Subgroup('Store', 'The token shop: plans for sale and what they cost.')]
@@ -31,6 +32,7 @@ class StoreController extends ClientApiController
         'subdomains_enabled' => true,
         'subdomain_base' => 'monoforge.net',
         'balance' => 1500,
+        'trial' => ['enabled' => true, 'hours' => 48, 'plan_ids' => [3], 'eligible' => true, 'reason' => null],
         'categories' => [[
             'id' => 1,
             'name' => 'Minecraft',
@@ -77,16 +79,23 @@ class StoreController extends ClientApiController
         private readonly PricingService $pricing,
         private readonly CapacityService $capacity,
         private readonly TokenWallet $wallet,
+        private readonly TrialService $trials,
     ) {}
 
     #[Endpoint('Get the store catalog', 'Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells. A node or location at its own shop limits stays listed with can_provision false.')]
     #[ResponseField('subdomains_enabled', 'boolean', 'Whether checkout offers a custom subdomain (Tunnels settings).')]
     #[ResponseField('subdomain_base', 'string', 'The domain a custom subdomain is created under, or null when subdomains are off.', required: false)]
     #[ResponseField('balance', 'integer', 'The token balance of the requesting user.')]
+    #[ResponseField('trial', 'object', 'Free trial servers: whether the store offers them, their length in hours, the plans that can be tried, and whether this user may start one (with the reason when not).')]
+    #[ResponseField('trial.reason', 'string', 'Why this user cannot start a free trial; null when they can.', nullable: true)]
     #[ScribeResponse(self::CATALOG_EXAMPLE, description: 'Catalog returned.')]
     public function catalog(ClientApiRequest $request): JsonResponse
     {
-        return new JsonResponse([...$this->catalog->catalog(), 'balance' => $this->wallet->balance($request->user())]);
+        return new JsonResponse([
+            ...$this->catalog->catalog(),
+            'balance' => $this->wallet->balance($request->user()),
+            'trial' => $this->trials->offer($request->user(), $request->ip()),
+        ]);
     }
 
     /**

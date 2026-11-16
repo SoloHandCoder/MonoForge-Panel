@@ -18,6 +18,7 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Models\Billing\ServerSubscription;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
+use Pterodactyl\Models\Billing\ShopTrial;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Pterodactyl\Services\Legal\LegalSettings;
@@ -48,6 +49,9 @@ class SubscriptionService
      * admin who force deletes a server on a dead node.
      */
     public const int FORCE_DELETE_AFTER_HOURS = 24;
+
+    /** The ledger reference prefix of the charge that keeps a free trial server. */
+    public const string TRIAL_CONVERSION_PREFIX = 'trial-convert:';
 
     private const string PAID = 'paid';
 
@@ -105,6 +109,133 @@ class SubscriptionService
     }
 
     /**
+     * Starts a free trial of a server created from the store: nothing is charged, the trial ends
+     * `$hours` from now and then the server is suspended (and deleted after the grace period)
+     * unless the player keeps it by paying for a period (convertTrial()).
+     */
+    public function startTrial(Server $server, User $user, ShopPlan $plan, int $hours): ServerSubscription
+    {
+        $subscription = ServerSubscription::query()->firstOrNew(['server_id' => $server->id]);
+        $subscription->fill([
+            'user_id' => $user->id,
+            'plan_id' => $plan->getKey(),
+            'period_id' => null,
+            'period_days' => max(1, (int) ceil($hours / 24)),
+            'price_tokens' => 0,
+            'addons' => [],
+            'status' => ServerSubscription::STATUS_TRIAL,
+            'is_trial' => true,
+            'next_renewal_at' => CarbonImmutable::now()->addHours($hours),
+            'suspended_at' => null,
+            'delete_at' => null,
+            // Nothing is ever charged without the player picking a period.
+            'auto_renew' => false,
+            'terms_version' => LegalSettings::acceptedVersion($user, LegalDocument::Terms),
+        ])->save();
+
+        return $subscription;
+    }
+
+    /**
+     * Keeps a free trial server: charges the first period at the given quote and turns the
+     * subscription into a normal one in place (same server), from now. A trial that already
+     * ended (suspended) is unsuspended. The ledger reference is the subscription, so a repeated
+     * request never charges twice.
+     *
+     * @throws SubscriptionRenewalException
+     */
+    public function convertTrial(ServerSubscription $s, ShopPeriod $period, Quote $quote): void
+    {
+        $wasSuspended = DB::transaction(function () use ($s, $period, $quote): bool {
+            $locked = $this->lock($s);
+            throw_if(
+                ! $locked instanceof ServerSubscription || ! $locked->is_trial || (! $locked->isTrial() && ! $locked->isSuspended()),
+                SubscriptionRenewalException::class,
+                'This server is not a free trial any more.',
+            );
+
+            $reference = self::TRIAL_CONVERSION_PREFIX.$locked->id;
+            $total = max(1, $quote->totalPerPeriod);
+            $days = max(1, $quote->periodDays);
+            if (! $this->wallet->hasTransaction(self::REFERENCE_TYPE, $reference, self::CHARGE_TYPE)) {
+                try {
+                    $this->wallet->debit(
+                        $locked->user,
+                        $total,
+                        self::CHARGE_TYPE,
+                        "Kept the trial server {$locked->server->name} ({$days} days)",
+                        self::REFERENCE_TYPE,
+                        $reference,
+                        ['server_id' => $locked->server_id, 'period_id' => $period->id, 'period_days' => $days, 'trial' => true],
+                    );
+                } catch (InsufficientTokensException) {
+                    throw new SubscriptionRenewalException("You need {$total} tokens to keep this server. Top up your wallet and try again.");
+                }
+            }
+
+            $wasSuspended = $locked->isSuspended();
+            $now = CarbonImmutable::now();
+            $locked->fill([
+                'status' => ServerSubscription::STATUS_ACTIVE,
+                'is_trial' => false,
+                'period_id' => $period->id,
+                'period_days' => $days,
+                'price_tokens' => $total,
+                'next_renewal_at' => $now->addDays($days),
+                'delete_at' => null,
+                'auto_renew' => true,
+            ])->save();
+            $s->setRawAttributes($locked->getAttributes(), true);
+
+            ShopTrial::query()->where('server_id', $locked->server_id)->whereNull('converted_at')->update(['converted_at' => $now]);
+
+            return $wasSuspended;
+        });
+
+        $this->notifier->clear($s);
+        if ($wasSuspended) {
+            $this->restoreServer($s);
+            $this->notifier->restored($s);
+        }
+    }
+
+    /**
+     * Ends the free trials whose time is up: the server is suspended (or deleted with a grace
+     * period of 0 days) like an unpaid renewal, and deleted once the grace period is over unless
+     * the player keeps it. Returns how many trials ended.
+     */
+    public function expireTrials(): int
+    {
+        $expired = 0;
+        $grace = ShopSettings::graceDays();
+
+        $this->each(
+            ServerSubscription::query()
+                ->where('status', ServerSubscription::STATUS_TRIAL)
+                ->where('next_renewal_at', '<=', CarbonImmutable::now()),
+            function (ServerSubscription $subscription) use (&$expired, $grace): void {
+                $ended = DB::transaction(function () use ($subscription, $grace): bool {
+                    $locked = $this->lock($subscription);
+                    if (! $locked instanceof ServerSubscription || ! $locked->isTrial() || $locked->next_renewal_at->isFuture()) {
+                        return false;
+                    }
+
+                    ShopTrial::query()->where('server_id', $locked->server_id)->whereNull('expired_at')->update(['expired_at' => CarbonImmutable::now()]);
+
+                    return $this->markSuspended($subscription, $locked, $grace);
+                });
+
+                if ($ended) {
+                    $this->afterSuspension($subscription, $grace);
+                    $expired++;
+                }
+            },
+        );
+
+        return $expired;
+    }
+
+    /**
      * Charges the renewal that is due, or suspends the subscription when the balance is short or
      * auto-renew is off. The charge and the suspension happen under the same row lock, so a
      * "Renew now" paid in between is seen and a paid server is never suspended.
@@ -148,6 +279,8 @@ class SubscriptionService
      */
     public function renewNow(ServerSubscription $s): void
     {
+        throw_if($s->is_trial, SubscriptionRenewalException::class, 'This is a free trial: pick a billing period with "Keep this server" to keep it.');
+
         if ($s->isSuspended()) {
             throw_unless($this->unsuspendIfPaid($s), SubscriptionRenewalException::class, $this->shortMessage($s));
 
@@ -243,11 +376,17 @@ class SubscriptionService
             $wasSuspended = $locked->isSuspended();
             $from = $wasSuspended ? CarbonImmutable::now() : $locked->next_renewal_at;
             $locked->fill([
-                'status' => ServerSubscription::STATUS_ACTIVE,
+                // A free trial stays a trial (with more time); it never becomes paid by itself.
+                'status' => $locked->is_trial ? ServerSubscription::STATUS_TRIAL : ServerSubscription::STATUS_ACTIVE,
                 'next_renewal_at' => $from->addDays($days),
                 'delete_at' => null,
             ])->save();
             $s->setRawAttributes($locked->getAttributes(), true);
+
+            if ($locked->is_trial) {
+                ShopTrial::query()->where('server_id', $locked->server_id)->whereNull('converted_at')
+                    ->update(['ends_at' => $locked->next_renewal_at, 'expired_at' => null]);
+            }
 
             return $wasSuspended;
         });
@@ -314,6 +453,7 @@ class SubscriptionService
             ServerSubscription::query()
                 ->with('user')
                 ->where('status', ServerSubscription::STATUS_SUSPENDED)
+                ->where('is_trial', false)
                 ->where('auto_renew', true),
             function (ServerSubscription $subscription) use (&$restored): void {
                 if ($this->wallet->balance($subscription->user) >= $this->sleep->bill($subscription)->charge && $this->unsuspendIfPaid($subscription)) {
@@ -564,7 +704,8 @@ class SubscriptionService
 
         return match ($mode) {
             self::MODE_DUE => $s->isActive() && $s->next_renewal_at->lessThanOrEqualTo($now),
-            self::MODE_OVERDUE => $s->isSuspended(),
+            // An ended free trial has no price: it is kept through convertTrial() only.
+            self::MODE_OVERDUE => $s->isSuspended() && ! $s->is_trial,
             self::MODE_EARLY => $s->isActive() && $s->next_renewal_at->lessThanOrEqualTo($now->addDays($s->period_days)),
             default => false,
         };
@@ -604,7 +745,7 @@ class SubscriptionService
                 return null;
             }
 
-            return ['user' => $locked->user, 'id' => $locked->id, 'name' => $server->name, 'uuid' => $server->uuid];
+            return ['user' => $locked->user, 'id' => $locked->id, 'name' => $server->name, 'uuid' => $server->uuid, 'trial' => $locked->is_trial];
         });
 
         if ($deleted === null) {
@@ -612,7 +753,7 @@ class SubscriptionService
         }
 
         Log::info('Deleted an unpaid shop server after its grace period.', ['server' => $deleted['uuid'], 'subscription' => $deleted['id']]);
-        $this->notifier->deleted($deleted['user'], $deleted['id'], $deleted['name']);
+        $this->notifier->deleted($deleted['user'], $deleted['id'], $deleted['name'], $deleted['trial']);
 
         return true;
     }
