@@ -75,7 +75,7 @@ function MoneyCard({ report }: { report: AdminRevenue }) {
             {report.money.length === 0 ? (
                 <p className='text-sm text-muted-foreground'>No Tebex payments in this range.</p>
             ) : (
-                <div className='-mx-1 overflow-x-auto'>
+                <div className='relative -mx-1 overflow-x-auto'>
                     <table className='w-full min-w-md text-sm'>
                         <caption className='sr-only'>Money per currency; currencies are never added together.</caption>
                         <thead>

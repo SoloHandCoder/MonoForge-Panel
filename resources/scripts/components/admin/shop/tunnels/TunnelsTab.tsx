@@ -170,7 +170,7 @@ const columns = [
                 )}
             </div>
         ),
-        meta: { headerClassName: 'w-56', cellClassName: 'w-56' },
+        meta: { headerClassName: 'w-32 sm:w-56', cellClassName: 'w-32 sm:w-56' },
     },
     actionsColumn<ServerTunnel>(2, (tunnel) => <TunnelActionsCell tunnel={tunnel} />),
 ] satisfies ColumnDef<ServerTunnel>[];

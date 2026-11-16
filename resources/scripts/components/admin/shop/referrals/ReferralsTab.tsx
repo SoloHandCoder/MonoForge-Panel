@@ -304,7 +304,7 @@ function ReferralList() {
             {!data && !error && <Spinner size='large' centered />}
             {data && data.data.length === 0 && <p className='text-sm text-muted-foreground'>No referrals yet.</p>}
             {data && data.data.length > 0 && (
-                <div className='overflow-x-auto'>
+                <div className='relative overflow-x-auto'>
                     <table className='w-full min-w-[36rem] text-left'>
                         <thead>
                             <tr className='text-xs text-muted-foreground'>
