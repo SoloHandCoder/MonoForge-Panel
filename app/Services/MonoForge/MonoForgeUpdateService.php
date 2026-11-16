@@ -328,6 +328,7 @@ class MonoForgeUpdateService
             } catch (Throwable $throwable) {
                 Log::warning('MonoForge: robots.txt was not rewritten after the update: '.$throwable->getMessage());
             }
+
             $this->artisan(['up']);
 
             $this->clearRun();
