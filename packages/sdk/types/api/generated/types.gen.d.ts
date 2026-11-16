@@ -1876,6 +1876,10 @@ export type ClientStorePurchaseAttributes = {
      * The coupon code used, or null.
      */
     coupon: string | null;
+    /**
+     * Set when the purchase went through but a step after it failed; the server exists and setup continues. Null normally.
+     */
+    warning: string | null;
 };
 export type ClientStorePurchaseResource = {
     object: string;
@@ -2449,6 +2453,10 @@ export type AdminUpdateFreeTrialSettingsRequest = {
      */
     max_concurrent: number;
     /**
+     * The daily cap. Must be at least 0. Must not be greater than 10000.
+     */
+    daily_cap?: number;
+    /**
      * The require verified.
      */
     require_verified: boolean;
@@ -2729,6 +2737,14 @@ export type AdminUpdateReferralSettingsRequest = {
      * The monthly cap. Must be at least 0. Must not be greater than 1000.
      */
     monthly_cap: number;
+    /**
+     * The hold days. Must be at least 1. Must not be greater than 365.
+     */
+    hold_days?: number;
+    /**
+     * The min purchase tokens. Must be at least 0. Must not be greater than 100000000.
+     */
+    min_purchase_tokens?: number;
 };
 export type AdminStartAnAdminAssistantConversationRequest = {
     /**
@@ -6112,6 +6128,7 @@ export type AdminGetFreeTrialsResponseBody = {
         plan_ids?: Array<number>;
         hours?: number;
         max_concurrent?: number;
+        daily_cap?: number;
         require_verified?: boolean;
     };
     stats?: {
@@ -6164,6 +6181,7 @@ export type AdminUpdateFreeTrialSettingsResponseBody = {
     plan_ids?: Array<number>;
     hours?: number;
     max_concurrent?: number;
+    daily_cap?: number;
     require_verified?: boolean;
 };
 export type AdminListShopNodesResponseBody = {
@@ -6473,12 +6491,16 @@ export type AdminGetReferralSettingsResponseBody = {
     reward_tokens?: number;
     monthly_cap?: number;
     hold_days?: number;
+    min_purchase_tokens?: number;
+    effective_min_purchase_tokens?: number;
 };
 export type AdminUpdateReferralSettingsResponseBody = {
     enabled?: boolean;
     reward_tokens?: number;
     monthly_cap?: number;
     hold_days?: number;
+    min_purchase_tokens?: number;
+    effective_min_purchase_tokens?: number;
 };
 export type AdminApproveReferralResponseBody = {
     id?: number;
@@ -7508,6 +7530,89 @@ export type AdminStartNodePlayitGgClaimResponseBody = {
          * The SHA-256 of the switch script, to check the download.
          */
         sha256: string | null;
+    };
+};
+export type AdminCheckNodePlayitGgSwitchStatusResponseBody = {
+    /**
+     * The playit mode of the node: `read_only`, `self_managed` or null.
+     */
+    mode: string | null;
+    self_managed?: boolean;
+    /**
+     * When the node switched to the self-managed agent.
+     */
+    switched_at: string | null;
+    can_undo?: boolean;
+    /**
+     * The claim of the node, or null before "Set up automatic tunnels" was started.
+     */
+    claim: {
+        status?: string;
+        /**
+         * The playit.gg URL to accept the claim at, while it waits.
+         */
+        claim_url: string | null;
+        /**
+         * When the waiting claim expires.
+         */
+        expires_at: string | null;
+        /**
+         * The claimed agent, once the claim was exchanged.
+         */
+        agent_id: string | null;
+        /**
+         * When the unused switch token expires.
+         */
+        token_expires_at: string | null;
+        /**
+         * When the switch script on the node fetched the secret.
+         */
+        fetched_at: string | null;
+        /**
+         * What the script reported: `switched` or `rolled_back`.
+         */
+        report: string | null;
+        /**
+         * When the script reported.
+         */
+        reported_at: string | null;
+        /**
+         * The last playit.gg error while checking the claim.
+         */
+        last_error: string | null;
+    } | null;
+    old_tunnels?: Array<{
+        id?: number;
+        playit_tunnel_id?: string;
+        name?: string;
+        address?: string;
+        local_port?: number;
+        server_id?: number;
+        server_name?: string;
+    }>;
+    old_tunnels_removed?: number;
+    script?: {
+        url?: string;
+        /**
+         * The SHA-256 of the switch script, to check the download.
+         */
+        sha256: string | null;
+    };
+    reconcile?: {
+        action?: string;
+        message?: string;
+        /**
+         * Whether playit.gg accepts tunnels for the node's agent; null without an agent.
+         */
+        agent_online: boolean | null;
+        tunnels?: number;
+        created?: number;
+        active?: number;
+        waiting_for_agent?: number;
+        /**
+         * The last tunnel error.
+         */
+        last_error: string | null;
     };
 };
 export type AdminCheckNodePlayitGgClaimResponseBody = {
@@ -8901,10 +9006,7 @@ export type ClientGetReferralsResponseBody = {
         id?: number;
         username?: string;
         status?: string;
-        under_review?: boolean;
         reward_tokens?: string | null;
-        payout_after?: string;
-        paid_at?: string | null;
         created_at?: string;
     }>;
 };
@@ -10086,6 +10188,7 @@ export type AdminGetNodeUtilizationNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminTestNodePlayitGgAgentNodeIdPathParameter = number;
 export type AdminGetNodePlayitGgSwitchNodeIdPathParameter = number;
+export type AdminCheckNodePlayitGgSwitchStatusNodeIdPathParameter = number;
 export type AdminCheckNodePlayitGgClaimNodeIdPathParameter = number;
 export type AdminCreateNodePlayitGgSwitchTokenNodeIdPathParameter = number;
 export type AdminFinishNodePlayitGgSwitchNodeIdPathParameter = number;
@@ -15086,6 +15189,39 @@ export type AdminStartNodePlayitGgClaimResponses = {
     200: AdminStartNodePlayitGgClaimResponseBody;
 };
 export type AdminStartNodePlayitGgClaimResponse = AdminStartNodePlayitGgClaimResponses[keyof AdminStartNodePlayitGgClaimResponses];
+export type AdminCheckNodePlayitGgSwitchStatusData = {
+    body?: never;
+    path: {
+        /**
+         * The node ID.
+         */
+        node_id: AdminCheckNodePlayitGgSwitchStatusNodeIdPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/nodes/{node_id}/playit/switch/reconcile';
+};
+export type AdminCheckNodePlayitGgSwitchStatusErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminCheckNodePlayitGgSwitchStatusError = AdminCheckNodePlayitGgSwitchStatusErrors[keyof AdminCheckNodePlayitGgSwitchStatusErrors];
+export type AdminCheckNodePlayitGgSwitchStatusResponses = {
+    /**
+     * Status checked.
+     */
+    200: AdminCheckNodePlayitGgSwitchStatusResponseBody;
+};
+export type AdminCheckNodePlayitGgSwitchStatusResponse = AdminCheckNodePlayitGgSwitchStatusResponses[keyof AdminCheckNodePlayitGgSwitchStatusResponses];
 export type AdminCheckNodePlayitGgClaimData = {
     body?: never;
     path: {
@@ -25237,7 +25373,7 @@ export type ClientCreateServerSubuserErrors = {
      */
     401: ErrorEnvelope;
     /**
-     * The API key does not have permission to perform this action.
+     * The server is a free trial nobody has paid for yet.
      */
     403: ErrorEnvelope;
     /**
