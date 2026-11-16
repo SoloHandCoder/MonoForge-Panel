@@ -714,6 +714,7 @@
         "fixtures": [
             "allocations",
             "playit",
+            "entrance",
             "full",
             "unmanaged",
             "readOnly",
