@@ -1221,7 +1221,8 @@
         "fixtures": [
             "subusers",
             "empty",
-            "readOnly"
+            "readOnly",
+            "trial"
         ],
         "classic": {
             "file": "views/server/users/SubuserList.tsx",
