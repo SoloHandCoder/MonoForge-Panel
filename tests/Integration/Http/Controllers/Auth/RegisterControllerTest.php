@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Notification;
 use Pterodactyl\Contracts\Captcha\VerifiesCaptcha;
 use Pterodactyl\Enum\LegalDocument;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Billing\TrialFingerprint;
 use Pterodactyl\Services\Captcha\HttpCaptchaVerifier;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Tests\Integration\Http\HttpTestCase;
@@ -89,6 +90,15 @@ test('registering creates a normal account and signs it in', function (): void {
     $this->assertAuthenticatedAs($user);
     // The new user is signed in already, so no "account created" email.
     Notification::assertNothingSent();
+});
+
+test('registering records the hashed network it came from, never the address', function (): void {
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->postJson('/auth/register', registration())->assertCreated();
+
+    $hash = User::query()->where('username', 'newplayer')->value('signup_subnet_hash');
+    expect($hash)->toBe(TrialFingerprint::subnet('203.0.113.200'))
+        ->and($hash)->not->toContain('203.0.113');
+    $this->getJson('/api/client/account')->assertOk()->assertJsonMissingPath('attributes.signup_subnet_hash');
 });
 
 test('registering records the accepted Terms of Service and Privacy Policy versions', function (): void {

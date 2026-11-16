@@ -265,7 +265,7 @@ test('the network an account signed up from counts too', function (): void {
     startTrial($alt, [], '198.51.100.9')->assertForbidden()->assertJsonPath('errors.0.detail', 'A free trial was already started from your network recently.');
 });
 
-test('sign-up records the hashed network of the new account', function (): void {
+test('networks are hashed per /24 for IPv4 and per /48 for IPv6', function (): void {
     expect(TrialFingerprint::subnet('203.0.113.7'))->toBe(TrialFingerprint::subnet('203.0.113.254'))
         ->not->toBe(TrialFingerprint::subnet('203.0.114.7'))
         ->and(TrialFingerprint::subnet('::ffff:203.0.113.9'))->toBe(TrialFingerprint::subnet('203.0.113.7'))
