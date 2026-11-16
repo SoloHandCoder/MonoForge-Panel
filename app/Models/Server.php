@@ -204,7 +204,17 @@ class Server extends Model implements Identifiable
      */
     public function tunnel(): HasOne
     {
-        return $this->hasOne(ServerTunnel::class);
+        return $this->hasOne(ServerTunnel::class)->where('port_key', ServerTunnel::MAIN);
+    }
+
+    /**
+     * Every playit.gg tunnel of the server: the main one and those of its game's extra ports.
+     *
+     * @return HasMany<ServerTunnel, $this>
+     */
+    public function tunnels(): HasMany
+    {
+        return $this->hasMany(ServerTunnel::class);
     }
 
     /**

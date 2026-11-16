@@ -703,7 +703,7 @@ class PlayitAgentSwitchService
     {
         $agentId = (string) $node->playit_agent_id;
         $linked = ServerTunnel::query()
-            ->with('server:id,node_id,allocation_id', 'server.allocation:id,port')
+            ->with('server:id,node_id,allocation_id', 'server.allocation:id,port', 'allocation:id,port')
             ->whereIn('server_id', Server::query()->select('id')->where('node_id', $node->id))
             ->whereNotNull('playit_tunnel_id')
             ->get()
@@ -716,7 +716,7 @@ class PlayitAgentSwitchService
                     'agent_id' => $agentId,
                     'server_id' => $tunnel->server_id,
                     'address' => $tunnel->address,
-                    'local_port' => $tunnel->server?->allocation?->port,
+                    'local_port' => $tunnel->allocation->port ?? $tunnel->server?->allocation?->port,
                     'removed_at' => null,
                 ],
             );

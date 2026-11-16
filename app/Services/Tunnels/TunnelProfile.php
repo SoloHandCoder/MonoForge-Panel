@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Tunnels;
 
 use Pterodactyl\Models\Egg;
+use Pterodactyl\Models\Game;
 use Pterodactyl\Models\Tag;
+use Pterodactyl\Services\Games\GameDetector;
 
 /**
- * Picks the playit.gg tunnel type and protocol for a server from its egg's name and tags.
+ * Picks the playit.gg tunnel type and protocol for a server: from the built-in game in
+ * Admin > Games that claims its egg, otherwise from the egg's name and tags.
  * Games playit knows get their own type (which gives Minecraft Java a port-less address);
  * everything else gets a plain tunnel for both TCP and UDP.
  */
@@ -35,6 +38,20 @@ final class TunnelProfile
     {
         if (! $egg instanceof Egg) {
             return ['tunnel_type' => null, 'port_type' => 'both'];
+        }
+
+        // A claimed built-in game decides, so an egg the admin filed under Minecraft gets the
+        // Minecraft tunnel whatever it is called.
+        if ($egg->game_id !== null) {
+            $egg->loadMissing('game');
+            $claimed = $egg->game instanceof Game && $egg->game->built_in ? $egg->game->slug : null;
+            if ($claimed === GameDetector::MINECRAFT) {
+                return ['tunnel_type' => 'minecraft-java', 'port_type' => 'tcp'];
+            }
+
+            if ($claimed === GameDetector::TERRARIA) {
+                return ['tunnel_type' => 'terraria', 'port_type' => 'tcp'];
+            }
         }
 
         $egg->loadMissing('tags');

@@ -7,7 +7,7 @@ namespace Pterodactyl\Services\Query;
 use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Services\Tunnels\TunnelProfile;
+use Pterodactyl\Services\Games\GameResolver;
 
 /**
  * Asks a game server who is online, the way its own players' clients do. Shared by auto-sleep,
@@ -34,7 +34,7 @@ class ServerQuery
     /** Whether the server's game can be asked for its players. */
     public static function supports(Server $server): bool
     {
-        return TunnelProfile::forEgg($server->egg)['tunnel_type'] === 'minecraft-java';
+        return GameResolver::isMinecraft($server);
     }
 
     public static function cacheKey(Server $server): string

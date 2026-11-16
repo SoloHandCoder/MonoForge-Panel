@@ -50,6 +50,13 @@
                 "skip_scripts": false,
                 "playit_address": null,
                 "address_pending": false,
+                "game": "minecraft",
+                "game_features": [
+                    "plugins",
+                    "versions",
+                    "player_count"
+                ],
+                "extra_addresses": [],
                 "relationships": {
                     "allocations": {
                         "object": "list",
@@ -458,6 +465,13 @@
                 "skip_scripts": false,
                 "playit_address": null,
                 "address_pending": false,
+                "game": "minecraft",
+                "game_features": [
+                    "plugins",
+                    "versions",
+                    "player_count"
+                ],
+                "extra_addresses": [],
                 "relationships": {
                     "allocations": {
                         "object": "list",

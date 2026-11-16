@@ -154,6 +154,14 @@ class Permission extends Model
                 'manage' => 'Install plugins, mods and modpacks — can add code and overwrite files on this server. Covers installing, updating and removing jars from Modrinth, Hangar and CurseForge, and modpacks whose files replace existing ones. Browsing them needs the file read permission.',
             ],
         ],
+
+        // The Minecraft Versions page.
+        'versions' => [
+            'description' => "Switch a Minecraft server's software and version. This replaces the server jar, so only give it to people you would trust with the files.",
+            'keys' => [
+                'manage' => 'Switch the Minecraft software and version — replaces the server jar (code that runs on the server) and, for Forge and NeoForge, reinstalls the server. The world is kept. Seeing the versions needs the file read permission.',
+            ],
+        ],
     ];
 
     /**

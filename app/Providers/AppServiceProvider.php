@@ -286,7 +286,8 @@ class AppServiceProvider extends ServiceProvider
 
         // One-click plugins: catalog lookups 60 a minute and installs 15 a minute per user and server.
         // The catalogs themselves are also limited panel-wide (see MarketplaceHttp).
-        foreach (['plugins.browse' => 60, 'plugins.manage' => 15] as $name => $perMinute) {
+        // Minecraft version switches replace the server jar: 3 a minute per user and server.
+        foreach (['plugins.browse' => 60, 'plugins.manage' => 15, 'versions.install' => 3] as $name => $perMinute) {
             RateLimiter::for($name, function (Request $request) use ($name, $perMinute): Limit {
                 $user = $request->user();
                 $server = $request->route('server');

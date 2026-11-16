@@ -182,6 +182,10 @@ return [
             'update' => 'Updated :old to :file (:version)',
             'remove' => 'Removed :file',
         ],
+        'version' => [
+            'install' => 'Switched the server to :software :version',
+            'failed' => 'Could not switch the server to :software :version: :reason',
+        ],
         'modpack' => [
             'install' => 'Started installing the :name modpack (:version)',
             'installed' => 'Installed the :name modpack (:version)',
@@ -378,6 +382,11 @@ return [
         'referral' => [
             'approve' => 'Approved referral #:id',
             'reject' => 'Rejected referral #:id',
+        ],
+        'game' => [
+            'create' => 'Created the :name game',
+            'update' => 'Updated the :name game',
+            'delete' => 'Deleted the :name game',
         ],
         'tag' => [
             'create' => 'Created the :slug tag',

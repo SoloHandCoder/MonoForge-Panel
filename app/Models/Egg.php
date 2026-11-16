@@ -20,6 +20,8 @@ use RuntimeException;
 
 /**
  * @property array<string, string> $docker_images
+ * @property int|null $game_id
+ * @property-read Game|null $game
  */
 #[Attributes\Identifiable('eegg')]
 #[Fillable([
@@ -78,6 +80,7 @@ class Egg extends Model implements Identifiable
     {
         return [
             'config_from' => 'integer',
+            'game_id' => 'integer',
             'config_startup' => 'string',
             'config_logs' => 'string',
             'config_files' => 'string',
@@ -108,6 +111,16 @@ class Egg extends Model implements Identifiable
     public function tags(): MorphToMany
     {
         return $this->morphToMany(Tag::class, 'taggable', 'taggables', 'taggable_id', 'tag_id');
+    }
+
+    /**
+     * The game in Admin > Games this egg belongs to, if one claims it.
+     *
+     * @return BelongsTo<Game, $this>
+     */
+    public function game(): BelongsTo
+    {
+        return $this->belongsTo(Game::class);
     }
 
     /**

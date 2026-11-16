@@ -28,6 +28,7 @@ use Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\Billing\CouponRedemption;
 use Pterodactyl\Models\Billing\ServerSubscription;
+use Pterodactyl\Models\Billing\ServerTunnel;
 use Pterodactyl\Models\Billing\ShopAddon;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
@@ -736,8 +737,9 @@ class StorePurchaseService
         }
 
         try {
-            $tunnel = $this->tunnels->provision($server);
-            if ($subdomain !== null) {
+            // Only servers whose egg belongs to a game with automatic tunnels get one.
+            $tunnel = $this->tunnels->provisionAutomatic($server);
+            if ($tunnel instanceof ServerTunnel && $subdomain !== null) {
                 $tunnel->forceFill(['subdomain' => $subdomain])->save();
             }
         } catch (Throwable $throwable) {

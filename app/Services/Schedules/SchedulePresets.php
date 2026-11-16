@@ -15,8 +15,8 @@ use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Query\ServerQuery;
-use Pterodactyl\Services\Tunnels\TunnelProfile;
 use Throwable;
 
 /**
@@ -89,7 +89,7 @@ final readonly class SchedulePresets
     /** Whether the server runs Minecraft Java, whose console has `say` and whose logs live in `logs/`. */
     public static function isMinecraft(Server $server): bool
     {
-        return TunnelProfile::forEgg($server->egg)['tunnel_type'] === 'minecraft-java';
+        return GameResolver::isMinecraft($server);
     }
 
     /** Why the server cannot have the preset at all, whoever asks, or null. */

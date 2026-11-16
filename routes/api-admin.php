@@ -24,6 +24,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Eggs\ImportEggController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\ReorderVariablesController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\UpdateImportEggController;
 use Pterodactyl\Http\Controllers\Api\Admin\Extensions\ExtensionController;
+use Pterodactyl\Http\Controllers\Api\Admin\Games\GameController;
 use Pterodactyl\Http\Controllers\Api\Admin\Insights\StorageController;
 use Pterodactyl\Http\Controllers\Api\Admin\Insights\UsageController;
 use Pterodactyl\Http\Controllers\Api\Admin\LanguagesController;
@@ -660,6 +661,27 @@ Route::prefix('/eggs')->name('api.admin.eggs')->group(function (): void {
     Route::put('/{egg:id}', [EggController::class, 'update'])->name('.update');
 
     Route::delete('/{egg:id}', [EggController::class, 'destroy'])->name('.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Game Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/games
+|
+| Which eggs run which game, the single source of truth for a server's
+| game-specific pages and its automatic playit.gg tunnels.
+|
+*/
+Route::prefix('/games')->name('api.admin.games')->group(function (): void {
+    Route::get('/', [GameController::class, 'index']);
+    Route::get('/{game:id}', [GameController::class, 'show'])->name('.view');
+
+    Route::post('/', [GameController::class, 'store'])->name('.store');
+    Route::put('/{game:id}', [GameController::class, 'update'])->name('.update');
+
+    Route::delete('/{game:id}', [GameController::class, 'destroy'])->name('.delete');
 });
 
 /*

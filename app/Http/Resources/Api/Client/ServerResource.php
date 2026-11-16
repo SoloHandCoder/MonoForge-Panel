@@ -16,6 +16,7 @@ use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Subuser;
+use Pterodactyl\Services\Games\GameResolver;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use UnexpectedValueException;
 
@@ -33,9 +34,24 @@ use UnexpectedValueException;
 #[ResponseField('playit_address', type: 'string', description: 'The playit.gg address players connect to, when the server has a live tunnel; otherwise null and the primary allocation is the address.', example: 'xyz.joinmc.link', nullable: true)]
 #[ResponseField('address_pending', type: 'boolean', description: 'True when the server is on a node with a playit.gg agent but has no live tunnel yet: players should be shown "Address pending" rather than the node allocation, which is not reachable from outside.', example: false)]
 #[ResponseField('egg_tags', schema: ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['minecraft']])]
+#[ResponseField('game', type: 'string', description: "The slug of the game the server's egg belongs to in Admin > Games (minecraft, terraria or a custom game), or of the built-in game the panel detects for an egg no game claims; null when unknown.", example: 'minecraft', nullable: true)]
+#[ResponseField('game_features', description: 'What the game adds to the server pages: plugins, versions, player_count, world_settings.', schema: ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['plugins', 'versions', 'player_count']])]
+#[ResponseField('extra_addresses', description: "The server's live extra playit.gg tunnels, such as voice chat. The public page never shows them.", schema: [
+    'type' => 'array',
+    'items' => [
+        'type' => 'object',
+        'required' => ['key', 'label', 'address', 'protocol'],
+        'properties' => [
+            'key' => ['type' => 'string', 'example' => 'voice'],
+            'label' => ['type' => 'string', 'example' => 'Voice chat'],
+            'address' => ['type' => 'string', 'example' => 'abc.ply.gg:12345'],
+            'protocol' => ['type' => 'string', 'enum' => ['tcp', 'udp', 'both'], 'example' => 'udp'],
+        ],
+    ],
+])]
 class ServerResource extends ClientResource
 {
-    protected array $eagerLoads = ['egg.variables', 'egg.configFrom', 'egg.tags', 'serverVariables', 'node', 'transfer', 'subusers', 'allocation', 'tunnel'];
+    protected array $eagerLoads = ['egg.variables', 'egg.configFrom', 'egg.tags', 'egg.game', 'serverVariables', 'node', 'transfer', 'subusers', 'allocation', 'tunnel', 'tunnels'];
 
     protected array $includeRelations = [
         'allocations' => ['relation' => 'allocations', 'resource' => AllocationResource::class],
@@ -57,10 +73,12 @@ class ServerResource extends ClientResource
         $user = $this->getUser();
         $server = $this->resource;
 
-        $server->loadMissing(['egg.tags', 'node', 'transfer', 'tunnel']);
+        $server->loadMissing(['egg.tags', 'egg.game', 'node', 'transfer', 'tunnel']);
 
         $egg = $server->egg ?? throw new UnexpectedValueException('The server does not have an egg relationship.');
-        $playit = resolve(TunnelService::class)->displayAddress($server);
+        $tunnels = resolve(TunnelService::class);
+        $playit = $tunnels->displayAddress($server);
+        $game = GameResolver::forEgg($egg);
 
         return [
             'server_owner' => $user->id === $server->owner_id,
@@ -106,6 +124,9 @@ class ServerResource extends ClientResource
             'skip_scripts' => $server->skip_scripts,
             'playit_address' => $playit,
             'address_pending' => $playit === null && $server->node->hasPlayitAgent(),
+            'game' => $game?->slug,
+            'game_features' => $game?->features() ?? [],
+            'extra_addresses' => $tunnels->extraAddresses($server),
         ];
     }
 

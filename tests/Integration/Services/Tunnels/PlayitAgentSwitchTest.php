@@ -572,10 +572,36 @@ test('the scheduler gives servers without a tunnel one on a self-managed node', 
         ->and($tunnel->status)->toBe(TunnelStatus::Active);
 });
 
-test('a create body playit refuses as malformed is sent again in the official agent shape', function (): void {
-    Http::fake(['api.playit.gg/v1/tunnels/create' => Http::sequence()
-        ->push(['status' => 'error', 'data' => ['type' => 'validation', 'message' => 'missing field `ports`']], 400)
-        ->push(['status' => 'success', 'data' => ['id' => NEW_TUNNEL]]),
+test('a tunnel to plain ports is created with the agent api_client ReqTunnelsCreate body', function (): void {
+    Http::fake(['api.playit.gg/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => NEW_TUNNEL]])]);
+
+    $id = resolve(PlayitClient::class)->createTunnel(NEW_SECRET, NEW_AGENT, [
+        'name' => 'survival-voice', 'tunnel_type' => null, 'port_type' => 'udp', 'local_ip' => '127.0.0.1', 'local_port' => 24454,
+    ]);
+
+    expect($id)->toBe(NEW_TUNNEL);
+    Http::assertSentCount(1);
+    $sent = Http::recorded()->sole()[0];
+    expect($sent->url())->toBe('https://api.playit.gg/tunnels/create')
+        ->and($sent->body())->toBe('{"name":"survival-voice","tunnel_type":null,"port_type":"udp","port_count":1,"origin":{"type":"agent","data":{"agent_id":"'.NEW_AGENT.'","local_ip":"127.0.0.1","local_port":24454}},"enabled":true,"alloc":null,"firewall_id":null,"proxy_protocol":null}');
+});
+
+test('a game tunnel keeps the v1 tunnel-type body', function (): void {
+    Http::fake(['api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => NEW_TUNNEL]])]);
+
+    resolve(PlayitClient::class)->createTunnel(NEW_SECRET, NEW_AGENT, [
+        'name' => 'survival', 'tunnel_type' => 'minecraft-java', 'port_type' => 'tcp', 'local_ip' => '127.0.0.1', 'local_port' => 25565,
+    ]);
+
+    $sent = Http::recorded()->sole()[0];
+    expect($sent->url())->toBe('https://api.playit.gg/v1/tunnels/create')
+        ->and($sent->data()['protocol'])->toBe(['type' => 'tunnel-type', 'details' => 'minecraft-java']);
+});
+
+test('a plain-port body playit refuses as malformed is sent again in the v1 agent shape', function (): void {
+    Http::fake([
+        'api.playit.gg/tunnels/create' => Http::response(['status' => 'error', 'data' => ['type' => 'validation', 'message' => 'failed to parse body']], 400),
+        'api.playit.gg/v1/tunnels/create' => Http::response(['status' => 'success', 'data' => ['id' => NEW_TUNNEL]]),
     ]);
 
     $id = resolve(PlayitClient::class)->createTunnel(NEW_SECRET, NEW_AGENT, [
