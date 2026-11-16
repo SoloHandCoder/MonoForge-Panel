@@ -49,6 +49,7 @@ class Backup extends Model implements Identifiable
     {
         return [
             'id' => 'integer',
+            'task_id' => 'integer',
             'is_successful' => 'boolean',
             'is_locked' => 'boolean',
             'ignored_files' => 'array',
@@ -63,6 +64,16 @@ class Backup extends Model implements Identifiable
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * The schedule task that made the backup, when one did.
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     /**

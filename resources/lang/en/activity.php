@@ -144,6 +144,7 @@ return [
         ],
         'schedule' => [
             'create' => 'Created the :name schedule',
+            'preset' => 'Set up the :name schedule with the :preset preset',
             'update' => 'Updated the :name schedule',
             'execute' => 'Manually executed the :name schedule',
             'delete' => 'Deleted the :name schedule',

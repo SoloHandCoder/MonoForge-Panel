@@ -17,6 +17,8 @@ use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Schedule;
 use Pterodactyl\Models\Task;
 use Pterodactyl\Services\Assistant\CrashDoctor\CrashRecorder;
+use Pterodactyl\Services\Schedules\LogCleanup;
+use Pterodactyl\Services\Schedules\RestartWhenEmpty;
 use Pterodactyl\Services\Sleep\ServerSleep;
 use Throwable;
 
@@ -50,6 +52,8 @@ class RunTaskJob implements ShouldQueue
     public function handle(
         InitiatesBackups $backupService,
         ServerSleep $sleep,
+        RestartWhenEmpty $restartWhenEmpty,
+        LogCleanup $logCleanup,
     ): void {
         // Do not process a task that is not set to active, unless it's been manually triggered.
         if (! $this->task->schedule->is_active && ! $this->manualRun) {
@@ -80,7 +84,9 @@ class RunTaskJob implements ShouldQueue
             match ($this->task->action) {
                 Task::ACTION_POWER => Daemon::server($server)->power($this->task->payload),
                 Task::ACTION_COMMAND => Daemon::server($server)->commands($this->task->payload),
-                Task::ACTION_BACKUP => $backupService->setIgnoredFiles(explode(PHP_EOL, $this->task->payload))->initiate($server, null, true),
+                Task::ACTION_BACKUP => $backupService->setIgnoredFiles(explode(PHP_EOL, $this->task->payload))->setTask($this->task)->initiate($server, null, true),
+                Task::ACTION_RESTART_IF_EMPTY => $restartWhenEmpty->run($this->task, $server),
+                Task::ACTION_DELETE_LOGS => $logCleanup->run($server, (int) mb_trim($this->task->payload)),
                 default => throw new InvalidArgumentException('Invalid task action provided: '.$this->task->action),
             };
 

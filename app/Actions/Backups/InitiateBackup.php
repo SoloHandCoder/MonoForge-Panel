@@ -16,6 +16,7 @@ use Pterodactyl\Facades\Activity;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Backup;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Task;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Throwable;
@@ -27,6 +28,8 @@ final class InitiateBackup implements InitiatesBackups
     private array $ignoredFiles = [];
 
     private bool $isLocked = false;
+
+    private ?Task $task = null;
 
     public function __construct(
         private readonly DeletesBackups $deleteBackup,
@@ -58,6 +61,13 @@ final class InitiateBackup implements InitiatesBackups
         return $this;
     }
 
+    public function setTask(?Task $task): InitiatesBackups
+    {
+        $this->task = $task;
+
+        return $this;
+    }
+
     public function initiate(Server $server, ?string $name = null, bool $override = false): Backup
     {
         Validator::validate(['name' => $name, 'is_locked' => $this->isLocked, 'ignored_files' => $this->ignoredFiles], self::rules());
@@ -85,8 +95,8 @@ final class InitiateBackup implements InitiatesBackups
                 }
             }
 
-            $rotated = new Collection;
-            $count = $server->backups()->nonFailed()->lockForUpdate()->count();
+            $rotated = $this->rotatedForTask($server);
+            $count = $server->backups()->nonFailed()->lockForUpdate()->count() - $rotated->count();
             if (! $server->backup_limit || $count >= $server->backup_limit) {
                 // Do not allow the user to continue if this server is already at its limit and can't override.
                 if (! $override || $server->backup_limit <= 0) {
@@ -98,19 +108,24 @@ final class InitiateBackup implements InitiatesBackups
                 // request that has not finished deleting it still counts here, so take enough to bring
                 // the server back to its limit. They are deleted once Wings accepts the new backup.
                 $needed = $count - $server->backup_limit + 1;
-                $rotated = $server->backups()
+                $more = $server->backups()
                     ->nonFailed()
                     ->where('is_locked', false)
+                    ->whereKeyNot($rotated->modelKeys())
                     ->orderBy('created_at')
+                    ->orderBy('id')
                     ->limit($needed)
                     ->get();
-                if ($rotated->count() < $needed) {
+                if ($more->count() < $needed) {
                     throw new TooManyBackupsException($server->backup_limit);
                 }
+
+                $rotated = $rotated->merge($more);
             }
 
             $backup = $server->backups()->create([
                 'uuid' => Uuid::uuid4()->toString(),
+                'task_id' => $this->task?->id,
                 'name' => mb_trim($name ?? '') ?: sprintf('Backup at %s', CarbonImmutable::now()->toDateTimeString()),
                 // Don't use the PHP empty function here in case anything that is "empty" by default
                 // (0, false, etc.) was passed as a file or folder name.
@@ -159,5 +174,35 @@ final class InitiateBackup implements InitiatesBackups
         }
 
         return $backup->refresh();
+    }
+
+    /**
+     * The oldest unlocked backups the task made, enough that the new one leaves it with at most
+     * `keep_backups`. Locked backups count towards the number but are never rotated out. Called
+     * inside the transaction, with the server's backups locked.
+     *
+     * @return Collection<int, Backup>
+     */
+    private function rotatedForTask(Server $server): Collection
+    {
+        $keep = $this->task?->keep_backups;
+        if (! $this->task instanceof Task || $keep === null || $keep < 1) {
+            return new Collection;
+        }
+
+        $own = $server->backups()->nonFailed()->where('task_id', $this->task->id)->lockForUpdate()->count();
+        $needed = $own - $keep + 1;
+        if ($needed < 1) {
+            return new Collection;
+        }
+
+        return $server->backups()
+            ->nonFailed()
+            ->where('task_id', $this->task->id)
+            ->where('is_locked', false)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->limit($needed)
+            ->get();
     }
 }

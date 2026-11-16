@@ -9,6 +9,7 @@
                 "sequence_id": 1,
                 "action": "command",
                 "payload": "say hello",
+                "keep_backups": null,
                 "time_offset": 10,
                 "is_queued": false,
                 "continue_on_failure": true,

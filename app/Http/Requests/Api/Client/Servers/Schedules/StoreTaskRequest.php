@@ -39,6 +39,6 @@ class StoreTaskRequest extends ViewScheduleRequest
      */
     public function rules(): array
     {
-        return CreateScheduleTask::rules($this->input('action') === Task::ACTION_POWER);
+        return CreateScheduleTask::rules($this->input('action'));
     }
 }

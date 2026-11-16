@@ -30,6 +30,7 @@ test('schedule can be created for server', function (array $permissions): void {
     expect(collect($response->json('attributes'))->except('relationships')->all())->toBe([
         'id' => $schedule->id,
         'name' => $schedule->name,
+        'preset' => $schedule->preset,
         'cron' => [
             'day_of_week' => $schedule->cron_day_of_week,
             'day_of_month' => $schedule->cron_day_of_month,

@@ -19,6 +19,8 @@ dataset('taskActionPermissions', [
     'power restart' => ['power', 'restart', Permissions::ControlRestart],
     'power kill' => ['power', 'kill', Permissions::ControlStop],
     'backup' => ['backup', null, Permissions::BackupCreate],
+    'restart when empty' => ['restart_if_empty', '2', Permissions::ControlRestart],
+    'delete old logs' => ['delete_logs', '7', Permissions::FileDelete],
 ]);
 test('task numbers accept integer strings and reject fractions', function (): void {
     [$user, $server] = $this->generateTestAccount();
@@ -52,6 +54,7 @@ test('task can be created', function (array $permissions): void {
         'sequence_id' => $task->sequence_id,
         'action' => $task->action,
         'payload' => $task->payload,
+        'keep_backups' => $task->keep_backups,
         'time_offset' => $task->time_offset,
         'is_queued' => $task->is_queued,
         'continue_on_failure' => $task->continue_on_failure,
@@ -122,4 +125,60 @@ test('error is returned if subuser does not have schedule update permissions', f
     /** @var Schedule $schedule */
     $schedule = Schedule::factory()->create(['server_id' => $server->id]);
     $this->actingAs($user)->postJson($this->link($schedule, '/tasks'))->assertForbidden();
+});
+
+test('a backup task keeps at most the server limit of its newest backups', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $server->forceFill(['backup_limit' => 3])->save();
+    $schedule = Schedule::factory()->create(['server_id' => $server->id]);
+
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'backup', 'time_offset' => 0, 'keep_backups' => 3])
+        ->assertOk()
+        ->assertJsonPath('attributes.keep_backups', 3);
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'backup', 'time_offset' => 0, 'keep_backups' => 4])
+        ->assertBadRequest()
+        ->assertJsonPath('errors.0.detail', 'A backup task can keep at most 3 backups on this server.');
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'command', 'payload' => 'say hi', 'time_offset' => 0, 'keep_backups' => 2])
+        ->assertOk()
+        ->assertJsonPath('attributes.keep_backups', null);
+});
+
+test('updating a backup task without keep_backups keeps the number it had', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $server->forceFill(['backup_limit' => 3])->save();
+    $schedule = Schedule::factory()->create(['server_id' => $server->id]);
+    $task = Task::factory()->create(['schedule_id' => $schedule->id, 'action' => 'backup', 'payload' => '', 'keep_backups' => 2]);
+
+    $this->actingAs($user)->postJson($this->link($schedule, "/tasks/{$task->id}"), ['action' => 'backup', 'payload' => 'cache', 'time_offset' => 5])
+        ->assertOk()
+        ->assertJsonPath('attributes.keep_backups', 2);
+    $this->actingAs($user)->postJson($this->link($schedule, "/tasks/{$task->id}"), ['action' => 'backup', 'time_offset' => 5, 'keep_backups' => null])
+        ->assertOk()
+        ->assertJsonPath('attributes.keep_backups', null);
+});
+
+test('restart when empty and log cleanup tasks take a number of hours or days', function (string $action, mixed $payload): void {
+    [$user, $server] = $this->generateTestAccount();
+    $schedule = Schedule::factory()->create(['server_id' => $server->id]);
+
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => $action, 'payload' => $payload, 'time_offset' => 0])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.0.meta.source_field', 'payload');
+})->with([
+    'no hours' => ['restart_if_empty', null],
+    'too many hours' => ['restart_if_empty', '73'],
+    'words' => ['restart_if_empty', 'soon'],
+    'no days' => ['delete_logs', '0'],
+    'too many days' => ['delete_logs', '366'],
+]);
+
+test('a restart when empty task needs a game that tells who is online', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $egg = $this->cloneEggAndVariables($server->egg);
+    $egg->forceFill(['name' => 'Valheim'])->save();
+    $server->forceFill(['egg_id' => $egg->id])->save();
+    $schedule = Schedule::factory()->create(['server_id' => $server->id]);
+
+    $this->actingAs($user)->postJson($this->link($schedule, '/tasks'), ['action' => 'restart_if_empty', 'payload' => '2', 'time_offset' => 0])
+        ->assertBadRequest();
 });

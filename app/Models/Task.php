@@ -22,6 +22,7 @@ use Pterodactyl\Models\Traits\HasHashid;
     'sequence_id',
     'action',
     'payload',
+    'keep_backups',
     'time_offset',
     'is_queued',
     'continue_on_failure',
@@ -41,6 +42,25 @@ class Task extends Model
     public const string ACTION_COMMAND = 'command';
 
     public const string ACTION_BACKUP = 'backup';
+
+    /** Restarts the server once its game has reported nobody online for `payload` hours. */
+    public const string ACTION_RESTART_IF_EMPTY = 'restart_if_empty';
+
+    /** Deletes the server's `logs/*.log(.gz)` files older than `payload` days (Minecraft). */
+    public const string ACTION_DELETE_LOGS = 'delete_logs';
+
+    /**
+     * Every action a task can perform.
+     *
+     * @var list<string>
+     */
+    public const array ACTIONS = [self::ACTION_COMMAND, self::ACTION_POWER, self::ACTION_BACKUP, self::ACTION_RESTART_IF_EMPTY, self::ACTION_DELETE_LOGS];
+
+    /** The most hours a restart-when-empty task waits. */
+    public const int MAX_EMPTY_HOURS = 72;
+
+    /** The most days a log cleanup task keeps logs for. */
+    public const int MAX_LOG_DAYS = 365;
 
     /**
      * The signals a power task may send.
@@ -64,6 +84,7 @@ class Task extends Model
             'id' => 'integer',
             'schedule_id' => 'integer',
             'sequence_id' => 'integer',
+            'keep_backups' => 'integer',
             'time_offset' => 'integer',
             'is_queued' => 'boolean',
             'continue_on_failure' => 'boolean',
@@ -79,6 +100,8 @@ class Task extends Model
         return match ($action) {
             self::ACTION_COMMAND => Permissions::ControlConsole,
             self::ACTION_BACKUP => Permissions::BackupCreate,
+            self::ACTION_RESTART_IF_EMPTY => Permissions::ControlRestart,
+            self::ACTION_DELETE_LOGS => Permissions::FileDelete,
             self::ACTION_POWER => match (mb_trim((string) $payload)) {
                 'start' => Permissions::ControlStart,
                 'stop', 'kill' => Permissions::ControlStop,
