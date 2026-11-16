@@ -4,8 +4,11 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as PluginQueries from '@/api/server/plugins/queries';
+import { AxiosError, AxiosHeaders } from 'axios';
 import {
+    isNoBackupError,
     modpackMismatch,
+    waitForPluginInstall,
     type InstalledPlugin,
     type ModpackProgress,
     type PluginEnvironment,
@@ -16,14 +19,36 @@ import ModpackProgressPanel, { modpackPercent } from './ModpackProgressPanel';
 
 const remove = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const update = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-const installed = vi.hoisted(() => ({ data: [] as InstalledPlugin[] }));
+const installed = vi.hoisted(() => ({ data: [] as InstalledPlugin[], scanning: false }));
+const progressCalls = vi.hoisted(() => ({ statuses: [] as string[] }));
+
+vi.mock('@/api/generated', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    clientGetPluginInstallProgress: vi.fn(async () => {
+        const status = progressCalls.statuses.shift() ?? 'completed';
+
+        return {
+            data: {
+                object: 'plugin_install',
+                attributes: {
+                    id: 'job',
+                    status,
+                    message: status === 'failed' ? 'Nope.' : null,
+                    file_name: 'A.jar',
+                    directory: 'plugins',
+                    version_number: '1.0',
+                },
+            },
+        };
+    }),
+}));
 
 vi.mock('@/api/server/plugins/queries', async (importOriginal) => ({
     ...(await importOriginal<typeof PluginQueries>()),
     useInstalledPlugins: () => ({
         isPending: false,
         isError: false,
-        data: { object: 'list', data: installed.data, meta: { directory: 'plugins' } },
+        data: { object: 'list', data: installed.data, meta: { directory: 'plugins', scanning: installed.scanning } },
     }),
     useUpdateInstalledPlugin: () => ({ update, isPending: false }),
     useRemoveInstalledPlugin: () => ({ remove, isPending: false }),
@@ -120,6 +145,7 @@ describe('installed plugins', () => {
         size: 2048,
         modified_at: null,
         sha1: 'abc',
+        note: null,
         project: {
             source: 'modrinth',
             id: 'p1',
@@ -152,6 +178,27 @@ describe('installed plugins', () => {
         expect(remove).toHaveBeenCalledWith('Mystery.jar');
     });
 
+    it('says when the jars are still being checked, and why a jar was not checked', () => {
+        installed.data = [
+            jar({
+                file_name: 'Huge.jar',
+                sha1: null,
+                note: 'Not checked: larger than 100 MB.',
+                project: null,
+                version: null,
+                update: null,
+            }),
+        ];
+        installed.scanning = true;
+
+        render(<InstalledTab uuid='uuid' environment={environment} overrides={{}} canManage />);
+
+        expect(screen.getByText(/Checking the jars against Modrinth/)).toBeTruthy();
+        expect(screen.getByText('Not checked: larger than 100 MB.')).toBeTruthy();
+        expect(screen.queryByText(/Not found on Modrinth/)).toBeNull();
+        installed.scanning = false;
+    });
+
     it('only lists jars for users who may not manage plugins', () => {
         installed.data = [jar({})];
 
@@ -159,5 +206,41 @@ describe('installed plugins', () => {
 
         expect(screen.getByText('LuckPerms')).toBeTruthy();
         expect(screen.queryByRole('button', { name: /Update|Remove/ })).toBeNull();
+    });
+});
+
+describe('queued installs', () => {
+    it('polls an install until it completed or failed', async () => {
+        const sleep = vi.fn(async () => {});
+
+        progressCalls.statuses = ['queued', 'running', 'completed'];
+        await expect(waitForPluginInstall('uuid', 'job', sleep)).resolves.toMatchObject({
+            status: 'completed',
+            file_name: 'A.jar',
+        });
+        expect(sleep).toHaveBeenCalledTimes(2);
+
+        progressCalls.statuses = ['failed'];
+        await expect(waitForPluginInstall('uuid', 'job', sleep)).resolves.toMatchObject({
+            status: 'failed',
+            message: 'Nope.',
+        });
+    });
+
+    it('knows the refusal that asks for an install without a backup', () => {
+        const refusal = (detail: string) =>
+            new AxiosError('Bad', '400', undefined, undefined, {
+                status: 400,
+                statusText: 'Bad Request',
+                headers: {},
+                config: { headers: new AxiosHeaders() },
+                data: { errors: [{ code: 'MarketplaceException', status: '400', detail }] },
+            });
+
+        expect(isNoBackupError(refusal('This server has no free backup slot, so the modpack was not installed.'))).toBe(
+            true
+        );
+        expect(isNoBackupError(refusal('That modpack version was not found on Modrinth.'))).toBe(false);
+        expect(isNoBackupError(new Error('offline'))).toBe(false);
     });
 });

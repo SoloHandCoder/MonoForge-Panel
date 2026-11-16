@@ -1,12 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
+
+import { clientGetPluginInstallProgress } from '@/api/generated';
 
 import {
     clientGetModpackInstallProgressOptions,
     clientGetModpackInstallProgressQueryKey,
     clientGetPluginEnvironmentOptions,
-    clientInstallModpackMutation,
     clientInstallPluginMutation,
+    clientInstallModpackMutation,
     clientListInstalledPluginsOptions,
     clientListPluginVersionsOptions,
     clientRemoveInstalledPluginMutation,
@@ -17,9 +20,11 @@ import type {
     ClientGetPluginEnvironmentResponse,
     ClientListInstalledPluginsResponse,
     ClientListPluginVersionsResponse,
+    ClientGetPluginInstallProgressResponse,
     ClientModpackInstallAttributes,
     ClientSearchPluginsResponse,
 } from '@/api/generated';
+import { httpErrorToHuman } from '@/api/http';
 import { hasGeneratedOperationId, hasPathParam } from '@/api/queryKeyGuards';
 import { retryUnlessClientError } from '@/api/queryRetry';
 import { notifyHttpError } from '@/plugins/notifications';
@@ -145,7 +150,54 @@ export const useInstalledPlugins = (uuid: string, overrides: PlatformOverrides, 
         ...clientListInstalledPluginsOptions({ path: { server_uuid: uuid }, query: overrideQuery(overrides) }),
         enabled: enabled && uuid.length > 0,
         retry: retryRead,
+        // The jars are checked in the background: read again every few seconds until that is done.
+        refetchInterval: (query) => (query.state.data?.meta.scanning ? 3000 : false),
     });
+
+export type PluginInstallProgress = ClientGetPluginInstallProgressResponse['attributes'];
+
+const INSTALL_POLL_MS = 2000;
+// An install waits in the queue and then downloads for up to about 16 minutes.
+const INSTALL_POLL_LIMIT = 600;
+
+/** Polls a queued install or update until it completed or failed. */
+export const waitForPluginInstall = async (
+    uuid: string,
+    id: string,
+    sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    attempt = 0
+): Promise<PluginInstallProgress> => {
+    if (attempt >= INSTALL_POLL_LIMIT) {
+        throw new Error('The install is taking longer than expected. Check the Installed tab later.');
+    }
+
+    const { data } = await clientGetPluginInstallProgress({ path: { server_uuid: uuid, installJob: id } });
+
+    if (data.attributes.status === 'completed' || data.attributes.status === 'failed') {
+        return data.attributes;
+    }
+
+    await sleep(INSTALL_POLL_MS);
+
+    return waitForPluginInstall(uuid, id, sleep, attempt + 1);
+};
+
+/** Waits for a queued install and reports how it ended. */
+const settleInstall = async (uuid: string, id: string, done: (fileName: string) => string): Promise<void> => {
+    const progress = await waitForPluginInstall(uuid, id);
+
+    if (progress.status === 'failed') {
+        throw new Error(progress.message ?? 'The install failed.');
+    }
+
+    toast.success(done(progress.file_name ?? ''));
+};
+
+/** The panel refused a modpack install because no backup can be made first. */
+export const isNoBackupError = (error: Error): boolean =>
+    isAxiosError(error) &&
+    error.response?.status === 400 &&
+    httpErrorToHuman(error).startsWith('This server has no free backup slot');
 
 /** Every installed-list query of the server, whatever overrides it was read with. */
 const invalidateInstalled = (queryClient: ReturnType<typeof useQueryClient>, uuid: string) =>
@@ -159,8 +211,9 @@ export const useInstallPlugin = (uuid: string, overrides: PlatformOverrides) => 
     const queryClient = useQueryClient();
     const mutation = useMutation({
         ...clientInstallPluginMutation(),
+        // The install is queued: the mutation settles once it completed or failed.
         onSuccess: async (result) => {
-            toast.success(`Installed ${result.attributes.file_name}`);
+            await settleInstall(uuid, result.attributes.id, (name) => `Installed ${name}`);
             await invalidateInstalled(queryClient, uuid);
         },
         onError: (error) => notifyHttpError(error, 'Could not install it'),
@@ -181,7 +234,7 @@ export const useUpdateInstalledPlugin = (uuid: string, overrides: PlatformOverri
     const mutation = useMutation({
         ...clientUpdateInstalledPluginMutation(),
         onSuccess: async (result) => {
-            toast.success(`Updated to ${result.attributes.file_name}`);
+            await settleInstall(uuid, result.attributes.id, (name) => `Updated to ${name}`);
             await invalidateInstalled(queryClient, uuid);
         },
         onError: (error) => notifyHttpError(error, 'Could not update it'),
@@ -232,13 +285,21 @@ export const useInstallModpack = (uuid: string) => {
         onSuccess: (result) => {
             queryClient.setQueryData(clientGetModpackInstallProgressQueryKey({ path: { server_uuid: uuid } }), result);
         },
-        onError: (error) => notifyHttpError(error, 'Could not start the modpack install'),
+        onError: (error) => {
+            // Asked again with a red confirmation instead of a toast.
+            if (!isNoBackupError(error)) {
+                notifyHttpError(error, 'Could not start the modpack install');
+            }
+        },
     });
 
     return {
         ...mutation,
-        install: (project: string, version: string) =>
-            mutation.mutateAsync({ path: { server_uuid: uuid }, body: { project, version } }),
+        install: (project: string, version: string, confirmWithoutBackup = false) =>
+            mutation.mutateAsync({
+                path: { server_uuid: uuid },
+                body: { project, version, confirm_without_backup: confirmWithoutBackup },
+            }),
     };
 };
 

@@ -14,6 +14,7 @@ class InstallModpackRequest extends ManagePluginsRequest
         return [
             'project' => ['required', 'string', 'regex:'.self::ID_PATTERN],
             'version' => ['required', 'string', 'regex:'.self::ID_PATTERN],
+            'confirm_without_backup' => ['sometimes', 'boolean'],
         ];
     }
 }

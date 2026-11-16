@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
@@ -11,6 +12,7 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\QueryParam;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Knuckles\Scribe\Attributes\UrlParam;
 use Pterodactyl\Data\Plugins\MarketplaceFile;
 use Pterodactyl\Data\Plugins\MarketplaceProject;
 use Pterodactyl\Data\Plugins\MarketplaceSearch;
@@ -27,14 +29,17 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Plugins\InstallPluginRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Plugins\ListPluginVersionsRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Plugins\ReadPluginsRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Plugins\SearchPluginsRequest;
+use Pterodactyl\Jobs\Plugins\InstallPluginJob;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Services\Plugins\DownloadPolicy;
 use Pterodactyl\Services\Plugins\InstalledPlugins;
 use Pterodactyl\Services\Plugins\MarketplaceCatalogs;
 use Pterodactyl\Services\Plugins\PluginInstaller;
+use Pterodactyl\Services\Plugins\PluginInstallProgress;
 use Pterodactyl\Services\Plugins\ServerPlatform;
 use Pterodactyl\Services\Plugins\ServerPlatformDetector;
 use Pterodactyl\Services\Plugins\Sources\CurseForgeCatalog;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -91,6 +96,7 @@ class PluginController extends ClientApiController
         'size' => 2097152,
         'modified_at' => '2026-10-01T12:00:00Z',
         'sha1' => 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3',
+        'note' => null,
         'project' => [
             'source' => 'modrinth',
             'id' => 'P7dR8mSH',
@@ -105,7 +111,33 @@ class PluginController extends ClientApiController
 
     private const array INSTALL_RESULT_EXAMPLE = [
         'object' => 'plugin_install',
-        'attributes' => ['file_name' => 'LuckPerms-Bukkit-5.4.150.jar', 'directory' => 'plugins', 'version_number' => '5.4.150'],
+        'attributes' => ['id' => '9b2f3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d', 'status' => 'queued', 'message' => null, 'file_name' => null, 'directory' => 'plugins', 'version_number' => '5.4.150'],
+    ];
+
+    private const array INSTALL_DONE_EXAMPLE = [
+        'object' => 'plugin_install',
+        'attributes' => ['id' => '9b2f3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d', 'status' => 'completed', 'message' => null, 'file_name' => 'LuckPerms-Bukkit-5.4.150.jar', 'directory' => 'plugins', 'version_number' => '5.4.150'],
+    ];
+
+    private const array INSTALL_ATTRIBUTES_SCHEMA = [
+        'type' => 'object',
+        'required' => ['id', 'status', 'message', 'file_name', 'directory', 'version_number'],
+        'properties' => [
+            'id' => ['type' => 'string', 'description' => 'The install ID to poll.'],
+            'status' => ['type' => 'string', 'enum' => ['queued', 'running', 'completed', 'failed']],
+            'message' => ['type' => 'string', 'nullable' => true, 'description' => 'Why it failed, or null.'],
+            'file_name' => ['type' => 'string', 'nullable' => true, 'description' => 'The installed jar, once completed.'],
+            'directory' => ['type' => 'string'],
+            'version_number' => ['type' => 'string'],
+        ],
+    ];
+
+    private const array NOT_FOUND_ERROR = [
+        'errors' => [['code' => 'NotFoundHttpException', 'status' => '404', 'detail' => 'That install was not found.']],
+    ];
+
+    private const array SCANNING_ERROR = [
+        'errors' => [['code' => 'ConflictHttpException', 'status' => '409', 'detail' => 'The installed files are still being checked. Try again in a moment.']],
     ];
 
     private const array STRING = ['type' => 'string'];
@@ -175,12 +207,13 @@ class PluginController extends ClientApiController
         'type' => 'array',
         'items' => [
             'type' => 'object',
-            'required' => ['file_name', 'size', 'modified_at', 'sha1', 'project', 'version', 'update'],
+            'required' => ['file_name', 'size', 'modified_at', 'sha1', 'note', 'project', 'version', 'update'],
             'properties' => [
                 'file_name' => self::STRING,
                 'size' => ['type' => 'integer'],
                 'modified_at' => self::NULLABLE_STRING,
-                'sha1' => self::NULLABLE_STRING,
+                'sha1' => ['type' => 'string', 'nullable' => true, 'description' => 'The sha1, or null until the jar has been checked (or when it is not checked).'],
+                'note' => ['type' => 'string', 'nullable' => true, 'description' => 'Why the jar was not checked (too large, too many jars), or null.'],
                 'project' => [
                     'type' => 'object',
                     'nullable' => true,
@@ -353,21 +386,20 @@ class PluginController extends ClientApiController
     }
 
     /**
-     * @return array{object: string, attributes: array{file_name: string, directory: string, version_number: string}}
-     *
      * @throws MarketplaceException
      * @throws DaemonConnectionException
      */
-    #[Endpoint('Install plugin', "Installs a plugin or mod version into plugins/ or mods/. The panel looks the version up in the catalog itself, has Wings download the file from the catalog's CDN (only cdn.modrinth.com, hangarcdn.papermc.io, mediafilez.forgecdn.net and edge.forgecdn.net are allowed), checks its hashes and only then puts it in place. Needs the plugins.manage permission.")]
+    #[Endpoint('Install plugin', "Queues the install of a plugin or mod version into plugins/ or mods/ and returns 202 with an install ID to poll. The panel looks the version up in the catalog itself, has Wings download the file from the catalog's CDN (only cdn.modrinth.com, hangarcdn.papermc.io, mediafilez.forgecdn.net and edge.forgecdn.net are allowed), checks its hashes (it needs a sha1, sha256 or sha512, or an MD5 together with the file size; anything else is refused) and only then puts it in place. Needs the plugins.manage permission.")]
     #[BodyParam('source', 'string', 'The catalog: modrinth, hangar or curseforge.', required: true, example: 'modrinth')]
     #[BodyParam('project', 'string', "The project's ID.", required: true, example: 'P7dR8mSH')]
     #[BodyParam('version', 'string', "The version's ID from the versions list.", required: true, example: 'OrIs0S6b')]
     #[BodyParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper', nullable: true)]
     #[BodyParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4', nullable: true)]
-    #[ScribeResponse(self::INSTALL_RESULT_EXAMPLE, description: 'Plugin installed.')]
-    #[ScribeResponse(self::INSTALL_ERROR, status: 400, description: 'The file could not be installed: not allowed, no file, or a failed hash check.')]
-    #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not download the file.')]
-    public function install(InstallPluginRequest $request, PluginInstaller $installer, Server $server): array
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('attributes', 'object', required: true, schema: self::INSTALL_ATTRIBUTES_SCHEMA)]
+    #[ScribeResponse(self::INSTALL_RESULT_EXAMPLE, status: 202, description: 'Install queued.')]
+    #[ScribeResponse(self::INSTALL_ERROR, status: 400, description: 'The file cannot be installed: not allowed or no file.')]
+    public function install(InstallPluginRequest $request, Server $server): JsonResponse
     {
         $platform = $this->platform($request, $server);
         $type = $this->type(null, $platform);
@@ -380,82 +412,78 @@ class PluginController extends ClientApiController
 
         throw_if(! $version->file instanceof MarketplaceFile, MarketplaceException::class, 'This version cannot be installed from the panel: its author does not allow downloads from other apps, or it has no jar.');
 
-        $name = $installer->install($server, $version->file, $directory);
-
-        Activity::event('server:plugin.install')->subject($server)->property([
-            'file' => $directory.'/'.$name,
-            'version' => $version->versionNumber,
-            'source' => $source->label(),
-        ])->log();
-
-        return [
-            'object' => 'plugin_install',
-            'attributes' => ['file_name' => $name, 'directory' => $directory, 'version_number' => $version->versionNumber],
-        ];
+        return $this->queueInstall($request, $server, $version->file, $directory, $version->versionNumber, $source->label());
     }
 
     /**
-     * @return array{object: string, data: list<array<string, mixed>>, meta: array{directory: string|null}}
+     * @return array{object: string, attributes: array<string, mixed>}
+     */
+    #[Endpoint('Get plugin install progress', 'Returns a queued plugin install or update: queued, running, completed (with the installed file name) or failed (with why). Kept for a day.')]
+    #[UrlParam('installJob', 'string', 'The install ID the install or update returned.', example: '9b2f3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d')]
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('attributes', 'object', required: true, schema: self::INSTALL_ATTRIBUTES_SCHEMA)]
+    #[ScribeResponse(self::INSTALL_DONE_EXAMPLE, description: 'Progress returned.')]
+    #[ScribeResponse(self::NOT_FOUND_ERROR, status: 404, description: 'No such install on this server.')]
+    public function installProgress(ReadPluginsRequest $request, Server $server, string $installJob): array
+    {
+        $progress = PluginInstallProgress::get($server, $installJob) ?? throw new NotFoundHttpException('That install was not found.');
+
+        return ['object' => 'plugin_install', 'attributes' => $progress];
+    }
+
+    /**
+     * @return array{object: string, data: list<array<string, mixed>>, meta: array{directory: string|null, scanning: bool}}
      *
      * @throws MarketplaceException
      * @throws DaemonConnectionException
      */
-    #[Endpoint('List installed plugins', "Lists the jars in the server's plugins/ or mods/ folder. Each is matched to its Modrinth project by sha1, with the newest version for the server's platform when there is a newer one.")]
+    #[Endpoint('List installed plugins', "Lists the jars in the server's plugins/ or mods/ folder. Each is matched to its Modrinth project by sha1, with the newest version for the server's platform when there is a newer one. Jars are hashed in the background (the first 300, each up to 100 MB): while meta.scanning is true the list is from the last check and is read again shortly.")]
     #[QueryParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper')]
     #[QueryParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4')]
     #[ResponseField('object', 'string', required: true)]
     #[ResponseField('data', 'object[]', 'The jars, by name.', required: true, schema: self::INSTALLED_SCHEMA)]
-    #[ResponseField('meta', 'object', required: true, schema: ['type' => 'object', 'required' => ['directory'], 'properties' => ['directory' => ['type' => 'string', 'nullable' => true, 'description' => 'plugins or mods, or null while the loader is unknown.']]])]
-    #[ScribeResponse(['object' => 'list', 'data' => [self::INSTALLED_EXAMPLE], 'meta' => ['directory' => 'plugins']], description: 'Installed plugins returned.')]
+    #[ResponseField('meta', 'object', required: true, schema: ['type' => 'object', 'required' => ['directory', 'scanning'], 'properties' => ['directory' => ['type' => 'string', 'nullable' => true, 'description' => 'plugins or mods, or null while the loader is unknown.'], 'scanning' => ['type' => 'boolean', 'description' => 'Whether the files changed since the last check and a new one is queued.']]])]
+    #[ScribeResponse(['object' => 'list', 'data' => [self::INSTALLED_EXAMPLE], 'meta' => ['directory' => 'plugins', 'scanning' => false]], description: 'Installed plugins returned.')]
     #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not list the folder.')]
     public function installed(ReadPluginsRequest $request, InstalledPlugins $installed, Server $server): array
     {
         $platform = $this->platform($request, $server);
+        $current = $installed->current($server, $platform);
 
         return [
             'object' => 'list',
-            'data' => $installed->list($server, $platform),
-            'meta' => ['directory' => $platform->directory()],
+            'data' => $current['list'],
+            'meta' => ['directory' => $platform->directory(), 'scanning' => $current['scanning']],
         ];
     }
 
     /**
-     * @return array{object: string, attributes: array{file_name: string, directory: string, version_number: string}}
-     *
      * @throws MarketplaceException
      * @throws DaemonConnectionException
      */
-    #[Endpoint('Update installed plugin', 'Replaces an installed jar with the newest Modrinth version for the server: the new file is downloaded and checked first, then the old one is removed. Needs the plugins.manage permission.')]
+    #[Endpoint('Update installed plugin', 'Queues replacing an installed jar with the newest Modrinth version for the server and returns 202 with an install ID to poll: the new file is downloaded and checked first, then the old one is removed. Returns 409 while the installed files are still being checked. Needs the plugins.manage permission.')]
     #[BodyParam('file', 'string', "The installed jar's file name.", required: true, example: 'LuckPerms-Bukkit-5.4.140.jar')]
     #[BodyParam('loader', 'string', 'Use this loader instead of the detected one.', required: false, example: 'paper', nullable: true)]
     #[BodyParam('game_version', 'string', 'Use this Minecraft version instead of the detected one.', required: false, example: '1.21.4', nullable: true)]
-    #[ScribeResponse(self::INSTALL_RESULT_EXAMPLE, description: 'Plugin updated.')]
-    #[ScribeResponse(self::INSTALL_ERROR, status: 400, description: 'There is no update, or the new file could not be installed.')]
-    #[ScribeResponse(self::DAEMON_ERROR, status: 502, description: 'Wings could not download the file.')]
-    public function update(InstalledPluginRequest $request, InstalledPlugins $installed, PluginInstaller $installer, Server $server): array
+    #[ResponseField('object', 'string', required: true)]
+    #[ResponseField('attributes', 'object', required: true, schema: self::INSTALL_ATTRIBUTES_SCHEMA)]
+    #[ScribeResponse(self::INSTALL_RESULT_EXAMPLE, status: 202, description: 'Update queued.')]
+    #[ScribeResponse(self::INSTALL_ERROR, status: 400, description: 'There is no update.')]
+    #[ScribeResponse(self::SCANNING_ERROR, status: 409, description: 'The installed files are still being checked.')]
+    public function update(InstalledPluginRequest $request, InstalledPlugins $installed, Server $server): JsonResponse
     {
         $platform = $this->platform($request, $server);
         $directory = $platform->directory() ?? throw new MarketplaceException("Choose the server's loader first.");
         $file = $this->jarName($request);
 
         $jar = $installed->find($server, $platform, $file) ?? throw new NotFoundHttpException('That file is not installed.');
+        throw_if($jar['sha1'] === null && $jar['note'] === null, ConflictHttpException::class, 'The installed files are still being checked. Try again in a moment.');
         throw_if($jar['project'] === null || $jar['update'] === null, MarketplaceException::class, 'There is no update for this file.');
 
         $version = $this->catalogs->modrinth()->version($jar['project']['id'], $jar['update']['id'], MarketplaceProjectType::Mod);
         throw_if(! $version instanceof MarketplaceVersion || ! $version->file instanceof MarketplaceFile, MarketplaceException::class, 'The update was not found in the catalog.');
 
-        $name = $installer->install($server, $version->file, $directory, replaces: $file);
-
-        Activity::event('server:plugin.update')->subject($server)->property([
-            'old' => $directory.'/'.$file,
-            'file' => $directory.'/'.$name,
-            'version' => $version->versionNumber,
-        ])->log();
-
-        return [
-            'object' => 'plugin_install',
-            'attributes' => ['file_name' => $name, 'directory' => $directory, 'version_number' => $version->versionNumber],
-        ];
+        return $this->queueInstall($request, $server, $version->file, $directory, $version->versionNumber, MarketplaceSource::Modrinth->label(), $file);
     }
 
     /**
@@ -481,6 +509,18 @@ class PluginController extends ClientApiController
         Activity::event('server:plugin.remove')->subject($server)->property(['file' => $directory.'/'.$file])->log();
 
         return $this->returnNoContent();
+    }
+
+    /** Queues an install or update on the "installs" queue and answers 202 with the ID to poll. */
+    private function queueInstall(ReadPluginsRequest $request, Server $server, MarketplaceFile $file, string $directory, string $versionNumber, string $sourceLabel, ?string $replaces = null): JsonResponse
+    {
+        // Checked here too, so an unsafe name is refused at once instead of in the queue.
+        throw_if(DownloadPolicy::jarName($file->filename) === null, MarketplaceException::class, 'The catalog gave this file a name the panel does not install.');
+
+        $progress = PluginInstallProgress::start($server, $directory, $versionNumber);
+        dispatch(new InstallPluginJob($server->id, $request->user()->id, $progress['id'], $file, $directory, $versionNumber, $sourceLabel, $replaces));
+
+        return new JsonResponse(['object' => 'plugin_install', 'attributes' => $progress], JsonResponse::HTTP_ACCEPTED);
     }
 
     private function platform(ReadPluginsRequest $request, Server $server): ServerPlatform

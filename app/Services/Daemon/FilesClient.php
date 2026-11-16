@@ -37,9 +37,11 @@ final readonly class FilesClient
      * @param  list<string>  $algorithms  hash_algos() names, such as sha1 and sha512
      * @return array<string, string> algorithm => lowercase hex digest
      *
+     * @param-out int $bytesRead
+     *
      * @throws FileSizeTooLargeException when the file is larger than $notLargerThan bytes
      */
-    public function hashes(string $path, array $algorithms, int $notLargerThan, int $timeout = 300): array
+    public function hashes(string $path, array $algorithms, int $notLargerThan, int $timeout = 300, ?int &$bytesRead = null): array
     {
         $response = $this->connection->stream("/api/servers/{$this->uuid}/files/contents", ['file' => $path], $timeout);
         $body = $response->toPsrResponse()->getBody();
@@ -52,7 +54,8 @@ final readonly class FilesClient
         $read = 0;
         while (! $body->eof()) {
             $chunk = $body->read(1024 * 1024);
-            $read += mb_strlen($chunk);
+            // Bytes, not characters: the cap is in bytes and the content is binary.
+            $read += mb_strlen($chunk, '8bit');
             if ($read > $notLargerThan) {
                 $body->close();
 
@@ -63,6 +66,8 @@ final readonly class FilesClient
                 hash_update($context, $chunk);
             }
         }
+
+        $bytesRead = $read;
 
         return array_map(hash_final(...), $contexts);
     }

@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Server\Plugins\ModpackControllerTest;
 
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Sleep;
 use Pterodactyl\Events\ActivityLogged;
+use Pterodactyl\Jobs\Plugins\InstallModpackJob;
 use Pterodactyl\Models\Backup;
 use Pterodactyl\Services\Plugins\ModpackInstaller;
 use Pterodactyl\Services\Plugins\ModpackProgress;
@@ -82,7 +83,7 @@ test('a modpack is downloaded, checked and installed with its overrides', functi
     $world->remote['https://cdn.modrinth.com/data/a/sodium.jar'] = 'sodium';
     $world->remote['https://cdn.modrinth.com/data/b/lithium.jar'] = 'lithium';
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])
         ->assertAccepted()
         ->assertJsonPath('attributes.project_title', 'Fabulously Optimized');
 
@@ -115,7 +116,7 @@ test('a modpack that writes outside the server or uses another host changes noth
     $world->remote['https://cdn.modrinth.com/data/a/fine.jar'] = 'fine';
     $before = $world->files;
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertAccepted();
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertAccepted();
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
         ->assertJsonPath('attributes.status', 'failed')
@@ -141,7 +142,7 @@ test('a modpack file that fails its hash check stops the install before anything
     $world->remote['https://cdn.modrinth.com/a.jar'] = 'tampered';
     $before = $world->files;
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertAccepted();
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertAccepted();
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
         ->assertJsonPath('attributes.status', 'failed')
@@ -155,7 +156,7 @@ test('a tampered .mrpack is refused', function (): void {
     $world->remote[PACK_URL] = 'something else';
     $before = $world->files;
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertAccepted();
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertAccepted();
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
         ->assertJsonPath('attributes.status', 'failed')
@@ -163,51 +164,157 @@ test('a tampered .mrpack is refused', function (): void {
     expect($world->files)->toBe($before);
 });
 
-test('the server is backed up first when it has a free backup slot', function (): void {
+/** Posts the install with the queue faked, and returns the queued job ready to run by hand. */
+function queuedInstall(object $test, $user, string $url, array $body = []): InstallModpackJob
+{
+    Bus::fake([InstallModpackJob::class]);
+    $test->actingAs($user)->postJson($url, ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', ...$body])->assertAccepted();
+    $job = null;
+    Bus::assertDispatched(InstallModpackJob::class, function (InstallModpackJob $dispatched) use (&$job): bool {
+        $job = $dispatched;
+
+        return true;
+    });
+    expect($job->connection)->toBe('installs')->and($job->queue)->toBe('installs');
+
+    return $job;
+}
+
+/** One worker run of the job: a fresh copy (as the queue would hand it out) with fake queue calls. */
+function runJob(InstallModpackJob $job): InstallModpackJob
+{
+    $run = clone $job;
+    $run->withFakeQueueInteractions();
+    $run->handle(resolve(ModpackInstaller::class));
+
+    return $run;
+}
+
+test('the server is backed up first, and the job waits for it without sleeping', function (): void {
     [$user, $server] = $this->generateTestAccount();
     $server->update(['backup_limit' => 2]);
     $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([]), 'overrides/a.txt' => 'a']));
 
-    Sleep::fake();
-    Sleep::whenFakingSleep(fn () => Backup::query()->where('server_id', $server->id)->update(['completed_at' => now(), 'is_successful' => true]));
+    $job = queuedInstall($this, $user, $this->link($server, '/plugins/modpack'));
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertAccepted();
+    // The first run starts the backup and puts the job back on the queue.
+    runJob($job)->assertReleased(InstallModpackJob::BACKUP_POLL_SECONDS);
+    expect(Backup::query()->where('server_id', $server->id)->count())->toBe(1)
+        ->and($world->pulled)->toBe([]);
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))->assertJsonPath('attributes.status', 'running')->assertJsonPath('attributes.step', 'backup');
+
+    // Still running: released again.
+    runJob($job)->assertReleased(InstallModpackJob::BACKUP_POLL_SECONDS);
+
+    Backup::query()->where('server_id', $server->id)->update(['completed_at' => now(), 'is_successful' => true]);
+    runJob($job)->assertNotReleased();
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
         ->assertJsonPath('attributes.status', 'completed')
         ->assertJsonPath('attributes.backup', 'created');
-    expect(Backup::query()->where('server_id', $server->id)->count())->toBe(1)
-        ->and($world->files['a.txt'])->toBe('a')
-        ->and($world->requestsTo('*/backup'))->toHaveCount(1);
+    expect($world->files['a.txt'])->toBe('a')
+        ->and($world->requestsTo('*/backup'))->toHaveCount(1)
+        ->and(ModpackProgress::claim($server))->toBeString();
 });
 
-test('a failed backup stops the install', function (): void {
+test('a failed or too slow backup stops the install', function (bool $slow): void {
     [$user, $server] = $this->generateTestAccount();
     $server->update(['backup_limit' => 1]);
     $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([])]));
 
-    Sleep::fake();
-    Sleep::whenFakingSleep(fn () => Backup::query()->where('server_id', $server->id)->update(['completed_at' => now(), 'is_successful' => false]));
+    $job = queuedInstall($this, $user, $this->link($server, '/plugins/modpack'));
+    runJob($job)->assertReleased(InstallModpackJob::BACKUP_POLL_SECONDS);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertAccepted();
+    if ($slow) {
+        $this->travel(ModpackInstaller::BACKUP_WAIT + 1)->seconds();
+    } else {
+        Backup::query()->where('server_id', $server->id)->update(['completed_at' => now(), 'is_successful' => false]);
+    }
+
+    runJob($job)->assertNotReleased();
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
         ->assertJsonPath('attributes.status', 'failed')
-        ->assertJsonPath('attributes.message', 'The backup before the install failed, so the modpack was not installed.');
+        ->assertJsonPath('attributes.message', $slow ? 'The backup before the install took too long, so the modpack was not installed.' : 'The backup before the install failed, so the modpack was not installed.');
     expect($world->pulled)->toBe([]);
+})->with(['failed' => [false], 'too slow' => [true]]);
+
+test('without a free backup slot the install needs an explicit confirmation', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([])]));
+
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])
+        ->assertStatus(400)
+        ->assertJsonPath('errors.0.detail', ModpackInstaller::NO_BACKUP_MESSAGE);
+    expect($world->pulled)->toBe([])
+        ->and(ModpackProgress::get($server))->toBeNull();
+
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertAccepted();
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))->assertJsonPath('attributes.status', 'completed')->assertJsonPath('attributes.backup', 'skipped');
 });
 
+test('a queued install that finds another install holding the server does nothing', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([]), 'overrides/a.txt' => 'a']));
+    $job = queuedInstall($this, $user, $this->link($server, '/plugins/modpack'), ['confirm_without_backup' => true]);
+
+    // The slot expired and another install took it meanwhile.
+    ModpackProgress::release($server);
+    $other = ModpackProgress::claim($server);
+    runJob($job);
+
+    expect($world->pulled)->toBe([])
+        ->and(ModpackProgress::claim($server))->toBeNull();
+    ModpackProgress::release($server, $other);
+    expect(ModpackProgress::claim($server))->toBeString();
+});
+
+test('a modpack never deletes folders and refuses before any change when types differ or worlds would change', function (array $pack, string $message): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([]), ...$pack]))
+        ->directory('world')->file('world/level.dat', 'my world')
+        ->directory('plugins')->directory('plugins/Essentials')->file('plugins/Essentials/userdata.yml', 'mine')
+        ->file('server-icon.png', 'icon');
+    $before = $world->files;
+    $folders = $world->directories;
+
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertAccepted();
+
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))
+        ->assertJsonPath('attributes.status', 'failed')
+        ->assertJsonPath('attributes.message', $message);
+    expect($world->files)->toBe($before)
+        ->and(array_keys($world->directories))->toEqualCanonicalizing(array_keys($folders));
+})->with([
+    'a file where a folder is' => [['overrides/world' => 'not a folder'], 'The modpack would put a file where the server has a folder (world), so nothing was changed.'],
+    'a folder where a file is' => [['overrides/server-icon.png/x.txt' => 'x'], 'The modpack needs a folder where the server has a file (server-icon.png), so nothing was changed.'],
+    'a world file' => [['overrides/world/level.dat' => 'pack world'], 'The modpack would replace world/level.dat, which may hold a world or plugin data, so nothing was changed.'],
+    'plugin data' => [['overrides/plugins/Essentials/userdata.yml' => 'pack'], 'The modpack would replace plugins/Essentials/userdata.yml, which may hold a world or plugin data, so nothing was changed.'],
+]);
+
+test('only pack paths in world or plugin data folders are protected', function (string $path, bool $protected): void {
+    expect(ModpackInstaller::protectedPath($path))->toBe($protected);
+})->with([
+    ['world/level.dat', true],
+    ['world_nether/DIM-1/region/r.0.0.mca', true],
+    ['World/x', true],
+    ['plugins/LuckPerms/config.yml', true],
+    ['plugins/LuckPerms.jar', false],
+    ['config/sodium.json', false],
+    ['mods/a.jar', false],
+    ['server.properties', false],
+]);
 test('only one modpack install runs per server and unknown versions are refused', function (): void {
     [$user, $server] = $this->generateTestAccount();
     $world = modpackWorld(FakePluginWorld::zip(['modrinth.index.json' => index([])]));
     $world->catalog['https://api.modrinth.com/v2/version/missing'] = fn (): PromiseInterface => Http::response([], 404);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'missing'])
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'missing', 'confirm_without_backup' => true])
         ->assertStatus(400)
         ->assertJsonPath('errors.0.detail', 'That modpack version was not found on Modrinth.');
 
-    expect(ModpackProgress::claim($server))->toBeTrue();
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk'])->assertConflict();
+    expect(ModpackProgress::claim($server))->toBeString();
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/modpack'), ['project' => '1KVo5zza', 'version' => 'yKXF4LMk', 'confirm_without_backup' => true])->assertConflict();
     ModpackProgress::release($server);
 
     $this->actingAs($user)->getJson($this->link($server, '/plugins/modpack'))->assertOk()->assertJsonPath('attributes.status', 'idle');

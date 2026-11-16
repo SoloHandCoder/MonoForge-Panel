@@ -11,6 +11,7 @@ use Pterodactyl\Data\Plugins\MarketplaceSearchResult;
 use Pterodactyl\Data\Plugins\MarketplaceVersion;
 use Pterodactyl\Enum\MarketplaceProjectType;
 use Pterodactyl\Enum\MarketplaceSource;
+use Pterodactyl\Services\Plugins\DownloadPolicy;
 use Pterodactyl\Services\Plugins\MarketplaceHttp;
 use Pterodactyl\Services\Plugins\Payload;
 use Pterodactyl\Services\Plugins\ServerPlatform;
@@ -79,7 +80,7 @@ final readonly class HangarCatalog implements MarketplaceCatalog
                     title: Payload::string($project, 'name', $slug),
                     description: Payload::string($project, 'description'),
                     author: $owner === '' ? null : $owner,
-                    iconUrl: str_starts_with(Payload::string($project, 'avatarUrl'), 'https://') ? Payload::string($project, 'avatarUrl') : null,
+                    iconUrl: DownloadPolicy::iconUrl(Payload::string($project, 'avatarUrl')),
                     downloads: Payload::int(Payload::array($project, 'stats'), 'downloads'),
                     updatedAt: Payload::nullableString($project, 'lastUpdated'),
                     url: 'https://hangar.papermc.io/'.rawurlencode($owner).'/'.rawurlencode($slug),

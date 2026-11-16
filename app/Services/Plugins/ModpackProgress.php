@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Plugins;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Pterodactyl\Models\Server;
 
 /**
@@ -23,20 +24,48 @@ final class ModpackProgress
 
     public const string FAILED = 'failed';
 
-    /** The longest an install may hold the slot, if a worker dies without releasing it. */
-    private const int CLAIM_SECONDS = 1800;
+    /**
+     * The longest an install may hold the slot, if a worker dies without releasing it: above the
+     * wait in the queue, the backup wait (10 minutes) and the job's timeout together.
+     */
+    public const int CLAIM_SECONDS = 7200;
 
     private const int KEEP_SECONDS = 86400;
 
-    /** Takes the server's install slot; false while another install runs. */
-    public static function claim(Server $server): bool
+    /** Takes the server's install slot and returns its owner token; null while another install holds it. */
+    public static function claim(Server $server): ?string
     {
-        return Cache::add(self::slotKey($server), 1, self::CLAIM_SECONDS);
+        $token = (string) Str::uuid();
+
+        return Cache::add(self::slotKey($server), $token, self::CLAIM_SECONDS) ? $token : null;
     }
 
-    public static function release(Server $server): void
+    /**
+     * At the start of a job run: true when the slot is this install's (renewed for another
+     * CLAIM_SECONDS), or was free and is taken again; false when another install holds it.
+     */
+    public static function acquire(Server $server, string $token): bool
     {
-        Cache::forget(self::slotKey($server));
+        $holder = Cache::get(self::slotKey($server));
+        if ($holder === null && Cache::add(self::slotKey($server), $token, self::CLAIM_SECONDS)) {
+            return true;
+        }
+
+        if ($holder !== $token && Cache::get(self::slotKey($server)) !== $token) {
+            return false;
+        }
+
+        Cache::put(self::slotKey($server), $token, self::CLAIM_SECONDS);
+
+        return true;
+    }
+
+    /** Frees the slot; with a token, only when that install still holds it. */
+    public static function release(Server $server, ?string $token = null): void
+    {
+        if ($token === null || Cache::get(self::slotKey($server)) === $token) {
+            Cache::forget(self::slotKey($server));
+        }
     }
 
     /** @return Progress|null */

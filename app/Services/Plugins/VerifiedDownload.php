@@ -31,7 +31,7 @@ final readonly class VerifiedDownload
      * @throws MarketplaceException
      * @throws DaemonConnectionException
      */
-    public function download(Server $server, string $url, string $directory, string $filename, array $hashes, bool $requireHash = false, ?string $label = null): void
+    public function download(Server $server, string $url, string $directory, string $filename, array $hashes, bool $requireHash = false, ?string $label = null, int $expectedSize = 0): void
     {
         $label ??= $filename;
         throw_unless(DownloadPolicy::allowedUrl($url), MarketplaceException::class, 'This file is not hosted on an allowed download site, so it was not installed.');
@@ -48,7 +48,9 @@ final readonly class VerifiedDownload
             unset($expected['md5']);
         }
 
-        throw_if($requireHash && array_diff_key($expected, ['md5' => true]) === [], MarketplaceException::class, "The catalog gave no hash for {$label}, so it was not installed.");
+        // An MD5 alone is only accepted together with the size the catalog gives.
+        $md5Only = array_diff_key($expected, ['md5' => true]) === [] && isset($expected['md5']);
+        throw_if($requireHash && array_diff_key($expected, ['md5' => true]) === [] && ! ($md5Only && $expectedSize > 0), MarketplaceException::class, "The catalog gave no hash for {$label}, so it was not installed.");
 
         $files = Daemon::server($server)->files();
         $root = '/'.$directory;
@@ -60,7 +62,7 @@ final readonly class VerifiedDownload
 
         $path = ($directory === '' ? '' : $directory.'/').$filename;
         try {
-            $actual = $files->hashes($path, array_keys($expected), self::MAX_BYTES);
+            $actual = $files->hashes($path, array_keys($expected), self::MAX_BYTES, bytesRead: $bytesRead);
         } catch (FileSizeTooLargeException) {
             $this->discard($server, $root, $filename);
 
@@ -69,6 +71,12 @@ final readonly class VerifiedDownload
             $this->discard($server, $root, $filename);
 
             throw $exception;
+        }
+
+        if ($md5Only && $bytesRead !== $expectedSize) {
+            $this->discard($server, $root, $filename);
+
+            throw new MarketplaceException("{$label} did not match the catalog's size, so it was removed.");
         }
 
         foreach ($expected as $algorithm => $digest) {

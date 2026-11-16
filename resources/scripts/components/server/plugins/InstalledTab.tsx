@@ -23,6 +23,15 @@ interface Props {
     canManage: boolean;
 }
 
+/** What comes before the size: the file name of a known jar, or why it is not matched. */
+function jarSource(jar: InstalledPlugin): string {
+    if (jar.project) {
+        return `${jar.file_name} · `;
+    }
+
+    return jar.note ? '' : 'Not found on Modrinth · ';
+}
+
 function InstalledRow({
     jar,
     canManage,
@@ -78,9 +87,10 @@ function InstalledRow({
                         )}
                     </p>
                     <p className='truncate text-xs text-muted-foreground'>
-                        {jar.project ? `${jar.file_name} · ` : 'Not found on Modrinth · '}
+                        {jarSource(jar)}
                         {bytesToString(jar.size)}
                     </p>
+                    {jar.note && <p className='text-xs text-muted-foreground'>{jar.note}</p>}
                 </div>
             </div>
             {canManage && (
@@ -184,6 +194,7 @@ function InstalledList({ uuid, directory, overrides, canManage }: Omit<Props, 'e
                 <>
                     <p className='text-sm text-muted-foreground' aria-live='polite'>
                         {summary(jars, directory)}
+                        {installed.data.meta.scanning && ' Checking the jars against Modrinth…'}
                     </p>
                     <ul className='space-y-2'>
                         {jars.map((jar) => (

@@ -19,6 +19,30 @@ final class DownloadPolicy
         'edge.forgecdn.net',
     ];
 
+    /** The only hosts project icons are shown from; any other icon is replaced by a placeholder. */
+    public const array ICON_HOSTS = [
+        'cdn.modrinth.com',
+        'hangarcdn.papermc.io',
+        'media.forgecdn.net',
+        'mediafilez.forgecdn.net',
+        'edge.forgecdn.net',
+    ];
+
+    /** An icon URL on a catalog CDN, or null (the page then shows its placeholder). */
+    public static function iconUrl(?string $url): ?string
+    {
+        if ($url === null || $url === '' || mb_strlen($url) > 2048 || preg_match('/[\s\x00-\x1f\x7f\\\\]/', $url) === 1) {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || ($parts['scheme'] ?? null) !== 'https' || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port'] !== 443)) {
+            return null;
+        }
+
+        return in_array(mb_strtolower($parts['host'] ?? ''), self::ICON_HOSTS, true) ? $url : null;
+    }
+
     /** Whether Wings may be asked to download this URL: HTTPS, an allowed host, no credentials or odd port. */
     public static function allowedUrl(string $url): bool
     {

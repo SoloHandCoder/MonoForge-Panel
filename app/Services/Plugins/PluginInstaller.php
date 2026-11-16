@@ -39,7 +39,8 @@ final readonly class PluginInstaller
         $existing = $this->jarNames($server, $directory);
 
         $temporary = '.monoforge-'.Str::lower(Str::random(16)).'.part';
-        $this->downloads->download($server, $file->url, $directory, $temporary, $file->hashes, label: $name);
+        // Every single install is checked: a catalog file without a usable hash is refused.
+        $this->downloads->download($server, $file->url, $directory, $temporary, $file->hashes, requireHash: true, label: $name, expectedSize: $file->size);
 
         try {
             if (in_array($name, $existing, true)) {

@@ -22,6 +22,7 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Plugins\ReadPluginsRequest;
 use Pterodactyl\Jobs\Plugins\InstallModpackJob;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Services\Plugins\MarketplaceCatalogs;
+use Pterodactyl\Services\Plugins\ModpackInstaller;
 use Pterodactyl\Services\Plugins\ModpackProgress;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Throwable;
@@ -86,9 +87,10 @@ class ModpackController extends ClientApiController
      * @throws MarketplaceException
      * @throws Throwable
      */
-    #[Endpoint('Install modpack', 'Starts installing a Modrinth modpack version. The panel backs the server up first when it has a free backup slot, downloads the .mrpack and every server file from allowed hosts with hash checks, and only then moves them into place with overrides/ and server-overrides/. It runs in the background; poll the progress endpoint. Needs the plugins.manage permission.')]
+    #[Endpoint('Install modpack', 'Starts installing a Modrinth modpack version. The panel backs the server up first; without a free backup slot the install is refused unless confirm_without_backup is true. It downloads the .mrpack and every server file from allowed hosts with hash checks, and only then moves them into place with overrides/ and server-overrides/, refusing before any change when a target differs in type from what is there or would replace something in a world or plugin data folder. Folders are never deleted. It runs in the background; poll the progress endpoint. Needs the plugins.manage permission.')]
     #[BodyParam('project', 'string', "The modpack's Modrinth project ID.", required: true, example: '1KVo5zza')]
     #[BodyParam('version', 'string', "The modpack version's ID.", required: true, example: 'yKXF4LMk')]
+    #[BodyParam('confirm_without_backup', 'boolean', 'Install even though no backup can be made first (the server has no free backup slot). Without it such an install is refused.', required: false, example: false)]
     #[ResponseField('attributes.message', 'string', nullable: true)]
     #[ResponseField('attributes.backup', 'string', nullable: true)]
     #[ResponseField('attributes.finished_at', 'string', nullable: true)]
@@ -104,16 +106,19 @@ class ModpackController extends ClientApiController
 
         $title = $modrinth->projects([$project])[$project]['title'] ?? $project;
 
-        throw_unless(ModpackProgress::claim($server), ConflictHttpException::class, 'A modpack install is already running on this server.');
+        $confirmed = $request->boolean('confirm_without_backup');
+        throw_if(! $confirmed && ! ModpackInstaller::canBackup($server), MarketplaceException::class, ModpackInstaller::NO_BACKUP_MESSAGE);
+
+        $token = ModpackProgress::claim($server) ?? throw new ConflictHttpException('A modpack install is already running on this server.');
 
         try {
             ModpackProgress::start($server, $title, $version->versionNumber);
 
             Activity::event('server:modpack.install')->subject($server)->property(['name' => $title, 'version' => $version->versionNumber])->log();
 
-            dispatch(new InstallModpackJob($server->id, $request->user()->id, $version->file, $title, $version->versionNumber));
+            dispatch(new InstallModpackJob($server->id, $request->user()->id, $version->file, $title, $version->versionNumber, $token, $confirmed));
         } catch (Throwable $throwable) {
-            ModpackProgress::release($server);
+            ModpackProgress::release($server, $token);
 
             throw $throwable;
         }

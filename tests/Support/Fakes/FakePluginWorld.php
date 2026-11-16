@@ -36,6 +36,9 @@ final class FakePluginWorld
     /** @var list<string> */
     public array $pulled = [];
 
+    /** @var array<string, int> path => the size Wings reports instead of the content's length */
+    public array $reportedSizes = [];
+
     public function __construct()
     {
         Http::fake(fn (Request $request): ?PromiseInterface => $this->handle($request));
@@ -118,7 +121,7 @@ final class FakePluginWorld
                 $file = $this->clean((string) ($query['file'] ?? ''));
 
                 return isset($this->files[$file])
-                    ? Http::response($this->files[$file], 200, ['Content-Length' => (string) mb_strlen($this->files[$file])])
+                    ? Http::response($this->files[$file], 200, ['Content-Length' => (string) mb_strlen($this->files[$file], '8bit')])
                     : Http::response(['error' => 'not found'], 404);
             case 'files/pull':
                 $url = (string) $data['url'];
@@ -210,7 +213,7 @@ final class FakePluginWorld
 
         foreach ($this->files as $path => $contents) {
             if (str_starts_with($path, $prefix) && ! str_contains(mb_substr($path, mb_strlen($prefix)), '/')) {
-                $entries[] = $this->entry(mb_substr($path, mb_strlen($prefix)), true, mb_strlen($contents));
+                $entries[] = $this->entry(mb_substr($path, mb_strlen($prefix)), true, $this->reportedSizes[$path] ?? mb_strlen($contents, '8bit'));
             }
         }
 

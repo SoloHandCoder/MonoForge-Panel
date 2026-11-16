@@ -12,6 +12,7 @@ use Pterodactyl\Data\Plugins\MarketplaceSearchResult;
 use Pterodactyl\Data\Plugins\MarketplaceVersion;
 use Pterodactyl\Enum\MarketplaceProjectType;
 use Pterodactyl\Enum\MarketplaceSource;
+use Pterodactyl\Services\Plugins\DownloadPolicy;
 use Pterodactyl\Services\Plugins\MarketplaceHttp;
 use Pterodactyl\Services\Plugins\Payload;
 use Pterodactyl\Services\Plugins\ServerPlatform;
@@ -106,7 +107,7 @@ final readonly class CurseForgeCatalog implements MarketplaceCatalog
                     title: Payload::string($mod, 'name', $id),
                     description: Payload::string($mod, 'summary'),
                     author: $authors === [] ? null : Payload::nullableString($authors[0], 'name'),
-                    iconUrl: str_starts_with($icon, 'https://') ? $icon : null,
+                    iconUrl: DownloadPolicy::iconUrl($icon),
                     downloads: Payload::int($mod, 'downloadCount'),
                     updatedAt: Payload::nullableString($mod, 'dateModified'),
                     url: str_starts_with($website, 'https://') ? $website : 'https://www.curseforge.com/minecraft',

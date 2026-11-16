@@ -90,6 +90,18 @@ return [
             'queue' => env('ASSISTANT_QUEUE', 'assistant'),
             'retry_after' => (int) env('ASSISTANT_QUEUE_RETRY_AFTER', 1080),
         ],
+
+        /*
+         * Plugin, mod and modpack installs and the installed-jar scans: the default connection's
+         * backend on its own "installs" queue and worker (`queue:work installs --queue=installs`),
+         * so long downloads never hold up the AI assistant or the panel's other jobs. retry_after
+         * stays above the longest job timeout (InstallModpackJob::TIMEOUT, 1000 s).
+         */
+        'installs' => [
+            ...($connections[$default] ?? $connections['sync']),
+            'queue' => env('INSTALLS_QUEUE', 'installs'),
+            'retry_after' => (int) env('INSTALLS_QUEUE_RETRY_AFTER', 1080),
+        ],
     ],
 
     /*

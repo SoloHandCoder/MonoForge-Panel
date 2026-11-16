@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -27,6 +28,9 @@ final class MarketplaceHttp
 
     /** Calls a minute the whole panel makes to each catalog (Modrinth allows 300 an IP). */
     private const array PER_MINUTE = ['modrinth' => 200, 'hangar' => 100, 'curseforge' => 100];
+
+    /** Each user's share of that budget, so one user cannot use it up for everyone. */
+    private const array PER_USER_MINUTE = ['modrinth' => 40, 'hangar' => 20, 'curseforge' => 20];
 
     /** @param  array<string, string>  $headers */
     public function client(MarketplaceSource $source, array $headers = []): PendingRequest
@@ -98,6 +102,14 @@ final class MarketplaceHttp
 
     private function throttle(MarketplaceSource $source): void
     {
+        $user = Auth::id();
+        if ($user !== null) {
+            $allowed = RateLimiter::attempt('marketplace:'.$source->value.':user:'.$user, self::PER_USER_MINUTE[$source->value], fn (): bool => true, 60);
+            if ($allowed === false) {
+                throw MarketplaceException::busy($source);
+            }
+        }
+
         $allowed = RateLimiter::attempt('marketplace:'.$source->value, self::PER_MINUTE[$source->value], fn (): bool => true, 60);
 
         if ($allowed === false) {

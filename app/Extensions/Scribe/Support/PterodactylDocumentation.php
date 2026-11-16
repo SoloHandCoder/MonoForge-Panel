@@ -108,6 +108,7 @@ class PterodactylDocumentation
         'conversation_uuid' => ['string', 'The assistant conversation UUID.', '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93'],
         'toolCall_id' => ['integer', 'The assistant tool call ID.', 2],
         'provider_id' => ['integer', 'The AI provider ID.', 1],
+        'installJob' => ['string', 'The plugin install ID an install or update returned.', '9b2f3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d'],
         // Phase 6: the AI crash doctor.
         'crash_id' => ['integer', 'The server crash ID.', 3],
         // Phase 6 Task F: friends and permission templates.

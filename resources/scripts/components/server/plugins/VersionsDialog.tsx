@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
     loaderLabel,
     modpackMismatch,
+    isNoBackupError,
     useInstallModpack,
     useInstallPlugin,
     usePluginVersions,
@@ -102,6 +103,7 @@ function ModpackConfirm({
     version,
     platform,
     pending,
+    withoutBackup,
     onClose,
     onConfirm,
 }: {
@@ -109,6 +111,7 @@ function ModpackConfirm({
     version: PluginVersion;
     platform: PluginPlatform;
     pending: boolean;
+    withoutBackup: boolean;
     onClose: () => void;
     onConfirm: () => void;
 }) {
@@ -118,12 +121,18 @@ function ModpackConfirm({
         <Dialog.Confirm
             open
             title={`Install ${project.title} ${version.version_number}?`}
-            confirm='Install modpack'
+            confirm={withoutBackup ? 'Install without a backup' : 'Install modpack'}
             pending={pending}
             onClose={onClose}
             onConfirmed={onConfirm}
         >
             <div className='space-y-3 text-sm'>
+                {withoutBackup && (
+                    <Alert type='danger' title='No backup can be made first'>
+                        This server has no free backup slot, so nothing can be restored if the modpack breaks it. Free a
+                        backup slot and try again, or install without a backup at your own risk.
+                    </Alert>
+                )}
                 {mismatch && (
                     <Alert type='warning' title='Check the server first'>
                         {mismatch} Change the server&apos;s version or loader on the Startup page first if needed.
@@ -190,6 +199,7 @@ export default function VersionsDialog({ uuid, type, project, platform, override
     const plugin = useInstallPlugin(uuid, overrides);
     const modpack = useInstallModpack(uuid);
     const [confirming, setConfirming] = useState<PluginVersion | null>(null);
+    const [withoutBackup, setWithoutBackup] = useState(false);
     const busy = plugin.isPending || modpack.isPending;
 
     const close = () => {
@@ -217,15 +227,24 @@ export default function VersionsDialog({ uuid, type, project, platform, override
                 version={confirming}
                 platform={platform}
                 pending={modpack.isPending}
-                onClose={() => setConfirming(null)}
+                withoutBackup={withoutBackup}
+                onClose={() => {
+                    setConfirming(null);
+                    setWithoutBackup(false);
+                }}
                 onConfirm={() =>
                     modpack
-                        .install(project.id, confirming.id)
+                        .install(project.id, confirming.id, withoutBackup)
                         .then(() => {
                             setConfirming(null);
+                            setWithoutBackup(false);
                             onClose();
                         })
-                        .catch(() => null)
+                        .catch((error: Error) => {
+                            if (isNoBackupError(error)) {
+                                setWithoutBackup(true);
+                            }
+                        })
                 }
             />
         );

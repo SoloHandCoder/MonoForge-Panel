@@ -1482,7 +1482,10 @@ export type ClientPluginEnvironmentResource = {
     attributes: ClientPluginEnvironmentAttributes;
 };
 export type ClientPluginInstallAttributes = {
-    file_name: string;
+    id: string;
+    status: string;
+    message: string | null;
+    file_name: string | null;
     directory: string;
     version_number: string;
 };
@@ -5063,10 +5066,6 @@ export type ClientUpdateServerPublicPageRequest = {
      */
     noindex: boolean;
     /**
-     * Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.
-     */
-    allow_wake?: boolean;
-    /**
      * The description in markdown, at most 2000 characters, or null for none.
      */
     description: string;
@@ -5074,6 +5073,10 @@ export type ClientUpdateServerPublicPageRequest = {
      * The banner colour as #rrggbb, or null for the default.
      */
     banner_color: string;
+    /**
+     * Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.
+     */
+    allow_wake?: boolean;
 };
 export type ClientUploadServerPublicPageBannerRequest = {
     /**
@@ -5152,6 +5155,10 @@ export type ClientInstallModpackRequest = {
      * The modpack version's ID.
      */
     version: string;
+    /**
+     * Install even though no backup can be made first (the server has no free backup slot). Without it such an install is refused.
+     */
+    confirm_without_backup?: boolean;
 };
 export type ClientRenameServerRequest = {
     /**
@@ -8233,7 +8240,14 @@ export type ClientListInstalledPluginsResponseBody = {
         file_name: string;
         size: number;
         modified_at: string | null;
+        /**
+         * The sha1, or null until the jar has been checked (or when it is not checked).
+         */
         sha1: string | null;
+        /**
+         * Why the jar was not checked (too large, too many jars), or null.
+         */
+        note: string | null;
         /**
          * The Modrinth project the jar belongs to, or null when Modrinth does not know it.
          */
@@ -8264,6 +8278,10 @@ export type ClientListInstalledPluginsResponseBody = {
          * plugins or mods, or null while the loader is unknown.
          */
         directory: string | null;
+        /**
+         * Whether the files changed since the last check and a new one is queued.
+         */
+        scanning: boolean;
     };
 };
 export type ApiListThePublicStorePlansResponseBody = {
@@ -9674,6 +9692,8 @@ export type ClientInstallPluginServerUuidPathParameter = string;
 export type ClientUpdateInstalledPluginServerUuidPathParameter = string;
 export type ClientRemoveInstalledPluginServerUuidPathParameter = string;
 export type ClientInstallModpackServerUuidPathParameter = string;
+export type ClientGetPluginInstallProgressServerUuidPathParameter = string;
+export type ClientGetPluginInstallProgressInstallJobPathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
@@ -24228,7 +24248,7 @@ export type ClientInstallPluginData = {
 };
 export type ClientInstallPluginErrors = {
     /**
-     * The file could not be installed: not allowed, no file, or a failed hash check.
+     * The file cannot be installed: not allowed or no file.
      */
     400: ErrorEnvelope;
     /**
@@ -24247,17 +24267,13 @@ export type ClientInstallPluginErrors = {
      * The submitted data is invalid.
      */
     422: ValidationErrorEnvelope;
-    /**
-     * Wings could not download the file.
-     */
-    502: ErrorEnvelope;
 };
 export type ClientInstallPluginError = ClientInstallPluginErrors[keyof ClientInstallPluginErrors];
 export type ClientInstallPluginResponses = {
     /**
-     * Plugin installed.
+     * Install queued.
      */
-    200: ClientPluginInstallResource;
+    202: ClientPluginInstallResource;
 };
 export type ClientInstallPluginResponse = ClientInstallPluginResponses[keyof ClientInstallPluginResponses];
 export type ClientUpdateInstalledPluginData = {
@@ -24273,7 +24289,7 @@ export type ClientUpdateInstalledPluginData = {
 };
 export type ClientUpdateInstalledPluginErrors = {
     /**
-     * There is no update, or the new file could not be installed.
+     * There is no update.
      */
     400: ErrorEnvelope;
     /**
@@ -24289,20 +24305,20 @@ export type ClientUpdateInstalledPluginErrors = {
      */
     404: ErrorEnvelope;
     /**
+     * The installed files are still being checked.
+     */
+    409: ErrorEnvelope;
+    /**
      * The submitted data is invalid.
      */
     422: ValidationErrorEnvelope;
-    /**
-     * Wings could not download the file.
-     */
-    502: ErrorEnvelope;
 };
 export type ClientUpdateInstalledPluginError = ClientUpdateInstalledPluginErrors[keyof ClientUpdateInstalledPluginErrors];
 export type ClientUpdateInstalledPluginResponses = {
     /**
-     * Plugin updated.
+     * Update queued.
      */
-    200: ClientPluginInstallResource;
+    202: ClientPluginInstallResource;
 };
 export type ClientUpdateInstalledPluginResponse = ClientUpdateInstalledPluginResponses[keyof ClientUpdateInstalledPluginResponses];
 export type ClientRemoveInstalledPluginData = {
@@ -24428,6 +24444,47 @@ export type ClientInstallModpackResponses = {
     202: ClientModpackInstallResource;
 };
 export type ClientInstallModpackResponse = ClientInstallModpackResponses[keyof ClientInstallModpackResponses];
+export type ClientGetPluginInstallProgressData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientGetPluginInstallProgressServerUuidPathParameter;
+        /**
+         * The plugin install ID an install or update returned.
+         */
+        installJob: ClientGetPluginInstallProgressInstallJobPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/plugins/install/{installJob}';
+};
+export type ClientGetPluginInstallProgressErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * No such install on this server.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientGetPluginInstallProgressError = ClientGetPluginInstallProgressErrors[keyof ClientGetPluginInstallProgressErrors];
+export type ClientGetPluginInstallProgressResponses = {
+    /**
+     * Progress returned.
+     */
+    200: ClientPluginInstallResource;
+};
+export type ClientGetPluginInstallProgressResponse = ClientGetPluginInstallProgressResponses[keyof ClientGetPluginInstallProgressResponses];
 export type ClientRenameServerData = {
     body: ClientRenameServerRequest;
     path: {

@@ -320,6 +320,7 @@ Route::group([
             Route::post('/modpack', [ModpackController::class, 'store']);
         });
         Route::get('/modpack', [ModpackController::class, 'progress']);
+        Route::get('/install/{installJob}', [PluginController::class, 'installProgress']);
     });
 
     Route::group(['prefix' => '/settings'], function (): void {

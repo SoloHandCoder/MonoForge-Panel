@@ -6,14 +6,22 @@ namespace Pterodactyl\Tests\Pest\Integration\Api\Client\Server\Plugins\PluginCon
 
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Events\ActivityLogged;
+use Pterodactyl\Jobs\Plugins\InstallPluginJob;
+use Pterodactyl\Jobs\Plugins\ScanInstalledPluginsJob;
 use Pterodactyl\Models\Setting;
+use Pterodactyl\Services\Plugins\DownloadPolicy;
+use Pterodactyl\Services\Plugins\InstalledPlugins;
 use Pterodactyl\Services\Plugins\MarketplaceHttp;
+use Pterodactyl\Services\Plugins\PluginInstallProgress;
 use Pterodactyl\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use Pterodactyl\Tests\Integration\TestResponse;
 use Pterodactyl\Tests\Support\Fakes\FakePluginWorld;
 
 uses(ClientApiIntegrationTestCase::class);
@@ -50,6 +58,18 @@ function paperWorld(): FakePluginWorld
         ->file('version_history.json', json_encode(['currentVersion' => '1.21.4-122-abcdef (MC: 1.21.4)']))
         ->file('server.properties', 'motd=hi')
         ->directory('plugins');
+}
+
+/** Posts an install or update (queued; the test queue runs it at once) and returns its progress. */
+function queued(object $test, $user, string $url, string $progressUrl, array $body): TestResponse
+{
+    $id = $test->actingAs($user)->postJson($url, $body)
+        ->assertAccepted()
+        ->assertJsonPath('object', 'plugin_install')
+        ->assertJsonPath('attributes.status', 'queued')
+        ->json('attributes.id');
+
+    return $test->actingAs($user)->getJson($progressUrl.'/'.$id)->assertOk();
 }
 
 test('reading needs file.read and managing needs plugins.manage', function (): void {
@@ -179,8 +199,8 @@ test('a plugin is pulled under a temporary name, hash checked and renamed into p
     $world->remote[$url] = JAR;
     $world->catalog['https://api.modrinth.com/v2/version/v2id'] = modrinthVersion('v2id', 'P7dR8mSH', '2.0', 'LuckPerms-2.jar', $url, JAR);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'P7dR8mSH', 'version' => 'v2id'])
-        ->assertOk()
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'P7dR8mSH', 'version' => 'v2id'])
+        ->assertJsonPath('attributes.status', 'completed')
         ->assertJsonPath('attributes.file_name', 'LuckPerms-2.jar')
         ->assertJsonPath('attributes.directory', 'plugins');
 
@@ -199,9 +219,9 @@ test('a download that fails its hash check is deleted and nothing is installed',
     $world->remote[$url] = 'tampered';
     $world->catalog['https://api.modrinth.com/v2/version/v2id'] = modrinthVersion('v2id', 'abc', '2.0', 'Good.jar', $url, JAR);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'abc', 'version' => 'v2id'])
-        ->assertStatus(400)
-        ->assertJsonPath('errors.0.detail', "Good.jar did not match the catalog's sha512 hash, so it was removed.");
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'abc', 'version' => 'v2id'])
+        ->assertJsonPath('attributes.status', 'failed')
+        ->assertJsonPath('attributes.message', "Good.jar did not match the catalog's sha512 hash, so it was removed.");
 
     expect(array_filter(array_keys($world->files), fn (string $path): bool => str_starts_with($path, 'plugins/')))->toBe([]);
 });
@@ -212,9 +232,9 @@ test('files on hosts outside the allowlist are never pulled', function (string $
     $world->remote[$url] = JAR;
     $world->catalog['https://api.modrinth.com/v2/version/v2id'] = modrinthVersion('v2id', 'abc', '2.0', 'Good.jar', $url, JAR);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'abc', 'version' => 'v2id'])
-        ->assertStatus(400)
-        ->assertJsonPath('errors.0.detail', 'This file is not hosted on an allowed download site, so it was not installed.');
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'abc', 'version' => 'v2id'])
+        ->assertJsonPath('attributes.status', 'failed')
+        ->assertJsonPath('attributes.message', 'This file is not hosted on an allowed download site, so it was not installed.');
 
     expect($world->requestsTo('*/files/pull'))->toBe([]);
 })->with([
@@ -258,17 +278,17 @@ test('hangar and curseforge files are checked against their sha256 and sha1', fu
         'platformDependencies' => ['PAPER' => ['1.21.4']],
     ];
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'hangar', 'project' => 'ViaVersion', 'version' => '33541'])
-        ->assertOk()->assertJsonPath('attributes.file_name', 'ViaVersion-5.jar');
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'hangar', 'project' => 'ViaVersion', 'version' => '33541'])
+        ->assertJsonPath('attributes.file_name', 'ViaVersion-5.jar');
 
     config()->set('monoforge.plugins.curseforge_key', 'cf-key');
     $cfUrl = 'https://edge.forgecdn.net/files/1/2/Essentials.jar';
     $world->remote[$cfUrl] = 'not what was published';
     $world->catalog['https://api.curseforge.com/v1/mods/55/files/77'] = ['data' => ['id' => 77, 'modId' => 55, 'displayName' => 'Essentials', 'fileName' => 'Essentials.jar', 'downloadUrl' => $cfUrl, 'hashes' => [['value' => sha1(JAR), 'algo' => 1], ['value' => md5(JAR), 'algo' => 2]], 'gameVersions' => ['1.21.4', 'Bukkit'], 'fileLength' => 5, 'releaseType' => 1]];
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'curseforge', 'project' => '55', 'version' => '77'])
-        ->assertStatus(400)
-        ->assertJsonPath('errors.0.detail', "Essentials.jar did not match the catalog's sha1 hash, so it was removed.");
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'curseforge', 'project' => '55', 'version' => '77'])
+        ->assertJsonPath('attributes.status', 'failed')
+        ->assertJsonPath('attributes.message', "Essentials.jar did not match the catalog's sha1 hash, so it was removed.");
 
     expect(array_keys(array_filter($world->files, fn (string $path): bool => str_starts_with($path, 'plugins/'), ARRAY_FILTER_USE_KEY)))->toBe(['plugins/ViaVersion-5.jar']);
 });
@@ -286,10 +306,17 @@ test('installed jars are matched by sha1, updated and removed', function (): voi
     $world->catalog['https://api.modrinth.com/v2/projects*'] = [['id' => 'P7dR8mSH', 'title' => 'LuckPerms', 'slug' => 'luckperms', 'icon_url' => null, 'project_type' => 'mod']];
     $world->catalog['https://api.modrinth.com/v2/version/v2id'] = $latest;
 
+    // The first look lists the jars and queues the check (the test queue runs it at once).
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))
+        ->assertOk()
+        ->assertJsonPath('meta.scanning', true)
+        ->assertJsonPath('data.0.sha1', null);
+
     $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))
         ->assertOk()
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('meta.directory', 'plugins')
+        ->assertJsonPath('meta.scanning', false)
         ->assertJsonPath('data.0.file_name', 'LuckPerms-1.jar')
         ->assertJsonPath('data.0.project.title', 'LuckPerms')
         ->assertJsonPath('data.0.version.version_number', '1.0')
@@ -300,11 +327,13 @@ test('installed jars are matched by sha1, updated and removed', function (): voi
     $body = $world->requestsTo('https://api.modrinth.com/v2/version_files/update')[0]['data'];
     expect($body['loaders'])->toBe(['paper', 'spigot', 'bukkit'])->and($body['game_versions'])->toBe(['1.21.4']);
 
-    $this->actingAs($user)->postJson($this->link($server, '/plugins/installed/update'), ['file' => 'LuckPerms-1.jar'])
-        ->assertOk()->assertJsonPath('attributes.file_name', 'LuckPerms-2.jar');
+    queued($this, $user, $this->link($server, '/plugins/installed/update'), $this->link($server, '/plugins/install'), ['file' => 'LuckPerms-1.jar'])
+        ->assertJsonPath('attributes.status', 'completed')
+        ->assertJsonPath('attributes.file_name', 'LuckPerms-2.jar');
     expect($world->files)->toHaveKey('plugins/LuckPerms-2.jar')->not->toHaveKey('plugins/LuckPerms-1.jar');
     $this->assertActivityFor('server:plugin.update', $user, $server);
 
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))->assertOk();
     $this->actingAs($user)->postJson($this->link($server, '/plugins/installed/update'), ['file' => 'Unknown.jar'])
         ->assertStatus(400)->assertJsonPath('errors.0.detail', 'There is no update for this file.');
 
@@ -338,4 +367,134 @@ test('plugin search and install calls are rate limited per user', function (): v
     }
 
     $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'abc', 'version' => 'last'])->assertTooManyRequests();
+});
+
+test('installed jars are hashed by a queued scan on the installs queue, again only when files change and at most once a minute', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    $world->file('plugins/A.jar', 'a')->file('plugins/Huge.jar', 'huge');
+    $world->reportedSizes['plugins/Huge.jar'] = InstalledPlugins::MAX_HASH_BYTES + 1;
+    $world->catalog['https://api.modrinth.com/v2/version_files'] = [];
+    Bus::fake([ScanInstalledPluginsJob::class]);
+
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))->assertJsonPath('meta.scanning', true);
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))->assertJsonPath('meta.scanning', true);
+    // Two looks within a minute queue one scan, and the request itself hashed nothing.
+    Bus::assertDispatchedTimes(ScanInstalledPluginsJob::class, 1);
+    Bus::assertDispatched(ScanInstalledPluginsJob::class, fn (ScanInstalledPluginsJob $job): bool => $job->connection === 'installs' && $job->queue === 'installs');
+    expect($world->requestsTo('*/files/contents?file=plugins*'))->toBe([]);
+
+    resolve(InstalledPlugins::class)->scan($server, 'plugins');
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))
+        ->assertJsonPath('meta.scanning', false)
+        ->assertJsonPath('data.0.file_name', 'A.jar')
+        ->assertJsonPath('data.0.sha1', sha1('a'))
+        ->assertJsonPath('data.1.file_name', 'Huge.jar')
+        ->assertJsonPath('data.1.sha1', null)
+        ->assertJsonPath('data.1.note', InstalledPlugins::TOO_LARGE_NOTE);
+    // Only the small jar was streamed.
+    expect($world->requestsTo('*/files/contents?file=plugins*'))->toHaveCount(1);
+
+    // Unchanged files: nothing is queued. A changed folder queues a rescan after the minute.
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'));
+    $world->file('plugins/B.jar', 'b');
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))->assertJsonPath('meta.scanning', true);
+    Bus::assertDispatchedTimes(ScanInstalledPluginsJob::class, 1);
+    $this->travel(InstalledPlugins::RESCAN_SECONDS + 1)->seconds();
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/installed'))->assertJsonPath('meta.scanning', true);
+    Bus::assertDispatchedTimes(ScanInstalledPluginsJob::class, 2);
+
+    // The stored hashes are one entry per server and folder, rebuilt (so pruned) on every scan.
+    unset($world->files['plugins/A.jar']);
+    resolve(InstalledPlugins::class)->scan($server, 'plugins');
+    expect(array_keys(Cache::get('plugins:installed:'.$server->uuid.':plugins')['files']))->toBe(['B.jar', 'Huge.jar']);
+});
+
+test('an update waits until the installed files have been checked', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    $world->file('plugins/A.jar', 'a');
+    Bus::fake([ScanInstalledPluginsJob::class]);
+
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/installed/update'), ['file' => 'A.jar'])
+        ->assertConflict()
+        ->assertJsonPath('errors.0.detail', 'The installed files are still being checked. Try again in a moment.');
+});
+
+test('installs are queued on the installs queue, and an unknown install id is not found', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    $url = 'https://cdn.modrinth.com/data/P7dR8mSH/versions/v2/LuckPerms-2.jar';
+    $world->catalog['https://api.modrinth.com/v2/version/v2id'] = modrinthVersion('v2id', 'P7dR8mSH', '2.0', 'LuckPerms-2.jar', $url, JAR);
+    Bus::fake([InstallPluginJob::class]);
+
+    $this->actingAs($user)->postJson($this->link($server, '/plugins/install'), ['source' => 'modrinth', 'project' => 'P7dR8mSH', 'version' => 'v2id'])->assertAccepted();
+    Bus::assertDispatched(InstallPluginJob::class, fn (InstallPluginJob $job): bool => $job->connection === 'installs' && $job->queue === 'installs');
+    expect($world->pulled)->toBe([]);
+
+    $this->actingAs($user)->getJson($this->link($server, '/plugins/install/9b2f3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d'))->assertNotFound();
+    [$other, $otherServer] = $this->generateTestAccount();
+    $id = PluginInstallProgress::start($server, 'plugins', '2.0')['id'];
+    $this->actingAs($other)->getJson($this->link($otherServer, '/plugins/install/'.$id))->assertNotFound();
+});
+
+test('a single install needs a usable hash; an md5 alone only together with the size', function (array $hashes, int $size, ?string $failure): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    config()->set('monoforge.plugins.curseforge_key', 'cf-key');
+    $cfUrl = 'https://edge.forgecdn.net/files/1/2/Essentials.jar';
+    $world->remote[$cfUrl] = JAR;
+    $world->catalog['https://api.curseforge.com/v1/mods/55/files/77'] = ['data' => ['id' => 77, 'modId' => 55, 'displayName' => 'Essentials', 'fileName' => 'Essentials.jar', 'downloadUrl' => $cfUrl, 'hashes' => $hashes, 'gameVersions' => ['1.21.4', 'Bukkit'], 'fileLength' => $size, 'releaseType' => 1]];
+
+    $progress = queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'curseforge', 'project' => '55', 'version' => '77']);
+
+    if ($failure === null) {
+        $progress->assertJsonPath('attributes.status', 'completed');
+        expect($world->files['plugins/Essentials.jar'] ?? null)->toBe(JAR);
+    } else {
+        $progress->assertJsonPath('attributes.status', 'failed')->assertJsonPath('attributes.message', $failure);
+        expect($world->files)->not->toHaveKey('plugins/Essentials.jar');
+    }
+})->with([
+    'no hash' => [[], mb_strlen(JAR), 'The catalog gave no hash for Essentials.jar, so it was not installed.'],
+    'md5 and the right size' => [[['value' => md5(JAR), 'algo' => 2]], mb_strlen(JAR), null],
+    'md5 and a wrong size' => [[['value' => md5(JAR), 'algo' => 2]], mb_strlen(JAR) + 1, "Essentials.jar did not match the catalog's size, so it was removed."],
+    'md5 without a size' => [[['value' => md5(JAR), 'algo' => 2]], 0, 'The catalog gave no hash for Essentials.jar, so it was not installed.'],
+]);
+
+test('project icons are shown only from the catalog CDNs', function (): void {
+    expect(DownloadPolicy::iconUrl('https://cdn.modrinth.com/data/AABB/icon.png'))->toBe('https://cdn.modrinth.com/data/AABB/icon.png')
+        ->and(DownloadPolicy::iconUrl('https://media.forgecdn.net/avatars/1/2/logo.png'))->toBe('https://media.forgecdn.net/avatars/1/2/logo.png')
+        ->and(DownloadPolicy::iconUrl('https://tracker.example.com/pixel.png'))->toBeNull()
+        ->and(DownloadPolicy::iconUrl('http://cdn.modrinth.com/icon.png'))->toBeNull()
+        ->and(DownloadPolicy::iconUrl('https://cdn.modrinth.com.evil.example/icon.png'))->toBeNull()
+        ->and(DownloadPolicy::iconUrl(null))->toBeNull();
+});
+
+test('each user gets only a share of the catalog budget', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    $world->catalog['https://api.modrinth.com/v2/search*'] = ['hits' => [], 'total_hits' => 0, 'limit' => 20, 'offset' => 0];
+
+    $statuses = [];
+    for ($i = 0; $i < 45; $i++) {
+        $statuses[] = $this->actingAs($user)->getJson($this->link($server, '/plugins/search?source=modrinth&query=q'.$i))->status();
+    }
+
+    // 40 catalog calls a minute for one user (the route allows 60 requests).
+    expect(array_count_values($statuses))->toBe([200 => 40, 429 => 5]);
+});
+
+test('the size check counts bytes, not characters', function (): void {
+    [$user, $server] = $this->generateTestAccount();
+    $world = paperWorld();
+    config()->set('monoforge.plugins.curseforge_key', 'cf-key');
+    $content = str_repeat("\u{00FC}n\u{00EF}c\u{00F6}d\u{00E9} ", 64);
+    $cfUrl = 'https://edge.forgecdn.net/files/1/2/Essentials.jar';
+    $world->remote[$cfUrl] = $content;
+    $world->catalog['https://api.curseforge.com/v1/mods/55/files/77'] = ['data' => ['id' => 77, 'modId' => 55, 'displayName' => 'Essentials', 'fileName' => 'Essentials.jar', 'downloadUrl' => $cfUrl, 'hashes' => [['value' => md5($content), 'algo' => 2]], 'gameVersions' => ['1.21.4', 'Bukkit'], 'fileLength' => mb_strlen($content, '8bit'), 'releaseType' => 1]];
+
+    queued($this, $user, $this->link($server, '/plugins/install'), $this->link($server, '/plugins/install'), ['source' => 'curseforge', 'project' => '55', 'version' => '77'])
+        ->assertJsonPath('attributes.status', 'completed');
+    expect(mb_strlen($content, '8bit'))->toBeGreaterThan(mb_strlen($content));
 });

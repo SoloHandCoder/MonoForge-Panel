@@ -11,6 +11,7 @@ use Pterodactyl\Data\Plugins\MarketplaceSearchResult;
 use Pterodactyl\Data\Plugins\MarketplaceVersion;
 use Pterodactyl\Enum\MarketplaceProjectType;
 use Pterodactyl\Enum\MarketplaceSource;
+use Pterodactyl\Services\Plugins\DownloadPolicy;
 use Pterodactyl\Services\Plugins\MarketplaceHttp;
 use Pterodactyl\Services\Plugins\Payload;
 use Pterodactyl\Services\Plugins\ServerPlatform;
@@ -87,7 +88,7 @@ final readonly class ModrinthCatalog implements MarketplaceCatalog
                     title: Payload::string($hit, 'title', $slug),
                     description: Payload::string($hit, 'description'),
                     author: Payload::nullableString($hit, 'author'),
-                    iconUrl: $this->httpsUrl(Payload::string($hit, 'icon_url')),
+                    iconUrl: DownloadPolicy::iconUrl(Payload::string($hit, 'icon_url')),
                     downloads: Payload::int($hit, 'downloads'),
                     updatedAt: Payload::nullableString($hit, 'date_modified'),
                     url: 'https://modrinth.com/'.rawurlencode($type === 'modpack' ? 'modpack' : ($search->type === MarketplaceProjectType::Plugin ? 'plugin' : 'mod')).'/'.rawurlencode($slug),
@@ -203,7 +204,7 @@ final readonly class ModrinthCatalog implements MarketplaceCatalog
                     $projects[$id] = [
                         'title' => Payload::string($project, 'title', $id),
                         'slug' => Payload::string($project, 'slug', $id),
-                        'icon_url' => $this->httpsUrl(Payload::string($project, 'icon_url')),
+                        'icon_url' => DownloadPolicy::iconUrl(Payload::string($project, 'icon_url')),
                         'project_type' => Payload::string($project, 'project_type', 'mod'),
                     ];
                 }
@@ -266,10 +267,5 @@ final readonly class ModrinthCatalog implements MarketplaceCatalog
             publishedAt: Payload::nullableString($version, 'date_published'),
             file: $file,
         );
-    }
-
-    private function httpsUrl(string $url): ?string
-    {
-        return str_starts_with($url, 'https://') ? $url : null;
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Plugins;
 
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Sleep;
+use Illuminate\Support\Facades\Cache;
 use JsonException;
 use Pterodactyl\Contracts\Backups\InitiatesBackups;
 use Pterodactyl\Data\Plugins\MarketplaceFile;
@@ -20,7 +20,8 @@ use Throwable;
 /**
  * Installs a Modrinth modpack (.mrpack, https://support.modrinth.com/en/articles/8802351):
  *
- *  1. backs the server up first when it has a free backup slot, and waits for the backup;
+ *  1. backs the server up first (see backupStep(): the job waits for it without sleeping),
+ *     or goes on without one only when the user confirmed that;
  *  2. has Wings download the .mrpack into a staging folder, checks its hashes, extracts it;
  *  3. reads modrinth.index.json and checks every file before anything is downloaded: a
  *     relative path inside the server root, an allowed download host, a sha1 or sha512;
@@ -29,7 +30,10 @@ use Throwable;
  *  5. only then moves the files into place, then overrides/ and server-overrides/ on top.
  *
  * Until step 5 nothing outside the staging folder changes, so a failed install leaves the
- * server as it was. The staging folder is removed at the end either way.
+ * server as it was. Step 5 first checks every target and refuses, before changing anything,
+ * when a target and what is there differ in type (file or folder), or when the pack would
+ * replace anything in a world folder or a plugin's data folder. Folders are never deleted.
+ * The staging folder is removed at the end either way.
  */
 final readonly class ModpackInstaller
 {
@@ -38,18 +42,39 @@ final readonly class ModpackInstaller
     /** Most files an index may list. */
     public const int MAX_FILES = 2000;
 
+    /** How long to wait for the backup, in seconds. */
+    public const int BACKUP_WAIT = 600;
+
+    public const string NO_BACKUP_MESSAGE = 'This server has no free backup slot, so the modpack was not installed. Free a backup slot, or confirm installing without a backup.';
+
     /** Most override files and folders walked. */
     private const int MAX_OVERRIDES = 10000;
 
     private const int MAX_INDEX_BYTES = 10 * 1024 * 1024;
 
-    /** How long to wait for the backup, in seconds. */
-    private const int BACKUP_WAIT = 600;
-
     /** Files moved per Wings rename or delete call. */
     private const int CHUNK = 100;
 
     public function __construct(private VerifiedDownload $downloads) {}
+
+    /** Whether the server has a free backup slot for the backup before an install. */
+    public static function canBackup(Server $server): bool
+    {
+        $limit = (int) $server->backup_limit;
+
+        return $limit > 0 && $server->backups()->nonFailed()->count() < $limit;
+    }
+
+    /**
+     * Whether a pack may not replace the path: anything in a world folder (world, world_nether,
+     * world_the_end, ...) or in a plugin's data folder (plugins/<name>/...).
+     */
+    public static function protectedPath(string $path): bool
+    {
+        $parts = explode('/', mb_strtolower($path));
+
+        return str_starts_with($parts[0], 'world') || ($parts[0] === 'plugins' && count($parts) >= 3);
+    }
 
     /**
      * @throws MarketplaceException
@@ -58,8 +83,6 @@ final readonly class ModpackInstaller
     public function install(Server $server, MarketplaceFile $pack): void
     {
         $files = Daemon::server($server)->files();
-
-        $this->backup($server);
 
         ModpackProgress::update($server, ['step' => 'download']);
         $this->removeStaging($server);
@@ -105,45 +128,57 @@ final readonly class ModpackInstaller
     }
 
     /**
-     * Starts a backup when the server has a free slot, and waits for it to finish.
+     * The backup before the install, one step at a time so the job never sleeps: the first call
+     * starts it, later calls check it. True when the install may go on (the backup completed, or
+     * the user confirmed going on without one), false while it is still running.
      *
-     * @throws MarketplaceException when the backup fails
+     * @throws MarketplaceException when there is no backup and no confirmation, or it failed or took too long
      */
-    private function backup(Server $server): void
+    public function backupStep(Server $server, bool $confirmedWithoutBackup): bool
     {
-        $limit = (int) $server->backup_limit;
-        if ($limit <= 0 || $server->backups()->nonFailed()->count() >= $limit) {
-            ModpackProgress::update($server, ['backup' => 'skipped']);
+        $key = 'plugins:modpack-backup:'.$server->uuid;
+        /** @var array{uuid: string, started_at: int}|null $pending */
+        $pending = Cache::get($key);
 
-            return;
-        }
-
-        ModpackProgress::update($server, ['step' => 'backup']);
-
-        try {
-            $backup = App::make(InitiatesBackups::class)->initiate($server, 'Before modpack install');
-        } catch (TooManyBackupsException) {
-            ModpackProgress::update($server, ['backup' => 'skipped']);
-
-            return;
-        }
-
-        $waited = 0;
-        while ($waited < self::BACKUP_WAIT) {
-            $backup = $backup->fresh() ?? $backup;
-            if ($backup->completed_at !== null) {
-                throw_unless($backup->is_successful, MarketplaceException::class, 'The backup before the install failed, so the modpack was not installed.');
-
-                ModpackProgress::update($server, ['backup' => 'created']);
-
-                return;
+        if (! is_array($pending)) {
+            $backup = null;
+            if (self::canBackup($server)) {
+                try {
+                    $backup = App::make(InitiatesBackups::class)->initiate($server, 'Before modpack install');
+                } catch (TooManyBackupsException) {
+                    $backup = null;
+                }
             }
 
-            Sleep::sleep(5);
-            $waited += 5;
+            if ($backup === null) {
+                throw_unless($confirmedWithoutBackup, MarketplaceException::class, self::NO_BACKUP_MESSAGE);
+                ModpackProgress::update($server, ['backup' => 'skipped']);
+
+                return true;
+            }
+
+            ModpackProgress::update($server, ['step' => 'backup']);
+            Cache::put($key, ['uuid' => $backup->uuid, 'started_at' => now()->getTimestamp()], self::BACKUP_WAIT * 2);
+
+            return false;
         }
 
-        throw new MarketplaceException('The backup before the install took too long, so the modpack was not installed.');
+        $backup = $server->backups()->where('uuid', $pending['uuid'])->first();
+        if ($backup !== null && $backup->completed_at !== null) {
+            Cache::forget($key);
+            throw_unless($backup->is_successful, MarketplaceException::class, 'The backup before the install failed, so the modpack was not installed.');
+            ModpackProgress::update($server, ['backup' => 'created']);
+
+            return true;
+        }
+
+        if ($backup === null || now()->getTimestamp() - $pending['started_at'] >= self::BACKUP_WAIT) {
+            Cache::forget($key);
+
+            throw new MarketplaceException('The backup before the install took too long, so the modpack was not installed.');
+        }
+
+        return false;
     }
 
     /**
@@ -288,27 +323,43 @@ final readonly class ModpackInstaller
         $folders = array_keys($folders);
         usort($folders, fn (string $a, string $b): int => mb_substr_count($a, '/') <=> mb_substr_count($b, '/') ?: strcmp($a, $b));
 
-        $contents = ['' => $this->names($server, '')];
+        // Check everything first: nothing is changed until every target is known to be safe.
+        /** @var array<string, array<string, bool>|null> $contents folder => name => is a file (null: to be created) */
+        $contents = ['' => $this->entries($server, '')];
+        $create = [];
         foreach ($folders as $folder) {
             $parent = str_contains($folder, '/') ? mb_substr($folder, 0, (int) mb_strrpos($folder, '/')) : '';
             $name = basename($folder);
-            if (! in_array($name, $contents[$parent] ?? [], true)) {
-                $files->createDirectory($name, '/'.$parent);
-                $contents[$folder] = [];
+            $around = $contents[$parent] ?? null;
+            if ($around !== null && array_key_exists($name, $around)) {
+                throw_if($around[$name], MarketplaceException::class, "The modpack needs a folder where the server has a file ({$this->label($folder)}), so nothing was changed.");
+                $contents[$folder] = $this->entries($server, $folder);
             } else {
-                $contents[$folder] = $this->names($server, $folder);
+                $create[] = [$name, $parent];
+                $contents[$folder] = null;
             }
         }
 
-        $existing = [];
+        $replace = [];
         foreach ($targets as $target) {
             $parent = str_contains($target, '/') ? mb_substr($target, 0, (int) mb_strrpos($target, '/')) : '';
-            if (in_array(basename($target), $contents[$parent] ?? [], true)) {
-                $existing[] = $target;
+            $around = $contents[$parent] ?? null;
+            $name = basename($target);
+            if ($around === null || ! array_key_exists($name, $around)) {
+                continue;
             }
+
+            throw_unless($around[$name], MarketplaceException::class, "The modpack would put a file where the server has a folder ({$this->label($target)}), so nothing was changed.");
+            throw_if(self::protectedPath($target), MarketplaceException::class, "The modpack would replace {$this->label($target)}, which may hold a world or plugin data, so nothing was changed.");
+            $replace[] = $target;
         }
 
-        foreach (array_chunk($existing, self::CHUNK) as $chunk) {
+        foreach ($create as [$name, $parent]) {
+            $files->createDirectory($name, '/'.$parent);
+        }
+
+        // Only files are ever deleted (each checked above), and only to be replaced.
+        foreach (array_chunk($replace, self::CHUNK) as $chunk) {
             $files->deleteFiles('/', $chunk);
         }
 
@@ -323,11 +374,13 @@ final readonly class ModpackInstaller
     }
 
     /**
-     * @return list<string>
+     * The folder's entries: name => whether it is a file.
+     *
+     * @return array<string, bool>
      *
      * @throws DaemonConnectionException
      */
-    private function names(Server $server, string $folder): array
+    private function entries(Server $server, string $folder): array
     {
         try {
             $entries = Daemon::server($server)->files()->getDirectory('/'.$folder);
@@ -339,7 +392,12 @@ final readonly class ModpackInstaller
             throw $daemonConnectionException;
         }
 
-        return array_map(fn (array $entry): string => $entry['name'] ?? '', $entries);
+        $found = [];
+        foreach ($entries as $entry) {
+            $found[(string) ($entry['name'] ?? '')] = ($entry['file'] ?? false) === true;
+        }
+
+        return $found;
     }
 
     private function removeStaging(Server $server): void
