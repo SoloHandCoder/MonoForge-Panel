@@ -11,6 +11,7 @@ use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
 use Pterodactyl\Http\Controllers\Base\PlayitSwitchScriptController;
 use Pterodactyl\Http\Controllers\Base\ReferralLinkController;
+use Pterodactyl\Http\Controllers\Base\ServerDiscoveryPageController;
 use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
 use Pterodactyl\Http\Controllers\Base\SitemapController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
@@ -68,6 +69,12 @@ Route::get('/s/{slug}', [IndexController::class, 'serverPage'])
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->where('slug', ServerPageSlug::PATTERN)
     ->name('server-page');
+
+// The server discovery page: the published server pages that are listed, readable without
+// signing in and indexable; the server adds the title and description, the SPA renders the list.
+Route::get('/servers', ServerDiscoveryPageController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->name('servers');
 
 // A public server page's banner image. Stateless, like the extension files below.
 Route::get('/s/{slug}/banner/{file}', ServerPageBannerController::class)

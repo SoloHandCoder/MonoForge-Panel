@@ -475,3 +475,54 @@ test('deleting the server deletes its page and banner', function (): void {
     expect(ServerPage::query()->count())->toBe(0);
     Storage::disk('local')->assertMissing('server-pages/'.$name);
 });
+
+test('the page carries its look, sections and links, with readable text colours', function (): void {
+    publishedPage([
+        'tagline' => 'Islands and events',
+        'banner_color' => '#ffd166',
+        'background_style' => 'gradient',
+        'background_from' => '#0e0d15',
+        'background_to' => '#5b21b6',
+        'button_style' => 'square',
+        'discord_url' => 'https://discord.gg/skyblock',
+        'website_url' => 'https://skyblock.example.com',
+    ]);
+
+    $this->getJson('/api/public/servers/skyblock')
+        ->assertOk()
+        ->assertJsonPath('tagline', 'Islands and events')
+        ->assertJsonPath('theme', [
+            'accent' => '#ffd166',
+            'accent_text' => '#000000',
+            'background' => ['style' => 'gradient', 'from' => '#0e0d15', 'to' => '#5b21b6', 'image_url' => null],
+            'text' => '#ffffff',
+            'button_style' => 'square',
+        ])
+        ->assertJsonPath('sections', ['players' => true, 'votes' => true, 'address' => true, 'description' => true])
+        ->assertJsonPath('links', ['discord' => 'https://discord.gg/skyblock', 'website' => 'https://skyblock.example.com']);
+});
+
+test('a section the owner hides is left out of the page data', function (): void {
+    $page = publishedPage(['show_players' => false, 'show_address' => false, 'show_description' => false, 'show_votes' => false]);
+    ServerTunnel::query()->create(['server_id' => $page->server_id, 'address' => 'skyblock.joinmc.link', 'status' => TunnelStatus::Active]);
+    $query = Mockery::mock(ServerQuery::class);
+    $query->shouldReceive('status')->andReturn(new QueryStatus(3, 20, 'Hi', '1.21.4', []));
+    $this->app->instance(ServerQuery::class, $query);
+
+    $response = $this->getJson('/api/public/servers/skyblock')
+        ->assertOk()
+        ->assertJsonPath('status', 'online')
+        ->assertJsonPath('players', null)
+        ->assertJsonPath('address', null)
+        ->assertJsonPath('join_url', null)
+        ->assertJsonPath('description', '')
+        ->assertJsonPath('sections', ['players' => false, 'votes' => false, 'address' => false, 'description' => false]);
+
+    expect((string) $response->getContent())->not->toContain('skyblock.joinmc.link')->not->toContain('friendly');
+});
+
+test('a stored link that is no longer valid is not shown', function (): void {
+    publishedPage(['discord_url' => 'https://evil.example/invite', 'website_url' => 'javascript:alert(1)']);
+
+    $this->getJson('/api/public/servers/skyblock')->assertJsonPath('links', ['discord' => null, 'website' => null]);
+});

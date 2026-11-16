@@ -3411,6 +3411,12 @@ export type AdminTransferServerRequest = {
      */
     ignore_tags?: boolean;
 };
+export type AdminUpdateServerPublicPageDiscoveryRequest = {
+    /**
+     * Whether the page is kept off the discovery page.
+     */
+    hidden: boolean;
+};
 export type AdminExtendServerSubscriptionRequest = {
     /**
      * Free days to add, 1 to 365.
@@ -5636,9 +5642,57 @@ export type ClientUpdateServerPublicPageRequest = {
      */
     description: string;
     /**
-     * The banner colour as #rrggbb, or null for the default.
+     * The accent colour (buttons and the banner without a background) as #rrggbb, or null for the default.
      */
     banner_color: string;
+    /**
+     * Whether the page is listed on the server discovery page at /servers. On for a new page; left unchanged when omitted.
+     */
+    discoverable?: boolean;
+    /**
+     * One line of plain text under the name, at most 80 characters, or null for none. Left unchanged when omitted.
+     */
+    tagline?: string | null;
+    /**
+     * solid, gradient or image. A gradient needs background_to, and its two colours must leave some text colour readable on both (WCAG AA); image uses the banner image. Left unchanged when omitted.
+     */
+    background_style?: 'solid' | 'gradient' | 'image';
+    /**
+     * The background colour (the start of a gradient) as #rrggbb, or null for the default.
+     */
+    background_from?: string | null;
+    /**
+     * The end of the gradient as #rrggbb, or null.
+     */
+    background_to?: string | null;
+    /**
+     * rounded or square buttons.
+     */
+    button_style?: 'rounded' | 'square';
+    /**
+     * Whether the page shows the players online.
+     */
+    show_players?: boolean;
+    /**
+     * Whether the page shows the votes.
+     */
+    show_votes?: boolean;
+    /**
+     * Whether the page shows the join address.
+     */
+    show_address?: boolean;
+    /**
+     * Whether the page shows the description.
+     */
+    show_description?: boolean;
+    /**
+     * An https Discord invite on discord.gg or discord.com, or null.
+     */
+    discord_url?: string | null;
+    /**
+     * An https website address, or null.
+     */
+    website_url?: string | null;
     /**
      * Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.
      */
@@ -8393,6 +8447,66 @@ export type AdminGetStorageUsageResponseBody = {
         remote_backups_count: number;
     };
 };
+export type AdminGetServerPublicPageDiscoveryResponseBody = {
+    /**
+     * Whether the server has a public page.
+     */
+    exists: boolean;
+    /**
+     * The part of the page address after /s/, or null without a page.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page, or null without a page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether the owner lists the page on the discovery page.
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * Whether the page is on the discovery page now: published, listed by its owner, not hidden, and its server installed and not suspended.
+     */
+    listed: boolean;
+};
+export type AdminUpdateServerPublicPageDiscoveryResponseBody = {
+    /**
+     * Always true.
+     */
+    exists: boolean;
+    /**
+     * The part of the page address after /s/.
+     */
+    slug: string | null;
+    /**
+     * The full address of the page.
+     */
+    url: string | null;
+    /**
+     * Whether anyone can open the page.
+     */
+    published: boolean;
+    /**
+     * Whether the owner lists the page on the discovery page.
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * Whether the page is on the discovery page now.
+     */
+    listed: boolean;
+};
 export type AdminListNodeAllocationIpsResponseBody = {
     data?: Array<string>;
 };
@@ -9683,6 +9797,58 @@ export type ClientGetServerPublicPageResponseBody = {
      * Whether visitors may wake the sleeping server from the page.
      */
     allow_wake: boolean;
+    /**
+     * Whether the owner lists the page on the server discovery page at /servers (on by default).
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page; the page itself stays published.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * One line of plain text under the name, at most 80 characters; empty for none.
+     */
+    tagline: string;
+    /**
+     * solid, gradient (between background_from and background_to) or image (the banner image).
+     */
+    background_style: 'solid' | 'gradient' | 'image';
+    /**
+     * The background colour as #rrggbb, or null for the panel's default.
+     */
+    background_from: string | null;
+    /**
+     * The end of the gradient as #rrggbb, or null.
+     */
+    background_to: string | null;
+    /**
+     * The shape of the buttons.
+     */
+    button_style: 'rounded' | 'square';
+    /**
+     * Whether the page shows the players online.
+     */
+    show_players: boolean;
+    /**
+     * Whether the page shows the votes and the vote button.
+     */
+    show_votes: boolean;
+    /**
+     * Whether the page shows the join address.
+     */
+    show_address: boolean;
+    /**
+     * Whether the page shows the description.
+     */
+    show_description: boolean;
+    /**
+     * The Discord invite, or null.
+     */
+    discord_url: string | null;
+    /**
+     * The website, or null.
+     */
+    website_url: string | null;
 };
 export type ClientUpdateServerPublicPageResponseBody = {
     /**
@@ -9729,6 +9895,58 @@ export type ClientUpdateServerPublicPageResponseBody = {
      * Whether visitors may wake the sleeping server from the page.
      */
     allow_wake: boolean;
+    /**
+     * Whether the owner lists the page on the server discovery page at /servers (on by default).
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page; the page itself stays published.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * One line of plain text under the name, at most 80 characters; empty for none.
+     */
+    tagline: string;
+    /**
+     * solid, gradient (between background_from and background_to) or image (the banner image).
+     */
+    background_style: 'solid' | 'gradient' | 'image';
+    /**
+     * The background colour as #rrggbb, or null for the panel's default.
+     */
+    background_from: string | null;
+    /**
+     * The end of the gradient as #rrggbb, or null.
+     */
+    background_to: string | null;
+    /**
+     * The shape of the buttons.
+     */
+    button_style: 'rounded' | 'square';
+    /**
+     * Whether the page shows the players online.
+     */
+    show_players: boolean;
+    /**
+     * Whether the page shows the votes and the vote button.
+     */
+    show_votes: boolean;
+    /**
+     * Whether the page shows the join address.
+     */
+    show_address: boolean;
+    /**
+     * Whether the page shows the description.
+     */
+    show_description: boolean;
+    /**
+     * The Discord invite, or null.
+     */
+    discord_url: string | null;
+    /**
+     * The website, or null.
+     */
+    website_url: string | null;
 };
 export type ClientUploadServerPublicPageBannerResponseBody = {
     /**
@@ -9775,6 +9993,58 @@ export type ClientUploadServerPublicPageBannerResponseBody = {
      * Whether visitors may wake the sleeping server from the page.
      */
     allow_wake: boolean;
+    /**
+     * Whether the owner lists the page on the server discovery page at /servers (on by default).
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page; the page itself stays published.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * One line of plain text under the name, at most 80 characters; empty for none.
+     */
+    tagline: string;
+    /**
+     * solid, gradient (between background_from and background_to) or image (the banner image).
+     */
+    background_style: 'solid' | 'gradient' | 'image';
+    /**
+     * The background colour as #rrggbb, or null for the panel's default.
+     */
+    background_from: string | null;
+    /**
+     * The end of the gradient as #rrggbb, or null.
+     */
+    background_to: string | null;
+    /**
+     * The shape of the buttons.
+     */
+    button_style: 'rounded' | 'square';
+    /**
+     * Whether the page shows the players online.
+     */
+    show_players: boolean;
+    /**
+     * Whether the page shows the votes and the vote button.
+     */
+    show_votes: boolean;
+    /**
+     * Whether the page shows the join address.
+     */
+    show_address: boolean;
+    /**
+     * Whether the page shows the description.
+     */
+    show_description: boolean;
+    /**
+     * The Discord invite, or null.
+     */
+    discord_url: string | null;
+    /**
+     * The website, or null.
+     */
+    website_url: string | null;
 };
 export type ClientDeleteServerPublicPageBannerResponseBody = {
     /**
@@ -9821,6 +10091,58 @@ export type ClientDeleteServerPublicPageBannerResponseBody = {
      * Whether visitors may wake the sleeping server from the page.
      */
     allow_wake: boolean;
+    /**
+     * Whether the owner lists the page on the server discovery page at /servers (on by default).
+     */
+    discoverable: boolean;
+    /**
+     * Whether an administrator took the page off the discovery page; the page itself stays published.
+     */
+    hidden_from_discovery: boolean;
+    /**
+     * One line of plain text under the name, at most 80 characters; empty for none.
+     */
+    tagline: string;
+    /**
+     * solid, gradient (between background_from and background_to) or image (the banner image).
+     */
+    background_style: 'solid' | 'gradient' | 'image';
+    /**
+     * The background colour as #rrggbb, or null for the panel's default.
+     */
+    background_from: string | null;
+    /**
+     * The end of the gradient as #rrggbb, or null.
+     */
+    background_to: string | null;
+    /**
+     * The shape of the buttons.
+     */
+    button_style: 'rounded' | 'square';
+    /**
+     * Whether the page shows the players online.
+     */
+    show_players: boolean;
+    /**
+     * Whether the page shows the votes and the vote button.
+     */
+    show_votes: boolean;
+    /**
+     * Whether the page shows the join address.
+     */
+    show_address: boolean;
+    /**
+     * Whether the page shows the description.
+     */
+    show_description: boolean;
+    /**
+     * The Discord invite, or null.
+     */
+    discord_url: string | null;
+    /**
+     * The website, or null.
+     */
+    website_url: string | null;
 };
 export type ClientGetCrashDoctorStatusResponseBody = {
     /**
@@ -10110,6 +10432,131 @@ export type ApiListThePublicStorePlansResponseBody = {
         }>;
     }>;
 };
+export type ApiListDiscoverableServerPagesResponseBody = {
+    /**
+     * The listed server pages.
+     */
+    data: Array<{
+        /**
+         * The part of the page address after /s/.
+         */
+        slug: string;
+        /**
+         * The path of the public page.
+         */
+        url: string;
+        /**
+         * The server name, at most 64 characters.
+         */
+        name: string;
+        /**
+         * The tagline, plain text up to 80 characters; empty for none.
+         */
+        tagline: string;
+        /**
+         * The start of the description as plain text, up to 160 characters; empty for none or when hidden.
+         */
+        description: string;
+        /**
+         * The game in Admin > Games, or null when the panel does not know it.
+         */
+        game: {
+            slug: string;
+            name: string;
+            /**
+             * The game colour as #rrggbb.
+             */
+            color: string;
+        } | null;
+        /**
+         * online when the game answers or Wings reports it running, sleeping when auto-sleep stopped it, unknown when its node cannot be reached.
+         */
+        status: 'online' | 'offline' | 'starting' | 'sleeping' | 'unknown';
+        /**
+         * The players online and the limit, when the game says; null otherwise.
+         */
+        players: {
+            online: number;
+            max: number;
+        } | null;
+        votes: number;
+        /**
+         * The playit address to join with, or null.
+         */
+        address: string | null;
+        /**
+         * The page's look. The text colours are picked by the panel so every combination stays readable (WCAG AA).
+         */
+        theme: {
+            /**
+             * The accent colour as #rrggbb.
+             */
+            accent: string;
+            /**
+             * The text colour on the accent: #ffffff or #000000.
+             */
+            accent_text: string;
+            background: {
+                /**
+                 * A solid colour, a gradient between two colours, or the banner image.
+                 */
+                style: 'solid' | 'gradient' | 'image';
+                /**
+                 * The background colour (the start of a gradient) as #rrggbb.
+                 */
+                from: string;
+                /**
+                 * The end of a gradient as #rrggbb, or null.
+                 */
+                to: string | null;
+                /**
+                 * The banner image path when the style is image, or null.
+                 */
+                image_url: string | null;
+            };
+            /**
+             * The text colour on the background: #ffffff or #000000 (always #ffffff over an image, which gets a dark scrim).
+             */
+            text: string;
+            /**
+             * The shape of the buttons.
+             */
+            button_style: 'rounded' | 'square';
+        };
+        /**
+         * Which parts of the page the owner shows. A hidden section is also left out of the data.
+         */
+        sections: {
+            players: boolean;
+            votes: boolean;
+            address: boolean;
+            description: boolean;
+        };
+        /**
+         * When the page was made.
+         */
+        created_at: string | null;
+    }>;
+    /**
+     * The page of results.
+     */
+    meta: {
+        page: number;
+        per_page: number;
+        /**
+         * Whether another page follows.
+         */
+        has_more: boolean;
+    };
+    /**
+     * The games to filter by.
+     */
+    games: Array<{
+        slug: string;
+        name: string;
+        color: string;
+    }>;
+};
 export type ApiGetAPublicServerPageResponseBody = {
     /**
      * The part of the page address after /s/.
@@ -10120,7 +10567,11 @@ export type ApiGetAPublicServerPageResponseBody = {
      */
     name: string;
     /**
-     * The description in markdown, to be shown with a safe renderer; empty for none.
+     * One line of plain text under the name, at most 80 characters; empty for none.
+     */
+    tagline: string;
+    /**
+     * The description in markdown, to be shown with a safe renderer; empty for none or when the owner hides it.
      */
     description: string;
     /**
@@ -10175,6 +10626,67 @@ export type ApiGetAPublicServerPageResponseBody = {
      * Whether a visitor may wake the server now: it is sleeping and its owner allows it.
      */
     can_wake: boolean;
+    /**
+     * The page's colours and button shape.
+     */
+    theme: {
+        /**
+         * The accent colour as #rrggbb.
+         */
+        accent: string;
+        /**
+         * The text colour on the accent: #ffffff or #000000.
+         */
+        accent_text: string;
+        background: {
+            /**
+             * A solid colour, a gradient between two colours, or the banner image.
+             */
+            style: 'solid' | 'gradient' | 'image';
+            /**
+             * The background colour (the start of a gradient) as #rrggbb.
+             */
+            from: string;
+            /**
+             * The end of a gradient as #rrggbb, or null.
+             */
+            to: string | null;
+            /**
+             * The banner image path when the style is image, or null.
+             */
+            image_url: string | null;
+        };
+        /**
+         * The text colour on the background: #ffffff or #000000 (always #ffffff over an image, which gets a dark scrim).
+         */
+        text: string;
+        /**
+         * The shape of the buttons.
+         */
+        button_style: 'rounded' | 'square';
+    };
+    /**
+     * Which parts of the page are shown.
+     */
+    sections: {
+        players: boolean;
+        votes: boolean;
+        address: boolean;
+        description: boolean;
+    };
+    /**
+     * The Discord invite and website.
+     */
+    links: {
+        /**
+         * A Discord invite on discord.gg or discord.com.
+         */
+        discord: string | null;
+        /**
+         * The server website.
+         */
+        website: string | null;
+    };
 };
 export type ApiVoteForAPublicServerPageResponseBody = {
     /**
@@ -10591,6 +11103,8 @@ export type AdminRebuildServerServerAdminIdentifierPathParameter = string;
 export type AdminGetServerTransferProgressServerAdminIdentifierPathParameter = string;
 export type AdminTransferServerServerAdminIdentifierPathParameter = string;
 export type AdminToggleServerInstallStateServerAdminIdentifierPathParameter = string;
+export type AdminGetServerPublicPageDiscoveryServerAdminIdentifierPathParameter = string;
+export type AdminUpdateServerPublicPageDiscoveryServerAdminIdentifierPathParameter = string;
 export type AdminGetServerSubscriptionServerAdminIdentifierPathParameter = string;
 export type AdminExtendServerSubscriptionServerAdminIdentifierPathParameter = string;
 export type AdminCancelServerSubscriptionServerAdminIdentifierPathParameter = string;
@@ -11543,6 +12057,26 @@ export type ClientListMinecraftVersionsSoftwarePathParameter = string;
 export type ClientRenameServerServerUuidPathParameter = string;
 export type ClientReinstallServerServerUuidPathParameter = string;
 export type ClientSetServerDockerImageServerUuidPathParameter = string;
+/**
+ * Only servers of this game, by its slug in Admin > Games.
+ */
+export type ApiListDiscoverableServerPagesGameQueryParameter = string;
+/**
+ * Only servers whose name contains this, at most 64 characters.
+ */
+export type ApiListDiscoverableServerPagesSearchQueryParameter = string;
+/**
+ * players (most players online first, the default), votes (most votes first) or newest.
+ */
+export type ApiListDiscoverableServerPagesSortQueryParameter = 'players' | 'votes' | 'newest';
+/**
+ * The page of results, from 1.
+ */
+export type ApiListDiscoverableServerPagesPageQueryParameter = number;
+/**
+ * Results per page, 1 to 24 (the default).
+ */
+export type ApiListDiscoverableServerPagesPerPageQueryParameter = number;
 export type ApiGetAPublicServerPageSlugPathParameter = string;
 export type ApiVoteForAPublicServerPageSlugPathParameter = string;
 export type ApiWakeASleepingServerSlugPathParameter = string;
@@ -16700,6 +17234,76 @@ export type AdminToggleServerInstallStateResponses = {
     204: void;
 };
 export type AdminToggleServerInstallStateResponse = AdminToggleServerInstallStateResponses[keyof AdminToggleServerInstallStateResponses];
+export type AdminGetServerPublicPageDiscoveryData = {
+    body?: never;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminGetServerPublicPageDiscoveryServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/page';
+};
+export type AdminGetServerPublicPageDiscoveryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminGetServerPublicPageDiscoveryError = AdminGetServerPublicPageDiscoveryErrors[keyof AdminGetServerPublicPageDiscoveryErrors];
+export type AdminGetServerPublicPageDiscoveryResponses = {
+    /**
+     * Public page returned.
+     */
+    200: AdminGetServerPublicPageDiscoveryResponseBody;
+};
+export type AdminGetServerPublicPageDiscoveryResponse = AdminGetServerPublicPageDiscoveryResponses[keyof AdminGetServerPublicPageDiscoveryResponses];
+export type AdminUpdateServerPublicPageDiscoveryData = {
+    body: AdminUpdateServerPublicPageDiscoveryRequest;
+    path: {
+        /**
+         * The server ID or UUID.
+         */
+        server_admin_identifier: AdminUpdateServerPublicPageDiscoveryServerAdminIdentifierPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/servers/{server_admin_identifier}/page/discovery';
+};
+export type AdminUpdateServerPublicPageDiscoveryErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The server has no public page.
+     */
+    404: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminUpdateServerPublicPageDiscoveryError = AdminUpdateServerPublicPageDiscoveryErrors[keyof AdminUpdateServerPublicPageDiscoveryErrors];
+export type AdminUpdateServerPublicPageDiscoveryResponses = {
+    /**
+     * Discovery setting saved.
+     */
+    200: AdminUpdateServerPublicPageDiscoveryResponseBody;
+};
+export type AdminUpdateServerPublicPageDiscoveryResponse = AdminUpdateServerPublicPageDiscoveryResponses[keyof AdminUpdateServerPublicPageDiscoveryResponses];
 export type AdminGetServerSubscriptionData = {
     body?: never;
     path: {
@@ -27860,6 +28464,51 @@ export type ApiListThePublicStorePlansResponses = {
     200: ApiListThePublicStorePlansResponseBody;
 };
 export type ApiListThePublicStorePlansResponse = ApiListThePublicStorePlansResponses[keyof ApiListThePublicStorePlansResponses];
+export type ApiListDiscoverableServerPagesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only servers of this game, by its slug in Admin > Games.
+         */
+        game?: ApiListDiscoverableServerPagesGameQueryParameter;
+        /**
+         * Only servers whose name contains this, at most 64 characters.
+         */
+        search?: ApiListDiscoverableServerPagesSearchQueryParameter;
+        /**
+         * players (most players online first, the default), votes (most votes first) or newest.
+         */
+        sort?: ApiListDiscoverableServerPagesSortQueryParameter;
+        /**
+         * The page of results, from 1.
+         */
+        page?: ApiListDiscoverableServerPagesPageQueryParameter;
+        /**
+         * Results per page, 1 to 24 (the default).
+         */
+        per_page?: ApiListDiscoverableServerPagesPerPageQueryParameter;
+    };
+    url: '/api/public/servers';
+};
+export type ApiListDiscoverableServerPagesErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * A filter is not valid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ApiListDiscoverableServerPagesError = ApiListDiscoverableServerPagesErrors[keyof ApiListDiscoverableServerPagesErrors];
+export type ApiListDiscoverableServerPagesResponses = {
+    /**
+     * Server pages listed.
+     */
+    200: ApiListDiscoverableServerPagesResponseBody;
+};
+export type ApiListDiscoverableServerPagesResponse = ApiListDiscoverableServerPagesResponses[keyof ApiListDiscoverableServerPagesResponses];
 export type ApiGetAPublicServerPageData = {
     body?: never;
     path: {

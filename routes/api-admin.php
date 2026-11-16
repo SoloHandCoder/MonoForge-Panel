@@ -57,6 +57,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Servers\RotateDatabasePasswordControl
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerBackupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerMountController;
+use Pterodactyl\Http\Controllers\Api\Admin\Servers\ServerPageDiscoveryController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\StartupController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\SubscriptionController as ServerSubscriptionController;
 use Pterodactyl\Http\Controllers\Api\Admin\Servers\SuspensionController;
@@ -457,6 +458,10 @@ Route::prefix('/servers')->name('api.admin.servers')->group(function (): void {
     Route::get('/{server:admin_identifier}/transfer/progress', TransferProgressController::class)->name('.transfer-progress');
     Route::post('/{server:admin_identifier}/transfer', TransferController::class)->name('.transfer');
     Route::post('/{server:admin_identifier}/settings/toggle-install', ToggleInstallController::class)->name('.toggle-install');
+
+    // The public page's place on the server discovery page at /servers.
+    Route::get('/{server:admin_identifier}/page', [ServerPageDiscoveryController::class, 'show'])->name('.page');
+    Route::put('/{server:admin_identifier}/page/discovery', [ServerPageDiscoveryController::class, 'update'])->name('.page.discovery');
 
     // Shop billing (phase 3 Task T).
     Route::get('/{server:admin_identifier}/subscription', [ServerSubscriptionController::class, 'show'])->name('.subscription');

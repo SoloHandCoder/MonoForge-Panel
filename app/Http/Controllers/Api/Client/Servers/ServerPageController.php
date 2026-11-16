@@ -21,11 +21,13 @@ use Pterodactyl\Models\Share\ServerPage;
 use Pterodactyl\Models\Share\ServerPageSlugHold;
 use Pterodactyl\Services\ServerPages\PublicServerPages;
 use Pterodactyl\Services\ServerPages\ServerPageBanners;
+use Pterodactyl\Services\ServerPages\ServerPageText;
+use Pterodactyl\Services\ServerPages\ServerPageTheme;
 use Pterodactyl\Services\Tunnels\TunnelService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 #[Group('Client API', 'Endpoints authenticated as a panel user using a client API token.')]
-#[Subgroup('Server Public Page', 'The shareable public page of a server at /s/{slug}. Needs the share.manage permission.')]
+#[Subgroup('Server Public Page', 'The shareable public page of a server at /s/{slug}, its look and whether it is listed on the discovery page at /servers. Needs the share.manage permission.')]
 class ServerPageController extends ClientApiController
 {
     private const array EXAMPLE = [
@@ -40,6 +42,19 @@ class ServerPageController extends ClientApiController
         'votes' => 42,
         'has_address' => true,
         'allow_wake' => false,
+        'discoverable' => true,
+        'hidden_from_discovery' => false,
+        'tagline' => 'Islands, events and no pay to win',
+        'background_style' => 'gradient',
+        'background_from' => '#241a44',
+        'background_to' => '#8b5cf6',
+        'button_style' => 'rounded',
+        'show_players' => true,
+        'show_votes' => true,
+        'show_address' => true,
+        'show_description' => true,
+        'discord_url' => 'https://discord.gg/skyblock',
+        'website_url' => null,
     ];
 
     private const array CONFLICT_ERROR = [
@@ -70,6 +85,19 @@ class ServerPageController extends ClientApiController
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address: only a live playit tunnel address is ever shown.')]
     #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
+    #[ResponseField('discoverable', 'boolean', 'Whether the owner lists the page on the server discovery page at /servers (on by default).')]
+    #[ResponseField('hidden_from_discovery', 'boolean', 'Whether an administrator took the page off the discovery page; the page itself stays published.')]
+    #[ResponseField('tagline', 'string', 'One line of plain text under the name, at most 80 characters; empty for none.')]
+    #[ResponseField('background_style', 'string', 'solid, gradient (between background_from and background_to) or image (the banner image).', enum: ServerPageTheme::BACKGROUND_STYLES)]
+    #[ResponseField('background_from', 'string', "The background colour as #rrggbb, or null for the panel's default.", nullable: true)]
+    #[ResponseField('background_to', 'string', 'The end of the gradient as #rrggbb, or null.', nullable: true)]
+    #[ResponseField('button_style', 'string', 'The shape of the buttons.', enum: ServerPageTheme::BUTTON_STYLES)]
+    #[ResponseField('show_players', 'boolean', 'Whether the page shows the players online.')]
+    #[ResponseField('show_votes', 'boolean', 'Whether the page shows the votes and the vote button.')]
+    #[ResponseField('show_address', 'boolean', 'Whether the page shows the join address.')]
+    #[ResponseField('show_description', 'boolean', 'Whether the page shows the description.')]
+    #[ResponseField('discord_url', 'string', 'The Discord invite, or null.', nullable: true)]
+    #[ResponseField('website_url', 'string', 'The website, or null.', nullable: true)]
     #[ScribeResponse(self::EXAMPLE, description: 'Public page returned.')]
     public function show(ServerPageRequest $request, Server $server): JsonResponse
     {
@@ -81,7 +109,19 @@ class ServerPageController extends ClientApiController
     #[BodyParam('published', 'boolean', 'Whether anyone can open the page.', required: true, example: true)]
     #[BodyParam('noindex', 'boolean', 'Whether search engines are asked not to list the page.', required: true, example: false)]
     #[BodyParam('description', 'string', 'The description in markdown, at most 2000 characters, or null for none.', required: true, example: 'A friendly **skyblock** server.', nullable: true)]
-    #[BodyParam('banner_color', 'string', 'The banner colour as #rrggbb, or null for the default.', required: true, example: '#8b5cf6', nullable: true)]
+    #[BodyParam('banner_color', 'string', 'The accent colour (buttons and the banner without a background) as #rrggbb, or null for the default.', required: true, example: '#8b5cf6', nullable: true)]
+    #[BodyParam('discoverable', 'boolean', 'Whether the page is listed on the server discovery page at /servers. On for a new page; left unchanged when omitted.', required: false, example: true)]
+    #[BodyParam('tagline', 'string', 'One line of plain text under the name, at most 80 characters, or null for none. Left unchanged when omitted.', required: false, example: 'Islands, events and no pay to win', nullable: true)]
+    #[BodyParam('background_style', 'string', 'solid, gradient or image. A gradient needs background_to, and its two colours must leave some text colour readable on both (WCAG AA); image uses the banner image. Left unchanged when omitted.', required: false, example: 'gradient', enum: ServerPageTheme::BACKGROUND_STYLES)]
+    #[BodyParam('background_from', 'string', 'The background colour (the start of a gradient) as #rrggbb, or null for the default.', required: false, example: '#241a44', nullable: true)]
+    #[BodyParam('background_to', 'string', 'The end of the gradient as #rrggbb, or null.', required: false, example: '#8b5cf6', nullable: true)]
+    #[BodyParam('button_style', 'string', 'rounded or square buttons.', required: false, example: 'rounded', enum: ServerPageTheme::BUTTON_STYLES)]
+    #[BodyParam('show_players', 'boolean', 'Whether the page shows the players online.', required: false, example: true)]
+    #[BodyParam('show_votes', 'boolean', 'Whether the page shows the votes.', required: false, example: true)]
+    #[BodyParam('show_address', 'boolean', 'Whether the page shows the join address.', required: false, example: true)]
+    #[BodyParam('show_description', 'boolean', 'Whether the page shows the description.', required: false, example: true)]
+    #[BodyParam('discord_url', 'string', 'An https Discord invite on discord.gg or discord.com, or null.', required: false, example: 'https://discord.gg/skyblock', nullable: true)]
+    #[BodyParam('website_url', 'string', 'An https website address, or null.', required: false, example: 'https://skyblock.example.com', nullable: true)]
     #[BodyParam('allow_wake', 'boolean', 'Whether visitors may wake the server from the page while it sleeps. Off by default; left unchanged when omitted.', required: false, example: false)]
     #[ResponseField('exists', 'boolean', 'Always true after a save.')]
     #[ResponseField('slug', 'string', 'The part of the address after /s/.', nullable: true)]
@@ -94,6 +134,19 @@ class ServerPageController extends ClientApiController
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
     #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
+    #[ResponseField('discoverable', 'boolean', 'Whether the owner lists the page on the server discovery page at /servers (on by default).')]
+    #[ResponseField('hidden_from_discovery', 'boolean', 'Whether an administrator took the page off the discovery page; the page itself stays published.')]
+    #[ResponseField('tagline', 'string', 'One line of plain text under the name, at most 80 characters; empty for none.')]
+    #[ResponseField('background_style', 'string', 'solid, gradient (between background_from and background_to) or image (the banner image).', enum: ServerPageTheme::BACKGROUND_STYLES)]
+    #[ResponseField('background_from', 'string', "The background colour as #rrggbb, or null for the panel's default.", nullable: true)]
+    #[ResponseField('background_to', 'string', 'The end of the gradient as #rrggbb, or null.', nullable: true)]
+    #[ResponseField('button_style', 'string', 'The shape of the buttons.', enum: ServerPageTheme::BUTTON_STYLES)]
+    #[ResponseField('show_players', 'boolean', 'Whether the page shows the players online.')]
+    #[ResponseField('show_votes', 'boolean', 'Whether the page shows the votes and the vote button.')]
+    #[ResponseField('show_address', 'boolean', 'Whether the page shows the join address.')]
+    #[ResponseField('show_description', 'boolean', 'Whether the page shows the description.')]
+    #[ResponseField('discord_url', 'string', 'The Discord invite, or null.', nullable: true)]
+    #[ResponseField('website_url', 'string', 'The website, or null.', nullable: true)]
     #[ScribeResponse(self::EXAMPLE, description: 'Public page saved.')]
     public function update(UpdateServerPageRequest $request, Server $server): JsonResponse
     {
@@ -113,6 +166,8 @@ class ServerPageController extends ClientApiController
         if ($request->has('allow_wake')) {
             $page->allow_wake = $request->boolean('allow_wake');
         }
+
+        $this->fillLook($request, $page);
 
         // Unpublishing gives the banner a new name, so the old address (and any copy a CDN keeps
         // of it) stops working at once.
@@ -149,6 +204,19 @@ class ServerPageController extends ClientApiController
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
     #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
+    #[ResponseField('discoverable', 'boolean', 'Whether the owner lists the page on the server discovery page at /servers (on by default).')]
+    #[ResponseField('hidden_from_discovery', 'boolean', 'Whether an administrator took the page off the discovery page; the page itself stays published.')]
+    #[ResponseField('tagline', 'string', 'One line of plain text under the name, at most 80 characters; empty for none.')]
+    #[ResponseField('background_style', 'string', 'solid, gradient (between background_from and background_to) or image (the banner image).', enum: ServerPageTheme::BACKGROUND_STYLES)]
+    #[ResponseField('background_from', 'string', "The background colour as #rrggbb, or null for the panel's default.", nullable: true)]
+    #[ResponseField('background_to', 'string', 'The end of the gradient as #rrggbb, or null.', nullable: true)]
+    #[ResponseField('button_style', 'string', 'The shape of the buttons.', enum: ServerPageTheme::BUTTON_STYLES)]
+    #[ResponseField('show_players', 'boolean', 'Whether the page shows the players online.')]
+    #[ResponseField('show_votes', 'boolean', 'Whether the page shows the votes and the vote button.')]
+    #[ResponseField('show_address', 'boolean', 'Whether the page shows the join address.')]
+    #[ResponseField('show_description', 'boolean', 'Whether the page shows the description.')]
+    #[ResponseField('discord_url', 'string', 'The Discord invite, or null.', nullable: true)]
+    #[ResponseField('website_url', 'string', 'The website, or null.', nullable: true)]
     #[ScribeResponse(self::EXAMPLE, description: 'Banner stored.')]
     #[ScribeResponse(self::CONFLICT_ERROR, status: 409, description: 'The page has not been saved yet.')]
     public function uploadBanner(UploadServerPageBannerRequest $request, Server $server): JsonResponse
@@ -177,6 +245,19 @@ class ServerPageController extends ClientApiController
     #[ResponseField('votes', 'integer', 'The total votes the page has received.')]
     #[ResponseField('has_address', 'boolean', 'Whether the page shows a join address.')]
     #[ResponseField('allow_wake', 'boolean', 'Whether visitors may wake the sleeping server from the page.')]
+    #[ResponseField('discoverable', 'boolean', 'Whether the owner lists the page on the server discovery page at /servers (on by default).')]
+    #[ResponseField('hidden_from_discovery', 'boolean', 'Whether an administrator took the page off the discovery page; the page itself stays published.')]
+    #[ResponseField('tagline', 'string', 'One line of plain text under the name, at most 80 characters; empty for none.')]
+    #[ResponseField('background_style', 'string', 'solid, gradient (between background_from and background_to) or image (the banner image).', enum: ServerPageTheme::BACKGROUND_STYLES)]
+    #[ResponseField('background_from', 'string', "The background colour as #rrggbb, or null for the panel's default.", nullable: true)]
+    #[ResponseField('background_to', 'string', 'The end of the gradient as #rrggbb, or null.', nullable: true)]
+    #[ResponseField('button_style', 'string', 'The shape of the buttons.', enum: ServerPageTheme::BUTTON_STYLES)]
+    #[ResponseField('show_players', 'boolean', 'Whether the page shows the players online.')]
+    #[ResponseField('show_votes', 'boolean', 'Whether the page shows the votes and the vote button.')]
+    #[ResponseField('show_address', 'boolean', 'Whether the page shows the join address.')]
+    #[ResponseField('show_description', 'boolean', 'Whether the page shows the description.')]
+    #[ResponseField('discord_url', 'string', 'The Discord invite, or null.', nullable: true)]
+    #[ResponseField('website_url', 'string', 'The website, or null.', nullable: true)]
     #[ScribeResponse([...self::EXAMPLE, 'banner_image_url' => null], description: 'Banner deleted.')]
     public function deleteBanner(ServerPageRequest $request, Server $server): JsonResponse
     {
@@ -192,13 +273,54 @@ class ServerPageController extends ClientApiController
         return new JsonResponse($this->settings($server, $page));
     }
 
+    /** The discovery and look settings; each one left out of the request stays as it is. */
+    private function fillLook(UpdateServerPageRequest $request, ServerPage $page): void
+    {
+        foreach (['discoverable', 'show_players', 'show_votes', 'show_address', 'show_description'] as $flag) {
+            if ($request->has($flag)) {
+                $page->setAttribute($flag, $request->boolean($flag));
+            }
+        }
+
+        foreach (['background_style', 'button_style'] as $choice) {
+            if ($request->has($choice)) {
+                $page->setAttribute($choice, $request->string($choice)->toString());
+            }
+        }
+
+        foreach (['background_from', 'background_to'] as $color) {
+            if ($request->has($color)) {
+                $page->setAttribute($color, ServerPageTheme::color($this->text($request, $color)));
+            }
+        }
+
+        if ($request->has('tagline')) {
+            $tagline = ServerPageText::line($this->text($request, 'tagline'), ServerPageText::TAGLINE_MAX);
+            $page->tagline = $tagline === '' ? null : $tagline;
+        }
+
+        foreach (['discord_url', 'website_url'] as $link) {
+            if ($request->has($link)) {
+                $value = mb_trim($this->text($request, $link) ?? '');
+                $page->setAttribute($link, $value === '' ? null : $value);
+            }
+        }
+    }
+
+    private function text(UpdateServerPageRequest $request, string $key): ?string
+    {
+        $value = $request->input($key);
+
+        return is_string($value) ? $value : null;
+    }
+
     private function page(Server $server): ?ServerPage
     {
         return ServerPage::query()->where('server_id', $server->id)->first();
     }
 
     /**
-     * @return array{exists: bool, slug: string|null, url: string|null, published: bool, noindex: bool, description: string, banner_color: string|null, banner_image_url: string|null, votes: int, has_address: bool, allow_wake: bool}
+     * @return array{exists: bool, slug: string|null, url: string|null, published: bool, noindex: bool, description: string, banner_color: string|null, banner_image_url: string|null, votes: int, has_address: bool, allow_wake: bool, discoverable: bool, hidden_from_discovery: bool, tagline: string, background_style: string, background_from: string|null, background_to: string|null, button_style: string, show_players: bool, show_votes: bool, show_address: bool, show_description: bool, discord_url: string|null, website_url: string|null}
      */
     private function settings(Server $server, ?ServerPage $page): array
     {
@@ -214,6 +336,19 @@ class ServerPageController extends ClientApiController
             'votes' => $page->votes ?? 0,
             'has_address' => $this->tunnels->displayAddress($server) !== null,
             'allow_wake' => $page->allow_wake ?? false,
+            'discoverable' => $page->discoverable ?? true,
+            'hidden_from_discovery' => $page->hidden_from_discovery ?? false,
+            'tagline' => $page->tagline ?? '',
+            'background_style' => $page->background_style ?? 'solid',
+            'background_from' => $page?->background_from,
+            'background_to' => $page?->background_to,
+            'button_style' => $page->button_style ?? 'rounded',
+            'show_players' => $page->show_players ?? true,
+            'show_votes' => $page->show_votes ?? true,
+            'show_address' => $page->show_address ?? true,
+            'show_description' => $page->show_description ?? true,
+            'discord_url' => $page?->discord_url,
+            'website_url' => $page?->website_url,
         ];
     }
 }
