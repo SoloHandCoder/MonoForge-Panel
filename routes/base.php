@@ -8,6 +8,7 @@ use Pterodactyl\Http\Controllers\Base\ExtensionFileController;
 use Pterodactyl\Http\Controllers\Base\IndexController;
 use Pterodactyl\Http\Controllers\Base\LegalPageController;
 use Pterodactyl\Http\Controllers\Base\LocaleController;
+use Pterodactyl\Http\Controllers\Base\ReferralLinkController;
 use Pterodactyl\Http\Controllers\Base\ServerPageBannerController;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 use Pterodactyl\Services\Extensions\ExtensionSettingFiles;
@@ -34,6 +35,13 @@ Route::get('/legal/{document}', LegalPageController::class)
 Route::get('/status', [IndexController::class, 'index'])
     ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
     ->name('status');
+
+// A referral link: remembers the code for 30 days and sends the visitor on to sign up.
+Route::get('/r/{code}', ReferralLinkController::class)
+    ->withoutMiddleware(['auth', RequireTwoFactorAuthentication::class])
+    ->where('code', '[A-Za-z0-9]{1,16}')
+    ->middleware('throttle:30,1')
+    ->name('referral');
 
 // The shareable public server pages, readable without signing in. The SPA renders the page; the
 // server adds its title and Open Graph tags for link previews.

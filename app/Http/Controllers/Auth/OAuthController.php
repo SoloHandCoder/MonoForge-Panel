@@ -23,6 +23,8 @@ use Pterodactyl\Services\Auth\OAuth\OAuthClient;
 use Pterodactyl\Services\Auth\OAuth\OAuthIdentity;
 use Pterodactyl\Services\Auth\OAuth\OAuthPending;
 use Pterodactyl\Services\Auth\OAuth\OAuthRegistration;
+use Pterodactyl\Services\Billing\ReferralService;
+use Pterodactyl\Services\Billing\ReferralSettings;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -182,7 +184,11 @@ class OAuthController extends Controller
         OAuthRegistration::forget($request->session());
         LegalSettings::recordAcceptance($user);
 
-        return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
+        // A visitor who came through a referral link (/r/{code}) carries its cookie.
+        resolve(ReferralService::class)->recordSignup($user, $request->cookies->get(ReferralSettings::COOKIE), $request->ip());
+
+        return (new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED))
+            ->withCookie(cookie()->forget(ReferralSettings::COOKIE));
     }
 
     /**

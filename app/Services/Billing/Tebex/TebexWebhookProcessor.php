@@ -13,6 +13,7 @@ use Pterodactyl\Models\Billing\TebexPayment;
 use Pterodactyl\Models\Billing\TokenPack;
 use Pterodactyl\Models\Billing\TokenTransaction;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Billing\ReferralService;
 use Pterodactyl\Services\Billing\TokenWallet;
 use Pterodactyl\Services\Notices\NoticeService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -30,6 +31,9 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
  *
  * A dispute takes the tokens back as soon as it is opened (into a negative balance if need be),
  * and a dispute won by the seller gives them back, once each.
+ *
+ * A referred user's first credited payment starts their referral's hold; a refund, lost dispute
+ * or opened dispute of that payment cancels the referral (or takes its rewards back).
  */
 readonly class TebexWebhookProcessor
 {
@@ -42,7 +46,7 @@ readonly class TebexWebhookProcessor
     /** Money is compared to the cent. */
     private const float CENT = 0.005;
 
-    public function __construct(private TokenWallet $wallet, private NoticeService $notices) {}
+    public function __construct(private TokenWallet $wallet, private NoticeService $notices, private ReferralService $referrals) {}
 
     /**
      * @param  array<array-key, mixed>  $event  the decoded, signature-checked webhook body
@@ -257,6 +261,8 @@ readonly class TebexWebhookProcessor
         $payment->tokens = $tokens;
         $payment->processed_at = now()->toImmutable();
 
+        $this->referrals->paymentCredited($payment, $user);
+
         $this->notices->notify(
             $user,
             'success',
@@ -269,6 +275,7 @@ readonly class TebexWebhookProcessor
     {
         $payment->status = $status;
         $payment->flagged_at ??= now()->toImmutable();
+        $this->referrals->paymentReversed($payment, $status === TebexPayment::STATUS_REFUNDED ? 'refunded' : 'charged back');
 
         $owed = $payment->tokens - $payment->tokens_reversed;
         $user = $payment->user_id === null ? null : User::query()->find($payment->user_id);
@@ -315,6 +322,7 @@ readonly class TebexWebhookProcessor
         }
 
         $payment->status = TebexPayment::STATUS_DISPUTED;
+        $this->referrals->paymentReversed($payment, 'disputed');
 
         // The tokens are held back while the dispute is open, like a refund.
         $owed = $payment->tokens - $payment->tokens_reversed;

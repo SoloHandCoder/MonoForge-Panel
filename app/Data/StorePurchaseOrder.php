@@ -12,7 +12,9 @@ final readonly class StorePurchaseOrder
 {
     /**
      * @param  array<string, int>  $addons  add-on key => units, without the ones left at zero
-     * @param  int|null  $expectedTotal  the price per period the player confirmed; a different quote is refused
+     * @param  int|null  $expectedTotal  what the player confirmed paying now (the first period, after any coupon); a different amount is refused
+     * @param  string|null  $couponCode  a discount coupon for the first period
+     * @param  string|null  $ip  the buyer's address, recorded (hashed by network) with a coupon redemption
      */
     public function __construct(
         public int $planId,
@@ -25,5 +27,7 @@ final readonly class StorePurchaseOrder
         public array $addons = [],
         public ?int $expectedTotal = null,
         public ?string $subdomain = null,
+        public ?string $couponCode = null,
+        public ?string $ip = null,
     ) {}
 }

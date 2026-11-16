@@ -14,6 +14,8 @@ use Pterodactyl\Contracts\Users\CompletesLogins;
 use Pterodactyl\Contracts\Users\CreatesUsers;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Http\Requests\Auth\RegisterRequest;
+use Pterodactyl\Services\Billing\ReferralService;
+use Pterodactyl\Services\Billing\ReferralSettings;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Throwable;
 
@@ -59,7 +61,7 @@ class RegisterController extends Controller
     #[ScribeResponse(self::REGISTER_COMPLETE_EXAMPLE, status: 201, description: 'The account was created and a browser session was established.')]
     #[ScribeResponse(status: 404, description: 'Sign-up is disabled.')]
     #[ScribeResponse(status: 429, description: 'Too many sign-up attempts from this address or for this email.')]
-    public function __invoke(RegisterRequest $request, CreatesUsers $users, CompletesLogins $logins): JsonResponse
+    public function __invoke(RegisterRequest $request, CreatesUsers $users, CompletesLogins $logins, ReferralService $referrals): JsonResponse
     {
         // Only the Terms of Service and Privacy Policy versions the form showed can be accepted.
         LegalSettings::ensureShownVersions($request->integer('terms_version'), $request->integer('privacy_version'));
@@ -78,6 +80,10 @@ class RegisterController extends Controller
         // The form cannot be sent without ticking the Terms of Service and Privacy Policy.
         LegalSettings::recordAcceptance($user);
 
-        return new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED);
+        // A visitor who came through a referral link (/r/{code}) carries its cookie.
+        $referrals->recordSignup($user, $request->cookies->get(ReferralSettings::COOKIE), $request->ip());
+
+        return (new JsonResponse(['data' => $logins->complete($user)->toResponseData()], JsonResponse::HTTP_CREATED))
+            ->withCookie(cookie()->forget(ReferralSettings::COOKIE));
     }
 }

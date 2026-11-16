@@ -10,7 +10,7 @@ use Pterodactyl\Models\Server;
 /**
  * A finished store purchase: the server that is now installing and what the first period cost.
  *
- * @extends ClientResource<array{server: Server, tokens_charged: int, period_days: int, replayed: bool, address: string|null}>
+ * @extends ClientResource<array{server: Server, tokens_charged: int, period_days: int, replayed: bool, address: string|null, discount_tokens: int, coupon: string|null}>
  */
 class StorePurchaseResource extends ClientResource
 {
@@ -35,6 +35,8 @@ class StorePurchaseResource extends ClientResource
             'period_days' => $this->resource['period_days'],
             'replayed' => $this->resource['replayed'],
             'address' => $this->resource['address'],
+            'discount_tokens' => $this->resource['discount_tokens'],
+            'coupon' => $this->resource['coupon'],
         ];
     }
 }

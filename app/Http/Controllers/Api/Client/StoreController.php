@@ -10,14 +10,20 @@ use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\ResponseField;
 use Knuckles\Scribe\Attributes\Subgroup;
+use Pterodactyl\Data\CouponDiscount;
+use Pterodactyl\Exceptions\Billing\CouponException;
 use Pterodactyl\Exceptions\Billing\InvalidQuoteException;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 use Pterodactyl\Http\Requests\Api\Client\Store\GetStoreQuoteRequest;
+use Pterodactyl\Models\Billing\Coupon;
 use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Node;
+use Pterodactyl\Models\User;
 use Pterodactyl\Services\Billing\CapacityService;
+use Pterodactyl\Services\Billing\CouponService;
 use Pterodactyl\Services\Billing\PricingService;
+use Pterodactyl\Services\Billing\Quote;
 use Pterodactyl\Services\Billing\ShopSettings;
 use Pterodactyl\Services\Billing\StoreCatalogService;
 use Pterodactyl\Services\Billing\TokenWallet;
@@ -70,6 +76,14 @@ class StoreController extends ClientApiController
             ],
             'resources' => ['memory' => 2048, 'swap' => 0, 'disk' => 10240, 'io' => 500, 'cpu' => 100, 'databases' => 1, 'backups' => 3, 'allocations' => 0],
         ],
+        'coupon' => [
+            'code' => 'WELCOME',
+            'valid' => true,
+            'message' => null,
+            'type' => 'percent',
+            'discount_tokens' => 204,
+            'first_period_tokens' => 1836,
+        ],
     ];
 
     public function __construct(
@@ -77,6 +91,7 @@ class StoreController extends ClientApiController
         private readonly PricingService $pricing,
         private readonly CapacityService $capacity,
         private readonly TokenWallet $wallet,
+        private readonly CouponService $coupons,
     ) {}
 
     #[Endpoint('Get the store catalog', 'Returns the visible categories with their plans cheapest first, where each plan can be placed and at what multiplier, the billing periods, the add-ons and whether each plan still fits within the capacity the store sells. A node or location at its own shop limits stays listed with can_provision false.')]
@@ -92,8 +107,15 @@ class StoreController extends ClientApiController
     /**
      * @throws InvalidQuoteException
      */
-    #[Endpoint('Quote a server', 'Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it within the shop-wide limits and within the limits of the node itself. In a location, the cheapest node with room is quoted.')]
+    #[Endpoint('Quote a server', 'Prices a plan for a billing period on a node (or the cheapest allowed node in a location) with add-ons, and says whether the store can provision it within the shop-wide limits and within the limits of the node itself. In a location, the cheapest node with room is quoted. With a coupon, coupon says what it takes off the first period (renewals are charged at the full total_per_period) or why it cannot be used; the coupon is not redeemed until the purchase. After 10 refused codes in 10 minutes every code is refused for a while.')]
     #[ResponseField('balance', 'integer', 'The token balance of the requesting user.')]
+    #[ResponseField('coupon', 'object', 'The coupon that was sent, checked but not redeemed; null without one.', nullable: true)]
+    #[ResponseField('coupon.code', 'string', 'The coupon code, upper case.')]
+    #[ResponseField('coupon.valid', 'boolean', 'Whether the coupon can be used on this order.')]
+    #[ResponseField('coupon.message', 'string', 'Why the coupon cannot be used; null when it can.', nullable: true)]
+    #[ResponseField('coupon.type', 'string', 'percent or fixed; null when the coupon cannot be used.', enum: ['percent', 'fixed'], nullable: true)]
+    #[ResponseField('coupon.discount_tokens', 'integer', 'Tokens taken off the first period.')]
+    #[ResponseField('coupon.first_period_tokens', 'integer', 'What the first period costs with the coupon: the expected_total to send with the purchase.')]
     #[ScribeResponse(self::QUOTE_EXAMPLE, description: 'Quote returned.')]
     public function quote(GetStoreQuoteRequest $request): JsonResponse
     {
@@ -127,6 +149,41 @@ class StoreController extends ClientApiController
             'can_provision' => $this->capacity->canProvision($quote->resources) && $this->capacity->canProvisionOn($node, $quote->resources),
             'balance' => $this->wallet->balance($request->user()),
             'quote' => $quote->toArray(),
+            'coupon' => $this->couponFor($request->user(), $request->coupon(), $plan, $quote),
         ]);
+    }
+
+    /**
+     * What the coupon would take off the first period, or why it cannot be used.
+     *
+     * @return array{code: string, valid: bool, message: string|null, type: string|null, discount_tokens: int, first_period_tokens: int}|null
+     */
+    private function couponFor(User $user, ?string $code, ShopPlan $plan, Quote $quote): ?array
+    {
+        if ($code === null) {
+            return null;
+        }
+
+        try {
+            $discount = $this->coupons->attempt($user, fn (): CouponDiscount => $this->coupons->preview($user, $code, $plan, $quote->totalPerPeriod));
+        } catch (CouponException $couponException) {
+            return [
+                'code' => mb_substr(Coupon::normalize($code), 0, 32),
+                'valid' => false,
+                'message' => $couponException->getMessage(),
+                'type' => null,
+                'discount_tokens' => 0,
+                'first_period_tokens' => $quote->totalPerPeriod,
+            ];
+        }
+
+        return [
+            'code' => $discount->coupon->code,
+            'valid' => true,
+            'message' => null,
+            'type' => $discount->coupon->type,
+            'discount_tokens' => $discount->discount,
+            'first_period_tokens' => $discount->firstPeriod,
+        ];
     }
 }
