@@ -12,6 +12,7 @@ use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AdminConversationController
 use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AiProviderController;
 use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AssistantSettingsController;
 use Pterodactyl\Http\Controllers\Api\Admin\Assistant\AssistantUsageController;
+use Pterodactyl\Http\Controllers\Api\Admin\Billing\RevenueController;
 use Pterodactyl\Http\Controllers\Api\Admin\DatabaseHosts\DatabaseHostController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\EggCatalogController;
 use Pterodactyl\Http\Controllers\Api\Admin\Eggs\EggController;
@@ -206,6 +207,20 @@ Route::prefix('/shop')->name('api.admin.shop')->group(function (): void {
     Route::post('/token-packs', [TokenPackController::class, 'store'])->name('.token-packs.store');
     Route::put('/token-packs/{tokenPack:id}', [TokenPackController::class, 'update'])->name('.token-packs.update');
     Route::delete('/token-packs/{tokenPack:id}', [TokenPackController::class, 'destroy'])->name('.token-packs.delete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Billing Routes (phase 7)
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/admin/billing
+|
+| The revenue dashboard, read-only and cached.
+|
+*/
+Route::prefix('/billing')->name('api.admin.billing')->group(function (): void {
+    Route::get('/revenue', RevenueController::class)->name('.revenue');
 });
 
 /*

@@ -20,6 +20,7 @@ use Pterodactyl\Models\Billing\ShopPeriod;
 use Pterodactyl\Models\Billing\ShopPlan;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
+use Pterodactyl\Services\Billing\Revenue\SubscriptionEndings;
 use Pterodactyl\Services\Legal\LegalSettings;
 use Pterodactyl\Services\Sleep\ServerSleep;
 use Throwable;
@@ -215,6 +216,7 @@ class SubscriptionService
 
             $locked->fill(['status' => ServerSubscription::STATUS_CANCELLED, 'auto_renew' => false, 'delete_at' => null])->save();
             $s->setRawAttributes($locked->getAttributes(), true);
+            SubscriptionEndings::record($locked, SubscriptionEndings::REASON_CANCELLED);
 
             return true;
         });

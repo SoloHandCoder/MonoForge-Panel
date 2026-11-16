@@ -6384,6 +6384,235 @@ export type AdminUpdateTokenPackResponseBody = {
     sort?: number;
 };
 
+export type AdminGetRevenueResponseBody = {
+    /**
+     * The days reported on.
+     */
+    range: {
+        /**
+         * The first day, as YYYY-MM-DD.
+         */
+        from: string;
+        /**
+         * The last day, as YYYY-MM-DD.
+         */
+        to: string;
+        /**
+         * How many days the range covers.
+         */
+        days: number;
+    };
+    /**
+     * When the report was built; it is cached for five minutes.
+     */
+    generated_at: string;
+    /**
+     * Tokens moved in the range.
+     */
+    tokens: {
+        /**
+         * Tokens credited for purchases.
+         */
+        sold: number;
+        /**
+         * Purchases credited.
+         */
+        purchases: number;
+        /**
+         * Tokens taken back for payments refunded in the range.
+         */
+        refunded: number;
+        /**
+         * Tokens taken back for payments charged back in the range.
+         */
+        charged_back: number;
+        /**
+         * Tokens sold less those refunded and charged back.
+         */
+        net: number;
+        /**
+         * Tokens charged for servers and add-ons.
+         */
+        spent_on_servers: number;
+    };
+    /**
+     * Money per currency, by currency code.
+     */
+    money: Array<{
+        /**
+         * The currency code Tebex reported.
+         */
+        currency: string;
+        /**
+         * Paid for payments credited in the range, as a decimal.
+         */
+        gross: string;
+        /**
+         * Paid for payments refunded in the range, as a decimal.
+         */
+        refunded: string;
+        /**
+         * Paid for payments charged back in the range, as a decimal.
+         */
+        charged_back: string;
+        /**
+         * Gross less refunded and charged back, as a decimal; can be negative.
+         */
+        net: string;
+        /**
+         * Payments credited.
+         */
+        payments: number;
+        /**
+         * Payments refunded.
+         */
+        refunds: number;
+        /**
+         * Payments charged back.
+         */
+        chargebacks: number;
+    }>;
+    /**
+     * Payments with a dispute open now, whatever the range.
+     */
+    disputes_open: number;
+    /**
+     * Subscriptions now, whatever the range.
+     */
+    subscriptions: {
+        /**
+         * Active subscriptions.
+         */
+        active: number;
+        /**
+         * Subscriptions suspended for not being paid.
+         */
+        suspended: number;
+        /**
+         * What the active subscriptions charge per 30 days, in tokens, before sleep discounts.
+         */
+        mrr_tokens: number;
+    };
+    /**
+     * Renewals due from now, whatever the range.
+     */
+    renewals_due: {
+        /**
+         * How many days ahead renewals are counted.
+         */
+        days: number;
+        /**
+         * Active, auto-renewing subscriptions that renew in those days.
+         */
+        count: number;
+        /**
+         * Tokens moved in the range.
+         */
+        tokens: number;
+        /**
+         * Renewals the owner's balance does not cover now, paying each owner's renewals in date order.
+         */
+        short_of_balance: number;
+    };
+    /**
+     * Subscriptions that ended in the range.
+     */
+    churn: {
+        /**
+         * Cancelled.
+         */
+        cancelled: number;
+        /**
+         * Deleted after not being paid.
+         */
+        unpaid: number;
+        /**
+         * Deleted while running (by the owner or an administrator).
+         */
+        deleted: number;
+        /**
+         * All of them.
+         */
+        total: number;
+        /**
+         * What they charged per 30 days, in tokens.
+         */
+        mrr_tokens: number;
+    };
+    /**
+     * The plans with the most active subscriptions, at most 5.
+     */
+    top_plans: Array<{
+        /**
+         * The plan ID, or null for subscriptions whose plan was deleted.
+         */
+        id: number | null;
+        /**
+         * The plan name.
+         */
+        name: string;
+        /**
+         * Active subscriptions on it.
+         */
+        active: number;
+        /**
+         * What they charge per 30 days, in tokens.
+         */
+        mrr_tokens: number;
+    }>;
+    /**
+     * Tokens renewals in the range did not charge because the server slept.
+     */
+    sleep_saved_tokens: number;
+    /**
+     * AI assistant usage in the range.
+     */
+    ai: {
+        /**
+         * Panel tokens charged for AI usage.
+         */
+        charged_tokens: number;
+        /**
+         * AI model tokens used, free allowance included.
+         */
+        ai_tokens: number;
+    };
+    /**
+     * Users in the range.
+     */
+    users: {
+        /**
+         * Accounts created.
+         */
+        new: number;
+        /**
+         * Users with at least one purchase credited.
+         */
+        paying: number;
+    };
+    /**
+     * One row per day of the range, oldest first.
+     */
+    daily: Array<{
+        /**
+         * The day, as YYYY-MM-DD.
+         */
+        date: string;
+        /**
+         * Tokens credited for purchases.
+         */
+        tokens_sold: number;
+        /**
+         * Tokens charged for servers and add-ons.
+         */
+        tokens_spent: number;
+        /**
+         * Accounts created.
+         */
+        new_users: number;
+    }>;
+};
+
 export type AdminListAdminAssistantConversationsResponseBody = {
     data?: Array<{
         uuid?: string;
@@ -9163,6 +9392,21 @@ export type AdminApproveAndCreditATebexPaymentPaymentIdPathParameter = number;
 export type AdminUpdateTokenPackTokenPackIdPathParameter = number;
 
 export type AdminUpdateTokenPackTokenPackPathParameter = number;
+
+/**
+ * The last 7, 30 or 90 days (today included), or custom with from and to. 30 by default.
+ */
+export type AdminGetRevenueRangeQueryParameter = '7' | '30' | '90' | 'custom';
+
+/**
+ * The first day of a custom range, as YYYY-MM-DD.
+ */
+export type AdminGetRevenueFromQueryParameter = string;
+
+/**
+ * The last day of a custom range, as YYYY-MM-DD; today at the latest, and at most 366 days after from.
+ */
+export type AdminGetRevenueToQueryParameter = string;
 
 export type AdminGetAnAdminAssistantConversationConversationUuidPathParameter = string;
 
@@ -12837,6 +13081,52 @@ export type AdminUpdateTokenPackResponses = {
 };
 
 export type AdminUpdateTokenPackResponse = AdminUpdateTokenPackResponses[keyof AdminUpdateTokenPackResponses];
+
+export type AdminGetRevenueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * The last 7, 30 or 90 days (today included), or custom with from and to. 30 by default.
+         */
+        range?: AdminGetRevenueRangeQueryParameter;
+        /**
+         * The first day of a custom range, as YYYY-MM-DD.
+         */
+        from?: AdminGetRevenueFromQueryParameter;
+        /**
+         * The last day of a custom range, as YYYY-MM-DD; today at the latest, and at most 366 days after from.
+         */
+        to?: AdminGetRevenueToQueryParameter;
+    };
+    url: '/api/admin/billing/revenue';
+};
+
+export type AdminGetRevenueErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+
+export type AdminGetRevenueError = AdminGetRevenueErrors[keyof AdminGetRevenueErrors];
+
+export type AdminGetRevenueResponses = {
+    /**
+     * Revenue returned.
+     */
+    200: AdminGetRevenueResponseBody;
+};
+
+export type AdminGetRevenueResponse = AdminGetRevenueResponses[keyof AdminGetRevenueResponses];
 
 export type AdminListAdminAssistantConversationsData = {
     body?: never;
