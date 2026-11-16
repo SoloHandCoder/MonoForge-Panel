@@ -10,7 +10,6 @@ use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
 use Knuckles\Scribe\Attributes\Subgroup;
-use Knuckles\Scribe\Attributes\UrlParam;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Extensions\Scribe\Attributes\ResponseFromResource;
 use Pterodactyl\Facades\Activity;
@@ -59,7 +58,6 @@ class GameController extends AdminApiController
      * Show game.
      */
     #[Endpoint('Get game', 'Returns a single game by ID.')]
-    #[UrlParam('game', 'integer', 'The ID of the game.', example: 1)]
     #[ResponseFromResource(GameResource::class, Game::class, description: 'Game returned.', resourceKey: 'game')]
     public function show(GetGamesRequest $request, Game $game): GameResource
     {
@@ -86,7 +84,6 @@ class GameController extends AdminApiController
      * Update game.
      */
     #[Endpoint('Update game', "Updates a game. `egg_ids`, when sent, becomes the game's full egg list: listed eggs move to it from any other game and eggs left out are released to the built-in detection.")]
-    #[UrlParam('game', 'integer', 'The ID of the game.', example: 1)]
     #[ResponseFromResource(GameResource::class, Game::class, description: 'Game updated.', resourceKey: 'game')]
     public function update(UpdateGameRequest $request, Game $game): GameResource
     {
@@ -105,7 +102,6 @@ class GameController extends AdminApiController
      * @throws DisplayException
      */
     #[Endpoint('Delete game', 'Deletes a custom game. Its eggs fall back to the built-in detection. Built-in games cannot be deleted.')]
-    #[UrlParam('game', 'integer', 'The ID of the game.', example: 2)]
     #[ScribeResponse(status: 204, description: 'Game deleted.')]
     #[ScribeResponse(self::BUILT_IN_ERROR, status: 400, description: 'The game is built in.')]
     public function destroy(DeleteGameRequest $request, Game $game): Response

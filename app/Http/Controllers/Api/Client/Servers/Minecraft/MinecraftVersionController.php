@@ -36,32 +36,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 #[Subgroup('Minecraft Versions', "Switch a Minecraft server's software and version.")]
 class MinecraftVersionController extends ClientApiController
 {
-    private const array SOFTWARE_SCHEMA = [
-        'type' => 'array',
-        'items' => [
-            'type' => 'object',
-            'required' => ['id', 'label', 'description', 'has_snapshots', 'needs_installer', 'available', 'unavailable_reason'],
-            'properties' => [
-                'id' => ['type' => 'string', 'enum' => ['vanilla', 'paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge']],
-                'label' => ['type' => 'string'],
-                'description' => ['type' => 'string'],
-                'has_snapshots' => ['type' => 'boolean', 'description' => 'Whether the version list can include snapshots.'],
-                'needs_installer' => ['type' => 'boolean', 'description' => 'Forge and NeoForge: installed by reinstalling the server with the chosen version.'],
-                'available' => ['type' => 'boolean', 'description' => "Whether this server's egg can switch to it."],
-                'unavailable_reason' => ['type' => 'string', 'nullable' => true],
-            ],
-        ],
-    ];
-
-    private const array CURRENT_SCHEMA = [
-        'type' => 'object',
-        'required' => ['software', 'minecraft_version'],
-        'properties' => [
-            'software' => ['type' => 'string', 'nullable' => true, 'description' => 'The detected software, or null when the panel cannot tell.'],
-            'minecraft_version' => ['type' => 'string', 'nullable' => true],
-        ],
-    ];
-
     private const array VERSIONS_SCHEMA = [
         'type' => 'array',
         'items' => [
@@ -114,8 +88,9 @@ class MinecraftVersionController extends ClientApiController
      */
     #[Endpoint('Get Minecraft software', "Returns the software the server runs now, as the panel detects it, and the software it can switch to, with whether this server's egg allows each.")]
     #[ResponseField('object', 'string', required: true)]
-    #[ResponseField('attributes.current', 'object', required: true, schema: self::CURRENT_SCHEMA)]
-    #[ResponseField('attributes.software', 'object[]', required: true, schema: self::SOFTWARE_SCHEMA)]
+    #[ResponseField('attributes.current.software', 'string', 'The detected software, or null when the panel cannot tell.', nullable: true)]
+    #[ResponseField('attributes.current.minecraft_version', 'string', 'The detected Minecraft version, or null.', nullable: true)]
+    #[ResponseField('attributes.software[].unavailable_reason', 'string', "Why this server's egg cannot switch to it, or null.", nullable: true)]
     #[ScribeResponse([
         'object' => 'minecraft_software',
         'attributes' => [

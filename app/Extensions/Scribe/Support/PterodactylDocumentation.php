@@ -68,7 +68,7 @@ class PterodactylDocumentation
         'databaseHost' => ['integer', 'The database host ID.', 1],
         'egg' => ['integer', 'The egg ID.', 1],
         'egg_id' => ['integer', 'The egg ID.', 1],
-        'game' => ['integer', 'The ID of the game.', 1],
+        'game_id' => ['integer', 'The ID of the game.', 1],
         'external_id' => ['string', 'The external ID.', 'external-identifier'],
         'extension' => ['string', 'The extension identifier.', 'probe'],
         'file' => ['string', 'The file path.', '/server.properties'],
