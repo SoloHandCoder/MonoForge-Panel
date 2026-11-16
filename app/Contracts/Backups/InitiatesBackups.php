@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use Pterodactyl\Exceptions\Service\Backup\TooManyBackupsException;
 use Pterodactyl\Models\Backup;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Task;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Throwable;
 
@@ -22,6 +23,12 @@ interface InitiatesBackups
      * @param  list<string>|null  $ignored
      */
     public function setIgnoredFiles(?array $ignored): self;
+
+    /**
+     * The schedule task making the backup. The backup remembers it, and when the task keeps only
+     * its newest `keep_backups` backups, its oldest unlocked ones are rotated out to make room.
+     */
+    public function setTask(?Task $task): self;
 
     /**
      * Start a backup of the server on Wings. The name and the ignored files are validated here:

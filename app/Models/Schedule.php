@@ -20,6 +20,7 @@ use Pterodactyl\Models\Traits\HasHashid;
 #[Fillable([
     'server_id',
     'name',
+    'preset',
     'cron_day_of_week',
     'cron_month',
     'cron_day_of_month',
@@ -44,6 +45,7 @@ class Schedule extends Model
 
     protected $attributes = [
         'name' => null,
+        'preset' => null,
         'cron_day_of_week' => '*',
         'cron_month' => '*',
         'cron_day_of_month' => '*',

@@ -12,6 +12,8 @@ use Pterodactyl\Contracts\Backups\InitiatesBackups;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Exceptions\Service\Backup\TooManyBackupsException;
 use Pterodactyl\Models\Backup;
+use Pterodactyl\Models\Schedule;
+use Pterodactyl\Models\Task;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 use Pterodactyl\Tests\Support\Fakes\FakeDaemonBackup;
 
@@ -126,4 +128,55 @@ test('a server at its limit without an unlocked backup is rejected before wings 
 
     $fake->assertNothingHappened();
     $this->assertDatabaseMissing('backups', ['server_id' => $server->id, 'name' => 'Blocked']);
+});
+
+test('a task that keeps its newest backups rotates out its own oldest unlocked one below the server limit', function (): void {
+    $server = $this->createServerModel(['backup_limit' => 5]);
+    $schedule = Schedule::factory()->for($server)->create();
+    $task = Task::factory()->for($schedule)->create(['action' => Task::ACTION_BACKUP, 'payload' => '', 'keep_backups' => 2]);
+    $manual = Backup::factory()->create(['server_id' => $server->id, 'created_at' => CarbonImmutable::now()->subDays(5)]);
+    $locked = Backup::factory()->create(['server_id' => $server->id, 'task_id' => $task->id, 'is_locked' => true, 'created_at' => CarbonImmutable::now()->subDays(4)]);
+    $oldest = Backup::factory()->create(['server_id' => $server->id, 'task_id' => $task->id, 'created_at' => CarbonImmutable::now()->subDays(3)]);
+    $newer = Backup::factory()->create(['server_id' => $server->id, 'task_id' => $task->id, 'created_at' => CarbonImmutable::now()->subDays(2)]);
+    $fake = new FakeDaemonBackup;
+
+    $backup = $this->app->make(InitiatesBackups::class)->setTask($task)->initiate($server, null, true);
+
+    // Three of its own (one locked) against keep 2: two unlocked ones make room for the new one.
+    $fake->assertBackedUp($backup->uuid);
+    expect($backup->task_id)->toBe($task->id);
+    $this->assertSoftDeleted($oldest);
+    $this->assertSoftDeleted($newer);
+    $this->assertNotSoftDeleted($locked);
+    $this->assertNotSoftDeleted($manual);
+});
+
+test('a task under its keep number rotates nothing while the server has room', function (): void {
+    $server = $this->createServerModel(['backup_limit' => 3]);
+    $task = Task::factory()->for(Schedule::factory()->for($server))->create(['action' => Task::ACTION_BACKUP, 'payload' => '', 'keep_backups' => 2]);
+    $own = Backup::factory()->create(['server_id' => $server->id, 'task_id' => $task->id, 'created_at' => CarbonImmutable::now()->subDay()]);
+    $fake = new FakeDaemonBackup;
+
+    $backup = $this->app->make(InitiatesBackups::class)->setTask($task)->initiate($server, null, true);
+
+    $fake->assertBackedUp($backup->uuid);
+    expect($fake->callsFor('delete'))->toBeEmpty();
+    $this->assertNotSoftDeleted($own);
+});
+
+test('a task that keeps its backups still respects the server limit', function (): void {
+    // A manual backup and one of the task's fill a limit of two. The task is under its keep
+    // number, so the server limit rotates out the oldest unlocked backup, as before presets.
+    $server = $this->createServerModel(['backup_limit' => 2]);
+    $task = Task::factory()->for(Schedule::factory()->for($server))->create(['action' => Task::ACTION_BACKUP, 'payload' => '', 'keep_backups' => 2]);
+    $manual = Backup::factory()->create(['server_id' => $server->id, 'created_at' => CarbonImmutable::now()->subDays(3)]);
+    $own = Backup::factory()->create(['server_id' => $server->id, 'task_id' => $task->id, 'created_at' => CarbonImmutable::now()->subDays(2)]);
+    $fake = new FakeDaemonBackup;
+
+    $backup = $this->app->make(InitiatesBackups::class)->setTask($task)->initiate($server, null, true);
+
+    $fake->assertBackedUp($backup->uuid);
+    $this->assertSoftDeleted($manual);
+    $this->assertNotSoftDeleted($own);
+    expect(Backup::query()->where('server_id', $server->id)->count())->toBe(2);
 });

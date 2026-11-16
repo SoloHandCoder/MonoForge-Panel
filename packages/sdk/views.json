@@ -1110,6 +1110,21 @@
             "export": "default"
         }
     },
+    "server.schedules.quickSetup": {
+        "kind": "block",
+        "context": "server",
+        "slots": [],
+        "fixtures": [
+            "presets",
+            "active",
+            "otherGame",
+            "readOnly"
+        ],
+        "classic": {
+            "file": "views/server/schedules/ScheduleQuickSetup.tsx",
+            "export": "default"
+        }
+    },
     "server.sftp": {
         "kind": "block",
         "context": "server",

@@ -7,9 +7,13 @@ export interface ScheduleCron {
     readonly month: string;
     readonly dayOfWeek: string;
 }
+/** The Quick setup presets a schedule can be made from. */
+export type SchedulePresetKey = 'daily_restart' | 'backup_rotation' | 'restart_when_empty' | 'weekly_cleanup';
 export interface ScheduleSummary {
     readonly id: number;
     readonly name: string;
+    /** The Quick setup preset it was made from, or null for a schedule made by hand. */
+    readonly preset: SchedulePresetKey | null;
     readonly cron: ScheduleCron;
     readonly active: boolean;
     /** A run is in progress. */
@@ -24,14 +28,19 @@ export interface ScheduleFormValues extends ScheduleCron {
     readonly enabled: boolean;
     readonly onlyWhenOnline: boolean;
 }
-export type ScheduleTaskAction = 'command' | 'power' | 'backup';
+export type ScheduleTaskAction = 'command' | 'power' | 'backup' | 'restart_if_empty' | 'delete_logs';
 export interface ScheduleTask {
     readonly id: number;
     /** The task's place in the run, from 1. */
     readonly sequence: number;
     readonly action: ScheduleTaskAction;
-    /** The command, the power signal, or the files a backup ignores. */
+    /**
+     * The command, the power signal, the files a backup ignores, the hours a restart when empty
+     * waits, or the days of logs a cleanup keeps.
+     */
     readonly payload: string;
+    /** A backup task keeps only its newest this many backups; null keeps them until the server limit. */
+    readonly keepBackups: number | null;
     /** Seconds to wait after the previous task; the first task runs at once. */
     readonly timeOffset: number;
     readonly continueOnFailure: boolean;
@@ -39,6 +48,7 @@ export interface ScheduleTask {
 export interface ScheduleTaskValues {
     readonly action: ScheduleTaskAction;
     readonly payload: string;
+    readonly keepBackups: number | null;
     readonly timeOffset: number | null;
     readonly continueOnFailure: boolean;
 }
@@ -56,6 +66,9 @@ export interface ScheduleTaskForm {
     readonly payloadFor: (action: ScheduleTaskAction, task?: ScheduleTask) => string;
     readonly validateTimeOffset: (value: number | null) => string | undefined;
     readonly validatePayload: (action: ScheduleTaskAction, payload: string) => string | undefined;
+    /** The most backups a backup task may keep: the server's backup limit. */
+    readonly maxKeepBackups: number | null;
+    readonly validateKeepBackups: (value: number | null) => string | undefined;
     /** Why the values cannot be saved at all, checked when the form is submitted. */
     readonly validate: (values: ScheduleTaskValues) => string | null;
 }
@@ -103,11 +116,67 @@ export interface ScheduleTasksModel {
         readonly remove: (id: number) => Promise<boolean>;
     };
 }
+/** What setting up a preset takes; the time is `HH:MM` in the panel's timezone. */
+export type SchedulePresetValues = {
+    readonly preset: 'daily_restart';
+    readonly time: string;
+    readonly warningMinutes: number;
+    /** The console command that broadcasts the warning on games other than Minecraft. */
+    readonly warningCommand: string;
+} | {
+    readonly preset: 'backup_rotation';
+    readonly everyHours: number;
+    readonly keep: number;
+} | {
+    readonly preset: 'restart_when_empty';
+    readonly hours: number;
+} | {
+    readonly preset: 'weekly_cleanup';
+    readonly days: number;
+};
+export interface SchedulePresetOption {
+    readonly key: SchedulePresetKey;
+    readonly title: string;
+    readonly description: string;
+    /** The viewer can set it up on this server. */
+    readonly available: boolean;
+    /** Why it cannot be set up, when it cannot. */
+    readonly reason: string | null;
+    /** The active schedules made from it. */
+    readonly active: readonly ScheduleSummary[];
+}
+/** The Quick setup card on the Schedules page. */
+export interface ScheduleQuickSetupModel {
+    /** The viewer can set up a preset, or one is active; the card renders nothing otherwise. */
+    readonly visible: boolean;
+    readonly loading: boolean;
+    /** The server's identifier, which links to each schedule. */
+    readonly serverId: string;
+    /** The timezone the times are in: the panel's. */
+    readonly timezone: string;
+    /** Minecraft Java: warnings use `say`; other games pick the command. */
+    readonly isMinecraft: boolean;
+    readonly backupLimit: number;
+    /** The viewer may send console commands, which a restart warning needs. */
+    readonly canSendCommands: boolean;
+    /** The viewer may switch a preset's schedule off (schedule.update). */
+    readonly canDisable: boolean;
+    readonly backupIntervals: readonly number[];
+    readonly maxWarningMinutes: number;
+    readonly presets: readonly SchedulePresetOption[];
+    readonly settingUp: boolean;
+    readonly disabling: boolean;
+    /** Resolves whether the preset was set up; a failure has already been reported. */
+    readonly setUp: (values: SchedulePresetValues) => Promise<boolean>;
+    /** Switches the schedule off; it stays in the list, where it can be edited or deleted. */
+    readonly disable: (schedule: ScheduleSummary) => Promise<boolean>;
+}
 declare module '../registry' {
     interface ViewModels {
         'page.server.schedules': PageStatusModel;
         'page.server.schedules.detail': PageStatusModel;
         'server.schedules': ScheduleListModel;
+        'server.schedules.quickSetup': ScheduleQuickSetupModel;
         'server.schedule': ScheduleModel;
         'server.schedule.tasks': ScheduleTasksModel;
     }

@@ -32,6 +32,7 @@ use Pterodactyl\Http\Controllers\Api\Client\Servers\Plugins\PluginController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\PowerController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ResourceUtilizationController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleController;
+use Pterodactyl\Http\Controllers\Api\Client\Servers\SchedulePresetController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ScheduleTaskController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ServerController;
 use Pterodactyl\Http\Controllers\Api\Client\Servers\ServerPageController;
@@ -232,6 +233,10 @@ Route::group([
         Route::get('/', [ScheduleController::class, 'index']);
         Route::middleware([ResourceLimit::Schedule->middleware()])
             ->post('/', [ScheduleController::class, 'store']);
+        // Quick setup presets: registered before /{schedule} so the word is not taken for an id.
+        Route::get('/presets', [SchedulePresetController::class, 'index']);
+        Route::middleware([ResourceLimit::Schedule->middleware()])
+            ->post('/presets', [SchedulePresetController::class, 'store']);
         Route::get('/{schedule}', [ScheduleController::class, 'view']);
         Route::post('/{schedule}', [ScheduleController::class, 'update']);
         Route::post('/{schedule}/execute', [ScheduleController::class, 'execute']);

@@ -9,6 +9,7 @@
                 "sequence_id": 1,
                 "action": "command",
                 "payload": "say \"edited\"",
+                "keep_backups": null,
                 "time_offset": 30,
                 "is_queued": false,
                 "continue_on_failure": false,

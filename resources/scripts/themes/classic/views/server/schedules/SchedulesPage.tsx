@@ -6,6 +6,7 @@ export default function SchedulesPage({ model, className }: ViewProps<'page.serv
     return (
         <PageStatus model={model} className={className}>
             <ServerContentBlock title='Schedules' className={className}>
+                <View name='server.schedules.quickSetup' className='mb-6' />
                 <View name='server.schedules' />
             </ServerContentBlock>
         </PageStatus>

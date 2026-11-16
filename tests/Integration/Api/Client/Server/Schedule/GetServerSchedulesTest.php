@@ -37,6 +37,7 @@ test('server schedules are returned', function (array $permissions, bool $indivi
     expect(collect($response->json($prefix.'attributes'))->except('relationships')->all())->toBe([
         'id' => $schedule->id,
         'name' => $schedule->name,
+        'preset' => $schedule->preset,
         'cron' => [
             'day_of_week' => $schedule->cron_day_of_week,
             'day_of_month' => $schedule->cron_day_of_month,
@@ -57,6 +58,7 @@ test('server schedules are returned', function (array $permissions, bool $indivi
         'sequence_id' => $task->sequence_id,
         'action' => $task->action,
         'payload' => $task->payload,
+        'keep_backups' => $task->keep_backups,
         'time_offset' => $task->time_offset,
         'is_queued' => $task->is_queued,
         'continue_on_failure' => $task->continue_on_failure,

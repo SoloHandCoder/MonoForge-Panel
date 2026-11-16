@@ -11,7 +11,8 @@ use Pterodactyl\Models\Task;
 /**
  * @extends ClientResource<Task>
  */
-#[ResponseField('action', example: 'power', enum: ['power', 'command', 'backup'])]
+#[ResponseField('action', example: 'power', enum: ['power', 'command', 'backup', 'restart_if_empty', 'delete_logs'])]
+#[ResponseField('keep_backups', 'integer', 'A backup task keeps only its newest this many backups, rotating out its oldest unlocked one; null keeps them until the server limit.', example: 3, nullable: true)]
 class TaskResource extends ClientResource
 {
     public function resourceName(): string
@@ -26,6 +27,7 @@ class TaskResource extends ClientResource
             'sequence_id' => $this->resource->sequence_id,
             'action' => $this->resource->action,
             'payload' => $this->resource->payload,
+            'keep_backups' => $this->resource->keep_backups,
             'time_offset' => $this->resource->time_offset,
             'is_queued' => $this->resource->is_queued,
             'continue_on_failure' => $this->resource->continue_on_failure,
