@@ -53,6 +53,7 @@ import { adminThemesQueryOptions } from '@/api/admin/themes/queries';
 import { adminTagListQueryParams, adminTagsQueryOptions } from '@/api/admin/tags/queries';
 import { adminSettingsQueryOptions } from '@/api/admin/settings/queries';
 import { adminRegistrationSettingsQueryOptions } from '@/api/admin/settings/registration';
+import { adminGuidesQueryOptions, adminHelpArticlesQueryOptions } from '@/api/admin/settings/help';
 import { adminLegalDocumentsQueryOptions } from '@/api/admin/settings/legal';
 import { adminPermissionTemplatesQueryOptions } from '@/api/admin/settings/permissionTemplates';
 import { adminStatusPageSettingsQueryOptions } from '@/api/admin/settings/status';
@@ -86,6 +87,7 @@ import { serverActivityFacetsQueryOptions, serverActivityLogsQueryOptions } from
 import { systemPermissionsQueryOptions } from '@/api/system/queries';
 import { siteSettingsQueryOptions } from '@/api/settings/queries';
 import { storeCatalogQueryOptions } from '@/api/store/queries';
+import { publicHelpQueryOptions } from '@/api/help';
 import { getBootstrapExtensions, hasBootstrapSession } from '@/bootstrap';
 import { registerClassPrefixes } from '@/lib/cn';
 import AuthenticatedLayout from '@/router/layouts/AuthenticatedLayout';
@@ -197,6 +199,26 @@ const statusRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: 'status',
     component: componentRoute(() => import('@/components/status/StatusPage')),
+});
+
+// The public help center and its articles: readable without signing in; the server adds each page's
+// title and description for search engines.
+const helpRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'help',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(publicHelpQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/help/HelpCenterPage')),
+});
+
+const helpArticleRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'help/$slug',
+    loader: ({ context }) => {
+        void context.queryClient.prefetchQuery(publicHelpQueryOptions());
+    },
+    component: componentRoute(() => import('@/components/help/HelpArticlePage')),
 });
 
 // A server's shareable public page: readable without signing in; the server adds its link preview tags.
@@ -1131,6 +1153,20 @@ const panelChildren = [
     }),
     createRoute({
         getParentRoute: () => panelRoute,
+        path: 'settings/help',
+        loader: async ({ context }) => {
+            await Promise.all([
+                context.queryClient.ensureQueryData({ ...adminSettingsQueryOptions(), revalidateIfStale: true }),
+                context.queryClient.ensureQueryData({ ...adminHelpArticlesQueryOptions(), revalidateIfStale: true }),
+            ]);
+        },
+        component: componentRoute(
+            () => import('@/components/admin/settings/SettingsContainer'),
+            ['panel.settings.before', 'panel.settings.after']
+        ),
+    }),
+    createRoute({
+        getParentRoute: () => panelRoute,
         path: 'settings/status',
         loader: async ({ context }) => {
             await Promise.all([
@@ -1369,6 +1405,16 @@ const panelChildren = [
             component: componentRoute(() => import('@/components/admin/assistant/AssistantAdminContainer')),
         })
     ),
+    // The guides for running the panel (root administrators); edited in Settings > Help.
+    createRoute({
+        getParentRoute: () => panelRoute,
+        path: 'help',
+        staticData: { nav: { label: 'Help', icon: 'circle-help', group: 'system' } },
+        loader: ({ context }) => {
+            void context.queryClient.prefetchQuery(adminGuidesQueryOptions());
+        },
+        component: componentRoute(() => import('@/components/admin/help/AdminHelpContainer')),
+    }),
     createRoute({
         getParentRoute: () => panelRoute,
         path: 'databases',
@@ -1592,6 +1638,8 @@ export function buildRouteTree(extensions: readonly SiteExtensionEntry[] = getBo
         authRoute.addChildren(authChildren),
         legalRoute,
         statusRoute,
+        helpRoute,
+        helpArticleRoute,
         serverPageRoute,
         authenticatedRoute.addChildren([
             dashboardRoute,
