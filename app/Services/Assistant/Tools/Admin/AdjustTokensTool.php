@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant\Tools\Admin;
 
+use Pterodactyl\Contracts\Assistant\AlwaysAsks;
 use Pterodactyl\Exceptions\Assistant\ToolException;
 use Pterodactyl\Exceptions\Billing\InsufficientTokensException;
 use Pterodactyl\Facades\Activity;
@@ -18,7 +19,7 @@ use Pterodactyl\Services\Billing\TokenWallet;
  * endpoint: root admins only, never their own wallet, at most 1,000,000 tokens either way,
  * a reason of 3 to 191 characters, and a balance that cannot go below zero.
  */
-final class AdjustTokensTool extends AdminTool
+final class AdjustTokensTool extends AdminTool implements AlwaysAsks
 {
     public const int MAX_ADJUSTMENT = AdjustUserTokensRequest::MAX_ADJUSTMENT;
 
@@ -44,6 +45,12 @@ final class AdjustTokensTool extends AdminTool
     }
 
     public function needsConfirmation(array $arguments, ToolContext $context): bool
+    {
+        return true;
+    }
+
+    /** Never allowed without an explicit click, even in "Allow everything". */
+    public function alwaysAsks(array $arguments, ToolContext $context): bool
     {
         return true;
     }

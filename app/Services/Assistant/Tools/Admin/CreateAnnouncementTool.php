@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Assistant\Tools\Admin;
 
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Pterodactyl\Contracts\Assistant\AlwaysAsks;
 use Pterodactyl\Enum\NoticeLevel;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Facades\Activity;
@@ -16,7 +17,7 @@ use Pterodactyl\Services\Assistant\ToolResult;
 /**
  * Publishes an announcement to every user, under the rules of the admin announcements form.
  */
-final class CreateAnnouncementTool extends AdminTool
+final class CreateAnnouncementTool extends AdminTool implements AlwaysAsks
 {
     public function name(): string
     {
@@ -41,6 +42,12 @@ final class CreateAnnouncementTool extends AdminTool
     }
 
     public function needsConfirmation(array $arguments, ToolContext $context): bool
+    {
+        return true;
+    }
+
+    /** Never allowed without an explicit click, even in "Allow everything". */
+    public function alwaysAsks(array $arguments, ToolContext $context): bool
     {
         return true;
     }

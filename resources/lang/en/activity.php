@@ -177,6 +177,9 @@ return [
         ],
         'assistant' => [
             'tool' => ':decision the assistant action ":label"',
+            'auto-approve' => 'The assistant action ":label" was allowed automatically (:reason)',
+            'approval-mode' => 'Set an assistant conversation to ":mode"',
+            'stop' => 'Stopped the assistant',
         ],
         'plugin' => [
             'install' => 'Installed :file (:version) from :source',
@@ -226,6 +229,9 @@ return [
         ],
         'assistant' => [
             'tool' => ':decision the admin assistant action ":label"',
+            'auto-approve' => 'The admin assistant action ":label" was allowed automatically (:reason)',
+            'approval-mode' => 'Set an admin assistant conversation to ":mode"',
+            'stop' => 'Stopped the admin assistant',
             'settings' => [
                 'update' => 'Updated the AI assistant settings',
             ],

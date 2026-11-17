@@ -9,6 +9,7 @@ import {
     FileText,
     FolderOpen,
     Gauge,
+    Globe,
     HardDrive,
     KeyRound,
     Megaphone,
@@ -26,7 +27,7 @@ import {
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
-import type { AssistantToolCall, AssistantToolCallStatus } from '@/api/assistant';
+import type { AssistantAutoApproval, AssistantToolCall, AssistantToolCallStatus } from '@/api/assistant';
 import type { UiTone } from '@/themes/skins';
 
 const icons = new Map<string, LucideIcon>([
@@ -59,6 +60,7 @@ const icons = new Map<string, LucideIcon>([
     ['unsuspend_server', ShieldCheck],
     ['create_announcement', Megaphone],
     ['adjust_tokens', Coins],
+    ['web_search', Globe],
 ]);
 
 /** The icon of a tool, by its name. */
@@ -120,6 +122,12 @@ export function confirmationWarning(call: Pick<AssistantToolCall, 'name' | 'need
                 : 'The assistant needs your permission for this action.';
     }
 }
+
+/** Why a call that needed confirmation ran without a click. */
+export const autoApprovalLabels = {
+    allow_everything: 'Allowed automatically (Allow everything)',
+    until_next_message: 'Allowed automatically (until your next message)',
+} satisfies Record<AssistantAutoApproval, string>;
 
 export const toolStatusLabels = {
     pending: 'Waiting for you',

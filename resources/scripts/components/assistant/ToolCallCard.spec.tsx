@@ -15,6 +15,8 @@ const call = (overrides: Partial<AssistantToolCall> = {}): AssistantToolCall => 
     arguments: { path: '.env' },
     details: [{ label: 'path', value: '/.env' }],
     needs_confirmation: true,
+    always_ask: false,
+    auto_approved: null,
     status: 'pending',
     result_preview: null,
     display: null,
@@ -31,6 +33,58 @@ describe('ToolCallCard', () => {
         await userEvent.click(screen.getByRole('button', { name: 'Deny: Read .env' }));
 
         expect(onDecide.mock.calls).toEqual([['approve'], ['deny']]);
+    });
+
+    it('offers Allow until my next message', async () => {
+        const onDecide = vi.fn();
+
+        render(<ToolCallCard call={call()} onDecide={onDecide} />);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Allow until my next message: Read .env' }));
+
+        expect(onDecide).toHaveBeenCalledWith('approve_until_next_message');
+    });
+
+    it('says when an action always asks, and when one was allowed automatically', () => {
+        const { rerender } = render(<ToolCallCard call={call({ always_ask: true })} onDecide={vi.fn()} />);
+
+        expect(screen.getByTestId('always-asks')).toHaveTextContent('even with “Allow everything”');
+        expect(screen.queryByTestId('auto-approved')).not.toBeInTheDocument();
+
+        rerender(<ToolCallCard call={call({ status: 'done', auto_approved: 'allow_everything' })} />);
+
+        expect(screen.getByTestId('auto-approved')).toHaveTextContent('Allowed automatically (Allow everything)');
+
+        rerender(<ToolCallCard call={call({ status: 'done', auto_approved: 'until_next_message' })} />);
+
+        expect(screen.getByTestId('auto-approved')).toHaveTextContent('until your next message');
+    });
+
+    it('links the sources of a web search, http(s) only', () => {
+        render(
+            <ToolCallCard
+                call={call({
+                    name: 'web_search',
+                    label: 'Search the web for "paper docs"',
+                    needs_confirmation: false,
+                    status: 'done',
+                    display: {
+                        summary: null,
+                        sources: [
+                            { title: 'Paper docs', url: 'https://docs.papermc.io/paper' },
+                            { title: 'Bad', url: 'javascript:alert(1)' },
+                        ],
+                    },
+                })}
+            />
+        );
+
+        const links = screen.getAllByRole('link');
+
+        expect(links).toHaveLength(1);
+        expect(links[0]).toHaveAttribute('href', 'https://docs.papermc.io/paper');
+        expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+        expect(links[0]).toHaveTextContent('Paper docs');
     });
 
     it('tints a sensitive read amber and a destructive action red', () => {
@@ -57,6 +111,7 @@ describe('ToolCallCard', () => {
         rerender(<ToolCallCard call={call()} onDecide={vi.fn()} deciding='approve' />);
 
         expect(screen.getByRole('button', { name: 'Allow: Read .env' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Allow until my next message: Read .env' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Deny: Read .env' })).toBeDisabled();
     });
 

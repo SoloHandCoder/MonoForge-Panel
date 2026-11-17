@@ -3,6 +3,7 @@ import {
     useAssistantSettings,
     useUpdateAssistantSettings,
     type AssistantProvider,
+    type AssistantSearchProvider,
     type AssistantSettings,
 } from '@/api/assistant';
 import { httpErrorToHuman } from '@/api/http';
@@ -13,10 +14,27 @@ import { Form, useAppForm } from '@/components/form';
 
 const NO_PROVIDER = 0;
 
-interface SettingsFormValues extends Omit<AssistantSettings, 'default_provider_id'> {
+interface SettingsFormValues extends Omit<AssistantSettings, 'default_provider_id' | 'web_search_key_set'> {
     /** 0 is "none", since the select cannot hold null. */
     default_provider_id: number;
+    /** A new search API key; blank keeps the stored one. */
+    web_search_key: string;
+    clear_web_search_key: boolean;
 }
+
+const searchProviderOptions = [
+    { value: 'native', label: 'The AI provider (OpenRouter only)' },
+    { value: 'brave', label: 'Brave Search API' },
+    { value: 'tavily', label: 'Tavily API' },
+] satisfies { value: AssistantSearchProvider; label: string }[];
+
+/** The form starts from the stored settings; whether a key is stored is shown, not sent back. */
+const formValues = ({ web_search_key_set: _keyStored, ...settings }: AssistantSettings): SettingsFormValues => ({
+    ...settings,
+    default_provider_id: settings.default_provider_id ?? NO_PROVIDER,
+    web_search_key: '',
+    clear_web_search_key: false,
+});
 
 const atLeast = (minimum: number) => ({
     onChange: ({ value }: { value: number | null }) =>
@@ -32,16 +50,17 @@ function SettingsForm({
 }) {
     const update = useUpdateAssistantSettings();
     const form = useAppForm({
-        defaultValues: {
-            ...settings,
-            default_provider_id: settings.default_provider_id ?? NO_PROVIDER,
-        } as SettingsFormValues,
-        onSubmit: async ({ value }) => {
+        defaultValues: formValues(settings),
+        onSubmit: async ({ value, formApi }) => {
             try {
                 await update.mutateAsync({
                     ...value,
                     default_provider_id: value.default_provider_id === NO_PROVIDER ? null : value.default_provider_id,
+                    web_search_key: value.web_search_key.trim() || null,
                 });
+                // Keys are write-only: the field empties once the key is stored.
+                formApi.setFieldValue('web_search_key', '');
+                formApi.setFieldValue('clear_web_search_key', false);
             } catch {
                 // Error toast is handled by the mutation.
             }
@@ -91,6 +110,61 @@ function SettingsForm({
                             />
                         )}
                     </form.AppField>
+                </div>
+            </TitledGreyBox>
+            <TitledGreyBox title='Approvals and web search' className='mt-6'>
+                <div className='grid gap-6'>
+                    <form.AppField name='allow_everything_enabled'>
+                        {(field) => (
+                            <field.SwitchField
+                                label='Allow "Allow everything"'
+                                description='Users may switch a conversation to run actions without asking (after a warning). Deleting many files or a world folder, token changes, suspensions and announcements always ask.'
+                            />
+                        )}
+                    </form.AppField>
+                    <form.AppField name='web_search_enabled'>
+                        {(field) => (
+                            <field.SwitchField
+                                label='Web search'
+                                description='The assistant may look up docs and error messages on the web. Searches are billed like other usage.'
+                            />
+                        )}
+                    </form.AppField>
+                    <div className='grid gap-6 sm:grid-cols-2'>
+                        <form.AppField name='web_search_provider'>
+                            {(field) => (
+                                <field.SelectField
+                                    label='Search with'
+                                    description='OpenRouter has its own web search; other providers need a search API key.'
+                                    options={searchProviderOptions}
+                                />
+                            )}
+                        </form.AppField>
+                        <form.AppField name='web_search_key'>
+                            {(field) => (
+                                <field.TextField
+                                    type='password'
+                                    autoComplete='off'
+                                    label='Search API key'
+                                    description={
+                                        settings.web_search_key_set
+                                            ? 'A key is stored. Leave blank to keep it.'
+                                            : 'For Brave Search or Tavily. Stored encrypted.'
+                                    }
+                                />
+                            )}
+                        </form.AppField>
+                    </div>
+                    {settings.web_search_key_set && (
+                        <form.AppField name='clear_web_search_key'>
+                            {(field) => (
+                                <field.SwitchField
+                                    label='Remove the stored search key'
+                                    description='Takes effect when you save.'
+                                />
+                            )}
+                        </form.AppField>
+                    )}
                 </div>
             </TitledGreyBox>
             <TitledGreyBox title='Billing' className='mt-6'>

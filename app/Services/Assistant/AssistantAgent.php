@@ -14,6 +14,7 @@ use Pterodactyl\Jobs\Assistant\RunAssistantTurn;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
 use Pterodactyl\Models\Assistant\AiToolCall;
+use Pterodactyl\Models\Assistant\AiUserSetting;
 use Pterodactyl\Services\Assistant\Chat\ChatClient;
 use Pterodactyl\Services\Assistant\Chat\ChatResponse;
 use Pterodactyl\Services\Assistant\Chat\ChatToolCall;
@@ -28,8 +29,16 @@ use Throwable;
  * then asked for a final answer without tools).
  *
  * Only one loop works on a conversation at a time (a cache lock), and only the run whose
- * token the conversation holds: before every model call and tool run the loop checks that the
- * conversation is still "running" under its token, and stops when it is not.
+ * token the conversation holds: before every model call (the summariser's too) and tool run
+ * the loop checks that the conversation is still "running" under its token, and stops when it
+ * is not. That is how the stop button works: stopping takes the turn away from the run
+ * (ConversationService::stop), so the loop starts no further model call or tool, a queued turn
+ * that has not started does nothing, and the answer of a model call still in flight is
+ * discarded (its usage, which the provider charged, is still recorded). The provider client
+ * sends complete requests, so an in-flight call is not cut off.
+ *
+ * Calls that wait for confirmation may be allowed without a click (AutoApproval) when the
+ * conversation is in "Allow everything" or the user chose "Allow until my next message".
  */
 class AssistantAgent
 {
@@ -44,6 +53,7 @@ class AssistantAgent
         private readonly ToolRegistry $registry,
         private readonly ToolExecutor $executor,
         private readonly AssistantBilling $billing,
+        private readonly AutoApproval $autoApproval,
     ) {}
 
     /** How long the conversation lock lasts: the whole job (the wait and the work), plus a margin. */
@@ -133,6 +143,7 @@ class AssistantAgent
     {
         while (true) {
             throw_unless(AssistantSettings::scopeEnabled($conversation->scope), AssistantUnavailableException::class, 'The AI assistant is turned off.');
+            throw_if(AiUserSetting::paused($conversation->user), AssistantUnavailableException::class, ConversationService::PAUSED);
 
             $ready = $this->runReadyCalls($conversation, $token);
             if ($ready === null) {
@@ -151,7 +162,12 @@ class AssistantAgent
             $provider = AssistantProviders::resolve($conversation);
 
             $tools = $final ? [] : $this->registry->for($conversation->scope, ToolExecutor::context($conversation));
-            $messages = $this->context->build($conversation, $final ? 'You have used the most tool calls allowed for this request. Answer the user now with what you found, without calling tools.' : null);
+            // Building the context may summarise older messages with a model call of its own.
+            $messages = $this->context->build(
+                $conversation,
+                $final ? 'You have used the most tool calls allowed for this request. Answer the user now with what you found, without calling tools.' : null,
+                fn (): bool => $conversation->touchRun($token),
+            );
             if (! $this->context->fits($messages)) {
                 $this->fail($conversation, self::CONTEXT_FULL, $token);
 
@@ -164,22 +180,29 @@ class AssistantAgent
             }
 
             $response = $this->client->complete($provider, $messages, ToolRegistry::definitions($tools), AssistantSettings::maxOutputTokens());
+            // The provider charged for the call, so it is recorded even when the turn was
+            // stopped meanwhile; its answer is then discarded.
             $this->billing->record($conversation->user, $conversation, $conversation->scope, $response->usage->total());
 
-            if (! $conversation->touchRun($token)) {
+            $calls = $tools === [] ? [] : $this->uniqueIds($conversation, $response->toolCalls);
+
+            // Stored only while the run still owns the turn, under the lock a stop takes.
+            $stored = $conversation->whileOwned($token, function () use ($conversation, $response, $calls): void {
+                $message = $this->store($conversation, $response, $calls);
+                if ($calls !== []) {
+                    $this->executor->record($conversation, $message, $calls);
+                }
+            });
+
+            if (! $stored) {
                 return;
             }
-
-            $calls = $tools === [] ? [] : $this->uniqueIds($conversation, $response->toolCalls);
-            $message = $this->store($conversation, $response, $calls);
 
             if ($calls === []) {
                 $conversation->finishRun($token, AiConversation::STATUS_IDLE);
 
                 return;
             }
-
-            $this->executor->record($conversation, $message, $calls);
         }
     }
 
@@ -201,12 +224,12 @@ class AssistantAgent
             ->get();
 
         foreach ($calls as $call) {
-            if ($call->status === AiToolCall::STATUS_PENDING && $call->needs_confirmation) {
-                return false;
-            }
-
             if (! $conversation->touchRun($token)) {
                 return null;
+            }
+
+            if ($call->status === AiToolCall::STATUS_PENDING && $call->needs_confirmation && ! $this->autoApproval->apply($conversation, $call)) {
+                return false;
             }
 
             $this->executor->run($conversation, $call);

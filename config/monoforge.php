@@ -173,6 +173,19 @@ return [
         'max_output_tokens' => 2048,
         // Phase 6: offer the AI crash doctor when a server crashes or fails to start.
         'crash_doctor_enabled' => true,
+        // Assistant controls: whether conversations may "Allow everything" without asking.
+        'allow_everything_enabled' => true,
+        // The web_search tool: off until set up. web_search_provider is "native" (the
+        // provider's own search, OpenRouter only), "brave" or "tavily" (with an API key,
+        // stored encrypted as "monoforge:ai:web_search_key").
+        'web_search_enabled' => false,
+        'web_search_provider' => 'native',
+        'web_search_key' => '',
+        // The search APIs the panel calls; public https addresses only.
+        'web_search_endpoints' => [
+            'brave' => 'https://api.search.brave.com/res/v1/web/search',
+            'tavily' => 'https://api.tavily.com/search',
+        ],
     ],
 
     /*

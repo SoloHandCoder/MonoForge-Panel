@@ -22,6 +22,7 @@ use Pterodactyl\Models\Model;
  * @property string|null $content
  * @property list<array{id: string, type: string, function: array{name: string, arguments: string}}>|null $tool_calls
  * @property string|null $tool_call_id
+ * @property string|null $notice "stopped" for the note a stop leaves in the thread
  * @property int $prompt_tokens
  * @property int $completion_tokens
  * @property CarbonImmutable|null $created_at
@@ -33,6 +34,7 @@ use Pterodactyl\Models\Model;
     'content',
     'tool_calls',
     'tool_call_id',
+    'notice',
     'prompt_tokens',
     'completion_tokens',
 ])]
@@ -47,6 +49,9 @@ class AiMessage extends Model
     public const string ROLE_ASSISTANT = 'assistant';
 
     public const string ROLE_TOOL = 'tool';
+
+    /** The note a stop leaves in the thread, an assistant message with this notice. */
+    public const string NOTICE_STOPPED = 'stopped';
 
     public const null UPDATED_AT = null;
 

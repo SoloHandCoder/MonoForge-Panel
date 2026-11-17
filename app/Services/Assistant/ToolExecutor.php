@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Assistant;
 
 use Carbon\CarbonImmutable;
+use Pterodactyl\Contracts\Assistant\AlwaysAsks;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
 use Pterodactyl\Contracts\Assistant\PreparesToolCall;
 use Pterodactyl\Exceptions\Assistant\ToolException;
@@ -26,6 +27,8 @@ class ToolExecutor
 
     public const string EXPIRED = 'Error: nobody allowed this action in time, so it did not run. Ask again if it is still needed.';
 
+    public const string STOPPED = 'Error: the user stopped the assistant, so this action did not run.';
+
     /** At most this many tool calls of one model answer run; the rest fail. */
     public const int MAX_CALLS_PER_STEP = 8;
 
@@ -35,7 +38,7 @@ class ToolExecutor
 
     public static function context(AiConversation $conversation): ToolContext
     {
-        return new ToolContext($conversation->user, $conversation->scope, $conversation->server);
+        return new ToolContext($conversation->user, $conversation->scope, $conversation->server, $conversation);
     }
 
     /**
@@ -55,6 +58,7 @@ class ToolExecutor
             $tool = $index < self::MAX_CALLS_PER_STEP ? $this->registry->find($call->name, $context) : null;
             $arguments = $call->arguments ?? [];
             $needsConfirmation = false;
+            $alwaysAsk = false;
             $label = $call->name;
             $details = null;
             $error = null;
@@ -74,7 +78,7 @@ class ToolExecutor
                 }
 
                 if ($error === null) {
-                    [$needsConfirmation, $label, $details] = $this->describe($tool, $arguments, $context);
+                    [$needsConfirmation, $label, $details, $alwaysAsk] = $this->describe($tool, $arguments, $context);
                 }
             }
 
@@ -87,6 +91,7 @@ class ToolExecutor
                 'arguments' => $arguments,
                 'details' => $details,
                 'needs_confirmation' => $needsConfirmation,
+                'always_ask' => $needsConfirmation && $alwaysAsk,
                 'status' => AiToolCall::STATUS_PENDING,
             ]);
 
@@ -153,6 +158,53 @@ class ToolExecutor
     }
 
     /**
+     * Allows a call that waits for confirmation without a click, because the conversation is in
+     * "Allow everything" or the user chose "Allow until my next message" ($reason). A call that
+     * always asks is never allowed this way. False if the call was not waiting.
+     */
+    public function autoApprove(AiToolCall $call, User $user, string $reason): bool
+    {
+        $now = CarbonImmutable::now();
+        $changed = AiToolCall::query()
+            ->whereKey($call->id)
+            ->where('status', AiToolCall::STATUS_PENDING)
+            ->where('needs_confirmation', true)
+            ->where('always_ask', false)
+            ->update([
+                'status' => AiToolCall::STATUS_APPROVED,
+                'decided_by' => $user->id,
+                'decided_at' => $now,
+                'auto_approved' => $reason,
+                'updated_at' => $now,
+            ]);
+
+        $call->refresh();
+
+        return $changed > 0;
+    }
+
+    /**
+     * Ends a call that has not started (waiting for a decision, or allowed and not yet run)
+     * because the user stopped the turn; the model is told it did not run. False if the call
+     * had started or ended already.
+     */
+    public function cancel(AiToolCall $call): bool
+    {
+        $changed = AiToolCall::query()
+            ->whereKey($call->id)
+            ->whereIn('status', [AiToolCall::STATUS_PENDING, AiToolCall::STATUS_APPROVED])
+            ->update(['status' => AiToolCall::STATUS_FAILED, 'updated_at' => CarbonImmutable::now()]);
+
+        if ($changed === 0) {
+            return false;
+        }
+
+        $this->finish($call, AiToolCall::STATUS_FAILED, self::STOPPED);
+
+        return true;
+    }
+
+    /**
      * Ends a call that waited too long for a decision; the model is told it did not run.
      * False if the call was not waiting.
      */
@@ -174,10 +226,11 @@ class ToolExecutor
     }
 
     /**
-     * Whether the prepared call needs a click, its label and its full details.
+     * Whether the prepared call needs a click, its label, its full details and whether it always
+     * asks, even in "Allow everything".
      *
      * @param  array<string, mixed>  $arguments
-     * @return array{bool, string, list<array{label: string, value: string}>|null}
+     * @return array{bool, string, list<array{label: string, value: string}>|null, bool}
      */
     private function describe(AssistantTool $tool, array $arguments, ToolContext $context): array
     {
@@ -203,7 +256,14 @@ class ToolExecutor
             $details = null;
         }
 
-        return [$needsConfirmation, $label, $details];
+        try {
+            $alwaysAsk = $tool instanceof AlwaysAsks && $tool->alwaysAsks($arguments, $context);
+        } catch (Throwable $throwable) {
+            report($throwable);
+            $alwaysAsk = true;
+        }
+
+        return [$needsConfirmation, $label, $details, $alwaysAsk];
     }
 
     private function decide(AiToolCall $call, User $user, string $status): bool

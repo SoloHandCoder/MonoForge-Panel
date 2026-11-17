@@ -1,12 +1,13 @@
 import { useId, useState } from 'react';
-import { ChevronRight, LoaderCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
-import type { AssistantDecision, AssistantToolCall } from '@/api/assistant';
+import { BadgeCheck, ChevronRight, ExternalLink, LoaderCircle, Lock, ShieldAlert, TriangleAlert } from 'lucide-react';
+import type { AssistantChoice, AssistantJson, AssistantJsonFields, AssistantToolCall } from '@/api/assistant';
 import Badge from '@/components/elements/Badge';
 import Button from '@/components/elements/Button';
 import Icon from '@/components/elements/Icon';
 import { revealHidden } from '@/components/assistant/hiddenCharacters';
 import { CopyButton } from '@/components/assistant/markdown';
 import {
+    autoApprovalLabels,
     confirmationWarning,
     isDestructiveTool,
     isSensitiveRead,
@@ -19,10 +20,10 @@ import { cn } from '@/lib/cn';
 
 export interface ToolCallCardProps {
     call: AssistantToolCall;
-    /** Shows Allow / Deny on a pending call; left out where nobody can decide. */
-    onDecide?: (decision: AssistantDecision) => void;
-    /** The decision being sent, while it is. */
-    deciding?: AssistantDecision | null;
+    /** Shows Allow / Allow until my next message / Deny on a pending call; left out where nobody can decide. */
+    onDecide?: (choice: AssistantChoice) => void;
+    /** The choice being sent, while it is. */
+    deciding?: AssistantChoice | null;
     /** A newer step of the assistant exists, so a call still pending here can no longer be decided. */
     superseded?: boolean;
 }
@@ -101,7 +102,7 @@ function ConfirmationBar({
     deciding,
 }: Required<Pick<ToolCallCardProps, 'call' | 'onDecide'>> & {
     destructive: boolean;
-    deciding?: AssistantDecision | null;
+    deciding?: AssistantChoice | null;
 }) {
     return (
         <div className='border-t border-inherit px-4 py-3'>
@@ -113,7 +114,13 @@ function ConfirmationBar({
                 />
                 {confirmationWarning(call)}
             </p>
-            <div className='mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end'>
+            {call.always_ask && (
+                <p data-testid='always-asks' className='mt-2 flex items-start gap-2 text-xs text-muted-foreground'>
+                    <Icon icon={Lock} className='mt-0.5 size-3.5 shrink-0' aria-hidden />
+                    This action always asks for your click, even with &ldquo;Allow everything&rdquo;.
+                </p>
+            )}
+            <div className='mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end'>
                 <Button.Text
                     type='button'
                     isSecondary
@@ -123,6 +130,16 @@ function ConfirmationBar({
                     aria-label={`Deny: ${call.label}`}
                 >
                     Deny
+                </Button.Text>
+                <Button.Text
+                    type='button'
+                    disabled={!!deciding}
+                    isLoading={deciding === 'approve_until_next_message'}
+                    onClick={() => onDecide('approve_until_next_message')}
+                    aria-label={`Allow until my next message: ${call.label}`}
+                    title='Allows this and the further actions of this reply, until you send your next message. Actions that always ask still wait for you.'
+                >
+                    Allow until my next message
                 </Button.Text>
                 <Button
                     type='button'
@@ -203,6 +220,70 @@ function CallTitle({ call, awaiting }: { call: AssistantToolCall; awaiting: bool
                 {revealHidden(call.label).text}
             </p>
             <p className='truncate font-mono text-xs text-muted-foreground'>{call.name}</p>
+            {call.auto_approved && (
+                <p data-testid='auto-approved' className='mt-0.5 flex items-center gap-1 text-xs text-muted-foreground'>
+                    <Icon icon={BadgeCheck} className='size-3.5 shrink-0' aria-hidden />
+                    <span className='truncate'>{autoApprovalLabels[call.auto_approved]}</span>
+                </p>
+            )}
+        </div>
+    );
+}
+
+interface SearchSource {
+    title: string;
+    url: string;
+}
+
+const isJsonFields = (value: AssistantJson): value is AssistantJsonFields =>
+    value !== null && !Array.isArray(value) && value instanceof Object;
+
+/** The sources of a web search, as plain http(s) links. */
+const searchSources = (call: AssistantToolCall): SearchSource[] => {
+    const sources: AssistantJson | undefined = call.display?.sources;
+
+    if (call.name !== 'web_search' || !Array.isArray(sources)) {
+        return [];
+    }
+
+    return sources.flatMap((source: AssistantJson): SearchSource[] => {
+        // Each source is an object of a title and a URL; anything else is left out.
+        if (!isJsonFields(source)) {
+            return [];
+        }
+
+        const url = String(source.url ?? '');
+        const title = String(source.title ?? '');
+
+        return /^https?:\/\//i.test(url) ? [{ title: title || url, url }] : [];
+    });
+};
+
+function Sources({ call }: { call: AssistantToolCall }) {
+    const sources = searchSources(call);
+
+    if (!sources.length) {
+        return null;
+    }
+
+    return (
+        <div data-testid='search-sources' className='border-t border-border px-4 py-3'>
+            <p className='mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase'>Sources</p>
+            <ul className='grid gap-1'>
+                {sources.map((source) => (
+                    <li key={source.url} className='min-w-0'>
+                        <a
+                            href={source.url}
+                            target='_blank'
+                            rel='noopener noreferrer nofollow'
+                            className='inline-flex max-w-full items-center gap-1.5 text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+                        >
+                            <span className='truncate'>{source.title}</span>
+                            <Icon icon={ExternalLink} className='size-3.5 shrink-0' aria-hidden />
+                        </a>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
@@ -256,6 +337,7 @@ export default function ToolCallCard({ call, onDecide, deciding = null, supersed
                     </button>
                 )}
             </div>
+            <Sources call={call} />
             {open && <Details call={call} id={detailsId} />}
             {awaiting && <ConfirmationDetails call={call} />}
             {awaiting && onDecide && (

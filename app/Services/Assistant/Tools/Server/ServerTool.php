@@ -75,7 +75,7 @@ abstract class ServerTool extends AbstractTool
         $server = $context->server instanceof Server ? Server::query()->find($context->server->id) : null;
         throw_unless($server instanceof Server, ToolException::class, 'This server no longer exists.');
 
-        return new ToolContext($context->user, $context->scope, $server);
+        return new ToolContext($context->user, $context->scope, $server, $context->conversation);
     }
 
     protected function guard(ToolContext $context): void

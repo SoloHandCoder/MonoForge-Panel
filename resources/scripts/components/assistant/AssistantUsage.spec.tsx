@@ -28,6 +28,7 @@ const status = (overrides: Partial<AssistantStatus> = {}): AssistantStatus => ({
     enabled: true,
     server_enabled: true,
     crash_doctor_enabled: true,
+    paused: false,
     free_limit: 50000,
     free_used: 41000,
     ratio: 1000,

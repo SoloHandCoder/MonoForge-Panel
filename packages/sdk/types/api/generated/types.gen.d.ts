@@ -2888,6 +2888,22 @@ export type AdminSendAnAdminAssistantMessageRequest = {
      */
     message: string;
 };
+export type AdminAllowAnAdminAssistantActionRequest = {
+    /**
+     * Also allow the further actions of this turn until your next message.
+     */
+    until_next_message?: boolean;
+};
+export type AdminSetTheAdminAssistantApprovalModeRequest = {
+    /**
+     * ask or allow_everything.
+     */
+    mode: 'ask' | 'allow_everything';
+    /**
+     * Whether the admin confirmed the warning; required for allow_everything.
+     */
+    confirmed?: boolean;
+};
 export type AdminCreateAnAiProviderRequest = {
     /**
      * The display name. Must be at least 1 character. Must not be greater than 191 characters.
@@ -3013,6 +3029,26 @@ export type AdminUpdateAiAssistantSettingsRequest = {
      * The max output tokens. Must be at least 64. Must not be greater than 32768.
      */
     max_output_tokens: number;
+    /**
+     * Whether assistant conversations may be switched to "Allow everything" (tool calls that need confirmation are allowed without asking). Optional; keeps its value when left out.
+     */
+    allow_everything_enabled?: boolean;
+    /**
+     * Whether the assistant may look things up on the web (the web_search tool). Optional; keeps its value when left out.
+     */
+    web_search_enabled?: boolean;
+    /**
+     * Which web search the assistant uses: native (the search built into the AI provider, OpenRouter only), brave or tavily. Optional; keeps its value when left out.
+     */
+    web_search_provider?: 'native' | 'brave' | 'tavily';
+    /**
+     * A new Brave Search or Tavily API key, stored encrypted; blank keeps the stored one. Optional. Must not be greater than 255 characters.
+     */
+    web_search_key?: string | null;
+    /**
+     * Remove the stored web search API key.
+     */
+    clear_web_search_key?: boolean;
 };
 export type AdminInstallExtensionRequest = {
     /**
@@ -5046,6 +5082,12 @@ export type AuthRegisterRequest = {
      */
     'g-recaptcha-response'?: string | null;
 };
+export type ClientPauseOrResumeTheAssistantRequest = {
+    /**
+     * true to pause, false to resume.
+     */
+    paused: boolean;
+};
 export type ClientOpenASupportTicketRequest = {
     /**
      * What the ticket is about.
@@ -5685,6 +5727,28 @@ export type ClientSendAnAssistantMessageRequest = {
      * The message. Must be at least 1 character. Must not be greater than 8000 characters.
      */
     message: string;
+};
+export type ClientAllowAnAssistantActionRequest = {
+    /**
+     * Also allow the further actions of this turn until your next message.
+     */
+    until_next_message?: boolean;
+};
+export type ClientDenyAnAssistantActionRequest = {
+    /**
+     * Also allow the further actions of this turn that need confirmation, until you send your next message. Actions that always ask still wait for a click.
+     */
+    until_next_message?: boolean;
+};
+export type ClientSetTheAssistantApprovalModeRequest = {
+    /**
+     * ask or allow_everything.
+     */
+    mode: 'ask' | 'allow_everything';
+    /**
+     * Whether the user confirmed the warning; required for allow_everything.
+     */
+    confirmed?: boolean;
 };
 export type ClientUpdateServerPublicPageRequest = {
     /**
@@ -7221,6 +7285,9 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7233,6 +7300,10 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -7253,6 +7324,14 @@ export type AdminStartAnAdminAssistantConversationResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -7274,6 +7353,9 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7286,6 +7368,10 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -7306,6 +7392,14 @@ export type AdminGetAnAdminAssistantConversationResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -7327,6 +7421,9 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7339,6 +7436,10 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -7359,6 +7460,14 @@ export type AdminSendAnAdminAssistantMessageResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -7380,6 +7489,9 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7392,6 +7504,10 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -7412,6 +7528,14 @@ export type AdminAllowAnAdminAssistantActionResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -7433,6 +7557,9 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -7445,6 +7572,10 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -7465,6 +7596,150 @@ export type AdminDenyAnAdminAssistantActionResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminStopTheAdminAssistantResponseBody = {
+    uuid?: string;
+    title?: string;
+    mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type AdminSetTheAdminAssistantApprovalModeResponseBody = {
+    uuid?: string;
+    title?: string;
+    mode?: string;
+    /**
+     * ask or allow_everything.
+     */
+    approval_mode: 'ask' | 'allow_everything';
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
+    status?: string;
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -7563,6 +7838,10 @@ export type AdminGetAiAssistantSettingsResponseBody = {
     max_tool_iterations?: number;
     context_tokens?: number;
     max_output_tokens?: number;
+    allow_everything_enabled?: boolean;
+    web_search_enabled?: boolean;
+    web_search_provider?: string;
+    web_search_key_set?: boolean;
 };
 export type AdminUpdateAiAssistantSettingsResponseBody = {
     enabled?: boolean;
@@ -7576,6 +7855,10 @@ export type AdminUpdateAiAssistantSettingsResponseBody = {
     max_tool_iterations?: number;
     context_tokens?: number;
     max_output_tokens?: number;
+    allow_everything_enabled?: boolean;
+    web_search_enabled?: boolean;
+    web_search_provider?: string;
+    web_search_key_set?: boolean;
 };
 export type AdminGetAiAssistantUsageResponseBody = {
     period?: string;
@@ -9369,6 +9652,18 @@ export type ClientGetAssistantStatusResponseBody = {
     ratio?: number;
     balance?: number;
     warning?: string;
+    paused?: boolean;
+};
+export type ClientPauseOrResumeTheAssistantResponseBody = {
+    enabled?: boolean;
+    server_enabled?: boolean;
+    crash_doctor_enabled?: boolean;
+    free_limit?: number;
+    free_used?: number;
+    ratio?: number;
+    balance?: number;
+    warning?: string;
+    paused?: boolean;
 };
 export type ClientGetSupportOptionsResponseBody = {
     /**
@@ -10002,6 +10297,9 @@ export type ClientStartAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10014,6 +10312,10 @@ export type ClientStartAnAssistantConversationResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10034,6 +10336,14 @@ export type ClientStartAnAssistantConversationResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -10055,6 +10365,9 @@ export type ClientGetAnAssistantConversationResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10067,6 +10380,10 @@ export type ClientGetAnAssistantConversationResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10087,6 +10404,14 @@ export type ClientGetAnAssistantConversationResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -10108,6 +10433,9 @@ export type ClientSendAnAssistantMessageResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10120,6 +10448,10 @@ export type ClientSendAnAssistantMessageResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10140,6 +10472,14 @@ export type ClientSendAnAssistantMessageResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -10161,6 +10501,9 @@ export type ClientAllowAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10173,6 +10516,10 @@ export type ClientAllowAnAssistantActionResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10193,6 +10540,14 @@ export type ClientAllowAnAssistantActionResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -10214,6 +10569,9 @@ export type ClientDenyAnAssistantActionResponseBody = {
     uuid?: string;
     title?: string;
     mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10226,6 +10584,10 @@ export type ClientDenyAnAssistantActionResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10246,6 +10608,150 @@ export type ClientDenyAnAssistantActionResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientStopTheAssistantResponseBody = {
+    uuid?: string;
+    title?: string;
+    mode?: string;
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
+    /**
+     * The conversation status: idle, running, awaiting_approval or error.
+     */
+    status: 'idle' | 'running' | 'awaiting_approval' | 'error';
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
+            status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
+            result_preview: string | null;
+            display: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            } | null;
+        }>;
+    }>;
+    usage?: {
+        free_used?: number;
+        free_limit?: number;
+        charged_this_month?: number;
+    };
+};
+export type ClientSetTheAssistantApprovalModeResponseBody = {
+    uuid?: string;
+    title?: string;
+    mode?: string;
+    /**
+     * ask or allow_everything.
+     */
+    approval_mode: 'ask' | 'allow_everything';
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
+    status?: string;
+    error?: string | null;
+    /**
+     * The messages, oldest first. Tool results are part of their tool call.
+     */
+    messages: Array<{
+        id: number;
+        role: 'user' | 'assistant';
+        content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
+        created_at: string | null;
+        tool_calls: Array<{
+            id: number;
+            name: string;
+            label: string;
+            arguments: {
+                [key: string]: string | number | boolean | Array<string | number | boolean | null | {
+                    [key: string]: string | number | boolean | null;
+                }> | {
+                    [key: string]: string | number | boolean | null;
+                } | null;
+            };
+            /**
+             * Every argument in full, as it will run (paths resolved). The card shows these before the user allows the call.
+             */
+            details: Array<{
+                label: string;
+                value: string;
+            }>;
+            needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -10706,6 +11212,9 @@ export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
      * The conversation mode: crash_doctor.
      */
     mode: 'chat' | 'crash_doctor';
+    approval_mode?: string;
+    allow_until_next_message?: boolean;
+    allow_everything_available?: boolean;
     /**
      * The conversation status: idle, running, awaiting_approval or error.
      */
@@ -10718,6 +11227,10 @@ export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
         id: number;
         role: 'user' | 'assistant';
         content: string | null;
+        /**
+         * "stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.
+         */
+        notice: 'stopped';
         created_at: string | null;
         tool_calls: Array<{
             id: number;
@@ -10738,6 +11251,14 @@ export type ClientDiagnoseWithTheCrashDoctorResponseBody = {
                 value: string;
             }>;
             needs_confirmation: boolean;
+            /**
+             * Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).
+             */
+            always_ask: boolean;
+            /**
+             * How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.
+             */
+            auto_approved: 'allow_everything' | 'until_next_message';
             status: 'pending' | 'approved' | 'denied' | 'running' | 'done' | 'failed';
             result_preview: string | null;
             display: {
@@ -11451,6 +11972,8 @@ export type AdminAllowAnAdminAssistantActionConversationUuidPathParameter = stri
 export type AdminAllowAnAdminAssistantActionToolCallIdPathParameter = number;
 export type AdminDenyAnAdminAssistantActionConversationUuidPathParameter = string;
 export type AdminDenyAnAdminAssistantActionToolCallIdPathParameter = number;
+export type AdminStopTheAdminAssistantConversationUuidPathParameter = string;
+export type AdminSetTheAdminAssistantApprovalModeConversationUuidPathParameter = string;
 export type AdminUpdateAnAiProviderProviderIdPathParameter = number;
 export type AdminTestAnAiProviderProviderIdPathParameter = number;
 /**
@@ -12479,6 +13002,10 @@ export type ClientAllowAnAssistantActionToolCallIdPathParameter = number;
 export type ClientDenyAnAssistantActionServerUuidPathParameter = string;
 export type ClientDenyAnAssistantActionConversationUuidPathParameter = string;
 export type ClientDenyAnAssistantActionToolCallIdPathParameter = number;
+export type ClientStopTheAssistantServerUuidPathParameter = string;
+export type ClientStopTheAssistantConversationUuidPathParameter = string;
+export type ClientSetTheAssistantApprovalModeServerUuidPathParameter = string;
+export type ClientSetTheAssistantApprovalModeConversationUuidPathParameter = string;
 export type ClientGetServerPublicPageServerUuidPathParameter = string;
 export type ClientUploadServerPublicPageBannerServerUuidPathParameter = string;
 export type ClientGetCrashDoctorStatusServerUuidPathParameter = string;
@@ -15030,7 +15557,7 @@ export type AdminSendAnAdminAssistantMessageResponses = {
 };
 export type AdminSendAnAdminAssistantMessageResponse = AdminSendAnAdminAssistantMessageResponses[keyof AdminSendAnAdminAssistantMessageResponses];
 export type AdminAllowAnAdminAssistantActionData = {
-    body?: never;
+    body?: AdminAllowAnAdminAssistantActionRequest;
     path: {
         /**
          * The assistant conversation UUID.
@@ -15061,6 +15588,10 @@ export type AdminAllowAnAdminAssistantActionErrors = {
      * The tool call is not waiting for a decision.
      */
     409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
 };
 export type AdminAllowAnAdminAssistantActionError = AdminAllowAnAdminAssistantActionErrors[keyof AdminAllowAnAdminAssistantActionErrors];
 export type AdminAllowAnAdminAssistantActionResponses = {
@@ -15111,6 +15642,76 @@ export type AdminDenyAnAdminAssistantActionResponses = {
     200: AdminDenyAnAdminAssistantActionResponseBody;
 };
 export type AdminDenyAnAdminAssistantActionResponse = AdminDenyAnAdminAssistantActionResponses[keyof AdminDenyAnAdminAssistantActionResponses];
+export type AdminStopTheAdminAssistantData = {
+    body?: never;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminStopTheAdminAssistantConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}/stop';
+};
+export type AdminStopTheAdminAssistantErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type AdminStopTheAdminAssistantError = AdminStopTheAdminAssistantErrors[keyof AdminStopTheAdminAssistantErrors];
+export type AdminStopTheAdminAssistantResponses = {
+    /**
+     * Assistant stopped.
+     */
+    200: AdminStopTheAdminAssistantResponseBody;
+};
+export type AdminStopTheAdminAssistantResponse = AdminStopTheAdminAssistantResponses[keyof AdminStopTheAdminAssistantResponses];
+export type AdminSetTheAdminAssistantApprovalModeData = {
+    body: AdminSetTheAdminAssistantApprovalModeRequest;
+    path: {
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: AdminSetTheAdminAssistantApprovalModeConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/admin/assistant/conversations/{conversation_uuid}/approval-mode';
+};
+export type AdminSetTheAdminAssistantApprovalModeErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * allow_everything without confirmed, or turned off in the settings.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type AdminSetTheAdminAssistantApprovalModeError = AdminSetTheAdminAssistantApprovalModeErrors[keyof AdminSetTheAdminAssistantApprovalModeErrors];
+export type AdminSetTheAdminAssistantApprovalModeResponses = {
+    /**
+     * Approval mode set.
+     */
+    200: AdminSetTheAdminAssistantApprovalModeResponseBody;
+};
+export type AdminSetTheAdminAssistantApprovalModeResponse = AdminSetTheAdminAssistantApprovalModeResponses[keyof AdminSetTheAdminAssistantApprovalModeResponses];
 export type AdminListAiProvidersData = {
     body?: never;
     path?: never;
@@ -23795,6 +24396,34 @@ export type ClientGetAssistantStatusResponses = {
     200: ClientGetAssistantStatusResponseBody;
 };
 export type ClientGetAssistantStatusResponse = ClientGetAssistantStatusResponses[keyof ClientGetAssistantStatusResponses];
+export type ClientPauseOrResumeTheAssistantData = {
+    body: ClientPauseOrResumeTheAssistantRequest;
+    path?: never;
+    query?: never;
+    url: '/api/client/assistant/pause';
+};
+export type ClientPauseOrResumeTheAssistantErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientPauseOrResumeTheAssistantError = ClientPauseOrResumeTheAssistantErrors[keyof ClientPauseOrResumeTheAssistantErrors];
+export type ClientPauseOrResumeTheAssistantResponses = {
+    /**
+     * Assistant status returned.
+     */
+    200: ClientPauseOrResumeTheAssistantResponseBody;
+};
+export type ClientPauseOrResumeTheAssistantResponse = ClientPauseOrResumeTheAssistantResponses[keyof ClientPauseOrResumeTheAssistantResponses];
 export type ClientListNoticesData = {
     body?: never;
     path?: never;
@@ -28061,7 +28690,7 @@ export type ClientSendAnAssistantMessageResponses = {
 };
 export type ClientSendAnAssistantMessageResponse = ClientSendAnAssistantMessageResponses[keyof ClientSendAnAssistantMessageResponses];
 export type ClientAllowAnAssistantActionData = {
-    body?: never;
+    body?: ClientAllowAnAssistantActionRequest;
     path: {
         /**
          * The server UUID.
@@ -28096,6 +28725,10 @@ export type ClientAllowAnAssistantActionErrors = {
      * The tool call is not waiting for a decision.
      */
     409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
 };
 export type ClientAllowAnAssistantActionError = ClientAllowAnAssistantActionErrors[keyof ClientAllowAnAssistantActionErrors];
 export type ClientAllowAnAssistantActionResponses = {
@@ -28106,7 +28739,7 @@ export type ClientAllowAnAssistantActionResponses = {
 };
 export type ClientAllowAnAssistantActionResponse = ClientAllowAnAssistantActionResponses[keyof ClientAllowAnAssistantActionResponses];
 export type ClientDenyAnAssistantActionData = {
-    body?: never;
+    body?: ClientDenyAnAssistantActionRequest;
     path: {
         /**
          * The server UUID.
@@ -28141,6 +28774,10 @@ export type ClientDenyAnAssistantActionErrors = {
      * The tool call is not waiting for a decision.
      */
     409: ErrorEnvelope;
+    /**
+     * The submitted data is invalid.
+     */
+    422: ValidationErrorEnvelope;
 };
 export type ClientDenyAnAssistantActionError = ClientDenyAnAssistantActionErrors[keyof ClientDenyAnAssistantActionErrors];
 export type ClientDenyAnAssistantActionResponses = {
@@ -28150,6 +28787,84 @@ export type ClientDenyAnAssistantActionResponses = {
     200: ClientDenyAnAssistantActionResponseBody;
 };
 export type ClientDenyAnAssistantActionResponse = ClientDenyAnAssistantActionResponses[keyof ClientDenyAnAssistantActionResponses];
+export type ClientStopTheAssistantData = {
+    body?: never;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientStopTheAssistantServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientStopTheAssistantConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}/stop';
+};
+export type ClientStopTheAssistantErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+};
+export type ClientStopTheAssistantError = ClientStopTheAssistantErrors[keyof ClientStopTheAssistantErrors];
+export type ClientStopTheAssistantResponses = {
+    /**
+     * Assistant stopped.
+     */
+    200: ClientStopTheAssistantResponseBody;
+};
+export type ClientStopTheAssistantResponse = ClientStopTheAssistantResponses[keyof ClientStopTheAssistantResponses];
+export type ClientSetTheAssistantApprovalModeData = {
+    body: ClientSetTheAssistantApprovalModeRequest;
+    path: {
+        /**
+         * The server UUID.
+         */
+        server_uuid: ClientSetTheAssistantApprovalModeServerUuidPathParameter;
+        /**
+         * The assistant conversation UUID.
+         */
+        conversation_uuid: ClientSetTheAssistantApprovalModeConversationUuidPathParameter;
+    };
+    query?: never;
+    url: '/api/client/servers/{server_uuid}/assistant/conversations/{conversation_uuid}/approval-mode';
+};
+export type ClientSetTheAssistantApprovalModeErrors = {
+    /**
+     * Authentication credentials were missing or invalid.
+     */
+    401: ErrorEnvelope;
+    /**
+     * The API key does not have permission to perform this action.
+     */
+    403: ErrorEnvelope;
+    /**
+     * The requested resource could not be found.
+     */
+    404: ErrorEnvelope;
+    /**
+     * allow_everything without confirmed, or turned off by an administrator.
+     */
+    422: ValidationErrorEnvelope;
+};
+export type ClientSetTheAssistantApprovalModeError = ClientSetTheAssistantApprovalModeErrors[keyof ClientSetTheAssistantApprovalModeErrors];
+export type ClientSetTheAssistantApprovalModeResponses = {
+    /**
+     * Approval mode set.
+     */
+    200: ClientSetTheAssistantApprovalModeResponseBody;
+};
+export type ClientSetTheAssistantApprovalModeResponse = ClientSetTheAssistantApprovalModeResponses[keyof ClientSetTheAssistantApprovalModeResponses];
 export type ClientGetServerPublicPageData = {
     body?: never;
     path: {

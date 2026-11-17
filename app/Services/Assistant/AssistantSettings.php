@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pterodactyl\Services\Assistant;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Crypt;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Setting;
 
@@ -26,6 +27,19 @@ final class AssistantSettings
     public const int MAX_CONTEXT_TOKENS = 1_000_000;
 
     public const int MAX_OUTPUT_TOKENS = 32768;
+
+    /** The provider's own web search (OpenRouter's web plugin). */
+    public const string SEARCH_NATIVE = 'native';
+
+    public const string SEARCH_BRAVE = 'brave';
+
+    public const string SEARCH_TAVILY = 'tavily';
+
+    /** @var list<string> */
+    public const array SEARCH_PROVIDERS = [self::SEARCH_NATIVE, self::SEARCH_BRAVE, self::SEARCH_TAVILY];
+
+    /** The setting that holds the search API key, encrypted. */
+    public const string SEARCH_KEY_SETTING = 'settings::monoforge:ai:web_search_key';
 
     public static function enabled(): bool
     {
@@ -58,6 +72,34 @@ final class AssistantSettings
     public static function scopeEnabled(string $scope): bool
     {
         return self::enabled() && ($scope === AiConversation::SCOPE_ADMIN ? self::adminEnabled() : self::serverEnabled());
+    }
+
+    /** Whether a conversation may be switched to "Allow everything" (on by default). */
+    public static function allowEverythingEnabled(): bool
+    {
+        return config()->boolean('monoforge.ai.allow_everything_enabled', true);
+    }
+
+    /** Whether the web_search tool may be offered (off until an admin sets it up). */
+    public static function webSearchEnabled(): bool
+    {
+        return config()->boolean('monoforge.ai.web_search_enabled', false);
+    }
+
+    /** native (the provider's own search), brave or tavily. */
+    public static function webSearchProvider(): string
+    {
+        $value = self::value('web_search_provider');
+
+        return is_string($value) && in_array($value, self::SEARCH_PROVIDERS, true) ? $value : self::SEARCH_NATIVE;
+    }
+
+    /** The Brave Search or Tavily API key, or '' when none is set. */
+    public static function webSearchKey(): string
+    {
+        $value = self::value('web_search_key');
+
+        return is_string($value) ? mb_trim($value) : '';
     }
 
     public static function defaultProviderId(): ?int
@@ -99,7 +141,7 @@ final class AssistantSettings
     }
 
     /**
-     * @return array{enabled: bool, server_enabled: bool, admin_enabled: bool, crash_doctor_enabled: bool, default_provider_id: int|null, ratio: int, free_tokens_monthly: int, warn_percent: int, max_tool_iterations: int, context_tokens: int, max_output_tokens: int}
+     * @return array{enabled: bool, server_enabled: bool, admin_enabled: bool, crash_doctor_enabled: bool, default_provider_id: int|null, ratio: int, free_tokens_monthly: int, warn_percent: int, max_tool_iterations: int, context_tokens: int, max_output_tokens: int, allow_everything_enabled: bool, web_search_enabled: bool, web_search_provider: string, web_search_key_set: bool}
      */
     public static function all(): array
     {
@@ -115,13 +157,17 @@ final class AssistantSettings
             'max_tool_iterations' => self::maxToolIterations(),
             'context_tokens' => self::contextTokens(),
             'max_output_tokens' => self::maxOutputTokens(),
+            'allow_everything_enabled' => self::allowEverythingEnabled(),
+            'web_search_enabled' => self::webSearchEnabled(),
+            'web_search_provider' => self::webSearchProvider(),
+            'web_search_key_set' => self::webSearchKey() !== '',
         ];
     }
 
     /**
      * Stores the given settings and applies them to this request's configuration.
      *
-     * @param  array<string, bool|int|null>  $values
+     * @param  array<string, bool|int|string|null>  $values
      */
     public static function store(array $values): void
     {
@@ -135,6 +181,15 @@ final class AssistantSettings
             Setting::put('settings::monoforge:ai:'.$key, $stored);
             config()->set('monoforge.ai.'.$key, $value);
         }
+    }
+
+    /**
+     * Stores a new search API key encrypted, or removes it when null.
+     */
+    public static function storeWebSearchKey(?string $key): void
+    {
+        Setting::put(self::SEARCH_KEY_SETTING, $key === null ? '' : Crypt::encrypt($key));
+        config()->set('monoforge.ai.web_search_key', $key ?? '');
     }
 
     private static function integer(string $key, int $default): int

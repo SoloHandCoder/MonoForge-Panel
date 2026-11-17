@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Pterodactyl\Models\Assistant;
 
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\RouteKey;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pterodactyl\Models\Model;
 use Pterodactyl\Models\Server;
@@ -25,6 +27,8 @@ use Pterodactyl\Models\User;
  * @property int $user_id
  * @property string $scope
  * @property string $mode "chat", or "crash_doctor" for a diagnosis the crash doctor started
+ * @property string $approval_mode "ask" (ask before changes) or "allow_everything"
+ * @property int|null $allow_until_message_id the user message "Allow until my next message" was given for
  * @property int|null $server_id
  * @property int|null $provider_id
  * @property string $title
@@ -44,6 +48,8 @@ use Pterodactyl\Models\User;
     'user_id',
     'scope',
     'mode',
+    'approval_mode',
+    'allow_until_message_id',
     'server_id',
     'provider_id',
     'title',
@@ -67,6 +73,13 @@ class AiConversation extends Model
 
     public const string MODE_CRASH_DOCTOR = 'crash_doctor';
 
+    public const string APPROVAL_ASK = 'ask';
+
+    public const string APPROVAL_ALLOW_EVERYTHING = 'allow_everything';
+
+    /** @var list<string> */
+    public const array APPROVAL_MODES = [self::APPROVAL_ASK, self::APPROVAL_ALLOW_EVERYTHING];
+
     public const string STATUS_IDLE = 'idle';
 
     public const string STATUS_RUNNING = 'running';
@@ -85,6 +98,7 @@ class AiConversation extends Model
     protected $attributes = [
         'status' => self::STATUS_IDLE,
         'mode' => self::MODE_CHAT,
+        'approval_mode' => self::APPROVAL_ASK,
     ];
 
     /**
@@ -97,6 +111,7 @@ class AiConversation extends Model
             'server_id' => 'int',
             'provider_id' => 'int',
             'summarized_until_message_id' => 'int',
+            'allow_until_message_id' => 'int',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
@@ -252,6 +267,50 @@ class AiConversation extends Model
             ->update(['updated_at' => CarbonImmutable::now()]);
 
         return $this->ownedBy($token);
+    }
+
+    /**
+     * Runs $callback while holding the conversation's row lock, only when the run holding the
+     * token still owns it. Stopping takes the same lock, so what the callback stores (a model
+     * answer and its tool calls) is either stored before a stop or not at all. Returns
+     * whether the callback ran.
+     *
+     * @param  Closure(): void  $callback
+     */
+    public function whileOwned(string $token, Closure $callback): bool
+    {
+        return DB::transaction(function () use ($token, $callback): bool {
+            $owned = self::query()
+                ->whereKey($this->id)
+                ->where('status', self::STATUS_RUNNING)
+                ->where('run_token', $token)
+                ->lockForUpdate()
+                ->exists();
+
+            if (! $owned) {
+                return false;
+            }
+
+            $callback();
+
+            return true;
+        });
+    }
+
+    /**
+     * The id of the user's newest message, which "Allow until my next message" is tied to.
+     */
+    public function latestUserMessageId(): ?int
+    {
+        $id = $this->messages()->where('role', AiMessage::ROLE_USER)->max('id');
+
+        return is_numeric($id) ? (int) $id : null;
+    }
+
+    /** Whether "Allow until my next message" still holds: no newer user message was sent. */
+    public function allowsUntilNextMessage(): bool
+    {
+        return $this->allow_until_message_id !== null && $this->allow_until_message_id === $this->latestUserMessageId();
     }
 
     /**

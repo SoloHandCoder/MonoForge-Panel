@@ -7,18 +7,21 @@ namespace Pterodactyl\Services\Assistant;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Pterodactyl\Exceptions\Assistant\AssistantUnavailableException;
 use Pterodactyl\Jobs\Assistant\RunAssistantTurn;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
 use Pterodactyl\Models\Assistant\AiToolCall;
+use Pterodactyl\Models\Assistant\AiUserSetting;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * What the chat endpoints do: start a conversation, add a message, allow or deny a tool
- * call. Each of them queues the agent loop; the browser polls the conversation meanwhile.
+ * call, stop a turn, change the approval mode, pause the assistant. Starting, sending and
+ * deciding queue the agent loop; the browser polls the conversation meanwhile.
  *
  * A user has at most one conversation the assistant is working on ("running") at a time,
  * across both assistants: starting or continuing another one meanwhile gives 409.
@@ -28,6 +31,14 @@ class ConversationService
     public const string BUSY = 'The assistant is still working on this conversation.';
 
     public const string USER_BUSY = 'The assistant is already working on another of your conversations. Wait for it to finish, then try again.';
+
+    public const string PAUSED = 'You paused the assistant. Resume it to continue.';
+
+    public const string STOPPED = 'Stopped by you.';
+
+    public const string ALLOW_EVERYTHING_OFF = 'An administrator has turned off "Allow everything" on this panel.';
+
+    public const string CONFIRM_ALLOW_EVERYTHING = 'Confirm the warning to allow everything without asking.';
 
     public function __construct(
         private readonly AssistantBilling $billing,
@@ -102,13 +113,18 @@ class ConversationService
      *
      * @throws ConflictHttpException when the call is not waiting for a decision
      */
-    public function approve(AiConversation $conversation, AiToolCall $call, User $user): AiConversation
+    public function approve(AiConversation $conversation, AiToolCall $call, User $user, bool $untilNextMessage = false): AiConversation
     {
         $this->assertAwaiting($conversation, $call);
+        throw_if(AiUserSetting::paused($conversation->user), AssistantUnavailableException::class, self::PAUSED);
 
         $expired = $call->isExpired();
-        $token = $this->withUserSlot($conversation->user, $conversation, function () use ($conversation, $call, $user, $expired): ?string {
+        $token = $this->withUserSlot($conversation->user, $conversation, function () use ($conversation, $call, $user, $expired, $untilNextMessage): ?string {
             $decided = $expired ? $this->executor->expire($call) : $this->executor->approve($call, $user);
+            if ($decided && ! $expired && $untilNextMessage) {
+                // Further confirmations of this turn are allowed until the user writes again.
+                $conversation->forceFill(['allow_until_message_id' => $conversation->latestUserMessageId()])->save();
+            }
 
             return $decided ? $conversation->startRun([AiConversation::STATUS_AWAITING_APPROVAL]) : null;
         });
@@ -137,6 +153,7 @@ class ConversationService
     public function deny(AiConversation $conversation, AiToolCall $call, User $user): AiConversation
     {
         $this->assertAwaiting($conversation, $call);
+        throw_if(AiUserSetting::paused($conversation->user), AssistantUnavailableException::class, self::PAUSED);
 
         $token = $this->withUserSlot($conversation->user, $conversation, fn (): ?string => $this->executor->deny($call, $user)
             ? $conversation->startRun([AiConversation::STATUS_AWAITING_APPROVAL])
@@ -149,11 +166,108 @@ class ConversationService
     }
 
     /**
+     * Stops the turn the assistant is working on or waiting with: the run loses the turn, so
+     * the loop starts no further model call or tool and a queued turn does nothing; calls that
+     * have not started never run (the model is told), and "Stopped by you." is added to the
+     * thread. "Allow until my next message" ends with the turn. Returns whether a turn was
+     * stopped: stopping an idle conversation (or one a turn just finished) changes nothing.
+     *
+     * Race-safe: it holds the conversation's row lock, which the loop also takes to store a
+     * model answer, so an answer arriving meanwhile is either stored before the stop (and its
+     * calls cancelled) or discarded.
+     */
+    public function stop(AiConversation $conversation): bool
+    {
+        $stopped = DB::transaction(function () use ($conversation): bool {
+            $locked = AiConversation::query()->whereKey($conversation->id)->lockForUpdate()->first();
+            if (! $locked instanceof AiConversation || ! $locked->isBusy()) {
+                return false;
+            }
+
+            $locked->forceFill([
+                'status' => AiConversation::STATUS_IDLE,
+                'run_token' => null,
+                'error' => null,
+                'allow_until_message_id' => null,
+            ])->save();
+
+            $calls = AiToolCall::query()
+                ->where('conversation_id', $conversation->id)
+                ->whereIn('status', [AiToolCall::STATUS_PENDING, AiToolCall::STATUS_APPROVED])
+                ->orderBy('id')
+                ->get();
+
+            foreach ($calls as $call) {
+                $this->executor->cancel($call);
+            }
+
+            AiMessage::query()->create([
+                'conversation_id' => $conversation->id,
+                'role' => AiMessage::ROLE_ASSISTANT,
+                'content' => self::STOPPED,
+                'notice' => AiMessage::NOTICE_STOPPED,
+            ]);
+
+            return true;
+        });
+
+        $conversation->refresh();
+
+        return $stopped;
+    }
+
+    /**
+     * Sets how the conversation handles calls that need confirmation. "Allow everything" needs
+     * $confirmed (the user confirmed the warning) and the panel setting; going back to "Ask
+     * before changes" needs neither. Returns whether the mode changed.
+     *
+     * @throws ValidationException
+     */
+    public function setApprovalMode(AiConversation $conversation, string $mode, bool $confirmed): bool
+    {
+        if ($mode === AiConversation::APPROVAL_ALLOW_EVERYTHING) {
+            throw_unless(AssistantSettings::allowEverythingEnabled(), ValidationException::withMessages(['mode' => self::ALLOW_EVERYTHING_OFF]));
+            throw_unless($confirmed, ValidationException::withMessages(['confirmed' => self::CONFIRM_ALLOW_EVERYTHING]));
+        }
+
+        if ($conversation->approval_mode === $mode) {
+            return false;
+        }
+
+        $conversation->forceFill(['approval_mode' => $mode])->save();
+
+        return true;
+    }
+
+    /**
+     * Pauses or resumes the assistant for the user. Pausing also stops every turn of theirs
+     * the assistant is working on or waiting with, so nothing more is spent.
+     */
+    public function setPaused(User $user, bool $paused): void
+    {
+        AiUserSetting::setPaused($user, $paused);
+
+        if (! $paused) {
+            return;
+        }
+
+        $active = AiConversation::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [AiConversation::STATUS_RUNNING, AiConversation::STATUS_AWAITING_APPROVAL])
+            ->get();
+
+        foreach ($active as $conversation) {
+            $this->stop($conversation);
+        }
+    }
+
+    /**
      * @throws AssistantUnavailableException
      */
     public function assertAvailable(User $user, string $scope): void
     {
         throw_unless(AssistantSettings::scopeEnabled($scope), AssistantUnavailableException::class, 'The AI assistant is turned off.');
+        throw_if(AiUserSetting::paused($user), AssistantUnavailableException::class, self::PAUSED);
 
         $this->billing->assertCanSpend($user, $scope);
     }
@@ -219,6 +333,11 @@ class ConversationService
             'role' => AiMessage::ROLE_USER,
             'content' => $message,
         ]);
+
+        // A new message ends "Allow until my next message" (it is tied to the previous one).
+        if ($conversation->allow_until_message_id !== null) {
+            $conversation->forceFill(['allow_until_message_id' => null])->save();
+        }
 
         if ($prepare instanceof Closure) {
             $prepare($conversation);

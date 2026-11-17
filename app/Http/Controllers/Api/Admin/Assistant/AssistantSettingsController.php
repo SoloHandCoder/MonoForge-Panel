@@ -31,20 +31,29 @@ class AssistantSettingsController extends AdminApiController
         'max_tool_iterations' => 8,
         'context_tokens' => 24000,
         'max_output_tokens' => 2048,
+        'allow_everything_enabled' => true,
+        'web_search_enabled' => false,
+        'web_search_provider' => 'native',
+        'web_search_key_set' => false,
     ];
 
-    #[Endpoint('Get AI assistant settings', 'Returns whether the assistant is on (overall, on server pages, in the admin area), whether the AI crash doctor is offered when a server crashes (crash_doctor_enabled; it also needs the server assistant on), the default provider, the panel token price (ratio: AI tokens per panel token), the free AI tokens per user and month, when the free allowance warning shows (warn_percent), and the loop and context limits.')]
+    #[Endpoint('Get AI assistant settings', 'Returns whether the assistant is on (overall, on server pages, in the admin area), whether the AI crash doctor is offered when a server crashes (crash_doctor_enabled; it also needs the server assistant on), the default provider, the panel token price (ratio: AI tokens per panel token), the free AI tokens per user and month, when the free allowance warning shows (warn_percent), the loop and context limits, whether conversations may be switched to "Allow everything" (allow_everything_enabled), and the web search: web_search_enabled, web_search_provider (native: the search built into the AI provider, OpenRouter only; brave; tavily) and whether a search API key is stored (web_search_key_set; the key is never returned).')]
     #[ScribeResponse(self::EXAMPLE, description: 'Settings returned.')]
     public function index(AdminAssistantRequest $request): JsonResponse
     {
         return new JsonResponse(AssistantSettings::all());
     }
 
-    #[Endpoint('Update AI assistant settings', 'Replaces the AI assistant settings. crash_doctor_enabled is optional and keeps its value when left out.')]
+    #[Endpoint('Update AI assistant settings', 'Replaces the AI assistant settings. crash_doctor_enabled, allow_everything_enabled, web_search_enabled and web_search_provider are optional and keep their value when left out. web_search_key sets a new Brave Search or Tavily key (a blank key keeps the stored one); clear_web_search_key removes it.')]
     #[ScribeResponse(self::EXAMPLE, description: 'Settings updated.')]
     public function update(UpdateAssistantSettingsRequest $request): JsonResponse
     {
         AssistantSettings::store($request->settings());
+
+        $key = $request->webSearchKey();
+        if ($key !== null) {
+            AssistantSettings::storeWebSearchKey($key === '' ? null : $key);
+        }
 
         Activity::event('admin:assistant.settings.update')->log();
 

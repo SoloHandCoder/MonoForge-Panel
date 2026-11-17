@@ -84,6 +84,11 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:ai:max_output_tokens',
         // Phase 6 Task D: the AI crash doctor.
         'monoforge:ai:crash_doctor_enabled',
+        // Assistant controls: "Allow everything" and the web_search tool.
+        'monoforge:ai:allow_everything_enabled',
+        'monoforge:ai:web_search_enabled',
+        'monoforge:ai:web_search_provider',
+        'monoforge:ai:web_search_key',
         // Addresses hidden from activity entries.
         'monoforge:privacy:hidden_ips',
         // Phase 6 Task M: the CurseForge API key for one-click mods.
@@ -136,6 +141,8 @@ class SettingsServiceProvider extends ServiceProvider
         'monoforge:captcha:turnstile:secret_key',
         // Phase 6 Task M: one-click plugins and mods.
         'monoforge:plugins:curseforge_key',
+        // Assistant controls: the Brave Search or Tavily API key.
+        'monoforge:ai:web_search_key',
     ];
 
     /**
@@ -180,7 +187,7 @@ class SettingsServiceProvider extends ServiceProvider
                     $value = $encrypter->decrypt($value);
                 } catch (DecryptException) {
                     // Task H: never hand ciphertext to the Resend transport (or CurseForge) as a key.
-                    if (in_array($key, ['services:resend:key', 'monoforge:plugins:curseforge_key'], true)) {
+                    if (in_array($key, ['services:resend:key', 'monoforge:plugins:curseforge_key', 'monoforge:ai:web_search_key'], true)) {
                         $value = null;
                     }
                 }

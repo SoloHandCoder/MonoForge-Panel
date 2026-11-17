@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant\Tools\Admin;
 
+use Pterodactyl\Contracts\Assistant\AlwaysAsks;
 use Pterodactyl\Contracts\Servers\TogglesServerSuspension;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Exceptions\Assistant\ToolException;
@@ -15,7 +16,7 @@ use Pterodactyl\Services\Assistant\ToolResult;
  * Suspends or unsuspends a server, as the admin server page does. Registered twice, as
  * suspend_server and unsuspend_server.
  */
-final class ServerSuspensionTool extends AdminTool
+final class ServerSuspensionTool extends AdminTool implements AlwaysAsks
 {
     public function __construct(
         private readonly TogglesServerSuspension $suspension,
@@ -42,6 +43,12 @@ final class ServerSuspensionTool extends AdminTool
     }
 
     public function needsConfirmation(array $arguments, ToolContext $context): bool
+    {
+        return true;
+    }
+
+    /** Never allowed without an explicit click, even in "Allow everything". */
+    public function alwaysAsks(array $arguments, ToolContext $context): bool
     {
         return true;
     }
