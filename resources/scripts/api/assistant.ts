@@ -37,7 +37,15 @@ export interface AssistantStatus {
     /** The user's panel token balance. */
     balance: number;
     warning: AssistantWarning | null;
+    /** The user paused the assistant: no turn starts or continues until they resume it. */
+    paused: boolean;
 }
+
+/** `ask` asks before changes (the default); `allow_everything` allows them without asking. */
+export type AssistantApprovalMode = 'ask' | 'allow_everything';
+
+/** How a call that needed confirmation was allowed without a click. */
+export type AssistantAutoApproval = 'allow_everything' | 'until_next_message';
 
 export type AssistantConversationStatus = 'idle' | 'running' | 'awaiting_approval' | 'error';
 
@@ -65,6 +73,9 @@ export interface AssistantToolCall {
     /** Every argument in full, as the card shows it before the user allows the call. */
     details: AssistantToolCallDetail[];
     needs_confirmation: boolean;
+    /** Waits for a click even in "Allow everything" (many files, a world folder, tokens…). */
+    always_ask: boolean;
+    auto_approved: AssistantAutoApproval | null;
     status: AssistantToolCallStatus;
     result_preview: string | null;
     display: AssistantJsonFields | null;
@@ -74,6 +85,8 @@ export interface AssistantMessage {
     id: number;
     role: AssistantRole;
     content: string | null;
+    /** `stopped` for the note the stop button leaves in the thread. */
+    notice: 'stopped' | null;
     created_at: string | null;
     tool_calls: AssistantToolCall[];
 }
@@ -97,6 +110,11 @@ export interface AssistantConversation {
     uuid: string;
     title: string;
     mode: AssistantConversationMode;
+    approval_mode: AssistantApprovalMode;
+    /** "Allow until my next message" holds for the turn in progress. */
+    allow_until_next_message: boolean;
+    /** Whether the panel lets conversations switch to "Allow everything". */
+    allow_everything_available: boolean;
     status: AssistantConversationStatus;
     error: string | null;
     messages: AssistantMessage[];
@@ -158,17 +176,47 @@ export const sendAssistantMessage = async (
 
 export type AssistantDecision = 'approve' | 'deny';
 
+/** A click on a confirmation card: Allow, Allow until my next message, or Deny. */
+export type AssistantChoice = 'approve' | 'approve_until_next_message' | 'deny';
+
 export const decideAssistantToolCall = async (
     scope: AssistantScope,
     conversation: string,
     toolCall: number,
-    decision: AssistantDecision
+    choice: AssistantChoice
+): Promise<AssistantConversation> => {
+    const url = `${conversationPath(scope, conversation)}/tool-calls/${toolCall}/${choice === 'deny' ? 'deny' : 'approve'}`;
+    const response =
+        choice === 'approve_until_next_message'
+            ? await http.post<AssistantConversation>(url, { until_next_message: true })
+            : await http.post<AssistantConversation>(url);
+
+    return response.data;
+};
+
+/** Stops the turn in progress; stopping an idle conversation changes nothing. */
+export const stopAssistantConversation = async (
+    scope: AssistantScope,
+    conversation: string
+): Promise<AssistantConversation> =>
+    (await http.post<AssistantConversation>(`${conversationPath(scope, conversation)}/stop`)).data;
+
+/** `allow_everything` needs `confirmed`: the user saw the warning. */
+export const setAssistantApprovalMode = async (
+    scope: AssistantScope,
+    conversation: string,
+    mode: AssistantApprovalMode,
+    confirmed = false
 ): Promise<AssistantConversation> =>
     (
-        await http.post<AssistantConversation>(
-            `${conversationPath(scope, conversation)}/tool-calls/${toolCall}/${decision}`
-        )
+        await http.put<AssistantConversation>(`${conversationPath(scope, conversation)}/approval-mode`, {
+            mode,
+            confirmed,
+        })
     ).data;
+
+export const setAssistantPaused = async (paused: boolean): Promise<AssistantStatus> =>
+    (await http.put<AssistantStatus>('/api/client/assistant/pause', { paused })).data;
 
 export const deleteAssistantConversation = async (scope: AssistantScope, conversation: string): Promise<void> => {
     await http.delete(conversationPath(scope, conversation));
@@ -264,6 +312,23 @@ export interface AssistantSettings {
     max_tool_iterations: number;
     context_tokens: number;
     max_output_tokens: number;
+    /** Whether conversations may be switched to "Allow everything". */
+    allow_everything_enabled: boolean;
+    /** Whether the assistant may look things up on the web. */
+    web_search_enabled: boolean;
+    /** `native` is the search built into the AI provider (OpenRouter only). */
+    web_search_provider: AssistantSearchProvider;
+    /** The search API key is write-only: the panel only says whether one is stored. */
+    web_search_key_set: boolean;
+}
+
+export type AssistantSearchProvider = 'native' | 'brave' | 'tavily';
+
+export interface AssistantSettingsInput extends Omit<AssistantSettings, 'web_search_key_set'> {
+    /** A new Brave Search or Tavily key; left out or blank keeps the stored one. */
+    web_search_key?: string | null;
+    /** Removes the stored key. */
+    clear_web_search_key?: boolean;
 }
 
 export interface AssistantUsageTotals {
@@ -310,7 +375,7 @@ export const testAssistantProvider = async (id: number): Promise<AssistantProvid
 export const getAssistantSettings = async (signal?: AbortSignal): Promise<AssistantSettings> =>
     (await http.get<AssistantSettings>('/api/admin/assistant/settings', { signal })).data;
 
-export const updateAssistantSettings = async (body: AssistantSettings): Promise<AssistantSettings> =>
+export const updateAssistantSettings = async (body: AssistantSettingsInput): Promise<AssistantSettings> =>
     (await http.put<AssistantSettings>('/api/admin/assistant/settings', body)).data;
 
 export const getAssistantUsage = async (period: string, signal?: AbortSignal): Promise<AssistantUsageReport> =>
@@ -347,6 +412,15 @@ export const describeAssistantError = (cause: unknown, fallback: string): Assist
             };
         case 403: {
             const message = httpErrorToHuman(cause);
+
+            if (/paused the assistant/i.test(message)) {
+                return {
+                    title: 'The assistant is paused',
+                    description:
+                        'You paused the assistant. Resume it to continue; nothing is spent while it is paused.',
+                    wallet: false,
+                };
+            }
 
             return /turned off/i.test(message)
                 ? {
@@ -465,7 +539,14 @@ let optimisticId = 0;
 const optimisticMessage = (content: string): AssistantMessage => {
     optimisticId -= 1;
 
-    return { id: optimisticId, role: 'user', content, created_at: new Date().toISOString(), tool_calls: [] };
+    return {
+        id: optimisticId,
+        role: 'user',
+        content,
+        notice: null,
+        created_at: new Date().toISOString(),
+        tool_calls: [],
+    };
 };
 
 export const useCreateAssistantConversation = (scope: AssistantScope) => {
@@ -531,7 +612,7 @@ export const useSendAssistantMessage = (scope: AssistantScope, conversation: str
 
 export interface AssistantDecisionInput {
     toolCall: number;
-    decision: AssistantDecision;
+    decision: AssistantChoice;
 }
 
 export const useDecideAssistantToolCall = (scope: AssistantScope, conversation: string) => {
@@ -549,10 +630,70 @@ export const useDecideAssistantToolCall = (scope: AssistantScope, conversation: 
         onError: async (error, { decision }) => {
             notifyAssistantError(
                 error,
-                decision === 'approve' ? 'Unable to allow the action' : 'Unable to deny the action'
+                decision === 'deny' ? 'Unable to deny the action' : 'Unable to allow the action'
             );
             await queryClient.invalidateQueries({ queryKey: key, exact: true });
         },
+    });
+};
+
+/** The stop button: the conversation comes back idle with "Stopped by you." in the thread. */
+export const useStopAssistantConversation = (scope: AssistantScope, conversation: string) => {
+    const queryClient = useQueryClient();
+    const key = conversationKey(scope, conversation);
+
+    return useMutation({
+        mutationFn: () => stopAssistantConversation(scope, conversation),
+        onMutate: async () => {
+            // A poll answering after the stop must not bring back the running state.
+            await queryClient.cancelQueries({ queryKey: key, exact: true });
+        },
+        onSuccess: async (updated) => {
+            queryClient.setQueryData(key, updated);
+            await queryClient.invalidateQueries({ queryKey: statusKey });
+        },
+        onError: async (error) => {
+            notifyAssistantError(error, 'Unable to stop the assistant');
+            await queryClient.invalidateQueries({ queryKey: key, exact: true });
+        },
+    });
+};
+
+export interface AssistantApprovalModeInput {
+    mode: AssistantApprovalMode;
+    confirmed?: boolean;
+}
+
+export const useSetAssistantApprovalMode = (scope: AssistantScope, conversation: string) => {
+    const queryClient = useQueryClient();
+    const key = conversationKey(scope, conversation);
+
+    return useMutation({
+        mutationFn: ({ mode, confirmed }: AssistantApprovalModeInput) =>
+            setAssistantApprovalMode(scope, conversation, mode, confirmed),
+        onSuccess: (updated) => {
+            queryClient.setQueryData(key, updated);
+        },
+        onError: (error) => notifyAssistantError(error, 'Unable to change the approval mode'),
+    });
+};
+
+/** The per-user "Pause the assistant" switch. Pausing also stops turns in progress. */
+export const useSetAssistantPaused = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (paused: boolean) => setAssistantPaused(paused),
+        onSuccess: async (status, paused) => {
+            queryClient.setQueryData(statusKey, status);
+
+            if (paused) {
+                await queryClient.invalidateQueries({ queryKey: assistantKey });
+            }
+
+            toast.success(paused ? 'Assistant paused' : 'Assistant resumed');
+        },
+        onError: (error) => notifyHttpError(error, 'Unable to change the pause switch'),
     });
 };
 
@@ -637,7 +778,7 @@ export const useUpdateAssistantSettings = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (body: AssistantSettings) => updateAssistantSettings(body),
+        mutationFn: (body: AssistantSettingsInput) => updateAssistantSettings(body),
         onSuccess: async (settings) => {
             queryClient.setQueryData(settingsKey, settings);
             await queryClient.invalidateQueries({ queryKey: statusKey });

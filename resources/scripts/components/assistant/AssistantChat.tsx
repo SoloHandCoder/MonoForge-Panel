@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bot, MessageSquarePlus, SendHorizontal, Sparkles, Trash2 } from 'lucide-react';
+import { Bot, CircleStop, MessageSquarePlus, Pause, Play, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react';
 import {
     assistantErrorText,
     assistantStatusQueryKey,
     useAssistantConversation,
     useAssistantConversations,
+    useAssistantStatus,
     useCreateAssistantConversation,
     useDecideAssistantToolCall,
     useDeleteAssistantConversation,
     useSendAssistantMessage,
+    useSetAssistantApprovalMode,
+    useSetAssistantPaused,
+    useStopAssistantConversation,
     useSyncConversationSummary,
+    type AssistantApprovalMode,
+    type AssistantChoice,
     type AssistantConversation,
     type AssistantConversationStatus,
     type AssistantConversationSummary,
-    type AssistantDecision,
     type AssistantMessage,
     type AssistantScope,
 } from '@/api/assistant';
@@ -144,6 +149,18 @@ function TypingIndicator() {
     );
 }
 
+function StoppedNotice() {
+    return (
+        <p
+            data-testid='message-stopped'
+            className='flex animate-fade-in items-center justify-center gap-1.5 text-xs text-muted-foreground'
+        >
+            <Icon icon={CircleStop} className='size-3.5' aria-hidden />
+            Stopped by you
+        </p>
+    );
+}
+
 function MessageItem({
     message,
     onDecide,
@@ -151,11 +168,15 @@ function MessageItem({
     superseded,
 }: {
     message: AssistantMessage;
-    onDecide?: (toolCall: number, decision: AssistantDecision) => void;
-    deciding: { toolCall: number; decision: AssistantDecision } | null;
+    onDecide?: (toolCall: number, decision: AssistantChoice) => void;
+    deciding: { toolCall: number; decision: AssistantChoice } | null;
     /** A newer assistant message exists, so this one's pending calls can no longer be decided. */
     superseded: boolean;
 }) {
+    if (message.notice === 'stopped') {
+        return <StoppedNotice />;
+    }
+
     if (message.role === 'user') {
         return (
             <div className='flex animate-fade-in justify-end' data-testid='message-user'>
@@ -194,11 +215,16 @@ function Composer({
     placeholder,
     sending,
     onSend,
+    onStop,
+    stopping = false,
 }: {
     disabled: boolean;
     placeholder: string;
     sending: boolean;
     onSend: (message: string) => void;
+    /** While the assistant works, the send button becomes a Stop button. */
+    onStop?: () => void;
+    stopping?: boolean;
 }) {
     const [value, setValue] = useState('');
     const textarea = useRef<HTMLTextAreaElement>(null);
@@ -253,15 +279,31 @@ function Composer({
             <span id='assistant-composer-hint' className='sr-only'>
                 Enter sends, Shift and Enter adds a new line.
             </span>
-            <Button
-                type='submit'
-                className='size-10 shrink-0 p-0'
-                disabled={!canSend}
-                isLoading={sending}
-                aria-label='Send'
-            >
-                <Icon icon={SendHorizontal} className='size-4' aria-hidden />
-            </Button>
+            {onStop ? (
+                <Button
+                    type='button'
+                    color='red'
+                    className='size-10 shrink-0 p-0'
+                    disabled={stopping}
+                    isLoading={stopping}
+                    onClick={onStop}
+                    aria-label='Stop the assistant'
+                    title='Stop the assistant (Esc)'
+                    aria-keyshortcuts='Escape'
+                >
+                    <Icon icon={X} className='size-4' aria-hidden />
+                </Button>
+            ) : (
+                <Button
+                    type='submit'
+                    className='size-10 shrink-0 p-0'
+                    disabled={!canSend}
+                    isLoading={sending}
+                    aria-label='Send'
+                >
+                    <Icon icon={SendHorizontal} className='size-4' aria-hidden />
+                </Button>
+            )}
         </form>
     );
 }
@@ -320,6 +362,190 @@ function useStickToBottom(dependency: string) {
     return { container, onScroll };
 }
 
+/** Esc stops the assistant while it works, unless a dialog is open (Esc closes that). */
+function useEscapeToStop(active: boolean, stop: () => void) {
+    const latest = useRef(stop);
+
+    latest.current = stop;
+
+    useEffect(() => {
+        const onKeyDown = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('[role="dialog"]')) {
+                latest.current();
+            }
+        };
+
+        if (active) {
+            window.addEventListener('keydown', onKeyDown);
+        }
+
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [active]);
+}
+
+/** The per-user pause switch: while paused, no turn starts or continues. */
+function PauseToggle({ paused }: { paused: boolean }) {
+    const setPaused = useSetAssistantPaused();
+
+    return (
+        <button
+            type='button'
+            aria-pressed={paused}
+            disabled={setPaused.isPending}
+            onClick={() => setPaused.mutate(!paused)}
+            title={
+                paused ? 'Resume the assistant' : 'Pause the assistant: nothing starts or is spent until you resume it'
+            }
+            className={cn(
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60',
+                paused
+                    ? 'border-warning/50 bg-warning/10 text-warning'
+                    : 'border-border text-muted-foreground hover:bg-(--hover-row) hover:text-foreground'
+            )}
+        >
+            <Icon icon={paused ? Play : Pause} className='size-3.5' aria-hidden />
+            {paused ? 'Resume' : 'Pause'}
+            <span className='sr-only'> the assistant</span>
+        </button>
+    );
+}
+
+function PausedBanner() {
+    const setPaused = useSetAssistantPaused();
+
+    return (
+        <div
+            role='status'
+            data-testid='assistant-paused'
+            className='flex flex-wrap items-center gap-3 border-b border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-foreground'
+        >
+            <Icon icon={Pause} className='size-4 shrink-0 text-warning' aria-hidden />
+            <span className='min-w-0 flex-1'>
+                The assistant is paused. Nothing starts and nothing is spent until you resume it.
+            </span>
+            <Button type='button' size='small' isLoading={setPaused.isPending} onClick={() => setPaused.mutate(false)}>
+                Resume
+            </Button>
+        </div>
+    );
+}
+
+const approvalModes = [
+    { mode: 'ask', label: 'Ask before changes' },
+    { mode: 'allow_everything', label: 'Allow everything' },
+] as const satisfies readonly { mode: AssistantApprovalMode; label: string }[];
+
+/** The selected mode is tinted: red for "Allow everything", the primary colour for asking. */
+const modeButtonClass = (mode: AssistantApprovalMode, selected: boolean): string => {
+    if (!selected) {
+        return 'text-muted-foreground hover:text-foreground';
+    }
+
+    return mode === 'allow_everything' ? 'bg-destructive/15 text-destructive' : 'bg-primary/15 text-primary';
+};
+
+/** "Ask before changes" or "Allow everything", with a warning before the latter. */
+function ApprovalModeSwitch({ scope, conversation }: { scope: AssistantScope; conversation: AssistantConversation }) {
+    const setMode = useSetAssistantApprovalMode(scope, conversation.uuid);
+    const [warning, setWarning] = useState(false);
+    const current = conversation.approval_mode;
+
+    const choose = (mode: AssistantApprovalMode) => {
+        if (mode === current || setMode.isPending) {
+            return;
+        }
+
+        if (mode === 'allow_everything') {
+            setWarning(true);
+        } else {
+            setMode.mutate({ mode });
+        }
+    };
+
+    return (
+        <>
+            <div
+                role='group'
+                aria-label='When the assistant asks before acting'
+                className='inline-flex shrink-0 rounded-md border border-border p-0.5'
+            >
+                {approvalModes.map(({ mode, label }) => {
+                    const unavailable = mode === 'allow_everything' && !conversation.allow_everything_available;
+
+                    return (
+                        <button
+                            key={mode}
+                            type='button'
+                            aria-pressed={current === mode}
+                            disabled={unavailable || setMode.isPending}
+                            title={unavailable ? 'An administrator has turned off "Allow everything".' : undefined}
+                            onClick={() => choose(mode)}
+                            className={cn(
+                                'rounded px-2 py-1 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                                modeButtonClass(mode, current === mode)
+                            )}
+                        >
+                            {label}
+                        </button>
+                    );
+                })}
+            </div>
+            <Dialog.Confirm
+                open={warning}
+                onClose={() => setWarning(false)}
+                title='Allow everything?'
+                confirm='Allow everything'
+                pending={setMode.isPending}
+                onConfirmed={() =>
+                    setMode.mutate(
+                        { mode: 'allow_everything', confirmed: true },
+                        { onSettled: () => setWarning(false) }
+                    )
+                }
+            >
+                <div className='space-y-2 text-sm text-muted-foreground'>
+                    <p>
+                        The assistant will no longer ask before it acts in this conversation. It can edit and delete
+                        files, run console commands, change startup settings and restart the server on its own.
+                    </p>
+                    <p>
+                        A few actions still ask every time, such as deleting many files or a world folder. You can stop
+                        the assistant at any moment with the X button or Esc, and switch back to &ldquo;Ask before
+                        changes&rdquo; here.
+                    </p>
+                </div>
+            </Dialog.Confirm>
+        </>
+    );
+}
+
+/** What the composer says while it cannot be used, or what to do next. */
+const threadPlaceholder = (status: AssistantConversationStatus, blockedReason: string | null): string => {
+    if (blockedReason) {
+        return blockedReason;
+    }
+
+    if (status === 'awaiting_approval') {
+        return 'Allow or deny the action above, or stop the assistant.';
+    }
+
+    return status === 'running' ? 'The assistant is working… Esc stops it.' : 'Ask a follow-up…';
+};
+
+function ThreadStatus({ conversation }: { conversation: AssistantConversation }) {
+    const busy = conversation.status === 'running' || conversation.status === 'awaiting_approval';
+
+    return (
+        <p className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+            <span className={cn('size-1.5 rounded-full', statusDots[conversation.status])} aria-hidden />
+            {statusNames[conversation.status]}
+            {conversation.allow_until_next_message && busy && (
+                <span className='truncate'> · Allowing until your next message</span>
+            )}
+        </p>
+    );
+}
+
 const threadSignature = (conversation: AssistantConversation | undefined): string =>
     conversation
         ? `${conversation.uuid}:${conversation.messages.length}:${conversation.status}:${conversation.messages
@@ -332,51 +558,51 @@ function Thread({
     uuid,
     conversation,
     blockedReason,
+    paused,
     onDeleted,
 }: {
     scope: AssistantScope;
     uuid: string;
     conversation: AssistantConversation;
     blockedReason: string | null;
+    paused: boolean;
     onDeleted: () => void;
 }) {
     const send = useSendAssistantMessage(scope, uuid);
     const decide = useDecideAssistantToolCall(scope, uuid);
+    const stop = useStopAssistantConversation(scope, uuid);
     const remove = useDeleteAssistantConversation(scope);
     const { container, onScroll } = useStickToBottom(threadSignature(conversation));
     const running = conversation.status === 'running';
     const awaiting = conversation.status === 'awaiting_approval';
+    const busy = running || awaiting;
     const deciding = decide.isPending && decide.variables ? decide.variables : null;
+    const onStop = () => {
+        if (!stop.isPending) {
+            stop.mutate();
+        }
+    };
+
+    useEscapeToStop(busy, onStop);
     // Only the latest step can be decided; the server refuses older pending calls.
     const latestAssistant = [...conversation.messages].reverse().find((message) => message.role === 'assistant')?.id;
     const onDecide = awaiting
-        ? (toolCall: number, decision: AssistantDecision) => decide.mutate({ toolCall, decision })
+        ? (toolCall: number, decision: AssistantChoice) => decide.mutate({ toolCall, decision })
         : undefined;
 
-    const placeholder = (() => {
-        if (blockedReason) {
-            return blockedReason;
-        }
-
-        if (awaiting) {
-            return 'Allow or deny the action above to continue.';
-        }
-
-        return running ? 'The assistant is working…' : 'Ask a follow-up…';
-    })();
+    const placeholder = threadPlaceholder(conversation.status, blockedReason);
 
     return (
         <>
-            <header className='flex items-center gap-3 border-b border-border px-4 py-3'>
-                <div className='min-w-0 flex-1'>
+            <header className='flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3'>
+                <div className='min-w-0 flex-1 basis-40'>
                     <h2 className='truncate text-sm font-semibold text-foreground'>
                         {conversation.title || 'New conversation'}
                     </h2>
-                    <p className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-                        <span className={cn('size-1.5 rounded-full', statusDots[conversation.status])} aria-hidden />
-                        {statusNames[conversation.status]}
-                    </p>
+                    <ThreadStatus conversation={conversation} />
                 </div>
+                <ApprovalModeSwitch scope={scope} conversation={conversation} />
+                <PauseToggle paused={paused} />
                 <Dialog.ConfirmTrigger
                     title='Delete conversation'
                     confirm='Delete'
@@ -406,6 +632,7 @@ function Thread({
                     </p>
                 </Dialog.ConfirmTrigger>
             </header>
+            {paused && <PausedBanner />}
             <div
                 ref={container}
                 onScroll={onScroll}
@@ -436,10 +663,12 @@ function Thread({
                 )}
             </div>
             <Composer
-                disabled={running || awaiting || !!blockedReason}
+                disabled={busy || !!blockedReason}
                 sending={send.isPending}
                 placeholder={placeholder}
                 onSend={(message) => send.mutate(message)}
+                onStop={busy ? onStop : undefined}
+                stopping={stop.isPending}
             />
         </>
     );
@@ -449,11 +678,13 @@ function NewThread({
     scope,
     suggestions,
     blockedReason,
+    paused,
     onCreated,
 }: {
     scope: AssistantScope;
     suggestions: readonly string[];
     blockedReason: string | null;
+    paused: boolean;
     onCreated: (uuid: string) => void;
 }) {
     const create = useCreateAssistantConversation(scope);
@@ -465,6 +696,11 @@ function NewThread({
 
     return (
         <>
+            <header className='flex items-center gap-3 border-b border-border px-4 py-3'>
+                <h2 className='min-w-0 flex-1 truncate text-sm font-semibold text-foreground'>New conversation</h2>
+                <PauseToggle paused={paused} />
+            </header>
+            {paused && <PausedBanner />}
             {create.isPending ? (
                 <div className='flex flex-1 flex-col gap-4 px-4 py-5'>
                     <div className='flex justify-end'>
@@ -526,6 +762,8 @@ export default function AssistantChat({
     const [active, setActive] = useState<string | null>(initialConversation);
     const list = useAssistantConversations(scope);
     const conversation = useAssistantConversation(scope, active);
+    const paused = useAssistantStatus().data?.paused ?? false;
+    const blocked = paused ? 'You paused the assistant. Resume it to chat.' : blockedReason;
 
     useConversationSideEffects(scope, conversation.data);
 
@@ -539,7 +777,8 @@ export default function AssistantChat({
                 <NewThread
                     scope={scope}
                     suggestions={suggestions}
-                    blockedReason={blockedReason}
+                    blockedReason={blocked}
+                    paused={paused}
                     onCreated={setActive}
                 />
             );
@@ -562,7 +801,8 @@ export default function AssistantChat({
                 scope={scope}
                 uuid={active}
                 conversation={conversation.data}
-                blockedReason={blockedReason}
+                blockedReason={blocked}
+                paused={paused}
                 onDeleted={() => setActive(null)}
             />
         ) : (
