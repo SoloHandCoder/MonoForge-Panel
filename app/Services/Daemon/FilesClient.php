@@ -6,6 +6,7 @@ namespace Pterodactyl\Services\Daemon;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Str;
+use Psr\Http\Message\StreamInterface;
 use Pterodactyl\Exceptions\Http\Server\FileSizeTooLargeException;
 
 final readonly class FilesClient
@@ -18,6 +19,44 @@ final readonly class FilesClient
     public static function forServer(string $uuid, DaemonConnection $connection): self
     {
         return new self($uuid, $connection);
+    }
+
+    /**
+     * Hashes a streamed body chunk by chunk, refusing one larger than $notLargerThan bytes.
+     *
+     * @param  list<string>  $algorithms  hash_algos() names
+     * @return array<string, string> algorithm => lowercase hex digest
+     *
+     * @param-out int $bytesRead
+     *
+     * @throws FileSizeTooLargeException
+     */
+    public static function hashStream(StreamInterface $body, array $algorithms, int $notLargerThan, ?int &$bytesRead = null): array
+    {
+        $contexts = [];
+        foreach ($algorithms as $algorithm) {
+            $contexts[$algorithm] = hash_init($algorithm);
+        }
+
+        $read = 0;
+        while (! $body->eof()) {
+            $chunk = $body->read(1024 * 1024);
+            // Bytes, not characters: the cap is in bytes and the content is binary.
+            $read += mb_strlen($chunk, '8bit');
+            if ($read > $notLargerThan) {
+                $body->close();
+
+                throw new FileSizeTooLargeException;
+            }
+
+            foreach ($contexts as $context) {
+                hash_update($context, $chunk);
+            }
+        }
+
+        $bytesRead = $read;
+
+        return array_map(hash_final(...), $contexts);
     }
 
     public function getContent(string $path, ?int $notLargerThan = null): string
@@ -44,32 +83,8 @@ final readonly class FilesClient
     public function hashes(string $path, array $algorithms, int $notLargerThan, int $timeout = 300, ?int &$bytesRead = null): array
     {
         $response = $this->connection->stream("/api/servers/{$this->uuid}/files/contents", ['file' => $path], $timeout);
-        $body = $response->toPsrResponse()->getBody();
 
-        $contexts = [];
-        foreach ($algorithms as $algorithm) {
-            $contexts[$algorithm] = hash_init($algorithm);
-        }
-
-        $read = 0;
-        while (! $body->eof()) {
-            $chunk = $body->read(1024 * 1024);
-            // Bytes, not characters: the cap is in bytes and the content is binary.
-            $read += mb_strlen($chunk, '8bit');
-            if ($read > $notLargerThan) {
-                $body->close();
-
-                throw new FileSizeTooLargeException;
-            }
-
-            foreach ($contexts as $context) {
-                hash_update($context, $chunk);
-            }
-        }
-
-        $bytesRead = $read;
-
-        return array_map(hash_final(...), $contexts);
+        return self::hashStream($response->toPsrResponse()->getBody(), $algorithms, $notLargerThan, $bytesRead);
     }
 
     public function putContent(string $path, string $content): Response

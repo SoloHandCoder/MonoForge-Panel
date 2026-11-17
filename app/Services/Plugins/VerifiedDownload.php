@@ -9,6 +9,7 @@ use Pterodactyl\Exceptions\Http\Server\FileSizeTooLargeException;
 use Pterodactyl\Exceptions\Plugins\MarketplaceException;
 use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Daemon\FileHasher;
 use Throwable;
 
 /**
@@ -22,6 +23,8 @@ final readonly class VerifiedDownload
 
     /** Hash algorithms catalogs publish, strongest first. */
     private const array ALGORITHMS = ['sha512', 'sha256', 'sha1', 'md5'];
+
+    public function __construct(private FileHasher $hasher) {}
 
     /**
      * @param  string  $directory  a clean relative directory ('' for the server root)
@@ -63,7 +66,8 @@ final readonly class VerifiedDownload
 
         $path = ($directory === '' ? '' : $directory.'/').$filename;
         try {
-            $actual = $files->hashes($path, array_keys($expected), self::MAX_BYTES, bytesRead: $bytesRead);
+            // Read through a signed download link when Wings will not show a jar's contents.
+            $actual = $this->hasher->hash($server, $path, array_keys($expected), self::MAX_BYTES, bytesRead: $bytesRead);
         } catch (FileSizeTooLargeException) {
             $this->discard($server, $root, $filename);
 

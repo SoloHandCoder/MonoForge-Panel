@@ -10,9 +10,9 @@ use Pterodactyl\Enum\MarketplaceSource;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Exceptions\Http\Server\FileSizeTooLargeException;
 use Pterodactyl\Exceptions\Plugins\MarketplaceException;
-use Pterodactyl\Facades\Daemon;
 use Pterodactyl\Jobs\Plugins\ScanInstalledPluginsJob;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Daemon\FileHasher;
 
 /**
  * The jars in a server's plugins/ or mods/ folder, matched to Modrinth projects by their sha1
@@ -50,6 +50,7 @@ final readonly class InstalledPlugins
         private PluginInstaller $installer,
         private MarketplaceCatalogs $catalogs,
         private MarketplaceHttp $http,
+        private FileHasher $hasher,
     ) {}
 
     /**
@@ -229,7 +230,7 @@ final readonly class InstalledPlugins
     private function sha1(Server $server, string $path): ?string
     {
         try {
-            return Daemon::server($server)->files()->hashes($path, ['sha1'], self::MAX_HASH_BYTES)['sha1'] ?? null;
+            return $this->hasher->hash($server, $path, ['sha1'], self::MAX_HASH_BYTES)['sha1'] ?? null;
         } catch (DaemonConnectionException|FileSizeTooLargeException) {
             return null;
         }
