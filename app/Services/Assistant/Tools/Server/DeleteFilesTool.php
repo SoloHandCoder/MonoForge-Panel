@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant\Tools\Server;
 
+use Pterodactyl\Contracts\Assistant\AlwaysAsks;
 use Pterodactyl\Contracts\Files\DeletesFiles;
 use Pterodactyl\Enum\Permissions;
 use Pterodactyl\Exceptions\Assistant\ToolException;
@@ -11,9 +12,12 @@ use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Services\Assistant\ToolResult;
 use Pterodactyl\Services\Assistant\Tools\ServerPaths;
 
-final class DeleteFilesTool extends ServerTool
+final class DeleteFilesTool extends ServerTool implements AlwaysAsks
 {
     public const int MAX_FILES = 50;
+
+    /** Deleting more than this many paths at once always asks, even in "Allow everything". */
+    public const int ALWAYS_ASK_ABOVE = 10;
 
     public function __construct(private readonly DeletesFiles $deleter) {}
 
@@ -38,6 +42,28 @@ final class DeleteFilesTool extends ServerTool
     public function needsConfirmation(array $arguments, ToolContext $context): bool
     {
         return true;
+    }
+
+    /**
+     * More than ALWAYS_ASK_ABOVE paths, or anything in or of a world folder ("world",
+     * "world_nether", "worlds/..."), always waits for an explicit click.
+     */
+    public function alwaysAsks(array $arguments, ToolContext $context): bool
+    {
+        $paths = $this->paths($arguments);
+        if ($paths === [] || count($paths) > self::ALWAYS_ASK_ABOVE) {
+            return true;
+        }
+
+        foreach ($paths as $path) {
+            foreach (explode('/', mb_trim($path, '/')) as $segment) {
+                if (preg_match('/^world/i', $segment) === 1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

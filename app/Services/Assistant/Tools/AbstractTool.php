@@ -163,7 +163,7 @@ abstract class AbstractTool implements AssistantTool, AuthorizesAssistantTool, P
     {
         $user = User::query()->find($context->user->id) ?? throw new ToolException(self::DENIED);
 
-        return new ToolContext($user, $context->scope, $context->server);
+        return new ToolContext($user, $context->scope, $context->server, $context->conversation);
     }
 
     /**

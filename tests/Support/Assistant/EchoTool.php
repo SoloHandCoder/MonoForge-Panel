@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Tests\Support\Assistant;
 
+use Closure;
 use Pterodactyl\Contracts\Assistant\AssistantTool;
 use Pterodactyl\Services\Assistant\ToolContext;
 use Pterodactyl\Services\Assistant\ToolResult;
@@ -13,6 +14,9 @@ final class EchoTool implements AssistantTool
 {
     /** @var list<array{arguments: array<string, mixed>, user: int}> */
     public array $calls = [];
+
+    /** Runs before each call, such as a stop arriving while the tool runs. */
+    public ?Closure $onRun = null;
 
     public function name(): string
     {
@@ -41,6 +45,10 @@ final class EchoTool implements AssistantTool
 
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
+        if ($this->onRun instanceof Closure) {
+            ($this->onRun)($arguments);
+        }
+
         $this->calls[] = ['arguments' => $arguments, 'user' => $context->user->id];
 
         return new ToolResult('echo: '.(is_string($arguments['text'] ?? null) ? $arguments['text'] : ''), ['echoed' => true]);

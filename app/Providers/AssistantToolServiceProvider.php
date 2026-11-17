@@ -38,6 +38,7 @@ use Pterodactyl\Services\Assistant\Tools\Server\ServerStatusTool;
 use Pterodactyl\Services\Assistant\Tools\Server\SetDockerImageTool;
 use Pterodactyl\Services\Assistant\Tools\Server\UpdateStartupVariableTool;
 use Pterodactyl\Services\Assistant\Tools\Server\WriteFileTool;
+use Pterodactyl\Services\Assistant\Tools\WebSearchTool;
 
 /**
  * Registers the assistant's tools with the tool registry once it is first resolved.
@@ -96,6 +97,10 @@ class AssistantToolServiceProvider extends ServiceProvider
 
             $registry->register(AbstractTool::SCOPE_ADMIN, $app->make(ServerSuspensionTool::class, ['suspend' => true]));
             $registry->register(AbstractTool::SCOPE_ADMIN, $app->make(ServerSuspensionTool::class, ['suspend' => false]));
+
+            // Offered only while web search is turned on and set up.
+            $registry->register(AbstractTool::SCOPE_SERVER, $app->make(WebSearchTool::class));
+            $registry->register(AbstractTool::SCOPE_ADMIN, $app->make(WebSearchTool::class));
         });
     }
 }

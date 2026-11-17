@@ -6,6 +6,7 @@ namespace Pterodactyl\Http\Controllers\Api\Client\Assistant;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Endpoint;
 use Knuckles\Scribe\Attributes\Group;
 use Knuckles\Scribe\Attributes\Response as ScribeResponse;
@@ -17,6 +18,7 @@ use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Assistant\AssistantRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Assistant\DecideToolCallRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Assistant\SendAssistantMessageRequest;
+use Pterodactyl\Http\Requests\Api\Client\Servers\Assistant\SetApprovalModeRequest;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiToolCall;
 use Pterodactyl\Models\Server;
@@ -40,6 +42,23 @@ class ConversationController extends ClientApiController
             'code' => 'AssistantUnavailableException',
             'status' => '402',
             'detail' => 'You have used your free AI tokens for this month and your token balance is empty. Top up your wallet to keep using the assistant.',
+        ]],
+    ];
+
+    public const array PAUSED_ERROR = [
+        'errors' => [[
+            'code' => 'AssistantUnavailableException',
+            'status' => '403',
+            'detail' => 'You paused the assistant. Resume it to continue.',
+        ]],
+    ];
+
+    public const array CONFIRM_ERROR = [
+        'errors' => [[
+            'code' => 'ValidationException',
+            'status' => '422',
+            'detail' => 'Confirm the warning to allow everything without asking.',
+            'meta' => ['source_field' => 'confirmed', 'rule' => 'confirmed'],
         ]],
     ];
 
@@ -108,20 +127,21 @@ class ConversationController extends ClientApiController
         return new JsonResponse($this->presenter->present($this->conversations->send($conversation, $request->message())));
     }
 
-    #[Endpoint('Allow an assistant action', 'Allows a tool call that is waiting for confirmation: it runs now with your permissions, and the assistant continues. From a panel session only (API keys get 403).')]
+    #[Endpoint('Allow an assistant action', 'Allows a tool call that is waiting for confirmation: it runs now with your permissions, and the assistant continues. With until_next_message, the further actions of this turn that need confirmation are allowed too, until you send your next message (actions that always ask still wait). From a panel session only (API keys get 403).')]
     #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
     #[UrlParam('toolCall_id', 'integer', 'The tool call ID.', example: 2)]
+    #[BodyParam('until_next_message', 'boolean', 'Also allow the further actions of this turn until your next message.', required: false, example: false)]
     #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Action allowed.')]
     #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
     #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
     #[ScribeResponse(self::NOT_WAITING_ERROR, status: 409, description: 'The tool call is not waiting for a decision.')]
     public function approve(DecideToolCallRequest $request, Server $server, AiConversation $conversation, AiToolCall $toolCall): JsonResponse
     {
-        $conversation = $this->conversations->approve($conversation, $toolCall, $request->user());
+        $conversation = $this->conversations->approve($conversation, $toolCall, $request->user(), $request->untilNextMessage());
 
         Activity::event('server:assistant.tool')
             ->subject($server)
-            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Allowed'])
+            ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => $request->untilNextMessage() ? 'Allowed (until the next message)' : 'Allowed'])
             ->log();
 
         return new JsonResponse($this->presenter->present($conversation));
@@ -142,6 +162,40 @@ class ConversationController extends ClientApiController
             ->subject($server)
             ->property(['tool' => $toolCall->name, 'label' => ConversationPresenter::activityLabel($toolCall), 'decision' => 'Denied'])
             ->log();
+
+        return new JsonResponse($this->presenter->present($conversation));
+    }
+
+    #[Endpoint('Stop the assistant', 'Stops the turn the assistant is working on or waiting with, so nothing more is spent: no further AI provider call or action starts, actions that have not started never run, and "Stopped by you." is added to the conversation. Usage of AI provider calls that already completed stays recorded. Stopping a conversation that is not working changes nothing.')]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Assistant stopped.')]
+    #[ResponseField('status', 'string', 'The conversation status: idle, running, awaiting_approval or error.', schema: ConversationPresenter::STATUS_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
+    public function stop(AssistantRequest $request, Server $server, AiConversation $conversation): JsonResponse
+    {
+        if ($this->conversations->stop($conversation)) {
+            Activity::event('server:assistant.stop')->subject($server)->log();
+        }
+
+        return new JsonResponse($this->presenter->present($conversation));
+    }
+
+    #[Endpoint('Set the assistant approval mode', 'Sets how the conversation handles actions that need confirmation: ask (ask before changes, the default) or allow_everything (allow them without asking, except actions that always ask such as deleting many files or a world folder). allow_everything needs confirmed: true, after showing the user what it means, and is refused with 422 when an administrator turned it off. From a panel session only (API keys get 403).')]
+    #[UrlParam('conversation_uuid', 'string', 'The conversation UUID.', example: '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93')]
+    #[BodyParam('mode', 'string', 'ask or allow_everything.', required: true, example: 'allow_everything', enum: AiConversation::APPROVAL_MODES)]
+    #[BodyParam('confirmed', 'boolean', 'Whether the user confirmed the warning; required for allow_everything.', required: false, example: true)]
+    #[ScribeResponse(ConversationPresenter::EXAMPLE, description: 'Approval mode set.')]
+    #[ResponseField('approval_mode', 'string', 'ask or allow_everything.', schema: ConversationPresenter::APPROVAL_MODE_SCHEMA)]
+    #[ResponseField('messages', 'object[]', 'The messages, oldest first. Tool results are part of their tool call.', schema: ConversationPresenter::MESSAGES_SCHEMA)]
+    #[ScribeResponse(self::CONFIRM_ERROR, status: 422, description: 'allow_everything without confirmed, or turned off by an administrator.')]
+    public function approvalMode(SetApprovalModeRequest $request, Server $server, AiConversation $conversation): JsonResponse
+    {
+        if ($this->conversations->setApprovalMode($conversation, $request->mode(), $request->confirmed())) {
+            Activity::event('server:assistant.approval-mode')
+                ->subject($server)
+                ->property(['mode' => ConversationPresenter::approvalModeLabel($request->mode())])
+                ->log();
+        }
 
         return new JsonResponse($this->presenter->present($conversation));
     }

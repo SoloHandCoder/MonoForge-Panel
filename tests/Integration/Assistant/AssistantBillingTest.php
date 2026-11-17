@@ -171,5 +171,5 @@ test('every model call of a turn is billed with the tokens it used', function ()
     expect(AiUsage::query()->orderBy('id')->pluck('ai_tokens')->all())->toBe([330, 440]);
     $this->actingAs($user)->getJson('/api/client/assistant')
         ->assertOk()
-        ->assertExactJson(['enabled' => true, 'server_enabled' => true, 'crash_doctor_enabled' => true, 'free_limit' => 100000, 'free_used' => 770, 'ratio' => 1000, 'balance' => 0, 'warning' => null]);
+        ->assertExactJson(['enabled' => true, 'server_enabled' => true, 'crash_doctor_enabled' => true, 'free_limit' => 100000, 'free_used' => 770, 'ratio' => 1000, 'balance' => 0, 'warning' => null, 'paused' => false]);
 });

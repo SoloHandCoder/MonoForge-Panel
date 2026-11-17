@@ -171,7 +171,13 @@ test('settings are read and stored', function (): void {
         'context_tokens' => 16000,
         'max_output_tokens' => 1024,
     ];
-    $this->putJson('/api/admin/assistant/settings', $settings)->assertOk()->assertExactJson($settings);
+    $this->putJson('/api/admin/assistant/settings', $settings)->assertOk()->assertExactJson([
+        ...$settings,
+        'allow_everything_enabled' => true,
+        'web_search_enabled' => false,
+        'web_search_provider' => 'native',
+        'web_search_key_set' => false,
+    ]);
     $this->assertActivityLogged('admin:assistant.settings.update');
 
     expect(Setting::query()->where('key', 'settings::monoforge:ai:ratio')->value('value'))->toBe('500');

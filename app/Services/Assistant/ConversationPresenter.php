@@ -27,6 +27,9 @@ class ConversationPresenter
         'uuid' => '6a0c2b9e-3f1d-4c7a-9b8e-2d5f4a1c0e93',
         'title' => 'Why does my server crash on start?',
         'mode' => 'chat',
+        'approval_mode' => 'ask',
+        'allow_until_next_message' => false,
+        'allow_everything_available' => true,
         'status' => 'awaiting_approval',
         'error' => null,
         'messages' => [
@@ -34,6 +37,7 @@ class ConversationPresenter
                 'id' => 1,
                 'role' => 'user',
                 'content' => 'Why does my server crash on start?',
+                'notice' => null,
                 'created_at' => '2026-11-18T12:00:00+00:00',
                 'tool_calls' => [],
             ],
@@ -41,6 +45,7 @@ class ConversationPresenter
                 'id' => 2,
                 'role' => 'assistant',
                 'content' => 'Let me look at the console first.',
+                'notice' => null,
                 'created_at' => '2026-11-18T12:00:03+00:00',
                 'tool_calls' => [
                     [
@@ -50,6 +55,8 @@ class ConversationPresenter
                         'arguments' => ['lines' => 100],
                         'details' => [['label' => 'lines', 'value' => '100']],
                         'needs_confirmation' => false,
+                        'always_ask' => false,
+                        'auto_approved' => null,
                         'status' => 'done',
                         'result_preview' => '[12:00:01 ERROR]: Could not load plugin.yml',
                         'display' => ['lines' => 100],
@@ -65,6 +72,8 @@ class ConversationPresenter
                             ['label' => 'Content', 'value' => 'enabled: true'],
                         ],
                         'needs_confirmation' => true,
+                        'always_ask' => false,
+                        'auto_approved' => null,
                         'status' => 'pending',
                         'result_preview' => null,
                         'display' => null,
@@ -80,17 +89,18 @@ class ConversationPresenter
         'type' => 'array',
         'items' => [
             'type' => 'object',
-            'required' => ['id', 'role', 'content', 'created_at', 'tool_calls'],
+            'required' => ['id', 'role', 'content', 'notice', 'created_at', 'tool_calls'],
             'properties' => [
                 'id' => ['type' => 'integer', 'example' => 2],
                 'role' => ['type' => 'string', 'enum' => ['user', 'assistant'], 'example' => 'assistant'],
                 'content' => ['type' => 'string', 'nullable' => true, 'example' => 'Let me look at the console first.'],
+                'notice' => ['type' => 'string', 'enum' => [AiMessage::NOTICE_STOPPED], 'nullable' => true, 'description' => '"stopped" for the note the stop button leaves in the thread ("Stopped by you."), otherwise null.', 'example' => null],
                 'created_at' => ['type' => 'string', 'nullable' => true, 'example' => '2026-11-18T12:00:03+00:00'],
                 'tool_calls' => [
                     'type' => 'array',
                     'items' => [
                         'type' => 'object',
-                        'required' => ['id', 'name', 'label', 'arguments', 'details', 'needs_confirmation', 'status', 'result_preview', 'display'],
+                        'required' => ['id', 'name', 'label', 'arguments', 'details', 'needs_confirmation', 'always_ask', 'auto_approved', 'status', 'result_preview', 'display'],
                         'properties' => [
                             'id' => ['type' => 'integer', 'example' => 2],
                             'name' => ['type' => 'string', 'example' => 'write_file'],
@@ -109,6 +119,8 @@ class ConversationPresenter
                                 ],
                             ],
                             'needs_confirmation' => ['type' => 'boolean', 'example' => true],
+                            'always_ask' => ['type' => 'boolean', 'description' => 'Whether the call waits for a click even in "Allow everything" (such as deleting many files or a world folder).', 'example' => false],
+                            'auto_approved' => ['type' => 'string', 'enum' => [AiToolCall::AUTO_ALLOW_EVERYTHING, AiToolCall::AUTO_UNTIL_NEXT_MESSAGE], 'nullable' => true, 'description' => 'How a call that needed confirmation was allowed without a click: allow_everything or until_next_message; null otherwise.', 'example' => null],
                             'status' => ['type' => 'string', 'enum' => ['pending', 'approved', 'denied', 'running', 'done', 'failed'], 'example' => 'pending'],
                             'result_preview' => ['type' => 'string', 'nullable' => true, 'example' => null],
                             'display' => [...self::JSON_FIELDS_SCHEMA, 'nullable' => true, 'example' => null],
@@ -123,6 +135,9 @@ class ConversationPresenter
 
     /** "crash_doctor" for a diagnosis the crash doctor started, "chat" otherwise. */
     public const array MODE_SCHEMA = ['type' => 'string', 'enum' => [AiConversation::MODE_CHAT, AiConversation::MODE_CRASH_DOCTOR], 'example' => 'chat'];
+
+    /** "ask" asks before changes; "allow_everything" allows them without asking. */
+    public const array APPROVAL_MODE_SCHEMA = ['type' => 'string', 'enum' => AiConversation::APPROVAL_MODES, 'example' => 'ask'];
 
     public const array LIST_EXAMPLE = [
         'data' => [[
@@ -183,6 +198,8 @@ class ConversationPresenter
             'arguments' => $call->arguments === [] ? (object) [] : $call->arguments,
             'details' => $call->details ?? [],
             'needs_confirmation' => $call->needs_confirmation,
+            'always_ask' => $call->always_ask,
+            'auto_approved' => $call->auto_approved,
             'status' => $call->status,
             'result_preview' => self::preview($call),
             'display' => $call->display === null || $call->display === [] ? null : $call->display,
@@ -200,6 +217,12 @@ class ConversationPresenter
         }
 
         return $call->result === null ? null : Str::limit($call->result, self::RESULT_PREVIEW_CHARS);
+    }
+
+    /** How the activity log and the UI name an approval mode. */
+    public static function approvalModeLabel(string $mode): string
+    {
+        return $mode === AiConversation::APPROVAL_ALLOW_EVERYTHING ? 'Allow everything' : 'Ask before changes';
     }
 
     /** The label for the activity log, which other users can read, with secrets masked. */
@@ -223,12 +246,16 @@ class ConversationPresenter
             'uuid' => $conversation->uuid,
             'title' => $conversation->title,
             'mode' => $conversation->mode,
+            'approval_mode' => $conversation->approval_mode,
+            'allow_until_next_message' => $conversation->isBusy() && $conversation->allowsUntilNextMessage(),
+            'allow_everything_available' => AssistantSettings::allowEverythingEnabled(),
             'status' => $conversation->status,
             'error' => $conversation->error,
             'messages' => $messages->map(fn (AiMessage $message): array => [
                 'id' => $message->id,
                 'role' => $message->role,
                 'content' => $message->content,
+                'notice' => $message->notice,
                 'created_at' => $message->created_at?->toAtomString(),
                 'tool_calls' => $message->calls->sortBy('id')->map(fn (AiToolCall $call): array => self::toolCall($call))->values()->all(),
             ])->values()->all(),

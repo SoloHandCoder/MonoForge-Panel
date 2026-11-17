@@ -54,12 +54,15 @@ class ChatClient
     /**
      * Sends the conversation and returns the model's answer.
      *
+     * $plugins are OpenRouter plugins, such as its web search (`[['id' => 'web']]`).
+     *
      * @param  list<array<string, mixed>>  $messages  OpenAI chat messages
      * @param  list<array<string, mixed>>  $tools  OpenAI function tool definitions
+     * @param  list<array<string, mixed>>  $plugins
      *
      * @throws ChatProviderException
      */
-    public function complete(AiProvider $provider, array $messages, array $tools = [], int $maxTokens = 2048): ChatResponse
+    public function complete(AiProvider $provider, array $messages, array $tools = [], int $maxTokens = 2048, array $plugins = []): ChatResponse
     {
         throw_unless(ProviderUrl::isAllowed($provider->base_url), ChatProviderException::class, 'The AI provider address is not allowed.');
 
@@ -73,6 +76,10 @@ class ChatClient
         // Never tool_choice: Ollama does not support it, and "auto" is everyone's default.
         if ($tools !== [] && $provider->supports_tools) {
             $payload['tools'] = $tools;
+        }
+
+        if ($plugins !== []) {
+            $payload['plugins'] = $plugins;
         }
 
         $response = $this->send($provider, $payload);
@@ -211,7 +218,32 @@ class ChatClient
             );
         }
 
-        return new ChatResponse($content, $toolCalls, $finish, $usage);
+        return new ChatResponse($content, $toolCalls, $finish, $usage, $this->citations($message['annotations'] ?? null));
+    }
+
+    /**
+     * The sources a web search answer cites (OpenRouter's url_citation annotations).
+     *
+     * @return list<array{url: string, title: string}>
+     */
+    private function citations(mixed $annotations): array
+    {
+        if (! is_array($annotations)) {
+            return [];
+        }
+
+        $citations = [];
+        foreach ($annotations as $annotation) {
+            $citation = is_array($annotation) && is_array($annotation['url_citation'] ?? null) ? $annotation['url_citation'] : null;
+            if (is_array($citation) && is_string($citation['url'] ?? null) && $citation['url'] !== '') {
+                $citations[] = [
+                    'url' => $citation['url'],
+                    'title' => is_string($citation['title'] ?? null) ? $citation['title'] : '',
+                ];
+            }
+        }
+
+        return $citations;
     }
 
     private function content(mixed $content): ?string

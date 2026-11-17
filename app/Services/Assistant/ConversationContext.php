@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pterodactyl\Services\Assistant;
 
+use Closure;
 use Illuminate\Support\Collection;
 use Pterodactyl\Models\Assistant\AiConversation;
 use Pterodactyl\Models\Assistant\AiMessage;
@@ -26,6 +27,9 @@ class ConversationContext
 
     /** What an older tool result becomes when a long turn outgrows the context. */
     public const string OMITTED = '[This older tool result was left out to stay within the context limit. Call the tool again if you still need it.]';
+
+    /** What the model reads where the user stopped a turn. */
+    public const string STOPPED_NOTE = '[The user stopped this request here. Do not continue it unless they ask again.]';
 
     /** How much of each message the summariser reads. */
     private const int SUMMARY_MESSAGE_CHARS = 2000;
@@ -75,11 +79,15 @@ class ConversationContext
     }
 
     /**
+     * $mayCall is asked right before the summariser's model call; when it says no (the turn was
+     * stopped), nothing is summarised.
+     *
+     * @param  (Closure(): bool)|null  $mayCall
      * @return list<array<string, mixed>>
      */
-    public function build(AiConversation $conversation, ?string $instruction = null): array
+    public function build(AiConversation $conversation, ?string $instruction = null, ?Closure $mayCall = null): array
     {
-        $this->summarizeIfNeeded($conversation);
+        $this->summarizeIfNeeded($conversation, $mayCall);
         $system = SystemPrompt::for($conversation).($instruction === null ? '' : "\n\n".$instruction);
 
         return $this->compact([
@@ -149,8 +157,10 @@ class ConversationContext
 
     /**
      * Summarises the oldest turns when the context would be too large. Returns whether it did.
+     *
+     * @param  (Closure(): bool)|null  $mayCall
      */
-    public function summarizeIfNeeded(AiConversation $conversation): bool
+    public function summarizeIfNeeded(AiConversation $conversation, ?Closure $mayCall = null): bool
     {
         $history = $this->history($conversation);
         $limit = AssistantSettings::contextTokens();
@@ -195,6 +205,10 @@ class ConversationContext
 
         $transcript = $old->map(fn (AiMessage $message): string => $this->transcriptLine($message))->implode("\n");
         $previous = is_string($conversation->summary) && $conversation->summary !== '' ? "Summary so far:\n{$conversation->summary}\n\n" : '';
+
+        if ($mayCall instanceof Closure && ! $mayCall()) {
+            return false;
+        }
 
         $response = $this->client->complete($this->providerOf($conversation), [
             ['role' => 'system', 'content' => SystemPrompt::summarizer()],
@@ -255,6 +269,12 @@ class ConversationContext
 
             if ($message->role === AiMessage::ROLE_USER) {
                 $messages[] = ['role' => 'user', 'content' => $message->content ?? ''];
+
+                continue;
+            }
+
+            if ($message->notice === AiMessage::NOTICE_STOPPED) {
+                $messages[] = ['role' => 'assistant', 'content' => self::STOPPED_NOTE];
 
                 continue;
             }

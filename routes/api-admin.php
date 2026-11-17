@@ -271,6 +271,8 @@ Route::prefix('/assistant')->name('api.admin.assistant')->middleware(RequireSess
     Route::post('/conversations/{conversation}/messages', [AdminConversationController::class, 'message'])->middleware('throttle:30,1')->name('.conversations.message')->withoutScopedBindings();
     Route::post('/conversations/{conversation}/tool-calls/{toolCall}/approve', [AdminConversationController::class, 'approve'])->name('.conversations.approve')->withoutScopedBindings();
     Route::post('/conversations/{conversation}/tool-calls/{toolCall}/deny', [AdminConversationController::class, 'deny'])->name('.conversations.deny')->withoutScopedBindings();
+    Route::post('/conversations/{conversation}/stop', [AdminConversationController::class, 'stop'])->name('.conversations.stop')->withoutScopedBindings();
+    Route::put('/conversations/{conversation}/approval-mode', [AdminConversationController::class, 'approvalMode'])->name('.conversations.approval-mode')->withoutScopedBindings();
     Route::delete('/conversations/{conversation}', [AdminConversationController::class, 'destroy'])->name('.conversations.delete')->withoutScopedBindings();
 
     Route::get('/providers', [AiProviderController::class, 'index'])->name('.providers');

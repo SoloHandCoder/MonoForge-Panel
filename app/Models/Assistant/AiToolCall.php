@@ -26,12 +26,14 @@ use Pterodactyl\Models\User;
  * @property array<string, mixed> $arguments
  * @property list<array{label: string, value: string}>|null $details
  * @property bool $needs_confirmation
+ * @property bool $always_ask needs an explicit click even in "Allow everything"
  * @property string $status
  * @property string|null $result
  * @property string|null $private_result
  * @property array<string, mixed>|null $display
  * @property int|null $decided_by
  * @property CarbonImmutable|null $decided_at
+ * @property string|null $auto_approved "allow_everything" or "until_next_message" when allowed without a click
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read AiConversation $conversation
@@ -46,12 +48,14 @@ use Pterodactyl\Models\User;
     'arguments',
     'details',
     'needs_confirmation',
+    'always_ask',
     'status',
     'result',
     'private_result',
     'display',
     'decided_by',
     'decided_at',
+    'auto_approved',
 ])]
 #[Hidden(['private_result'])]
 #[RouteKey('id')]
@@ -72,6 +76,12 @@ class AiToolCall extends Model
 
     public const string STATUS_FAILED = 'failed';
 
+    /** Allowed because the conversation is in "Allow everything". */
+    public const string AUTO_ALLOW_EVERYTHING = 'allow_everything';
+
+    /** Allowed because the user chose "Allow until my next message". */
+    public const string AUTO_UNTIL_NEXT_MESSAGE = 'until_next_message';
+
     /** Stored results are cut to 16 KB. */
     public const int MAX_RESULT_BYTES = 16384;
 
@@ -80,6 +90,7 @@ class AiToolCall extends Model
 
     protected $attributes = [
         'needs_confirmation' => false,
+        'always_ask' => false,
         'status' => self::STATUS_PENDING,
     ];
 
@@ -95,6 +106,7 @@ class AiToolCall extends Model
             'details' => 'array',
             'private_result' => 'encrypted',
             'needs_confirmation' => 'bool',
+            'always_ask' => 'bool',
             'display' => 'array',
             'decided_by' => 'int',
             'decided_at' => 'immutable_datetime',
