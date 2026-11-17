@@ -92,7 +92,10 @@ test('a Brave search returns public sources to the model and the card, and is bi
         ->assertJsonPath('messages.1.tool_calls.0.label', 'Search the web for "paper server docs"')
         ->assertJsonPath('messages.1.tool_calls.0.needs_confirmation', false)
         ->assertJsonPath('messages.1.tool_calls.0.status', 'done')
-        ->assertJsonPath('messages.1.tool_calls.0.display.sources', [['title' => 'Paper docs', 'url' => 'https://docs.papermc.io/paper']])
+        // Field by field: MySQL stores JSON keys in its own order.
+        ->assertJsonCount(1, 'messages.1.tool_calls.0.display.sources')
+        ->assertJsonPath('messages.1.tool_calls.0.display.sources.0.title', 'Paper docs')
+        ->assertJsonPath('messages.1.tool_calls.0.display.sources.0.url', 'https://docs.papermc.io/paper')
         ->assertJsonPath('messages.2.content', 'Paper is a fork of Spigot.');
 
     Http::assertSent(fn (Request $request): bool => str_starts_with($request->url(), 'https://api.search.brave.com/')
@@ -178,7 +181,9 @@ test('native search uses the OpenRouter web plugin and is billed like a model ca
         ->assertOk()
         ->assertJsonPath('messages.1.tool_calls.0.status', 'done')
         ->assertJsonPath('messages.1.tool_calls.0.display.summary', 'Paper needs Java 21.')
-        ->assertJsonPath('messages.1.tool_calls.0.display.sources', [['title' => 'Java versions', 'url' => 'https://docs.papermc.io/java']]);
+        ->assertJsonCount(1, 'messages.1.tool_calls.0.display.sources')
+        ->assertJsonPath('messages.1.tool_calls.0.display.sources.0.title', 'Java versions')
+        ->assertJsonPath('messages.1.tool_calls.0.display.sources.0.url', 'https://docs.papermc.io/java');
 
     $request = Http::recorded()->values()[1][0]->data();
     expect($request['plugins'])->toBe([['id' => 'web', 'max_results' => WebSearch::MAX_RESULTS]])
