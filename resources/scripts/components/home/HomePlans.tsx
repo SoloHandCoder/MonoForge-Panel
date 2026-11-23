@@ -1,8 +1,5 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
-import { Archive, Cpu, Database, HardDrive, MemoryStick, type LucideIcon } from 'lucide-react';
+import { useId, useState, type CSSProperties, type ReactNode } from 'react';
 import type { PublicCategory, PublicPeriod, PublicPlan, PublicStorePlans } from '@/api/public/storePlans';
-import Icon from '@/components/elements/Icon';
-import { storeCardClass } from '@/components/store/PlanCard';
 import { cpu, megabytes } from '@/components/store/storeFormat';
 import { cn } from '@/lib/cn';
 
@@ -25,7 +22,7 @@ export function periodLabel(days: number): string {
 export const priceFor = (plan: PublicPlan, periodId: number | undefined) =>
     plan.prices.find((price) => price.periodId === periodId);
 
-/** The lowest monthly price in a category, for the game cards. */
+/** The lowest monthly price in a category, for the games. */
 export function cheapestMonthly(category: PublicCategory): number | null {
     const monthly = category.plans
         .flatMap((plan) => plan.prices)
@@ -34,68 +31,55 @@ export function cheapestMonthly(category: PublicCategory): number | null {
     return monthly.length > 0 ? Math.min(...monthly) : null;
 }
 
-function Spec({ icon, children }: { icon: LucideIcon; children: string }) {
-    return (
-        <li className='flex items-center gap-2.5 text-sm text-foreground'>
-            <span className='grid size-7 shrink-0 place-items-center rounded-lg bg-(--active-item) text-(--accent-soft)'>
-                <Icon icon={icon} className='size-3.5' aria-hidden />
-            </span>
-            {children}
-        </li>
-    );
+/** "2 GB memory, 10 GB storage, 1 CPU thread, 2 backups and 1 database." */
+export function planIncludes(plan: PublicPlan): string {
+    const parts = [
+        `${megabytes(plan.memory)} memory`,
+        `${megabytes(plan.disk)} storage`,
+        cpu(plan.cpu),
+        `${plan.backups} ${plan.backups === 1 ? 'backup' : 'backups'}`,
+        `${plan.databases} ${plan.databases === 1 ? 'database' : 'databases'}`,
+    ];
+
+    return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}.`;
 }
 
-function PlanCard({
+/** The chosen plan: its price for the period, what it includes and the way to buy it. */
+function Stage({
     plan,
     period,
-    index,
+    id,
     action,
 }: {
     plan: PublicPlan;
-    period: PublicPeriod | undefined;
-    index: number;
+    period: PublicPeriod;
+    id: string;
     action: (plan: PublicPlan) => ReactNode;
 }) {
-    const price = priceFor(plan, period?.id);
+    const price = priceFor(plan, period.id);
 
     return (
-        <article
-            className={storeCardClass}
-            style={{ '--rise-delay': `${Math.min(index * 0.08, 0.5)}s` } as CSSProperties}
-            aria-labelledby={`home-plan-${plan.id}`}
-        >
-            <h3 id={`home-plan-${plan.id}`} className='font-header text-lg font-semibold text-foreground'>
-                {plan.name}
-            </h3>
-            {plan.description && <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>{plan.description}</p>}
+        <div id={id} className='home-stage pt-2 pb-8 lg:pt-3 lg:pb-0'>
             {price ? (
-                <p className='mt-4 flex flex-wrap items-baseline gap-x-1.5'>
-                    <span className='font-header text-3xl font-bold text-foreground tabular-nums'>
-                        {integer.format(price.tokens)}
-                    </span>
-                    <span className='text-sm text-muted-foreground'>tokens / {periodLabel(price.days)}</span>
+                <p className='flex flex-wrap items-baseline gap-x-3'>
+                    <span className='home-display tabular-nums'>{integer.format(price.tokens)}</span>
+                    <span className='home-lead'>tokens / {periodLabel(price.days)}</span>
                 </p>
             ) : (
-                <p className='mt-4 text-sm text-muted-foreground'>Not sold for this period</p>
+                <p className='home-lead font-semibold'>Not sold for this period</p>
             )}
-            <ul className='mt-5 grid gap-2.5'>
-                <Spec icon={MemoryStick}>{`${megabytes(plan.memory)} RAM`}</Spec>
-                <Spec icon={HardDrive}>{`${megabytes(plan.disk)} storage`}</Spec>
-                <Spec icon={Cpu}>{cpu(plan.cpu)}</Spec>
-                <Spec icon={Archive}>{`${plan.backups} ${plan.backups === 1 ? 'backup' : 'backups'}`}</Spec>
-                <Spec icon={Database}>{`${plan.databases} ${plan.databases === 1 ? 'database' : 'databases'}`}</Spec>
-            </ul>
-            <p className='mt-4 line-clamp-2 text-xs text-muted-foreground'>Runs {plan.games.join(', ')}</p>
-            <div className='mt-auto pt-6'>
-                {plan.available ? (
-                    action(plan)
-                ) : (
-                    <p className='rounded-lg border border-border px-3.5 py-2 text-center text-sm text-muted-foreground'>
-                        Sold out for now
-                    </p>
-                )}
+            {price && price.days !== 30 && (
+                <p className='home-body home-muted mt-1'>
+                    About {integer.format((price.tokens * 30) / price.days)} tokens a month.
+                </p>
+            )}
+            {plan.description && <p className='home-body mt-6 max-w-[44ch]'>{plan.description}</p>}
+            <p className='home-body mt-3 max-w-[44ch]'>{planIncludes(plan)}</p>
+            <p className='home-body home-muted mt-3 max-w-[44ch]'>Runs {plan.games.join(', ')}</p>
+            <div className='mt-8'>
+                {plan.available ? action(plan) : <p className='home-lead font-semibold'>Sold out for now</p>}
             </div>
-        </article>
+        </div>
     );
 }
 
@@ -111,11 +95,7 @@ function Choice({
     onChange: (value: string) => void;
 }) {
     return (
-        <div
-            role='radiogroup'
-            aria-label={label}
-            className='inline-flex flex-wrap gap-1 rounded-full border border-border bg-card/70 p-1 backdrop-blur'
-        >
+        <div role='radiogroup' aria-label={label} className='flex flex-wrap gap-x-7 gap-y-2'>
             {options.map((option) => (
                 <button
                     key={option.value}
@@ -123,12 +103,7 @@ function Choice({
                     role='radio'
                     aria-checked={option.value === value}
                     onClick={() => onChange(option.value)}
-                    className={cn(
-                        'rounded-full px-3.5 py-1.5 text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                        option.value === value
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
+                    className='home-choice'
                 >
                     {option.label}
                 </button>
@@ -137,19 +112,43 @@ function Choice({
     );
 }
 
-function Skeleton() {
+/** A plan's name as the button that opens it; the open one's stage follows it. */
+function PlanRow({
+    plan,
+    open,
+    stageId,
+    onOpen,
+    children,
+}: {
+    plan: PublicPlan;
+    open: boolean;
+    stageId: string;
+    onOpen: () => void;
+    children: ReactNode;
+}) {
     return (
-        <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3' aria-hidden='true'>
-            {[0, 1, 2].map((index) => (
-                <div key={index} className='h-96 animate-pulse rounded-2xl border border-border bg-card/60' />
-            ))}
-        </div>
+        <>
+            <h3 className={cn('home-plan-row py-1', plan.name.length > 22 ? 'home-heading' : 'home-display')}>
+                <button
+                    type='button'
+                    aria-expanded={open}
+                    aria-controls={open ? stageId : undefined}
+                    onClick={onOpen}
+                    onFocus={onOpen}
+                    className='home-plan-name'
+                >
+                    {plan.name}
+                </button>
+            </h3>
+            {children}
+        </>
     );
 }
 
 /**
- * The live plans from the shop: a category switch when there are several, a period switch, and a
- * card per plan with its price for that period. `action` draws each card's call to action.
+ * The live plans from the shop as a list of names: the chosen one opens its price and contents
+ * beside the list (under its name on a phone). A game switch when there are several, a period
+ * switch, and `action` draws the way to buy the chosen plan.
  */
 export default function HomePlans({
     data,
@@ -162,11 +161,13 @@ export default function HomePlans({
     action: (plan: PublicPlan) => ReactNode;
     fallback: ReactNode;
 }) {
+    const stageId = useId();
     const [slug, setSlug] = useState<string | null>(null);
     const [periodId, setPeriodId] = useState<number | null>(null);
+    const [planId, setPlanId] = useState<number | null>(null);
 
     if (loading) {
-        return <Skeleton />;
+        return <p className='home-lead home-muted'>Fetching today’s prices…</p>;
     }
 
     if (!data?.enabled || data.categories.length === 0 || data.periods.length === 0) {
@@ -175,19 +176,24 @@ export default function HomePlans({
 
     const category = data.categories.find((entry) => entry.slug === slug) ?? data.categories[0];
     const period = data.periods.find((entry) => entry.id === periodId) ?? data.periods[0];
+    const plans = category.plans;
+    const chosen = plans.find((plan) => plan.id === planId) ?? plans[Math.floor((plans.length - 1) / 2)] ?? null;
 
     return (
-        <div className='flex flex-col gap-6'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div className='flex flex-col gap-10'>
+            <div className='flex flex-wrap items-end justify-between gap-x-10 gap-y-4'>
                 {data.categories.length > 1 ? (
                     <Choice
                         label='Game'
                         options={data.categories.map((entry) => ({ value: entry.slug, label: entry.name }))}
                         value={category.slug}
-                        onChange={setSlug}
+                        onChange={(value) => {
+                            setSlug(value);
+                            setPlanId(null);
+                        }}
                     />
                 ) : (
-                    <p className='font-header text-lg font-semibold text-foreground'>{category.name}</p>
+                    <p className='home-lead font-semibold'>{category.name}</p>
                 )}
                 {data.periods.length > 1 && (
                     <Choice
@@ -198,12 +204,30 @@ export default function HomePlans({
                     />
                 )}
             </div>
-            {category.description && <p className='-mt-2 text-sm text-muted-foreground'>{category.description}</p>}
-            <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3'>
-                {category.plans.map((plan, index) => (
-                    <PlanCard key={plan.id} plan={plan} period={period} index={index} action={action} />
-                ))}
-            </div>
+            {plans.length === 0 ? (
+                <p className='home-lead'>No plans in this game yet.</p>
+            ) : (
+                <div className='home-plans' style={{ '--rows': plans.length } as CSSProperties}>
+                    {plans.map((plan) => (
+                        <PlanRow
+                            key={plan.id}
+                            plan={plan}
+                            open={plan.id === chosen?.id}
+                            stageId={stageId}
+                            onOpen={() => setPlanId(plan.id)}
+                        >
+                            {plan.id === chosen?.id && (
+                                <Stage plan={plan} period={period} id={stageId} action={action} />
+                            )}
+                        </PlanRow>
+                    ))}
+                </div>
+            )}
+            {category.description && (
+                <p className='home-body home-muted'>
+                    {category.name}: {category.description.replace(/\.$/, '')}.
+                </p>
+            )}
         </div>
     );
 }
