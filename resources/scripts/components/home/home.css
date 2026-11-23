@@ -22,6 +22,21 @@
     --home-paper-ink: var(--background);
     --home-paper-muted: #4a4560;
 
+    /* The interface fragments' own colours: the console log and the code editor. */
+    --home-on-action: #fff;
+    --home-log-time: #8f89a8;
+    --home-log-info: #7ef0a6;
+    --home-log-warn: #fcd34d;
+    --home-log-text: #ddd3ff;
+    --home-code-keyword: #c4b5fd;
+    --home-code-string: #bae67e;
+    --home-code-number: #ffcc66;
+    --home-code-variable: #5ccfe6;
+    --home-round: 50%;
+    --home-pill: 999px;
+    --home-radius: 8px;
+    --home-radius-lg: 10px;
+
     --home-monument: clamp(4.5rem, 13vw, 13.5rem);
     --home-display: clamp(2.25rem, 4.6vw, 4.5rem);
     --home-heading: clamp(1.75rem, 2.6vw, 2.5rem);
@@ -102,7 +117,7 @@
     min-height: 3.25rem;
     padding: 0 1.5rem;
     background: var(--home-action);
-    color: #fff;
+    color: var(--home-on-action);
     font-weight: 600;
     font-size: var(--home-body);
     text-decoration: none;
@@ -336,7 +351,7 @@
     flex: none;
     width: 0.3em;
     height: 0.3em;
-    border-radius: 50%;
+    border-radius: var(--home-round);
     background: var(--home-ember);
     opacity: 0;
     transform: translateY(-0.12em) scale(0.5);
@@ -425,7 +440,7 @@
     color: var(--ui-ink);
     background: var(--ui-panel);
     border: 1px solid var(--ui-line);
-    border-radius: 10px;
+    border-radius: var(--home-radius-lg);
     overflow: hidden;
     text-align: left;
 }
@@ -456,7 +471,7 @@
     display: inline-block;
     width: 0.5rem;
     height: 0.5rem;
-    border-radius: 50%;
+    border-radius: var(--home-round);
     background: var(--ui-ok);
 }
 
@@ -465,7 +480,7 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.15rem 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--home-pill);
     background: var(--status-online-bg);
     color: var(--status-online-fg);
     font-size: 0.8125rem;
@@ -488,9 +503,9 @@
     align-items: center;
     justify-content: center;
     padding: 0.4rem 0.85rem;
-    border-radius: 8px;
+    border-radius: var(--home-radius);
     background: var(--usage-from);
-    color: #fff;
+    color: var(--home-on-action);
     font-weight: 600;
     font-size: 0.8125rem;
     white-space: nowrap;
@@ -522,7 +537,7 @@
 
 [data-ui] .ui-field {
     border: 1px solid var(--ui-line);
-    border-radius: 8px;
+    border-radius: var(--home-radius);
     background: var(--ui-ground);
     padding: 0.45rem 0.7rem;
 }
@@ -533,19 +548,19 @@
 }
 
 [data-ui] .t-time {
-    color: #8f89a8;
+    color: var(--home-log-time);
 }
 
 [data-ui] .t-info {
-    color: #7ef0a6;
+    color: var(--home-log-info);
 }
 
 [data-ui] .t-warn {
-    color: #fcd34d;
+    color: var(--home-log-warn);
 }
 
 [data-ui] .t-chat {
-    color: #ddd3ff;
+    color: var(--home-log-text);
 }
 
 [data-ui] .t-done {
@@ -554,23 +569,23 @@
 
 /* Skript, as the file editor highlights it. */
 [data-ui] .sk-event {
-    color: #c4b5fd;
+    color: var(--home-code-keyword);
 }
 
 [data-ui] .sk-string {
-    color: #bae67e;
+    color: var(--home-code-string);
 }
 
 [data-ui] .sk-expr {
-    color: #ffcc66;
+    color: var(--home-code-number);
 }
 
 [data-ui] .sk-keyword {
-    color: #5ccfe6;
+    color: var(--home-code-variable);
 }
 
 [data-ui] .sk-comment {
-    color: #8f89a8;
+    color: var(--home-log-time);
 }
 
 @media (prefers-reduced-motion: reduce) {
