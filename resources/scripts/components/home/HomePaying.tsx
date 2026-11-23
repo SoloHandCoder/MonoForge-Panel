@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { EXAMPLE_SLUG } from './HomeHero';
-import dufourMap from './images/dufour-orbe-1865.jpg';
 import { rise, useReveal } from './useReveal';
 
 /** The wallet: a token pack bought, a plan paid, and the balance they leave. */
@@ -89,22 +88,6 @@ const STAGES: Stage[] = [
     {
         lead: 'All of it runs',
         text: 'on our own machines in Switzerland.',
-        evidence: (
-            <figure className='home-map m-0'>
-                <img
-                    src={dufourMap}
-                    width={1187}
-                    height={668}
-                    alt='An engraved 1865 map of the Swiss plain between Orbe and Chavornay, light lines on a dark ground.'
-                    loading='lazy'
-                    decoding='async'
-                    className='block h-auto w-full'
-                />
-                <figcaption className='home-body home-muted mt-3'>
-                    Orbe and Chavornay on the Dufour map of Switzerland, 1865.
-                </figcaption>
-            </figure>
-        ),
     },
 ];
 

@@ -265,14 +265,16 @@ describe('public homepage', () => {
         expect(panel().getAllByRole('listitem')).toHaveLength(6);
     });
 
-    it('explains paying with tokens step by step, with the map of where it runs', () => {
+    it('explains paying with tokens step by step, and where it runs', () => {
         render(<HomePage />);
         const paying = within(screen.getByRole('region', { name: 'How paying works' }));
 
         expect(paying.getByText('First, you buy tokens.')).toBeVisible();
         expect(paying.getByText('While nobody plays,')).toBeVisible();
         expect(paying.getByRole('img', { name: /84 tokens saved by sleeping/ })).toBeInTheDocument();
-        expect(paying.getByRole('img', { name: /1865 map of the Swiss plain/ })).toHaveAttribute('loading', 'lazy');
+        expect(paying.getByText('All of it runs')).toBeVisible();
+        // No map: an old map of some Swiss region would read as the servers' real location.
+        expect(paying.queryByRole('img', { name: /map/i })).not.toBeInTheDocument();
     });
 
     it('answers the common questions in the open and links the legal pages and Discord in the footer', () => {
@@ -296,7 +298,7 @@ describe('public homepage', () => {
         expect(footer.getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status');
         expect(footer.getByRole('link', { name: 'Discover servers' })).toHaveAttribute('href', '/servers');
         // The found pictures are credited with a link to their source.
-        expect(footer.getByRole('link', { name: 'Dufour map, 1865, public domain' })).toHaveAttribute(
+        expect(footer.getByRole('link', { name: 'Durand vignette, The Met, CC0' })).toHaveAttribute(
             'href',
             expect.stringContaining('commons.wikimedia.org')
         );

@@ -230,14 +230,6 @@ function Close() {
                     </FooterColumn>
                     <FooterColumn title='Pictures' className='col-span-6 md:col-span-3'>
                         <a
-                            href='https://commons.wikimedia.org/wiki/File:Canal_d%27Entreroches,_Dufour_Map_1865,_01_12.png'
-                            target='_blank'
-                            rel='noopener noreferrer'
-                            className='home-link home-link--muted'
-                        >
-                            Dufour map, 1865, public domain
-                        </a>
-                        <a
                             href='https://commons.wikimedia.org/wiki/File:Banknote_vignette_with_a_blacksmith_and_forge_MET_DP837932.jpg'
                             target='_blank'
                             rel='noopener noreferrer'

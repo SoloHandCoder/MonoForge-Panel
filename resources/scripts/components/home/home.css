@@ -286,15 +286,6 @@
     }
 }
 
-@keyframes home-drift {
-    from {
-        transform: scale(1.08) translate3d(-1.5%, 0, 0);
-    }
-    to {
-        transform: scale(1.08) translate3d(1.5%, -1%, 0);
-    }
-}
-
 @media (prefers-reduced-motion: no-preference) {
     .home-line > span {
         animation: home-line-up 900ms var(--ease-expo) both;
@@ -323,14 +314,6 @@
     .home-stage {
         animation: home-fade 220ms ease both;
     }
-
-    .home-map img {
-        animation: home-drift 24s ease-in-out infinite alternate;
-    }
-}
-
-.home-map {
-    overflow: hidden;
 }
 
 /* Plans: the names are the list, the stage beside them shows the chosen one. */
