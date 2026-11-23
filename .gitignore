@@ -58,3 +58,6 @@ result
 
 # Build identity written into release tarballs by the MonoForge release workflow
 /version.json
+
+# tasteskill working files
+/.taste-skill/

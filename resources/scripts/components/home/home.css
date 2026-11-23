@@ -1,114 +1,600 @@
 /*
- * The public homepage's backdrop. Only transform and opacity animate, every layer is decorative,
- * and `[data-paused]` (set while the hero is off screen) stops the work. The panel's global
- * reduced-motion rule turns every animation here off.
+ * The public homepage. The brand's own colours and face (theme tokens, Inter); one pair of outer
+ * margins, five type steps, square buttons, no gradients, rules or shadows outside the interface
+ * fragments (`[data-ui]`), which keep the panel's own borders. Motion is transform and opacity only
+ * and stops under prefers-reduced-motion.
  */
-@keyframes home-tumble {
-    0% {
-        opacity: 0;
-        transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+.home {
+    --home-margin: clamp(1rem, 2.2vw, 2rem);
+    --home-gutter: clamp(0.75rem, 1.6vw, 1.5rem);
+    --home-ground: var(--background);
+    --home-surface: var(--card);
+    --home-raised: var(--popover);
+    --home-ink: var(--foreground);
+    --home-muted: var(--muted-foreground);
+    --home-line: var(--border);
+    /* The action colour: the brand's deep violet, so white labels pass 4.5:1. */
+    --home-action: var(--usage-from);
+    --home-action-hover: var(--primary);
+    --home-select: var(--accent);
+    --home-ember: #ffb02e;
+    --home-paper: var(--foreground);
+    --home-paper-ink: var(--background);
+    --home-paper-muted: #4a4560;
+
+    --home-monument: clamp(4.5rem, 13vw, 13.5rem);
+    --home-display: clamp(2.25rem, 4.6vw, 4.5rem);
+    --home-heading: clamp(1.75rem, 2.6vw, 2.5rem);
+    --home-lead: 1.25rem;
+    --home-body: 1.0625rem;
+
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+    background: var(--home-ground);
+    color: var(--home-ink);
+    font-size: var(--home-body);
+    line-height: 1.55;
+}
+
+.home-wrap {
+    padding-inline: var(--home-margin);
+}
+
+.home-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--home-gutter);
+}
+
+/* Type steps. */
+.home-monument {
+    font-size: var(--home-monument);
+    font-weight: 800;
+    letter-spacing: -0.055em;
+    line-height: 0.86;
+    font-kerning: normal;
+}
+
+.home-display {
+    font-size: var(--home-display);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+}
+
+.home-heading {
+    font-size: var(--home-heading);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+
+.home-lead {
+    font-size: var(--home-lead);
+    line-height: 1.45;
+    text-wrap: pretty;
+}
+
+.home-body {
+    font-size: var(--home-body);
+    line-height: 1.55;
+    text-wrap: pretty;
+}
+
+.home-muted {
+    color: var(--home-muted);
+}
+
+.home-section {
+    scroll-margin-top: 1.5rem;
+    padding-block: clamp(4.5rem, 10vw, 9rem);
+}
+
+/* Buttons: one shape, square. */
+.home-button {
+    display: inline-flex;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3.25rem;
+    padding: 0 1.5rem;
+    background: var(--home-action);
+    color: #fff;
+    font-weight: 600;
+    font-size: var(--home-body);
+    text-decoration: none;
+    transition:
+        transform 140ms var(--ease-out),
+        background-color 180ms ease;
+}
+
+.home-button:active {
+    transform: scale(0.97);
+}
+
+.home-button:focus-visible,
+.home-link:focus-visible,
+.home-choice:focus-visible,
+.home-plan-name:focus-visible,
+.home-input:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+
+.home-button--quiet {
+    background: var(--home-raised);
+    color: var(--home-ink);
+}
+
+.home-button--small {
+    min-height: 2.5rem;
+    padding: 0 1rem;
+}
+
+.home-link {
+    color: var(--home-ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 0.22em;
+    text-decoration-thickness: 0.07em;
+    transition:
+        text-decoration-color 180ms ease,
+        color 180ms ease;
+}
+
+.home-link--muted {
+    color: var(--home-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-button:hover {
+        background: var(--home-action-hover);
     }
-    10% {
-        opacity: var(--home-block-opacity, 0.9);
+
+    .home-button--quiet:hover {
+        background: var(--secondary);
     }
-    80% {
-        opacity: var(--home-block-opacity, 0.9);
-    }
-    100% {
-        opacity: 0;
-        transform: translate3d(var(--home-drift, 0px), -115vh, 0) rotate(var(--home-turn, 270deg)) scale(1);
+
+    .home-link:hover {
+        color: var(--home-ink);
+        text-decoration-color: currentColor;
     }
 }
 
-@keyframes home-orb {
-    0%,
-    100% {
-        transform: translate3d(0, 0, 0) scale(1);
-    }
-    33% {
-        transform: translate3d(6vw, -4vh, 0) scale(1.12);
-    }
-    66% {
-        transform: translate3d(-5vw, 3vh, 0) scale(0.92);
+/* A text switch (game, billing period): the selected one in ink with the panel's accent line under it. */
+.home-choice {
+    position: relative;
+    padding: 0.25rem 0;
+    color: var(--home-muted);
+    font-size: var(--home-lead);
+    font-weight: 500;
+    transition: color 180ms ease;
+}
+
+.home-choice[aria-checked='true'] {
+    color: var(--home-ink);
+}
+
+.home-choice::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 -0.125rem 0;
+    height: 2px;
+    background: var(--home-select);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 240ms var(--ease-out);
+}
+
+.home-choice[aria-checked='true']::after {
+    transform: scaleX(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .home-choice:hover {
+        color: var(--home-ink);
     }
 }
 
-@keyframes home-spark {
-    0% {
-        opacity: 0;
-        transform: translate3d(0, 0, 0) scale(1);
+/* The hero. */
+.home-hero {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 3rem;
+}
+
+@media (width >= 64rem) {
+    .home-hero {
+        min-height: max(36rem, calc(100svh - 4.5rem));
     }
-    15% {
+}
+
+.home-line {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+}
+
+.home-line > span {
+    display: block;
+}
+
+.home-hero-forge {
+    padding-left: 28vw;
+}
+
+/* The close's two lines, a size down so "Forge your own" holds one line on a phone. */
+.home-close-title {
+    font-size: min(var(--home-monument), 11.5vw);
+}
+
+@media (width < 48rem) {
+    .home {
+        --home-monument: 21vw;
+    }
+
+    .home-hero-forge {
+        padding-left: 0;
+        text-align: right;
+        margin-top: 0.06em;
+    }
+}
+
+/* Entrances: a section's parts rise in turn once it is on screen. Shown at once without the observer. */
+@keyframes home-line-up {
+    from {
+        transform: translateY(105%);
+    }
+    to {
+        transform: none;
+    }
+}
+
+@keyframes home-rise {
+    from {
+        opacity: 0;
+        transform: translateY(1.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes home-fade {
+    from {
+        opacity: 0;
+    }
+    to {
         opacity: 1;
     }
-    100% {
+}
+
+@keyframes home-log {
+    from {
         opacity: 0;
-        transform: translate3d(var(--home-drift, 0px), -24vh, 0) scale(0.3);
+        transform: translateY(0.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: none;
     }
 }
 
-@keyframes home-ember-glow {
-    0%,
-    100% {
-        opacity: 0.55;
-        transform: scale(1);
+@keyframes home-drift {
+    from {
+        transform: scale(1.08) translate3d(-1.5%, 0, 0);
     }
-    50% {
-        opacity: 0.9;
-        transform: scale(1.08);
+    to {
+        transform: scale(1.08) translate3d(1.5%, -1%, 0);
     }
 }
 
-@keyframes home-bob {
-    0%,
-    100% {
-        transform: translate3d(0, 0, 0);
+@media (prefers-reduced-motion: no-preference) {
+    .home-line > span {
+        animation: home-line-up 900ms var(--ease-expo) both;
+        animation-delay: calc(var(--i, 0) * 110ms + 150ms);
     }
-    50% {
-        transform: translate3d(0, -10px, 0);
+
+    .home-hero-after {
+        animation: home-rise 800ms var(--ease-out) 450ms both;
+    }
+
+    [data-ui] .home-log-line {
+        animation: home-log 360ms var(--ease-out) both;
+        animation-delay: calc(var(--i, 0) * 160ms + 300ms);
+    }
+
+    [data-reveal]:not([data-shown]) .home-rise {
+        opacity: 0;
+        transform: translateY(1.5rem);
+    }
+
+    [data-reveal][data-shown] .home-rise {
+        animation: home-rise 800ms var(--ease-out) both;
+        animation-delay: calc(var(--i, 0) * 80ms);
+    }
+
+    .home-stage {
+        animation: home-fade 220ms ease both;
+    }
+
+    .home-map img {
+        animation: home-drift 24s ease-in-out infinite alternate;
     }
 }
 
-.home-block {
-    animation: home-tumble 14s linear infinite;
+.home-map {
+    overflow: hidden;
 }
 
-.home-orb {
-    animation: home-orb 22s ease-in-out infinite;
+/* Plans: the names are the list, the stage beside them shows the chosen one. */
+.home-plan-name {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35em;
+    width: 100%;
+    text-align: left;
+    color: var(--home-muted);
+    transition: color 180ms ease;
 }
 
-.home-spark {
-    animation: home-spark 3.2s ease-out infinite;
+.home-plan-name[aria-expanded='true'] {
+    color: var(--home-ink);
 }
 
-.home-ember-glow {
-    animation: home-ember-glow 3.6s ease-in-out infinite;
+.home-plan-name::before {
+    content: '';
+    flex: none;
+    width: 0.3em;
+    height: 0.3em;
+    border-radius: 50%;
+    background: var(--home-ember);
+    opacity: 0;
+    transform: translateY(-0.12em) scale(0.5);
+    transition:
+        transform 240ms var(--ease-out),
+        opacity 240ms ease;
 }
 
-.home-bob {
-    animation: home-bob 6s ease-in-out infinite;
+.home-plan-name[aria-expanded='true']::before {
+    opacity: 1;
+    transform: translateY(-0.12em) scale(1);
 }
 
-[data-paused] .home-block,
-[data-paused] .home-orb,
-[data-paused] .home-spark,
-[data-paused] .home-ember-glow,
-[data-paused] .home-bob {
-    animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+    .home-plan-name:hover {
+        color: var(--home-ink);
+    }
 }
 
-/* The pointer glow follows --home-x/--home-y, which the hero sets from the pointer. */
-.home-pointer-glow {
-    background-image: radial-gradient(
-        600px circle at var(--home-x, 50%) var(--home-y, 30%),
-        color-mix(in srgb, var(--primary) 18%, transparent),
-        transparent 60%
-    );
+@media (width >= 64rem) {
+    .home-plans {
+        display: grid;
+        grid-template-columns: 7fr 5fr;
+        grid-template-rows: repeat(var(--rows), auto) 1fr;
+        column-gap: calc(var(--home-gutter) * 4);
+        align-items: start;
+    }
+
+    .home-plans > .home-plan-row {
+        grid-column: 1;
+    }
+
+    .home-plans > .home-stage {
+        grid-column: 2;
+        grid-row: 1 / -1;
+    }
+}
+
+/* FAQ and form field. */
+.home-input {
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0 1rem;
+    background: var(--home-surface);
+    border: 1px solid var(--home-line);
+    color: var(--home-ink);
+    font-size: var(--home-lead);
+}
+
+.home-input::placeholder {
+    color: var(--home-muted);
+}
+
+/* The close: the page's colours turned over. */
+.home-paper {
+    background: var(--home-paper);
+    color: var(--home-paper-ink);
+    --home-muted: var(--home-paper-muted);
+    --home-ink: var(--home-paper-ink);
+}
+
+.home-paper :where(p, h2, h3, dt, dd, figcaption) {
+    color: inherit;
+}
+
+.home-paper .home-link {
+    color: var(--home-paper-ink);
+}
+
+.home-paper .home-link--muted {
+    color: var(--home-paper-muted);
+}
+
+/* ---- Interface fragments: the panel's own look, borders and all. ---- */
+[data-ui] {
+    --ui-ground: #0b0a11;
+    --ui-panel: var(--card);
+    --ui-raised: var(--popover);
+    --ui-line: var(--border);
+    --ui-ink: var(--foreground);
+    --ui-muted: var(--muted-foreground);
+    --ui-accent: var(--accent);
+    --ui-ok: var(--status-online);
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--ui-ink);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-line);
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: left;
+}
+
+[data-ui] .ui-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--ui-line);
+    background: var(--ui-ground);
+}
+
+[data-ui] .ui-bar--foot {
+    border-bottom: 0;
+    border-top: 1px solid var(--ui-line);
+}
+
+[data-ui] .ui-split {
+    border-right: 1px solid var(--ui-line);
+}
+
+[data-ui] .ui-muted {
+    color: var(--ui-muted);
+}
+
+[data-ui] .ui-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--ui-ok);
+}
+
+[data-ui] .ui-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: var(--status-online-bg);
+    color: var(--status-online-fg);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+[data-ui] .ui-pill--sleep {
+    background: var(--status-offline-bg);
+    color: var(--status-offline-fg);
+}
+
+[data-ui] .ui-code {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+}
+
+[data-ui] .ui-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    background: var(--usage-from);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+[data-ui] .ui-button--ghost {
+    background: transparent;
+    border: 1px solid var(--ui-line);
+    color: var(--ui-ink);
+}
+
+[data-ui] .ui-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--ui-line);
+}
+
+[data-ui] .ui-row:last-child {
+    border-bottom: 0;
+}
+
+[data-ui] .ui-row[aria-selected='true'] {
+    background: var(--active-item);
+    color: var(--active-item-foreground);
+    box-shadow: inset 2px 0 0 var(--ui-accent);
+}
+
+[data-ui] .ui-field {
+    border: 1px solid var(--ui-line);
+    border-radius: 8px;
+    background: var(--ui-ground);
+    padding: 0.45rem 0.7rem;
+}
+
+/* The console's log, in the panel's terminal colours. */
+[data-ui] .ui-term {
+    background: var(--ui-ground);
+}
+
+[data-ui] .t-time {
+    color: #8f89a8;
+}
+
+[data-ui] .t-info {
+    color: #7ef0a6;
+}
+
+[data-ui] .t-warn {
+    color: #fcd34d;
+}
+
+[data-ui] .t-chat {
+    color: #ddd3ff;
+}
+
+[data-ui] .t-done {
+    color: var(--home-ember, #ffb02e);
+}
+
+/* Skript, as the file editor highlights it. */
+[data-ui] .sk-event {
+    color: #c4b5fd;
+}
+
+[data-ui] .sk-string {
+    color: #bae67e;
+}
+
+[data-ui] .sk-expr {
+    color: #ffcc66;
+}
+
+[data-ui] .sk-keyword {
+    color: #5ccfe6;
+}
+
+[data-ui] .sk-comment {
+    color: #8f89a8;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .home-block,
-    .home-spark {
-        display: none;
+    .home *,
+    .home *::before,
+    .home *::after {
+        animation: none !important;
+        transition-duration: 1ms !important;
     }
 }

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicStorePlans } from '@/api/public/storePlans';
 import { DISCORD_INVITE_URL } from '@/themes/classic/views/brand/links';
 import HomePage, { HOME_TITLE } from './HomePage';
-import { cheapestMonthly, periodLabel } from './HomePlans';
+import { cheapestMonthly, periodLabel, planIncludes } from './HomePlans';
 
 const state = vi.hoisted(() => ({
     plans: { data: undefined as PublicStorePlans | undefined, isPending: false },
@@ -103,7 +103,8 @@ const catalog = (overrides: Partial<PublicStorePlans> = {}): PublicStorePlans =>
     ...overrides,
 });
 
-const plansSection = () => within(screen.getByRole('region', { name: 'Pick your plan' }));
+const plansSection = () => within(screen.getByRole('region', { name: 'Plans and prices' }));
+const gamesSection = () => within(screen.getByRole('region', { name: 'Pick a game, name your server' }));
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -112,17 +113,23 @@ beforeEach(() => {
 });
 
 describe('public homepage', () => {
-    it('titles the page and leads with the anvil, the tagline and the way in', () => {
+    it('titles the page with the name, says what it is and leads to sign-up', () => {
         render(<HomePage />);
 
         expect(document.title).toBe(HOME_TITLE);
-        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Forge your own game server');
+        expect(screen.getByRole('heading', { level: 1, name: 'MonoForge' })).toHaveTextContent('MonoForge');
+        expect(
+            screen.getByText(/Minecraft Java and Terraria servers on our own machines in Switzerland/)
+        ).toBeVisible();
         expect(screen.getAllByRole('img', { name: 'MonoForge' })).not.toHaveLength(0);
+        expect(screen.getByRole('img', { name: /console for the server Friday Survival/ })).toBeInTheDocument();
         for (const link of screen.getAllByRole('link', { name: /^Get started/ })) {
             expect(link).toHaveAttribute('href', '/auth/register');
         }
 
-        expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth/login');
+        for (const link of screen.getAllByRole('link', { name: 'Sign in' })) {
+            expect(link).toHaveAttribute('href', '/auth/login');
+        }
     });
 
     it('sends "Get started" to sign in, back to the chosen plan, when sign-up is off', () => {
@@ -136,44 +143,89 @@ describe('public homepage', () => {
         );
     });
 
-    it('shows Minecraft Java and Terraria first with their lowest monthly price', () => {
+    it('shows Minecraft Java first and Terraria on a switch, each with its lowest monthly price', () => {
         render(<HomePage />);
+        const games = gamesSection();
 
-        const games = within(screen.getByRole('region', { name: 'Start with the classics' }));
-        const titles = games.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-
-        expect(titles).toEqual(['Minecraft: Java Edition', 'Terraria']);
+        expect(games.getByRole('radio', { name: 'Minecraft: Java Edition' })).toHaveAttribute('aria-checked', 'true');
         expect(games.getByText('From 360 tokens a month')).toBeVisible();
+
+        fireEvent.click(games.getByRole('radio', { name: 'Terraria' }));
+        expect(games.getByRole('radio', { name: 'Terraria' })).toHaveAttribute('aria-checked', 'true');
         expect(games.getByText('From 250 tokens a month')).toBeVisible();
+        expect(games.getByText(/fight bosses together/)).toBeVisible();
     });
 
-    it('lists the live plans with their price for the chosen period and game', () => {
+    it('works out the page and join address of the name the visitor types', () => {
+        render(<HomePage />);
+        const games = gamesSection();
+        const input = games.getByLabelText('Server name');
+        const said = () => games.getByText(/^Its page:/).closest('p');
+
+        // Before anything is typed, the worked example.
+        expect(said()).toHaveTextContent('Its page: /s/friday-survival');
+        expect(said()).toHaveTextContent('Friends join at friday-survival.play.monoforge.net');
+
+        fireEvent.change(input, { target: { value: "Mira's Build Club!" } });
+        expect(said()).toHaveTextContent('Its page: /s/miras-build-club');
+        expect(said()).toHaveTextContent('Friends join at miras-build-club.play.monoforge.net');
+        // The page picture follows the name too.
+        expect(games.getByText("Mira's Build Club!")).toBeVisible();
+        expect(games.getAllByText('miras-build-club.play.monoforge.net')).not.toHaveLength(0);
+
+        fireEvent.change(input, { target: { value: 'Staff Hangout' } });
+        expect(games.getByText('That name is kept for the panel itself. Try another one.')).toBeVisible();
+        expect(games.queryByText(/^Its page:/)).toBeNull();
+
+        fireEvent.change(input, { target: { value: 'ab' } });
+        expect(games.getByText('Use at least 3 letters or digits.')).toBeVisible();
+
+        // Terraria is joined through playit.gg, so no play.monoforge.net address is promised.
+        fireEvent.change(input, { target: { value: 'Boss Rush' } });
+        fireEvent.click(games.getByRole('radio', { name: 'Terraria' }));
+        expect(said()).toHaveTextContent('Its page: /s/boss-rush');
+        expect(games.queryByText(/play\.monoforge\.net/)).toBeNull();
+        expect(games.getByText('Your playit.gg address and port')).toBeVisible();
+    });
+
+    it('lists the live plans by name and opens the chosen one with its price for the period and game', () => {
         render(<HomePage />);
         const plans = plansSection();
 
-        expect(plans.getByRole('heading', { name: 'Stone' })).toBeVisible();
+        expect(plans.getByRole('button', { name: 'Stone' })).toHaveAttribute('aria-expanded', 'true');
+        expect(plans.getByRole('heading', { name: 'Diamond' })).toBeVisible();
         expect(plans.getByText('400')).toBeVisible();
-        expect(plans.getByText('2 GB RAM')).toBeVisible();
+        expect(plans.getByText('tokens / month')).toBeVisible();
+        expect(plans.getByText(/^2 GB memory, 10 GB storage/)).toBeVisible();
         expect(plans.getByText('Runs Paper, Vanilla')).toBeVisible();
+
         // A plan the store cannot place right now is shown but cannot be picked.
+        fireEvent.click(plans.getByRole('button', { name: 'Diamond' }));
+        expect(plans.getByRole('button', { name: 'Diamond' })).toHaveAttribute('aria-expanded', 'true');
+        expect(plans.getByRole('button', { name: 'Stone' })).toHaveAttribute('aria-expanded', 'false');
         expect(plans.getByText('Sold out for now')).toBeVisible();
         expect(plans.queryByRole('link', { name: 'Get started with Diamond' })).toBeNull();
 
         fireEvent.click(plans.getByRole('radio', { name: 'Quarterly' }));
         expect(plans.getByRole('radio', { name: 'Quarterly' })).toHaveAttribute('aria-checked', 'true');
+        expect(plans.getByText('Not sold for this period')).toBeVisible();
+
+        fireEvent.click(plans.getByRole('button', { name: 'Stone' }));
         expect(plans.getByText('1,080')).toBeVisible();
         expect(plans.getByText('tokens / 3 months')).toBeVisible();
-        expect(plans.getByText('Not sold for this period')).toBeVisible();
+        expect(plans.getByText('About 360 tokens a month.')).toBeVisible();
 
         fireEvent.click(plans.getByRole('radio', { name: 'Terraria' }));
         expect(plans.getByRole('heading', { name: 'Guide' })).toBeVisible();
+        expect(plans.getByRole('button', { name: 'Guide' })).toHaveAttribute('aria-expanded', 'true');
         expect(plans.queryByRole('heading', { name: 'Stone' })).toBeNull();
     });
 
-    it('draws placeholders while loading and invites to Discord when the store is closed', () => {
+    it('says prices are on their way while loading and invites to Discord when the store is closed', () => {
         state.plans = { data: undefined, isPending: true };
         const { rerender } = render(<HomePage />);
 
+        expect(plansSection().getByText('Fetching today’s prices…')).toBeVisible();
         expect(plansSection().queryByRole('heading', { level: 3 })).toBeNull();
 
         state.plans = { data: catalog({ enabled: false, periods: [], categories: [] }), isPending: false };
@@ -183,60 +235,71 @@ describe('public homepage', () => {
             'href',
             DISCORD_INVITE_URL
         );
-        expect(screen.getAllByText('Plans coming soon')).toHaveLength(2);
+        expect(gamesSection().getByText('Plans coming soon')).toBeVisible();
     });
 
-    it('lists the AI assistant only when it is enabled, always with six cards so the grid has no gap', () => {
+    it('shows six parts of the panel, the AI assistant only when it is enabled', () => {
         const { rerender } = render(<HomePage />);
-        const features = () => within(screen.getByRole('region', { name: 'Everything you need, nothing to install' }));
+        const panel = () => within(screen.getByRole('region', { name: 'Run it all from your browser' }));
 
-        expect(features().queryByRole('heading', { name: 'AI assistant' })).toBeNull();
+        expect(panel().queryByRole('heading', { name: 'An assistant for crashes' })).toBeNull();
         for (const name of [
-            'Instant setup',
-            'Ready-made addresses',
-            'Live console',
-            'Web file editor',
-            'Backups',
-            'Discord support',
+            'Every Minecraft version, one click',
+            'Plugins, mods and modpacks',
+            'A file editor that knows Skript',
+            'Backups you can lock',
+            'Schedules without cron',
+            'People on Discord',
         ]) {
-            expect(features().getByRole('heading', { name })).toBeVisible();
+            expect(panel().getByRole('heading', { name })).toBeVisible();
         }
 
-        expect(features().getAllByRole('listitem')).toHaveLength(6);
+        expect(panel().getAllByRole('listitem')).toHaveLength(6);
+        // Every part is pictured by the panel's own screen, described for screen readers.
+        expect(panel().getAllByRole('img')).toHaveLength(6);
 
         state.plans = { data: catalog({ assistantEnabled: true }), isPending: false };
         rerender(<HomePage />);
-        expect(features().getByRole('heading', { name: 'AI assistant' })).toBeVisible();
-        expect(features().queryByRole('heading', { name: 'Live console' })).toBeNull();
-        expect(features().getAllByRole('listitem')).toHaveLength(6);
+        expect(panel().getByRole('heading', { name: 'An assistant for crashes' })).toBeVisible();
+        expect(panel().queryByRole('heading', { name: 'Schedules without cron' })).toBeNull();
+        expect(panel().getAllByRole('listitem')).toHaveLength(6);
     });
 
-    it('answers the common questions and links the legal pages and Discord in the footer', () => {
+    it('explains paying with tokens step by step, with the map of where it runs', () => {
+        render(<HomePage />);
+        const paying = within(screen.getByRole('region', { name: 'How paying works' }));
+
+        expect(paying.getByText('First, you buy tokens.')).toBeVisible();
+        expect(paying.getByText('While nobody plays,')).toBeVisible();
+        expect(paying.getByRole('img', { name: /84 tokens saved by sleeping/ })).toBeInTheDocument();
+        expect(paying.getByRole('img', { name: /1865 map of the Swiss plain/ })).toHaveAttribute('loading', 'lazy');
+    });
+
+    it('answers the common questions in the open and links the legal pages and Discord in the footer', () => {
         render(<HomePage />);
 
-        const question = screen.getByText('How do my friends join?');
+        const faq = within(screen.getByRole('region', { name: 'Questions people ask' }));
 
-        expect(question.closest('details')).not.toHaveAttribute('open');
+        expect(faq.getByText('How do my friends join?')).toBeVisible();
+        expect(faq.getByText(/address of their own on play\.monoforge\.net/)).toBeVisible();
+        expect(faq.getByText('Where do the servers run?')).toBeVisible();
         expect(screen.getByRole('link', { name: 'refund policy' })).toHaveAttribute('href', '/legal/refunds');
+        expect(screen.getByRole('link', { name: 'help center' })).toHaveAttribute('href', '/help');
 
         const footer = within(screen.getByRole('contentinfo'));
 
         expect(footer.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/legal/terms');
         expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/legal/privacy');
+        expect(footer.getByRole('link', { name: 'Refunds' })).toHaveAttribute('href', '/legal/refunds');
         expect(footer.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', DISCORD_INVITE_URL);
         expect(footer.getByRole('link', { name: 'Help center' })).toHaveAttribute('href', '/help');
-        expect(screen.getByRole('link', { name: 'help center' })).toHaveAttribute('href', '/help');
-    });
-
-    it('keeps the decorative backdrop out of the accessibility tree', () => {
-        const { container } = render(<HomePage />);
-
-        const blocks = container.querySelectorAll('.home-block');
-
-        expect(blocks.length).toBeGreaterThan(20);
-        for (const block of blocks) {
-            expect(block.closest('[aria-hidden="true"]')).not.toBeNull();
-        }
+        expect(footer.getByRole('link', { name: 'Status' })).toHaveAttribute('href', '/status');
+        expect(footer.getByRole('link', { name: 'Discover servers' })).toHaveAttribute('href', '/servers');
+        // The found pictures are credited with a link to their source.
+        expect(footer.getByRole('link', { name: 'Dufour map, 1865, public domain' })).toHaveAttribute(
+            'href',
+            expect.stringContaining('commons.wikimedia.org')
+        );
     });
 });
 
@@ -254,5 +317,12 @@ describe('homepage formatting', () => {
         // 1080 tokens for 90 days is 360 a month, below the 400 monthly price.
         expect(cheapestMonthly(minecraft)).toBe(360);
         expect(cheapestMonthly({ ...minecraft, plans: [] })).toBeNull();
+    });
+
+    it('says what a plan includes in one sentence', () => {
+        const [stone, diamond] = catalog().categories[0].plans;
+
+        expect(planIncludes(stone)).toBe('2 GB memory, 10 GB storage, 1 CPU thread, 2 backups and 1 database.');
+        expect(planIncludes(diamond)).toMatch(/5 backups and 2 databases\.$/);
     });
 });
