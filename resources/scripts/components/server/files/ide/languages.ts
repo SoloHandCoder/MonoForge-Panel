@@ -24,6 +24,8 @@ const byExtension = new Map<string, EditorLanguage>([
     ['ts', { id: 'typescript', label: 'TypeScript' }],
     ['lua', { id: 'lua', label: 'Lua' }],
     ['sk', { id: 'skript', label: 'Skript' }],
+    // HyperScript, MonoForge's own Minecraft scripting language (not Haskell, on a game panel).
+    ['hs', { id: 'hyperscript', label: 'HyperScript' }],
     ['xml', { id: 'xml', label: 'XML' }],
     ['md', { id: 'markdown', label: 'Markdown' }],
     ['markdown', { id: 'markdown', label: 'Markdown' }],

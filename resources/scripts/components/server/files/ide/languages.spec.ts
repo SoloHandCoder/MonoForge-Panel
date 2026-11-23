@@ -11,6 +11,7 @@ describe('detectLanguage', () => {
         ['index.js', 'javascript', 'JavaScript'],
         ['main.lua', 'lua', 'Lua'],
         ['hello.sk', 'skript', 'Skript'],
+        ['plugins/HyperScript/scripts/greeter.hs', 'hyperscript', 'HyperScript'],
         ['spigot.cfg', 'ini', 'Config'],
         ['php.ini', 'ini', 'INI'],
         ['pom.xml', 'xml', 'XML'],

@@ -67,6 +67,7 @@ import 'monaco-editor/languages/definitions/xml/register.js';
 import 'monaco-editor/languages/definitions/yaml/register.js';
 import 'monaco-editor/languages/features/json/register.js';
 
+import { registerHyperScript } from './hyperscript';
 import { registerSkript } from './skript';
 
 self.MonacoEnvironment = {
@@ -74,5 +75,6 @@ self.MonacoEnvironment = {
 };
 
 registerSkript(monaco);
+registerHyperScript(monaco);
 
 export { monaco };
